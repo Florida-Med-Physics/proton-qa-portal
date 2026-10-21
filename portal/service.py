@@ -1,0 +1,441 @@
+"""Portal operations. Each function takes the database, the acting user, and plain data."""
+
+from datetime import date
+
+from . import auth, qa
+from .db import now
+
+
+class PortalError(Exception):
+    def __init__(self, message, status=400):
+        super().__init__(message)
+        self.status = status
+
+
+def require(user, permission):
+    if not auth.can(user, permission):
+        raise PortalError("You do not have permission to do that.", 403)
+
+
+def _text(data, key, required=False, default=""):
+    value = str(data.get(key) if data.get(key) is not None else default).strip()
+    if required and not value:
+        raise PortalError(f"{key.replace('_', ' ').capitalize()} is required.")
+    return value
+
+
+def _number(data, key):
+    value = data.get(key)
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise PortalError(f"{key.replace('_', ' ').capitalize()} must be a number.")
+
+
+def _tolerance(data, key):
+    value = _number(data, key)
+    if value is not None and value < 0:
+        raise PortalError(f"{key.capitalize()} tolerance cannot be negative.")
+    return value
+
+
+def _limits(data, allow_blank_mode):
+    limits = {"expected": _number(data, "expected"), "warn": _tolerance(data, "warn"), "fail": _tolerance(data, "fail")}
+    mode = data.get("tol_mode") or None
+    if mode is None and not allow_blank_mode:
+        mode = "absolute"
+    if mode is not None and mode not in ("absolute", "percent"):
+        raise PortalError("Tolerance mode must be absolute or percent.")
+    if limits["warn"] is not None and limits["fail"] is not None and limits["warn"] > limits["fail"]:
+        raise PortalError("Warning tolerance must not be larger than the fail tolerance.")
+    limits["tol_mode"] = mode
+    return limits
+
+
+def _get(db, table, row_id):
+    row = db.one(f"SELECT * FROM {table} WHERE id = ?", (row_id,))
+    if not row:
+        raise PortalError(f"{table[:-1].capitalize()} not found.", 404)
+    return row
+
+
+def _flag(data, key, default=True):
+    return 1 if data.get(key, default) not in (False, 0, "0", "false") else 0
+
+
+# ---- users -----------------------------------------------------------------
+
+def list_users(db, user):
+    require(user, "manage_users")
+    return db.all("SELECT id, username, full_name, role, active, created_at FROM users ORDER BY username")
+
+
+def create_user(db, user, data):
+    require(user, "manage_users")
+    try:
+        return {"id": auth.create_user(db, data.get("username"), data.get("full_name"), data.get("role"), data.get("password") or "", user["id"])}
+    except ValueError as exc:
+        raise PortalError(str(exc))
+
+
+def update_user(db, user, user_id, data):
+    require(user, "manage_users")
+    target = _get(db, "users", user_id)
+    role = data.get("role", target["role"])
+    if role not in auth.ROLES:
+        raise PortalError("Unknown role.")
+    active = _flag(data, "active", bool(target["active"]))
+    if target["id"] == user["id"] and (role != "admin" or not active):
+        raise PortalError("You cannot remove your own admin access.")
+    db.run("UPDATE users SET full_name = ?, role = ?, active = ? WHERE id = ?",
+           (_text(data, "full_name", default=target["full_name"]), role, active, user_id))
+    if data.get("password"):
+        try:
+            auth.validate_password(data["password"])
+        except ValueError as exc:
+            raise PortalError(str(exc))
+        db.run("UPDATE users SET password_hash = ? WHERE id = ?", (auth.hash_password(data["password"]), user_id))
+        db.run("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    db.audit(user["id"], "update", "user", user_id, role=role, active=active, password_reset=bool(data.get("password")))
+    return {"ok": True}
+
+
+def change_own_password(db, user, data):
+    row = db.one("SELECT password_hash FROM users WHERE id = ?", (user["id"],))
+    if not auth.verify_password(data.get("current") or "", row["password_hash"]):
+        raise PortalError("Current password is incorrect.")
+    try:
+        auth.validate_password(data.get("new") or "")
+    except ValueError as exc:
+        raise PortalError(str(exc))
+    db.run("UPDATE users SET password_hash = ? WHERE id = ?", (auth.hash_password(data["new"]), user["id"]))
+    db.audit(user["id"], "change_password", "user", user["id"])
+    return {"ok": True}
+
+
+# ---- machines --------------------------------------------------------------
+
+def list_machines(db, user):
+    return db.all("SELECT * FROM machines ORDER BY active DESC, name")
+
+
+def save_machine(db, user, data, machine_id=None):
+    require(user, "configure")
+    fields = (_text(data, "name", required=True), _text(data, "kind"), _text(data, "location"), _text(data, "notes"), _flag(data, "active"))
+    clash = db.one("SELECT id FROM machines WHERE name = ? AND id != ?", (fields[0], machine_id or 0))
+    if clash:
+        raise PortalError(f"A machine named '{fields[0]}' already exists.")
+    if machine_id is None:
+        machine_id = db.run("INSERT INTO machines (name, kind, location, notes, active, created_at) VALUES (?, ?, ?, ?, ?, ?)", fields + (now(),))
+        db.audit(user["id"], "create", "machine", machine_id, name=fields[0])
+    else:
+        _get(db, "machines", machine_id)
+        db.run("UPDATE machines SET name = ?, kind = ?, location = ?, notes = ?, active = ? WHERE id = ?", fields + (machine_id,))
+        db.audit(user["id"], "update", "machine", machine_id, name=fields[0], active=fields[4])
+    return {"id": machine_id}
+
+
+# ---- test library ----------------------------------------------------------
+
+def list_tests(db, user):
+    return db.all("SELECT * FROM tests ORDER BY active DESC, category, name")
+
+
+def save_test(db, user, data, test_id=None):
+    require(user, "configure")
+    test_type = data.get("type") or "numeric"
+    if test_type not in ("numeric", "boolean", "text"):
+        raise PortalError("Test type must be numeric, boolean, or text.")
+    limits = _limits(data, allow_blank_mode=False) if test_type == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": "absolute"}
+    name, category = _text(data, "name", required=True), _text(data, "category")
+    clash = db.one("SELECT id FROM tests WHERE name = ? AND category = ? AND id != ?", (name, category, test_id or 0))
+    if clash:
+        raise PortalError(f"A test named '{name}' already exists in that category.")
+    values = (name, category, test_type, _text(data, "unit"), _text(data, "description"),
+              limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], _flag(data, "active"))
+    if test_id is None:
+        test_id = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values)
+        db.audit(user["id"], "create", "test", test_id, name=name, **limits)
+    else:
+        _get(db, "tests", test_id)
+        db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
+               "tol_mode = ?, active = ? WHERE id = ?", values + (test_id,))
+        db.audit(user["id"], "update", "test", test_id, name=name, **limits)
+    return {"id": test_id}
+
+
+# ---- queues ----------------------------------------------------------------
+
+def list_queues(db, user):
+    return db.all(
+        "SELECT q.*, (SELECT COUNT(*) FROM queue_items qi WHERE qi.queue_id = q.id) AS item_count, "
+        "(SELECT COUNT(*) FROM assignments a WHERE a.queue_id = q.id AND a.active = 1) AS machine_count "
+        "FROM queues q ORDER BY q.active DESC, q.name")
+
+
+def get_queue(db, user, queue_id):
+    queue = _get(db, "queues", queue_id)
+    queue["items"] = db.all(
+        "SELECT qi.test_id, qi.position, qi.expected, qi.warn, qi.fail, qi.tol_mode, t.name, t.category, t.type, t.unit, "
+        "t.expected AS default_expected, t.warn AS default_warn, t.fail AS default_fail, t.tol_mode AS default_tol_mode "
+        "FROM queue_items qi JOIN tests t ON t.id = qi.test_id WHERE qi.queue_id = ? ORDER BY qi.position", (queue_id,))
+    return queue
+
+
+def save_queue(db, user, data, queue_id=None):
+    require(user, "configure")
+    name = _text(data, "name", required=True)
+    clash = db.one("SELECT id FROM queues WHERE name = ? AND id != ?", (name, queue_id or 0))
+    if clash:
+        raise PortalError(f"A queue named '{name}' already exists.")
+    items = []
+    for position, item in enumerate(data.get("items") or []):
+        test = _get(db, "tests", int(item.get("test_id")))
+        limits = _limits(item, allow_blank_mode=True) if test["type"] == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": None}
+        items.append((test["id"], position, limits))
+    if len({i[0] for i in items}) != len(items):
+        raise PortalError("A test can only appear once in a queue.")
+    with db.transaction():
+        if queue_id is None:
+            queue_id = db.run("INSERT INTO queues (name, description, active) VALUES (?, ?, ?)", (name, _text(data, "description"), _flag(data, "active")))
+            action = "create"
+        else:
+            _get(db, "queues", queue_id)
+            db.run("UPDATE queues SET name = ?, description = ?, active = ? WHERE id = ?", (name, _text(data, "description"), _flag(data, "active"), queue_id))
+            db.run("DELETE FROM queue_items WHERE queue_id = ?", (queue_id,))
+            action = "update"
+        for test_id, position, limits in items:
+            db.run("INSERT INTO queue_items (queue_id, test_id, position, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                   (queue_id, test_id, position, limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
+        db.audit(user["id"], action, "queue", queue_id, name=name, tests=[i[0] for i in items])
+    return {"id": queue_id}
+
+
+# ---- machine assignments (scheduled queues) ---------------------------------
+
+def _last_done(db, assignment_id):
+    row = db.one("SELECT MAX(qa_date) AS last FROM runs WHERE assignment_id = ?", (assignment_id,))
+    return date.fromisoformat(row["last"]) if row and row["last"] else None
+
+
+def list_assignments(db, user, machine_id, today=None):
+    today = today or date.today()
+    rows = db.all("SELECT a.*, q.name AS queue_name FROM assignments a JOIN queues q ON q.id = a.queue_id "
+                  "WHERE a.machine_id = ? ORDER BY a.active DESC, q.name", (machine_id,))
+    for row in rows:
+        row["schedule"] = qa.describe_schedule(row)
+        row.update(qa.due_state(row, _last_done(db, row["id"]), today))
+    return rows
+
+
+def save_assignment(db, user, data, assignment_id=None):
+    require(user, "configure")
+    frequency = data.get("frequency")
+    if frequency not in qa.FREQUENCIES:
+        raise PortalError("Choose a frequency.")
+    interval = data.get("interval_days")
+    if frequency == "custom":
+        try:
+            interval = int(interval)
+            assert interval > 0
+        except (TypeError, ValueError, AssertionError):
+            raise PortalError("Custom schedules need a whole number of days greater than zero.")
+    else:
+        interval = None
+    weekdays = ",".join(str(d) for d in sorted(qa.parse_weekdays(",".join(str(d) for d in data.get("weekdays", [0, 1, 2, 3, 4])))))
+    try:
+        start = date.fromisoformat(data.get("start_date") or date.today().isoformat()).isoformat()
+    except ValueError:
+        raise PortalError("Start date must be YYYY-MM-DD.")
+    active = _flag(data, "active")
+    if assignment_id is None:
+        machine = _get(db, "machines", int(data.get("machine_id") or 0))
+        queue = _get(db, "queues", int(data.get("queue_id") or 0))
+        if db.one("SELECT id FROM assignments WHERE machine_id = ? AND queue_id = ?", (machine["id"], queue["id"])):
+            raise PortalError(f"'{queue['name']}' is already scheduled on {machine['name']}.")
+        assignment_id = db.run("INSERT INTO assignments (machine_id, queue_id, frequency, interval_days, weekdays, start_date, active) "
+                               "VALUES (?, ?, ?, ?, ?, ?, ?)", (machine["id"], queue["id"], frequency, interval, weekdays, start, active))
+        db.audit(user["id"], "create", "assignment", assignment_id, machine=machine["name"], queue=queue["name"], frequency=frequency)
+    else:
+        _get(db, "assignments", assignment_id)
+        db.run("UPDATE assignments SET frequency = ?, interval_days = ?, weekdays = ?, start_date = ?, active = ? WHERE id = ?",
+               (frequency, interval, weekdays, start, active, assignment_id))
+        db.audit(user["id"], "update", "assignment", assignment_id, frequency=frequency, weekdays=weekdays, start=start, active=active)
+    return {"id": assignment_id}
+
+
+def run_template(db, user, assignment_id):
+    """The queue as it applies to one machine: each test with its resolved limits."""
+    assignment = _get(db, "assignments", assignment_id)
+    machine = _get(db, "machines", assignment["machine_id"])
+    queue = get_queue(db, user, assignment["queue_id"])
+    overrides = {o["test_id"]: o for o in db.all("SELECT * FROM assignment_overrides WHERE assignment_id = ?", (assignment_id,))}
+    items = []
+    for item in queue["items"]:
+        test = _get(db, "tests", item["test_id"])
+        override = overrides.get(test["id"])
+        items.append({
+            "test_id": test["id"], "name": test["name"], "category": test["category"], "type": test["type"],
+            "unit": test["unit"], "description": test["description"],
+            "limits": qa.resolve_limits(test, item, override),
+            "queue_limits": qa.resolve_limits(test, item),
+            "override": {k: override[k] for k in ("expected", "warn", "fail", "tol_mode")} if override else None,
+        })
+    assignment["schedule"] = qa.describe_schedule(assignment)
+    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"]}, "items": items}
+
+
+def save_overrides(db, user, assignment_id, data):
+    """Per-machine tweaks to a queue's limits. Blank fields fall back to the queue."""
+    require(user, "configure")
+    _get(db, "assignments", assignment_id)
+    rows = []
+    for item in data.get("overrides") or []:
+        limits = _limits(item, allow_blank_mode=True)
+        if any(v is not None for v in limits.values()):
+            rows.append((int(item["test_id"]), limits))
+    with db.transaction():
+        db.run("DELETE FROM assignment_overrides WHERE assignment_id = ?", (assignment_id,))
+        for test_id, limits in rows:
+            db.run("INSERT INTO assignment_overrides (assignment_id, test_id, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?)",
+                   (assignment_id, test_id, limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
+        db.audit(user["id"], "update", "overrides", assignment_id, overrides={t: l for t, l in rows})
+    return {"ok": True}
+
+
+# ---- dashboard ---------------------------------------------------------------
+
+def dashboard(db, user, today=None):
+    today = today or date.today()
+    machines = []
+    for machine in db.all("SELECT * FROM machines WHERE active = 1 ORDER BY name"):
+        queues = [a for a in list_assignments(db, user, machine["id"], today) if a["active"]]
+        for a in queues:
+            last = db.one("SELECT id, overall, review_status FROM runs WHERE assignment_id = ? ORDER BY qa_date DESC, id DESC LIMIT 1", (a["id"],))
+            a["last_run"] = last
+        machine["queues"] = queues
+        machine["pending_review"] = db.one("SELECT COUNT(*) AS n FROM runs WHERE machine_id = ? AND review_status = 'pending'", (machine["id"],))["n"]
+        machines.append(machine)
+    return {"today": today.isoformat(), "machines": machines}
+
+
+# ---- runs --------------------------------------------------------------------
+
+def submit_run(db, user, assignment_id, data):
+    require(user, "perform")
+    template = run_template(db, user, assignment_id)
+    if not template["assignment"]["active"] or not template["machine"]["active"]:
+        raise PortalError("This queue is not active on this machine.")
+    try:
+        qa_date = date.fromisoformat(data.get("qa_date") or date.today().isoformat())
+    except ValueError:
+        raise PortalError("QA date must be YYYY-MM-DD.")
+    if qa_date > date.today():
+        raise PortalError("QA date cannot be in the future.")
+    entered = {int(r["test_id"]): r for r in data.get("results") or []}
+    results, missing = [], []
+    for item in template["items"]:
+        raw = entered.get(item["test_id"], {})
+        value = raw.get("value")
+        if value is None or (isinstance(value, str) and not value.strip()):
+            if item["type"] != "text":
+                missing.append(item["name"])
+            continue
+        if item["type"] == "numeric":
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                raise PortalError(f"{item['name']}: enter a number.")
+        elif item["type"] == "boolean":
+            value = value in (True, 1, "1", "true", "pass", "yes")
+        else:
+            value = str(value)
+        try:
+            status = qa.evaluate(item["type"], value, item["limits"])
+        except ValueError as exc:
+            raise PortalError(f"{item['name']}: {exc}")
+        results.append((item, value, status, _text(raw, "comment")))
+    if missing:
+        raise PortalError("Missing results for: " + ", ".join(missing))
+    if not results:
+        raise PortalError("This queue has no tests.")
+    result_overall = qa.overall(r[2] for r in results)
+    with db.transaction():
+        run_id = db.run(
+            "INSERT INTO runs (assignment_id, machine_id, queue_id, performed_by, performed_at, qa_date, overall, comment) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (assignment_id, template["machine"]["id"], template["queue"]["id"], user["id"], now(), qa_date.isoformat(),
+             result_overall, _text(data, "comment")))
+        for item, value, status, comment in results:
+            limits = item["limits"]
+            db.run("INSERT INTO results (run_id, test_id, value_num, value_text, expected, warn, fail, tol_mode, status, comment) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   (run_id, item["test_id"], float(value) if item["type"] != "text" else None,
+                    value if item["type"] == "text" else None,
+                    limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], status, comment))
+        db.audit(user["id"], "submit", "run", run_id, machine=template["machine"]["name"], queue=template["queue"]["name"], overall=result_overall)
+    return {"id": run_id, "overall": result_overall}
+
+
+_RUN_SELECT = ("SELECT r.*, m.name AS machine_name, q.name AS queue_name, pu.full_name AS performer_name, pu.username AS performer, "
+               "ru.full_name AS reviewer_name, ru.username AS reviewer FROM runs r JOIN machines m ON m.id = r.machine_id "
+               "JOIN queues q ON q.id = r.queue_id JOIN users pu ON pu.id = r.performed_by LEFT JOIN users ru ON ru.id = r.reviewed_by ")
+
+
+def list_runs(db, user, filters):
+    clauses, params = [], []
+    for key in ("machine_id", "queue_id"):
+        if filters.get(key):
+            clauses.append(f"r.{key} = ?")
+            params.append(int(filters[key]))
+    if filters.get("review_status"):
+        clauses.append("r.review_status = ?")
+        params.append(filters["review_status"])
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    limit = min(int(filters.get("limit") or 200), 1000)
+    return db.all(_RUN_SELECT + where + f" ORDER BY r.qa_date DESC, r.id DESC LIMIT {limit}", params)
+
+
+def get_run(db, user, run_id):
+    run = db.one(_RUN_SELECT + "WHERE r.id = ?", (run_id,))
+    if not run:
+        raise PortalError("Run not found.", 404)
+    run["results"] = db.all("SELECT res.*, t.name, t.category, t.type, t.unit FROM results res JOIN tests t ON t.id = res.test_id "
+                            "WHERE res.run_id = ? ORDER BY res.id", (run_id,))
+    return run
+
+
+def review_run(db, user, run_id, data):
+    require(user, "review")
+    run = _get(db, "runs", run_id)
+    decision = data.get("decision")
+    if decision not in ("approved", "rejected"):
+        raise PortalError("Decision must be approve or reject.")
+    if run["review_status"] != "pending":
+        raise PortalError("This run has already been reviewed.")
+    if run["performed_by"] == user["id"]:
+        raise PortalError("Runs must be reviewed by someone other than the person who performed them.")
+    comment = _text(data, "comment")
+    if decision == "rejected" and not comment:
+        raise PortalError("Add a comment explaining the rejection.")
+    db.run("UPDATE runs SET review_status = ?, reviewed_by = ?, reviewed_at = ?, review_comment = ? WHERE id = ?",
+           (decision, user["id"], now(), comment, run_id))
+    db.audit(user["id"], decision, "run", run_id, comment=comment)
+    return {"ok": True}
+
+
+def trend(db, user, machine_id, test_id):
+    test = _get(db, "tests", test_id)
+    points = db.all(
+        "SELECT r.id AS run_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
+        "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.test_id = ? AND res.value_num IS NOT NULL "
+        "ORDER BY r.qa_date, r.id", (machine_id, test_id))
+    return {"test": test, "points": points}
+
+
+def list_audit(db, user, limit=300):
+    require(user, "review")
+    return db.all("SELECT a.*, u.username FROM audit a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT ?", (min(int(limit), 2000),))
