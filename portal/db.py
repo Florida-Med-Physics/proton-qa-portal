@@ -40,13 +40,16 @@ CREATE TABLE IF NOT EXISTS tests (
     fail REAL,
     tol_mode TEXT NOT NULL DEFAULT 'absolute' CHECK (tol_mode IN ('absolute', 'percent')),
     active INTEGER NOT NULL DEFAULT 1,
-    UNIQUE (category, name)
+    owner_queue_id INTEGER REFERENCES queues(id),
+    UNIQUE (owner_queue_id, category, name)
 );
 CREATE TABLE IF NOT EXISTS queues (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE COLLATE NOCASE,
     description TEXT NOT NULL DEFAULT '',
-    active INTEGER NOT NULL DEFAULT 1
+    active INTEGER NOT NULL DEFAULT 1,
+    is_template INTEGER NOT NULL DEFAULT 0,
+    template_id INTEGER REFERENCES queues(id)
 );
 CREATE TABLE IF NOT EXISTS queue_items (
     id INTEGER PRIMARY KEY,
@@ -144,7 +147,35 @@ class Database:
         if run_columns and "source_ref" not in run_columns:
             raise RuntimeError(f"{self.path} was made by the first preview build and cannot be upgraded. "
                                "Delete it and start again (for the demo, rerun seed_demo.py).")
+        self._migrate()
         self.conn.executescript(SCHEMA)
+
+    def _migrate(self):
+        """Bring older databases up to date. Each step is skipped once applied."""
+        queue_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(queues)")}
+        if queue_columns and "is_template" not in queue_columns:
+            self.conn.execute("ALTER TABLE queues ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0")
+            self.conn.execute("ALTER TABLE queues ADD COLUMN template_id INTEGER REFERENCES queues(id)")
+        test_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(tests)")}
+        if test_columns and "owner_queue_id" not in test_columns:
+            # Checks now belong to one QA list; the unique key changes, so the table is rebuilt.
+            self.conn.executescript("""
+                PRAGMA foreign_keys = OFF;
+                BEGIN;
+                CREATE TABLE tests_new (
+                    id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '',
+                    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'text')), unit TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '', expected REAL, warn REAL, fail REAL,
+                    tol_mode TEXT NOT NULL DEFAULT 'absolute' CHECK (tol_mode IN ('absolute', 'percent')),
+                    active INTEGER NOT NULL DEFAULT 1, owner_queue_id INTEGER REFERENCES queues(id),
+                    UNIQUE (owner_queue_id, category, name));
+                INSERT INTO tests_new (id, name, category, type, unit, description, expected, warn, fail, tol_mode, active)
+                    SELECT id, name, category, type, unit, description, expected, warn, fail, tol_mode, active FROM tests;
+                DROP TABLE tests;
+                ALTER TABLE tests_new RENAME TO tests;
+                COMMIT;
+                PRAGMA foreign_keys = ON;
+            """)
         self.lock = threading.RLock()
 
     def all(self, sql, params=()):

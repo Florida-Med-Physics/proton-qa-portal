@@ -4,7 +4,7 @@ import base64
 import binascii
 from datetime import date
 
-from . import auth, qa, sphinx
+from . import auth, checklist, qa, sphinx
 from .db import now
 
 
@@ -142,7 +142,16 @@ def save_machine(db, user, data, machine_id=None):
 # ---- test library ----------------------------------------------------------
 
 def list_tests(db, user):
-    return db.all("SELECT * FROM tests ORDER BY active DESC, category, name")
+    return db.all("SELECT t.*, q.name AS owner_name FROM tests t LEFT JOIN queues q ON q.id = t.owner_queue_id "
+                  "ORDER BY t.active DESC, q.name, t.category, t.name")
+
+
+def _owner(db, data, current=None):
+    """Which QA list a check belongs to (None = shared library check)."""
+    raw = data.get("owner_queue_id", current)
+    if raw in (None, "", 0, "0"):
+        return None
+    return _get(db, "queues", int(raw))["id"]
 
 
 def save_test(db, user, data, test_id=None):
@@ -152,20 +161,21 @@ def save_test(db, user, data, test_id=None):
         raise PortalError("Test type must be numeric, boolean, or text.")
     limits = _limits(data, allow_blank_mode=False) if test_type == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": "absolute"}
     name, category = _text(data, "name", required=True), _text(data, "category")
-    clash = db.one("SELECT id FROM tests WHERE name = ? AND category = ? AND id != ?", (name, category, test_id or 0))
+    existing = _get(db, "tests", test_id) if test_id is not None else None
+    owner = _owner(db, data, existing["owner_queue_id"] if existing else None)
+    clash = db.one("SELECT id FROM tests WHERE name = ? AND category = ? AND owner_queue_id IS ? AND id != ?", (name, category, owner, test_id or 0))
     if clash:
-        raise PortalError(f"A test named '{name}' already exists in that category.")
+        raise PortalError(f"A check named '{name}' already exists in that category" + (" of this QA list." if owner else "."))
     values = (name, category, test_type, _text(data, "unit"), _text(data, "description"),
-              limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], _flag(data, "active"))
+              limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], _flag(data, "active"), owner)
     if test_id is None:
-        test_id = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active) "
-                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values)
-        db.audit(user["id"], "create", "test", test_id, name=name, **limits)
+        test_id = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values)
+        db.audit(user["id"], "create", "test", test_id, name=name, owner=owner, **limits)
     else:
-        _get(db, "tests", test_id)
         db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
-               "tol_mode = ?, active = ? WHERE id = ?", values + (test_id,))
-        db.audit(user["id"], "update", "test", test_id, name=name, **limits)
+               "tol_mode = ?, active = ?, owner_queue_id = ? WHERE id = ?", values + (test_id,))
+        db.audit(user["id"], "update", "test", test_id, name=name, owner=owner, **limits)
     return {"id": test_id}
 
 
@@ -174,8 +184,10 @@ def save_test(db, user, data, test_id=None):
 def list_queues(db, user):
     return db.all(
         "SELECT q.*, (SELECT COUNT(*) FROM queue_items qi WHERE qi.queue_id = q.id) AS item_count, "
-        "(SELECT COUNT(*) FROM assignments a WHERE a.queue_id = q.id AND a.active = 1) AS machine_count "
-        "FROM queues q ORDER BY q.active DESC, q.name")
+        "(SELECT COUNT(*) FROM assignments a WHERE a.queue_id = q.id AND a.active = 1) AS machine_count, "
+        "(SELECT name FROM queues t WHERE t.id = q.template_id) AS template_name, "
+        "(SELECT GROUP_CONCAT(m.name, ', ') FROM assignments a JOIN machines m ON m.id = a.machine_id WHERE a.queue_id = q.id AND a.active = 1) AS machines "
+        "FROM queues q ORDER BY q.is_template DESC, q.active DESC, q.name")
 
 
 def get_queue(db, user, queue_id):
@@ -196,17 +208,24 @@ def save_queue(db, user, data, queue_id=None):
     items = []
     for position, item in enumerate(data.get("items") or []):
         test = _get(db, "tests", int(item.get("test_id")))
+        if test["owner_queue_id"] is not None and test["owner_queue_id"] != queue_id:
+            raise PortalError(f"'{test['name']}' belongs to another QA list. Duplicate that list, or add a new check here.")
         limits = _limits(item, allow_blank_mode=True) if test["type"] == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": None}
         items.append((test["id"], position, limits))
     if len({i[0] for i in items}) != len(items):
-        raise PortalError("A test can only appear once in a queue.")
+        raise PortalError("A check can only appear once in a QA list.")
+    existing = _get(db, "queues", queue_id) if queue_id is not None else None
+    is_template = _flag(data, "is_template", bool(existing["is_template"]) if existing else False)
+    if is_template and existing and db.one("SELECT id FROM assignments WHERE queue_id = ?", (queue_id,)):
+        raise PortalError("This list is scheduled on a machine, so it cannot become a template. Duplicate it instead.")
     with db.transaction():
         if queue_id is None:
-            queue_id = db.run("INSERT INTO queues (name, description, active) VALUES (?, ?, ?)", (name, _text(data, "description"), _flag(data, "active")))
+            queue_id = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, ?, ?)",
+                              (name, _text(data, "description"), _flag(data, "active"), is_template))
             action = "create"
         else:
-            _get(db, "queues", queue_id)
-            db.run("UPDATE queues SET name = ?, description = ?, active = ? WHERE id = ?", (name, _text(data, "description"), _flag(data, "active"), queue_id))
+            db.run("UPDATE queues SET name = ?, description = ?, active = ?, is_template = ? WHERE id = ?",
+                   (name, _text(data, "description"), _flag(data, "active"), is_template, queue_id))
             db.run("DELETE FROM queue_items WHERE queue_id = ?", (queue_id,))
             action = "update"
         for test_id, position, limits in items:
@@ -214,6 +233,31 @@ def save_queue(db, user, data, queue_id=None):
                    (queue_id, test_id, position, limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
         db.audit(user["id"], action, "queue", queue_id, name=name, tests=[i[0] for i in items])
     return {"id": queue_id}
+
+
+def duplicate_queue(db, user, source_id, data):
+    """Copy a QA list (usually a template). Every check is copied, so the copy owns its own limits."""
+    require(user, "configure")
+    source = get_queue(db, user, source_id)
+    name = _text(data, "name", required=True)
+    if db.one("SELECT id FROM queues WHERE name = ?", (name,)):
+        raise PortalError(f"A QA list named '{name}' already exists.")
+    with db.transaction():
+        queue_id = db.run("INSERT INTO queues (name, description, active, is_template, template_id) VALUES (?, ?, 1, 0, ?)",
+                          (name, source["description"], source_id))
+        for item in source["items"]:
+            test = _get(db, "tests", item["test_id"])
+            limits = qa.resolve_limits(test, item)
+            new_id = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                            (test["name"], test["category"], test["type"], test["unit"], test["description"],
+                             limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], queue_id))
+            db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (queue_id, new_id, item["position"]))
+        db.audit(user["id"], "duplicate", "queue", queue_id, name=name, source=source["name"], checks=len(source["items"]))
+    result = {"id": queue_id}
+    if data.get("machine_id"):
+        result["assignment_id"] = save_assignment(db, user, {**data, "queue_id": queue_id})["id"]
+    return result
 
 
 # ---- machine assignments (scheduled queues) ---------------------------------
@@ -256,6 +300,8 @@ def save_assignment(db, user, data, assignment_id=None):
     if assignment_id is None:
         machine = _get(db, "machines", int(data.get("machine_id") or 0))
         queue = _get(db, "queues", int(data.get("queue_id") or 0))
+        if queue["is_template"]:
+            raise PortalError(f"'{queue['name']}' is a template. Duplicate it, then schedule the copy.")
         if db.one("SELECT id FROM assignments WHERE machine_id = ? AND queue_id = ?", (machine["id"], queue["id"])):
             raise PortalError(f"'{queue['name']}' is already scheduled on {machine['name']}.")
         assignment_id = db.run("INSERT INTO assignments (machine_id, queue_id, frequency, interval_days, weekdays, start_date, active) "
@@ -434,21 +480,14 @@ def _sphinx_test_ids(db, user, template, measurements, create):
         if not create:
             continue
         require(user, "configure")
-        file_limits = _file_limits(m)
-        test = db.one("SELECT * FROM tests WHERE category = ? AND name = ?", key)
-        if test:
-            # Shared with another machine: give this queue its own limits when they differ from the library's.
-            test_id = test["id"]
-            queue_limits = file_limits if any(test[k] != v for k, v in file_limits.items()) else dict.fromkeys(file_limits)
-        else:
-            test_id = save_test(db, user, {
-                "category": m["category"], "name": m["name"], "unit": m["unit"], **file_limits,
-                "description": f"Measured by Sphinx. Export label: {m['sphinx_label']}."})["id"]
-            queue_limits = dict.fromkeys(file_limits)
-        position = db.one("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM queue_items WHERE queue_id = ?", (template["queue"]["id"],))["p"]
-        db.run("INSERT INTO queue_items (queue_id, test_id, position, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?, ?)",
-               (template["queue"]["id"], test_id, position, queue_limits["expected"], queue_limits["warn"], queue_limits["fail"],
-                queue_limits["tol_mode"]))
+        queue_id = template["queue"]["id"]
+        # Each QA list owns its checks, so the file's limits go straight onto this list's own copy.
+        test = db.one("SELECT id FROM tests WHERE owner_queue_id = ? AND category = ? AND name = ?", (queue_id,) + key)
+        test_id = test["id"] if test else save_test(db, user, {
+            "category": m["category"], "name": m["name"], "unit": m["unit"], **_file_limits(m), "owner_queue_id": queue_id,
+            "description": f"Measured by Sphinx. Export label: {m['sphinx_label']}."})["id"]
+        position = db.one("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM queue_items WHERE queue_id = ?", (queue_id,))["p"]
+        db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (queue_id, test_id, position))
         ids[key] = in_queue[key] = test_id
         added.append(m["name"])
     if added:
@@ -522,6 +561,27 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
                           "imported" if historical else "pending")
         imported.append({"file": name, "run_id": run["id"], "qa_date": parsed["qa_date"], "overall": run["overall"]})
     return {"imported": imported, "skipped": skipped}
+
+
+def import_checklist(db, user, queue_id, parsed):
+    """Add a myQA template's manual checks to a queue (tests are created in the library if missing)."""
+    require(user, "configure")
+    queue = _get(db, "queues", queue_id)
+    in_queue = {r["test_id"] for r in db.all("SELECT test_id FROM queue_items WHERE queue_id = ?", (queue_id,))}
+    added = []
+    for spec in checklist.to_tests(parsed):
+        test = db.one("SELECT id FROM tests WHERE owner_queue_id = ? AND category = ? AND name = ?", (queue_id, spec["category"], spec["name"]))
+        test_id = test["id"] if test else save_test(db, user, {**spec, "owner_queue_id": queue_id})["id"]
+        if test_id in in_queue:
+            continue
+        position = db.one("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM queue_items WHERE queue_id = ?", (queue_id,))["p"]
+        db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (queue_id, test_id, position))
+        in_queue.add(test_id)
+        added.append(spec["name"])
+    if parsed.get("setup") and not queue["description"]:
+        db.run("UPDATE queues SET description = ? WHERE id = ?", (parsed["setup"], queue_id))
+    db.audit(user["id"], "add_checklist", "queue", queue_id, tests=added)
+    return {"added": added}
 
 
 def import_sphinx_uploads(db, user, assignment_id, data):

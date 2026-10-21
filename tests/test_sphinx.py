@@ -192,13 +192,12 @@ class ImportTests(unittest.TestCase):
         other = service.save_assignment(self.db, admin, {"machine_id": machine, "queue_id": queue, "frequency": "daily"})["id"]
         service.import_sphinx(self.db, admin, self.assignment, [("a.xls", fake_file("shared-a", energy_label="Energy [100.81 MeV]"))])
         service.import_sphinx(self.db, admin, other, [("b.xls", fake_file("shared-b", offset=1, energy_label="100 MeV", depth_warn="± 0.8 mm"))])
-        self.assertEqual(self.db.one("SELECT COUNT(*) AS n FROM tests")["n"], 5)  # one set of tests serves both machines
-        limits = {i["test_id"]: i["limits"] for i in service.run_template(self.db, admin, other)["items"]}
-        depth = self.db.one("SELECT id, warn, description FROM tests WHERE name = 'Energy 100 MeV – Distal Depth'")
-        self.assertEqual((depth["warn"], limits[depth["id"]]["warn"]), (0.9, 0.8))
-        self.assertIn("Energy [100.81 MeV]", depth["description"])
-        first = {i["test_id"]: i["limits"] for i in service.run_template(self.db, admin, self.assignment)["items"]}
-        self.assertEqual(first[depth["id"]]["warn"], 0.9)
+        self.assertEqual(self.db.one("SELECT COUNT(*) AS n FROM tests")["n"], 10)  # each list owns its own copies
+        depths = {d["owner_queue_id"]: d for d in self.db.all("SELECT * FROM tests WHERE name = 'Energy 100 MeV – Distal Depth'")}
+        self.assertEqual((depths[self.queue]["warn"], depths[queue]["warn"]), (0.9, 0.8))
+        self.assertIn("Energy [100.81 MeV]", depths[self.queue]["description"])
+        limits = {i["name"]: i["limits"]["warn"] for i in service.run_template(self.db, admin, other)["items"]}
+        self.assertEqual(limits["Energy 100 MeV – Distal Depth"], 0.8)
 
     def test_upload_endpoint_validation(self, _):
         with self.assertRaisesRegex(PortalError, "Choose"):
@@ -235,6 +234,7 @@ class CommandLineTests(unittest.TestCase):
             db = Database(db_path)
             self.assertEqual(db.one("SELECT COUNT(*) AS n FROM runs WHERE review_status = 'imported'")["n"], 2)
             self.assertEqual(db.one("SELECT COUNT(*) AS n FROM queue_items")["n"], 5)
+            self.assertEqual(db.one("SELECT COUNT(*) AS n FROM tests WHERE owner_queue_id IS NULL")["n"], 0)
             db.close()
 
 

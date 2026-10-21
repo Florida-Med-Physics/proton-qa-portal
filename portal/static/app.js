@@ -200,28 +200,33 @@ function evaluate(type, value, limits) {
 // Shell, login, routing
 // ---------------------------------------------------------------------------
 
+// Four places to go. Everything that configures the portal lives under Setup.
 const NAV = [
-  ["#/", "Dashboard", null],
-  ["#/machines", "Machines", null],
-  ["#/queues", "QA queues", null],
-  ["#/tests", "Test library", null],
-  ["#/runs", "History", null],
-  ["#/trends", "Trends", null],
-  ["#/users", "Users", "manage_users"],
-  ["#/audit", "Audit log", "review"],
+  ["#/", "Today", null, ["#/", "#", "#/perform"]],
+  ["#/runs", "History", null, ["#/runs"]],
+  ["#/trends", "Trends", null, ["#/trends"]],
+  ["#/setup", "Setup", "configure", ["#/setup", "#/machines", "#/queues", "#/tests", "#/users", "#/audit", "#/assignments"]],
 ];
 
 function renderShell() {
   const bar = document.getElementById("topbar");
   bar.hidden = !state.user;
   if (!state.user) return;
-  const current = location.hash.split("/").slice(0, 2).join("/") || "#/";
-  document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label]) =>
-    el("a", { href, class: (current === href || (href === "#/" && current === "#")) ? "active" : "" }, label)));
+  const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
+  document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns]) =>
+    el("a", { href, class: owns.includes(current) ? "active" : "" }, label)));
   document.getElementById("who").replaceChildren(
-    el("a", { href: "#/account" }, personName(state.user.full_name, state.user.username)),
-    el("span", { class: "chip" }, ROLE_LABEL[state.user.role]),
+    el("a", { href: "#/account", title: ROLE_LABEL[state.user.role] }, personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"));
+}
+
+function shortDate(iso) {
+  return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+// "Daily QA – GTR1" reads as "Daily QA" on GTR1's own card.
+function queueLabel(queueName, machineName) {
+  return queueName.endsWith(` – ${machineName}`) ? queueName.slice(0, -(machineName.length + 3)) : queueName;
 }
 
 function renderLogin() {
@@ -256,6 +261,7 @@ async function logout() {
 
 const ROUTES = [
   [/^#?\/?$/, renderDashboard],
+  [/^#\/setup$/, renderSetup],
   [/^#\/machines$/, renderMachines],
   [/^#\/machines\/(\d+)$/, renderMachine],
   [/^#\/assignments\/(\d+)\/limits$/, renderLimits],
@@ -299,25 +305,43 @@ function queryParams() {
 
 async function renderDashboard() {
   const data = await api("GET", "/api/dashboard");
-  page("Today", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" }),
-    can("configure") ? [el("a", { class: "button", href: "#/machines" }, "Manage machines")] : []);
+  const queues = data.machines.flatMap((m) => m.queues);
+  const todo = queues.filter((q) => q.state === "due" || q.state === "overdue").length;
+  const toReview = data.machines.reduce((n, m) => n + m.pending_review, 0);
+  page("Today", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }));
   if (!data.machines.length) {
     app.append(el("div", { class: "card empty" }, "No machines yet. ",
       can("configure") ? el("a", { href: "#/machines" }, "Add your first machine.") : "Ask a physicist to add one."));
     return;
   }
+  app.append(el("p", { class: "lead" },
+    todo ? `${todo} QA ${todo === 1 ? "list" : "lists"} to do.` : "All QA is done for today.",
+    can("review") && toReview ? [" ", el("a", { href: "#/runs?review_status=pending" }, `${toReview} ${toReview === 1 ? "run is" : "runs are"} waiting for review.`)] : ""));
   app.append(el("div", { class: "grid" }, data.machines.map((machine) => el("div", { class: "card machine-card" },
-    el("h3", {}, el("a", { href: `#/machines/${machine.id}` }, machine.name),
-      machine.pending_review ? el("a", { href: `#/runs?machine_id=${machine.id}&review_status=pending`, class: "chip pending" }, `${machine.pending_review} to review`) : null),
-    el("div", { class: "muted small" }, [machine.kind, machine.location].filter(Boolean).join(" · ") || " "),
-    machine.queues.length ? machine.queues.map((q) => el("div", { class: "queue-row" },
-      el("div", {}, el("strong", {}, q.queue_name), " ", el("span", { class: "muted small" }, q.schedule)),
-      el("div", { class: "actions" }, can("perform") ? el("a", { class: `button ${q.state === "due" || q.state === "overdue" ? "primary" : ""}`, href: `#/perform/${q.id}` }, "Perform") : null),
-      el("div", { class: "row small" },
-        chip(q.state, STATE_LABEL[q.state]),
-        el("span", { class: "muted" }, q.state === "done" ? `next ${q.next_due}` : `due ${q.next_due}`),
-        q.last_run ? el("a", { href: `#/runs/${q.last_run.id}` }, chip(q.last_run.overall, `Last: ${capitalize(q.last_run.overall)}`)) : null)))
-      : el("p", { class: "muted" }, "No QA queues scheduled.")))));
+    el("h3", {}, machine.name),
+    machine.queues.length ? machine.queues.map((q) => {
+      const due = q.state === "due" || q.state === "overdue";
+      const status = q.state === "overdue" ? `Overdue since ${shortDate(q.next_due)}`
+        : q.state === "due" ? "Due today"
+          : q.state === "done" ? "Done today" : `Next due ${shortDate(q.next_due)}`;
+      return el("div", { class: "queue-row" },
+        el("div", {}, el("strong", {}, queueLabel(q.queue_name, machine.name))),
+        el("div", { class: "actions" }, due && can("perform") ? el("a", { class: "button primary", href: `#/perform/${q.id}` }, "Start")
+          : q.last_run ? el("a", { class: "button", href: `#/runs/${q.last_run.id}` }, "View result") : null),
+        el("div", { class: "row small" }, chip(q.state, status),
+          q.last_run && q.state === "done" ? chip(q.last_run.overall) : null));
+    }) : el("p", { class: "muted" }, "Nothing scheduled.")))));
+}
+
+async function renderSetup() {
+  page("Setup", "Machines, what gets checked, and who can sign in.");
+  const card = (href, title, text) => el("a", { class: "card setup-card", href }, el("h3", {}, title), el("p", { class: "muted" }, text));
+  app.append(el("div", { class: "grid" },
+    card("#/machines", "Machines", "Gantries and the QA lists scheduled on each."),
+    card("#/queues", "QA lists", "Which checks make up each daily, monthly or annual list."),
+    card("#/tests", "Checks", "Every check, its expected value and its limits."),
+    can("manage_users") ? card("#/users", "People", "Accounts and roles.") : null,
+    card("#/audit", "Audit log", "Who changed what, and when.")));
 }
 
 // ---------------------------------------------------------------------------
@@ -386,59 +410,67 @@ async function renderMachine(id) {
       await api("PUT", `/api/machines/${id}`, data);
       toast("Machine saved");
       route();
-    }) }, "Edit machine"));
+    }) }, "Edit"));
     actions.push(el("button", { class: "primary", onclick: async () => {
       const queues = (await api("GET", "/api/queues")).filter((q) => q.active && !assignments.some((a) => a.queue_id === q.id));
-      if (!queues.length) return toast("Every active queue is already scheduled here. Create a queue first.", true);
-      modal(`Schedule a queue on ${machine.name}`, scheduleForm(null, queues), async (data, form) => {
+      if (!queues.length) return toast("Every active QA list is already scheduled here. Create a list first.", true);
+      modal(`Schedule a QA list on ${machine.name}`, scheduleForm(null, queues), async (data, form) => {
         await api("POST", "/api/assignments", { ...scheduleData(data, form), machine_id: Number(id) });
-        toast("Queue scheduled");
+        toast("QA list scheduled");
         route();
       });
-    } }, "Schedule a queue"));
+    } }, "Schedule a QA list"));
   }
   page(machine.name, [machine.kind, machine.location, machine.active ? null : "Retired"].filter(Boolean).join(" · "), actions);
   if (machine.notes) app.append(el("p", { class: "muted" }, machine.notes));
-  app.append(el("h2", {}, "Scheduled QA queues"));
-  app.append(table(["Queue", "Schedule", "Starts", "Next due", "Status", ""], assignments.map((a) => el("tr", {},
-    el("td", {}, el("strong", {}, a.queue_name)),
-    el("td", {}, a.schedule),
-    el("td", {}, a.start_date),
-    el("td", {}, a.active ? a.next_due : "-"),
-    el("td", {}, a.active ? chip(a.state, STATE_LABEL[a.state]) : chip("", "Paused")),
-    el("td", {}, el("div", { class: "row" },
-      can("perform") && a.active ? el("a", { class: "button", href: `#/perform/${a.id}` }, "Perform") : null,
-      can("configure") ? el("button", { onclick: () => modal(`${a.queue_name} schedule`, scheduleForm(a), async (data, form) => {
-        await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
-        toast("Schedule saved");
-        route();
-      }) }, "Schedule") : null,
-      can("configure") ? el("a", { class: "button", href: `#/assignments/${a.id}/limits` }, "Adjust limits") : null,
-      can("configure") ? el("button", { onclick: () => importSphinxDialog(a) }, "Import Sphinx") : null,
-      el("a", { class: "button", href: `#/runs?machine_id=${id}&queue_id=${a.queue_id}` }, "History"))))),
-    "No QA queues scheduled on this machine yet."));
+  if (!assignments.length) {
+    app.append(el("div", { class: "card empty" }, "No QA lists scheduled on this machine yet."));
+    return;
+  }
+  app.append(el("div", { class: "stack" }, assignments.map((a) => {
+    const due = a.active && (a.state === "due" || a.state === "overdue");
+    const status = !a.active ? "Paused" : a.state === "overdue" ? `Overdue since ${shortDate(a.next_due)}`
+      : a.state === "due" ? "Due today" : a.state === "done" ? "Done today" : `Next due ${shortDate(a.next_due)}`;
+    const more = can("configure") ? el("details", { class: "more" }, el("summary", { class: "button" }, "More"),
+      el("div", { class: "menu" },
+        el("button", { class: "link", onclick: () => modal(`${a.queue_name}: schedule`, scheduleForm(a), async (data, form) => {
+          await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
+          toast("Schedule saved");
+          route();
+        }) }, "Change schedule"),
+        el("a", { href: `#/assignments/${a.id}/limits` }, "Adjust limits for this machine"),
+        el("a", { href: `#/queues/${a.queue_id}` }, "Edit the checks in this list"),
+        el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
+    return el("div", { class: "card list-row" },
+      el("div", {}, el("strong", {}, queueLabel(a.queue_name, machine.name)), el("div", { class: "muted small" }, a.schedule)),
+      chip(a.active ? a.state : "", status),
+      el("div", { class: "row" },
+        due && can("perform") ? el("a", { class: "button primary", href: `#/perform/${a.id}` }, "Start") : null,
+        el("a", { class: "button", href: `#/runs?machine_id=${id}&queue_id=${a.queue_id}` }, "History"),
+        more));
+  })));
 }
 
 async function renderLimits(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
-  page(`Adjust limits: ${t.queue.name} on ${t.machine.name}`,
-    "Values here apply only to this machine. Leave a field blank to use the queue's value (shown as the placeholder).");
+  page(`Limits for ${t.machine.name}: ${queueLabel(t.queue.name, t.machine.name)}`,
+    "Only fill in what is different on this machine. Blank fields use the list's value, shown in grey.");
   const numeric = t.items.filter((i) => i.type === "numeric");
   if (!numeric.length) {
-    app.append(el("div", { class: "card empty" }, "This queue has no numeric tests."));
+    app.append(el("div", { class: "card empty" }, "This list has no measured values."));
     return;
   }
   const rows = numeric.map((item) => {
     const o = item.override || {};
     const q = item.queue_limits;
     return el("tr", { "data-test": item.test_id, class: "compact" },
-      el("td", {}, el("strong", {}, item.name), el("div", { class: "muted small" }, [item.category, item.unit].filter(Boolean).join(" · "))),
+      el("td", {}, el("strong", {}, item.name), item.unit ? el("div", { class: "muted small" }, item.unit) : null),
       el("td", {}, el("input", { name: "expected", type: "number", step: "any", value: o.expected ?? "", placeholder: fmt(q.expected) })),
       el("td", {}, el("input", { name: "warn", type: "number", step: "any", min: 0, value: o.warn ?? "", placeholder: fmt(q.warn) })),
       el("td", {}, el("input", { name: "fail", type: "number", step: "any", min: 0, value: o.fail ?? "", placeholder: fmt(q.fail) })),
-      el("td", {}, select("tol_mode", [["", `Queue (${q.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || "")));
+      el("td", {}, select("tol_mode", [["", `List (${q.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || "")));
   });
-  app.append(table(["Test", "Expected", "Warning ±", "Fail ±", "Tolerance"], rows));
+  app.append(table(["Check", "Expected", "Warning ±", "Fail ±", "Tolerance"], rows));
   const error = el("p", { class: "error" });
   app.append(error, el("div", { class: "row" },
     el("a", { class: "button", href: `#/machines/${t.machine.id}` }, "Back"),
@@ -460,65 +492,113 @@ async function renderLimits(assignmentId) {
 }
 
 // ---------------------------------------------------------------------------
-// Performing a queue
+// Performing a QA list
 // ---------------------------------------------------------------------------
+
+function passFailInput(name) {
+  // A hidden value plus two big buttons: one tap instead of opening a dropdown.
+  const value = el("input", { type: "hidden" });
+  const pick = (v) => () => {
+    value.value = value.value === v ? "" : v;
+    pass.classList.toggle("on", value.value === "pass");
+    fail.classList.toggle("on", value.value === "fail");
+    value.dispatchEvent(new Event("input"));
+  };
+  const pass = el("button", { type: "button", class: "seg pass", "aria-label": `${name}: pass`, onclick: pick("pass") }, "Pass");
+  const fail = el("button", { type: "button", class: "seg fail", "aria-label": `${name}: fail`, onclick: pick("fail") }, "Fail");
+  return { value, control: el("div", { class: "segmented" }, pass, fail, value) };
+}
+
+function helpText(description) {
+  if (!description || description.startsWith("Measured by Sphinx")) return null;
+  const text = description.replace(/^Template \d+\.\d+\.\s*/, "");
+  return text ? el("details", { class: "help" }, el("summary", {}, "How to"), el("div", { class: "pre" }, text)) : null;
+}
 
 async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
-  page(`${t.queue.name}`, `${t.machine.name} · ${t.assignment.schedule}`);
-  if (t.queue.description) app.append(el("p", { class: "muted" }, t.queue.description));
-  const overallChip = el("span");
+  page(`${queueLabel(t.queue.name, t.machine.name)} · ${t.machine.name}`, t.assignment.schedule);
+  if (t.queue.description) {
+    app.append(el("details", { class: "card instructions" }, el("summary", {}, "Setup instructions"), el("div", { class: "pre" }, t.queue.description)));
+  }
   const inputs = [];
+  const sections = [];
+  const progress = el("span");
+  const overallChip = el("span");
   const refresh = () => {
-    const statuses = inputs.map((i) => i.status()).filter(Boolean);
-    const worst = statuses.reduce((w, s) => (STATUS_RANK[s] > STATUS_RANK[w] ? s : w), "pass");
-    const missing = inputs.filter((i) => i.required && !i.status()).length;
-    overallChip.replaceChildren(missing ? chip("", `${missing} remaining`) : chip(worst, `Overall: ${capitalize(worst)}`));
+    const statuses = inputs.map((i) => i.status());
+    const worst = statuses.filter(Boolean).reduce((w, s) => (STATUS_RANK[s] > STATUS_RANK[w] ? s : w), "pass");
+    const required = inputs.filter((i) => i.required);
+    const done = required.filter((i) => i.status()).length;
+    progress.textContent = `${done} of ${required.length} done`;
+    overallChip.replaceChildren(done && done === required.length ? chip(worst, capitalize(worst)) : statuses.some((s) => s === "fail" || s === "warn") ? chip(worst, `${capitalize(worst)} so far`) : "");
+    for (const s of sections) s.refresh();
   };
-  const rows = [];
-  let lastCategory = null;
+  const byCategory = new Map();
   for (const item of t.items) {
-    if (item.category !== lastCategory) {
-      rows.push(el("tr", { class: "group" }, el("td", { colspan: 5 }, item.category || "General")));
-      lastCategory = item.category;
+    const key = item.category || "General";
+    if (!byCategory.has(key)) byCategory.set(key, []);
+    byCategory.get(key).push(item);
+  }
+  for (const [category, items] of byCategory) {
+    const rows = [];
+    const entries = [];
+    for (const item of items) {
+      let input, control;
+      if (item.type === "boolean") ({ value: input, control } = passFailInput(item.name));
+      else if (item.type === "numeric") control = input = el("input", { type: "number", step: "any", class: "result-input", "aria-label": item.name });
+      else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
+      const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
+      const noteToggle = el("button", { type: "button", class: "link small", onclick: () => { comment.hidden = false; noteToggle.hidden = true; comment.focus(); } }, "+ note");
+      const note = el("div", { class: "muted small" });
+      const statusCell = el("div", { class: "status-cell" });
+      const entry = {
+        item, input, comment, note, required: item.type !== "text",
+        status() {
+          const raw = input.value.trim();
+          if (!raw) return null;
+          if (item.type === "numeric") return Number.isFinite(Number(raw)) ? evaluate("numeric", Number(raw), item.limits) : null;
+          return evaluate(item.type, raw, item.limits);
+        },
+      };
+      const update = () => {
+        const s = entry.status();
+        statusCell.replaceChildren(s && item.type !== "boolean" ? chip(s) : "");
+        if (s === "warn" || s === "fail") { comment.hidden = false; noteToggle.hidden = true; }
+        refresh();
+      };
+      input.addEventListener("input", update);
+      input.addEventListener("change", update);
+      inputs.push(entry);
+      entries.push(entry);
+      rows.push(el("div", { class: "check-row" },
+        el("div", { class: "check-name" }, el("strong", {}, item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
+          item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note, helpText(item.description)),
+        el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
+        statusCell,
+        el("div", { class: "check-note" }, noteToggle, comment)));
     }
-    const statusCell = el("td", {});
-    let input;
-    if (item.type === "numeric") input = el("input", { type: "number", step: "any", class: "result-input", "aria-label": item.name });
-    else if (item.type === "boolean") input = select("", [["", "Choose"], ["pass", "Pass"], ["fail", "Fail"]], "", { class: "result-input", "aria-label": item.name });
-    else input = el("input", { type: "text", "aria-label": item.name });
-    const comment = el("input", { type: "text", placeholder: "Comment", "aria-label": `${item.name} comment` });
-    const note = el("div", { class: "muted small" });
-    const entry = {
-      item, input, comment, note, required: item.type !== "text",
-      status() {
-        const raw = input.value.trim();
-        if (!raw) return null;
-        if (item.type === "numeric") return Number.isFinite(Number(raw)) ? evaluate("numeric", Number(raw), item.limits) : null;
-        return evaluate(item.type, raw, item.limits);
+    const summary = el("span", { class: "section-summary" });
+    const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, category), summary), rows);
+    sections.push({
+      box, entries,
+      refresh() {
+        const s = entries.map((e) => e.status());
+        const req = entries.filter((e) => e.required);
+        const left = req.filter((e) => !e.status()).length;
+        const bad = s.filter((x) => x === "fail").length;
+        const warn = s.filter((x) => x === "warn").length;
+        summary.replaceChildren(left ? `${left} to do` : "All done",
+          bad ? [" · ", chip("fail", `${bad} fail`)] : "", warn ? [" · ", chip("warn", `${warn} warn`)] : "");
       },
-    };
-    const update = () => {
-      const s = entry.status();
-      statusCell.replaceChildren(s ? chip(s) : "");
-      refresh();
-    };
-    input.addEventListener("input", update);
-    input.addEventListener("change", update);
-    inputs.push(entry);
-    rows.push(el("tr", {},
-      el("td", {}, el("strong", {}, item.name), item.description ? el("div", { class: "muted small" }, item.description) : null, note),
-      el("td", { class: "small muted" }, item.type === "numeric" ? limitsText(item.limits, item.unit) : item.type === "boolean" ? "Pass / fail" : "Record"),
-      el("td", {}, el("div", { class: "row" }, input, item.type === "numeric" && item.unit ? el("span", { class: "muted" }, item.unit) : null)),
-      statusCell,
-      el("td", {}, comment)));
+      settled() {
+        return entries.every((e) => !e.required || e.status() === "pass" || e.status() === "recorded");
+      },
+    });
   }
-  if (!t.items.length) {
-    app.append(el("div", { class: "card empty" }, "This queue has no tests yet. ",
-      can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add tests to it"), ", or choose a Sphinx file below to add its measurements."] : ""), el("br"));
-  }
-  const qaDate = el("input", { type: "date", value: today(), max: today() });
-  const runComment = el("textarea", { placeholder: "Notes for the reviewer (optional)" });
+
+  const qaDate = el("input", { type: "date", value: today(), max: today(), "aria-label": "QA date" });
+  const runComment = el("textarea", { placeholder: "Anything the reviewer should know" });
   let sourceRef = null;
   const sphinxInfo = el("div", { class: "small" });
   const applySphinx = async () => {
@@ -530,23 +610,24 @@ async function renderPerform(assignmentId) {
       const entry = byTest[m.test_id];
       entry.input.value = m.value;
       entry.input.dispatchEvent(new Event("input"));
-      entry.note.replaceChildren(`Sphinx: ${m.sphinx_status || "no status"}`,
-        m.limits_differ ? ` · file limits ${limitsText(m.file_limits, entry.item.unit)}` : "");
+      entry.note.replaceChildren(m.limits_differ ? `Sphinx file limits: ${limitsText(m.file_limits, entry.item.unit)}` : "");
     }
+    // Fold away sections where everything passed so only what needs attention stays open.
+    for (const s of sections) s.box.open = !s.settled();
     sphinxInfo.replaceChildren(el("div", {},
-      el("div", {}, `Filled ${p.matched.length} value(s) from ${p.filename}. Sphinx finished ${p.finished.replace("T", " ")}${p.sphinx_user ? " by " + p.sphinx_user : ""}.`),
+      el("div", {}, `Filled ${p.matched.length} values from ${p.filename}.`),
       p.duplicate_run ? el("div", { class: "error" }, "This file is already recorded as ", el("a", { href: `#/runs/${p.duplicate_run}` }, `run #${p.duplicate_run}`), ".") : null,
-      p.unmatched.length ? el("div", { class: "row" }, `${p.unmatched.length} measurement(s) in the file are not in this queue.`,
+      p.unmatched.length ? el("div", { class: "row" }, `${p.unmatched.length} values in the file are not in this list.`,
         can("configure") ? el("button", { onclick: async () => {
           try {
             const r = await api("POST", `/api/assignments/${assignmentId}/sphinx/tests`, { file: state.sphinxFile });
-            toast(`Added ${r.added.length} test(s) to the queue`);
+            toast(`Added ${r.added.length} checks to the list`);
             state.applySphinxOnLoad = true;
             route();
           } catch (err) {
             toast(err.message, true);
           }
-        } }, "Add them to this queue") : "Ask a physicist to add them.") : null));
+        } }, "Add them") : "Ask a physicist to add them.") : null));
   };
   const sphinxFile = el("input", { type: "file", accept: ".xls", "aria-label": "Sphinx export file" });
   sphinxFile.addEventListener("change", async () => {
@@ -558,12 +639,14 @@ async function renderPerform(assignmentId) {
       sphinxInfo.replaceChildren(el("span", { class: "error" }, err.message));
     }
   });
-  app.append(el("div", { class: "card" }, el("h3", {}, "Fill from a Sphinx file"),
-    el("p", { class: "muted small" }, "Choose today's Sphinx .xls export to fill in the measured values, then complete the remaining checks."),
-    sphinxFile, sphinxInfo), el("br"));
-  if (!t.items.length) return;
-  app.append(el("div", { class: "row" }, field("QA date", qaDate), el("div", { class: "spacer" }), overallChip));
-  app.append(el("br"), table(["Test", "Expected / limits", "Result", "Status", "Comment"], rows));
+  app.append(el("div", { class: "card step" }, el("strong", {}, "Sphinx file"),
+    el("span", { class: "muted small" }, " Optional. Fills in every measured value."), el("div", {}, sphinxFile), sphinxInfo));
+  if (!t.items.length) {
+    app.append(el("div", { class: "card empty" }, "This list has no checks yet. ",
+      can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add checks"), ", or load a Sphinx file above."] : ""));
+    return;
+  }
+  app.append(...sections.map((s) => s.box));
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
@@ -579,7 +662,9 @@ async function renderPerform(assignmentId) {
       submit.disabled = false;
     }
   } }, "Submit for review");
-  app.append(el("h2", {}, "Notes"), runComment, error, el("div", { class: "row" }, el("a", { class: "button", href: "#/" }, "Cancel"), submit));
+  app.append(el("details", { class: "card" }, el("summary", {}, "Notes for the reviewer"), runComment), error);
+  app.append(el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
+    el("div", { class: "spacer" }), el("a", { class: "button", href: "#/" }, "Cancel"), submit));
   refresh();
   if (state.applySphinxOnLoad && state.sphinxFile) {
     state.applySphinxOnLoad = false;
@@ -619,26 +704,55 @@ function importSphinxDialog(a) {
 // Queues and test library
 // ---------------------------------------------------------------------------
 
+function duplicateDialog(source, machines) {
+  // Name the copy, and optionally put it straight onto a machine.
+  const body = el("div", {},
+    el("p", { class: "muted" }, `Every check in "${source.name}" is copied, so the new list's limits can be adjusted on its own.`),
+    el("div", { class: "form-grid" },
+      field("Name for the copy", el("input", { name: "name", required: true, placeholder: `${source.name.replace(/ template$/i, "")} – GTR2` }), "wide"),
+      field("Schedule on", select("machine_id", [["", "Not yet"], ...machines.filter((m) => m.active).map((m) => [m.id, m.name])], ""))),
+    el("div", { class: "schedule-part", hidden: true }, scheduleForm(null)));
+  const machinePick = body.querySelector("[name=machine_id]");
+  const schedulePart = body.querySelector(".schedule-part");
+  machinePick.addEventListener("change", () => (schedulePart.hidden = !machinePick.value));
+  modal(`Duplicate ${source.name}`, body, async (data, form) => {
+    const payload = { name: data.name, machine_id: data.machine_id || null, ...(data.machine_id ? scheduleData(data, form) : {}) };
+    const r = await api("POST", `/api/queues/${source.id}/duplicate`, payload);
+    toast("QA list created");
+    location.hash = r.assignment_id ? `#/machines/${data.machine_id}` : `#/queues/${r.id}`;
+  }, "Duplicate");
+}
+
 async function renderQueues() {
-  const queues = await api("GET", "/api/queues");
-  page("QA queues", "A queue is an ordered list of tests that you schedule on one or more machines.",
-    can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New queue")] : []);
-  app.append(table(["Queue", "#Tests", "#Machines", "Status"], queues.map((q) =>
-    el("tr", { class: "clickable", onclick: () => (location.hash = `#/queues/${q.id}`) },
-      el("td", {}, el("strong", {}, q.name), q.description ? el("div", { class: "muted small" }, q.description) : null),
-      el("td", { class: "num" }, q.item_count), el("td", { class: "num" }, q.machine_count),
-      el("td", {}, q.active ? chip("pass", "Active") : chip("", "Inactive")))), "No queues yet."));
+  const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
+  page("QA lists", "A template is the master copy. Duplicate it for each machine; each copy owns its checks and limits.",
+    can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
+  const templates = queues.filter((q) => q.is_template);
+  const lists = queues.filter((q) => !q.is_template);
+  const row = (q) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/queues/${q.id}`) },
+    el("td", {}, el("strong", {}, q.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+    el("td", { class: "num" }, q.item_count),
+    el("td", {}, q.is_template ? el("span", { class: "muted" }, "—") : q.machines || el("span", { class: "muted" }, "not scheduled")),
+    el("td", {}, q.active ? "" : chip("", "Inactive")),
+    el("td", {}, can("configure") ? el("button", { onclick: (e) => { e.stopPropagation(); duplicateDialog(q, machines); } }, "Duplicate") : null));
+  app.append(el("h2", {}, "Templates"));
+  app.append(templates.length ? table(["Template", "#Checks", "Machines", "", ""], templates.map(row))
+    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
+  app.append(el("h2", {}, "Machine lists"));
+  app.append(table(["QA list", "#Checks", "Scheduled on", "", ""], lists.map(row), "No machine lists yet. Duplicate a template to make one."));
 }
 
 async function renderQueueEditor(id) {
   const isNew = id === "new";
-  const [tests, queue] = await Promise.all([api("GET", "/api/tests"), isNew ? null : api("GET", `/api/queues/${id}`)]);
-  const q = queue || { name: "", description: "", active: 1, items: [] };
+  const [tests, queue, machines] = await Promise.all([api("GET", "/api/tests"), isNew ? null : api("GET", `/api/queues/${id}`), api("GET", "/api/machines")]);
+  const q = queue || { name: "", description: "", active: 1, is_template: 0, items: [] };
   const editable = can("configure");
-  page(isNew ? "New queue" : q.name, "Blank limits use the test library's defaults (shown as the placeholder).");
+  page(isNew ? "New QA list" : q.name, q.is_template ? "Template. Duplicate it to put it on a machine." : "Blank limits use each check's default, shown in grey.",
+    !isNew && editable ? [el("button", { onclick: () => duplicateDialog(q, machines) }, "Duplicate")] : []);
   const info = el("form", { class: "card" }, el("div", { class: "form-grid" },
-    field("Queue name", el("input", { name: "name", value: q.name, required: true, disabled: !editable, placeholder: "e.g. Daily QA - TG-224" })),
-    field("Description", el("textarea", { name: "description", disabled: !editable }, q.description), "wide"),
+    field("Name", el("input", { name: "name", value: q.name, required: true, disabled: !editable, placeholder: "e.g. Daily QA template" })),
+    field("Setup instructions (shown when performing)", el("textarea", { name: "description", disabled: !editable }, q.description), "wide"),
+    el("label", { class: "check" }, el("input", { type: "checkbox", name: "is_template", checked: !!q.is_template, disabled: !editable }), "Template (master copy; not scheduled directly)"),
     el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!q.active, disabled: !editable }), "Active")));
   app.append(info);
 
@@ -653,7 +767,7 @@ async function renderQueueEditor(id) {
       const input = (name, props) => el("input", { type: "number", step: "any", value: item[name] ?? "", placeholder: fmt(t[name]), disabled: !editable || !numeric,
         oninput: (e) => (item[name] = e.target.value), ...(props || {}) });
       return el("tr", { class: "compact" },
-        el("td", {}, el("strong", {}, t.name), el("div", { class: "muted small" }, [t.category, t.type, t.unit].filter(Boolean).join(" · "))),
+        el("td", {}, el("strong", {}, t.name), el("div", { class: "muted small" }, [t.category, t.type === "numeric" ? t.unit : t.type === "boolean" ? "pass / fail" : "text"].filter(Boolean).join(" · "))),
         el("td", {}, input("expected")),
         el("td", {}, input("warn", { min: 0 })),
         el("td", {}, input("fail", { min: 0 })),
@@ -662,32 +776,41 @@ async function renderQueueEditor(id) {
         el("td", {}, editable ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; draw(); } }, "↓"),
+          el("button", { class: "icon-btn", title: "Edit check", onclick: () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
+            await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+            toast("Check saved");
+            route();
+          }) }, "✎"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null));
     }));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Test", "Expected", "Warning ±", "Fail ±", "Tolerance", ""].map((h) => el("th", {}, h)))), body))
-      : el("div", { class: "card empty" }, "No tests in this queue yet."));
-    picker.replaceChildren(el("option", { value: "" }, "Add a test from the library…"),
-      ...tests.filter((t) => t.active && !items.some((i) => i.test_id === t.id)).map((t) => el("option", { value: t.id }, testLabel(t))));
+      el("thead", {}, el("tr", {}, ["Check", "Expected", "Warning ±", "Fail ±", "Tolerance", ""].map((h) => el("th", {}, h)))), body))
+      : el("div", { class: "card empty" }, "No checks in this list yet."));
+    // Only this list's own checks (or shared library checks) can be added here.
+    picker.replaceChildren(el("option", { value: "" }, "Add an existing check…"),
+      ...tests.filter((t) => t.active && (!t.owner_queue_id || String(t.owner_queue_id) === id) && !items.some((i) => i.test_id === t.id))
+        .map((t) => el("option", { value: t.id }, testLabel(t))));
   };
   const picker = el("select", { onchange: (e) => { if (e.target.value) { items.push({ test_id: Number(e.target.value) }); draw(); } } });
-  app.append(el("h2", {}, "Tests"), holder);
+  app.append(el("h2", {}, "Checks"), holder);
   if (editable) {
-    app.append(el("div", { class: "row" }, el("div", {}, picker), el("a", { href: "#/tests" }, "Manage the test library")));
+    const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => modal("New check for this list", testForm(), async (data) => {
+      const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
+      items.push({ test_id: r.id });
+      await save();
+    }) }, "New check");
     const error = el("p", { class: "error" });
+    const save = async () => {
+      error.textContent = "";
+      const payload = { ...formData(info), items };
+      const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
+      toast("QA list saved");
+      location.hash = `#/queues/${result.id}`;
+      if (!isNew) route();
+    };
+    app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
     app.append(error, el("div", { class: "row" }, el("a", { class: "button", href: "#/queues" }, "Back"),
-      el("button", { class: "primary", onclick: async () => {
-        error.textContent = "";
-        try {
-          const payload = { ...formData(info), items };
-          const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
-          toast("Queue saved");
-          location.hash = `#/queues/${result.id}`;
-          if (!isNew) route();
-        } catch (err) {
-          error.textContent = err.message;
-        }
-      } }, "Save queue")));
+      el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save")));
   }
   draw();
 }
@@ -716,25 +839,44 @@ function testForm(test) {
 async function renderTests() {
   const tests = await api("GET", "/api/tests");
   const editable = can("configure");
-  page("Test library", "Default limits here can be adjusted per queue and per machine.", editable ? [el("button", {
+  page("Checks", "Grouped by category. Limits here are the defaults; a QA list or a machine can override them.", editable ? [el("button", {
     class: "primary",
-    onclick: () => modal("New test", testForm(), async (data) => {
+    onclick: () => modal("New check", testForm(), async (data) => {
       await api("POST", "/api/tests", data);
-      toast("Test added");
+      toast("Check added");
       route();
     }),
-  }, "New test")] : []);
-  app.append(table(["Category", "Test", "Type", "#Expected", "#Warning ±", "#Fail ±", "Tolerance", "Status"], tests.map((t) =>
-    el("tr", { class: editable ? "clickable" : "", onclick: editable ? () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-      await api("PUT", `/api/tests/${t.id}`, data);
-      toast("Test saved");
-      route();
-    }) : null },
-      el("td", {}, t.category), el("td", {}, el("strong", {}, t.name)), el("td", {}, t.type),
-      el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.expected)} ${t.unit}` : ""),
-      el("td", { class: "num" }, fmt(t.warn)), el("td", { class: "num" }, fmt(t.fail)),
-      el("td", {}, t.type === "numeric" ? t.tol_mode : ""),
-      el("td", {}, t.active ? chip("pass", "Active") : chip("", "Inactive")))), "No tests yet. Add the checks your queues will use."));
+  }, "New check")] : []);
+  const search = el("input", { type: "search", placeholder: "Filter checks…", "aria-label": "Filter checks", class: "search" });
+  const holder = el("div", { class: "stack" });
+  const draw = () => {
+    const needle = search.value.trim().toLowerCase();
+    const groups = new Map();
+    for (const t of tests) {
+      if (needle && !`${t.category} ${t.name}`.toLowerCase().includes(needle)) continue;
+      const key = t.category || "General";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(t);
+    }
+    holder.replaceChildren(...[...groups].map(([category, list]) => el("details", { class: "card section", open: !!needle || groups.size <= 3 },
+      el("summary", {}, el("strong", {}, category), el("span", { class: "section-summary" }, `${list.length}`)),
+      table(["Check", "Type", "#Expected", "#Warn ±", "#Fail ±", ""], list.map((t) =>
+        el("tr", { class: editable ? "clickable" : "", onclick: editable ? () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
+          await api("PUT", `/api/tests/${t.id}`, data);
+          toast("Check saved");
+          route();
+        }) : null },
+          el("td", {}, el("strong", {}, t.name.startsWith(category + " – ") ? t.name.slice(category.length + 3) : t.name)),
+          el("td", { class: "muted" }, t.type === "boolean" ? "Pass / fail" : t.type === "text" ? "Text" : "Measured"),
+          el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.expected)} ${t.unit}`.trim() : ""),
+          el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.warn)}${t.tol_mode === "percent" ? " %" : ""}` : ""),
+          el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.fail)}${t.tol_mode === "percent" ? " %" : ""}` : ""),
+          el("td", {}, t.active ? "" : chip("", "Inactive")))))));
+    if (!groups.size) holder.replaceChildren(el("div", { class: "card empty" }, tests.length ? "No checks match." : "No checks yet."));
+  };
+  search.addEventListener("input", draw);
+  app.append(search, el("br"), el("br"), holder);
+  draw();
 }
 
 // ---------------------------------------------------------------------------
@@ -744,60 +886,78 @@ async function renderTests() {
 async function renderRuns() {
   const params = queryParams();
   const [machines, queues, runs] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), api("GET", `/api/runs?${params}`)]);
-  page("History", "Every submitted QA run, newest first.");
+  page("History", "Newest first.");
   const filters = el("form", { class: "row" },
     select("machine_id", [["", "All machines"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
-    select("queue_id", [["", "All queues"], ...queues.map((q) => [q.id, q.name])], params.get("queue_id")),
+    select("queue_id", [["", "All QA lists"], ...queues.map((q) => [q.id, q.name])], params.get("queue_id")),
     select("review_status", [["", "Any review status"], ...Object.entries(REVIEW_LABEL)], params.get("review_status")));
   filters.addEventListener("change", () => {
     const next = new URLSearchParams(Object.entries(formData(filters)).filter(([, v]) => v));
     location.hash = `#/runs${next.toString() ? "?" + next : ""}`;
   });
   app.append(filters, el("br"));
-  app.append(table(["QA date", "Machine", "Queue", "Result", "Performed by", "Review"], runs.map((r) =>
+  app.append(table(["Date", "Machine", "QA list", "Result", "Review"], runs.map((r) =>
     el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
-      el("td", {}, r.qa_date), el("td", {}, r.machine_name), el("td", {}, r.queue_name),
-      el("td", {}, chip(r.overall)), el("td", {}, personName(r.performer_name, r.performer)),
-      el("td", {}, reviewChip(r.review_status)))), "No runs match."));
+      el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
+      el("td", {}, r.machine_name), el("td", {}, queueLabel(r.queue_name, r.machine_name)),
+      el("td", {}, chip(r.overall)),
+      el("td", {}, r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)))), "No runs match."));
 }
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(`${run.queue_name} · ${run.machine_name}`, `QA date ${run.qa_date}`);
-  app.append(el("div", { class: "card summary" },
-    el("div", {}, el("span", { class: "muted small" }, "Overall"), chip(run.overall)),
-    el("div", {}, el("span", { class: "muted small" }, "Performed by"), `${personName(run.performer_name, run.performer)} · ${run.performed_at.replace("T", " ")}`),
-    el("div", {}, el("span", { class: "muted small" }, "Source"), run.source === "sphinx" ? "Sphinx export" : "Manual entry"),
-    el("div", {}, el("span", { class: "muted small" }, "Review"), reviewChip(run.review_status),
-      run.reviewed_by ? ` ${personName(run.reviewer_name, run.reviewer)} · ${run.reviewed_at.replace("T", " ")}` : ""),
-    run.comment ? el("div", {}, el("span", { class: "muted small" }, "Notes"), run.comment) : null,
-    run.review_comment ? el("div", {}, el("span", { class: "muted small" }, "Review comment"), run.review_comment) : null));
-  app.append(el("br"), table(["Test", "Result", "Expected / limits at the time", "Status", "Comment"], run.results.map((r) => el("tr", {},
-    el("td", {}, el("strong", {}, r.name), el("div", { class: "muted small" }, r.category)),
-    el("td", {}, r.type === "boolean" ? (r.value_num ? "Pass" : "Fail") : r.type === "text" ? r.value_text : `${fmt(r.value_num)} ${r.unit}`),
-    el("td", { class: "small muted" }, r.type === "numeric" ? limitsText(r, r.unit) : ""),
-    el("td", {}, chip(r.status)),
-    el("td", {}, r.comment)))));
+  page(`${queueLabel(run.queue_name, run.machine_name)} · ${run.machine_name}`, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`);
+  const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
+  const facts = el("dl", { class: "result-card card" },
+    el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),
+    el("dt", {}, "Performed by"), el("dd", {}, who, run.source === "sphinx" ? el("span", { class: "muted small" }, " · from Sphinx file") : ""),
+    el("dt", {}, "Review"), el("dd", {}, reviewChip(run.review_status),
+      run.reviewed_by ? ` ${personName(run.reviewer_name, run.reviewer)}, ${run.reviewed_at.slice(0, 16).replace("T", " ")}` : ""),
+    run.comment ? [el("dt", {}, "Notes"), el("dd", { class: "pre" }, run.comment)] : null,
+    run.review_comment ? [el("dt", {}, "Review note"), el("dd", {}, run.review_comment)] : null);
+  app.append(facts);
+
   if (run.review_status === "pending" && can("review")) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
-      return;
+    } else {
+      const comment = el("textarea", { placeholder: "Note (required to reject)" });
+      const error = el("p", { class: "error" });
+      const decide = (decision) => async () => {
+        error.textContent = "";
+        try {
+          await api("POST", `/api/runs/${id}/review`, { decision, comment: comment.value });
+          toast(decision === "approved" ? "Approved" : "Rejected");
+          route();
+        } catch (err) {
+          error.textContent = err.message;
+        }
+      };
+      app.append(el("div", { class: "card review-box" }, el("strong", {}, "Your review"), comment, error, el("div", { class: "row" },
+        el("button", { class: "primary", onclick: decide("approved") }, "Approve"),
+        el("button", { class: "danger", onclick: decide("rejected") }, "Reject"))));
     }
-    const comment = el("textarea", { placeholder: "Review comment (required to reject)" });
-    const error = el("p", { class: "error" });
-    const decide = (decision) => async () => {
-      error.textContent = "";
-      try {
-        await api("POST", `/api/runs/${id}/review`, { decision, comment: comment.value });
-        toast(decision === "approved" ? "Run approved" : "Run rejected");
-        route();
-      } catch (err) {
-        error.textContent = err.message;
-      }
-    };
-    app.append(el("h2", {}, "Review"), comment, error, el("div", { class: "row" },
-      el("button", { class: "primary", onclick: decide("approved") }, "Approve"),
-      el("button", { class: "danger", onclick: decide("rejected") }, "Reject")));
+  }
+
+  // Problems first; passes are there but folded away.
+  const problems = run.results.filter((r) => r.status === "fail" || r.status === "warn");
+  const rest = run.results.filter((r) => !problems.includes(r));
+  const valueText = (r) => r.type === "boolean" ? (r.value_num ? "Pass" : "Fail") : r.type === "text" ? r.value_text : `${fmt(r.value_num)} ${r.unit}`.trim();
+  const rows = (list) => list.map((r) => el("tr", {},
+    el("td", {}, el("strong", {}, r.name), r.comment ? el("div", { class: "muted small" }, r.comment) : null),
+    el("td", { class: "num" }, valueText(r)),
+    el("td", { class: "small muted" }, r.type === "numeric" ? limitsText(r, r.unit) : ""),
+    el("td", {}, chip(r.status))));
+  const headers = ["Check", "#Result", "Expected / limits", "Status"];
+  if (problems.length) {
+    app.append(el("h2", {}, `${problems.length} to look at`), table(headers, rows(problems)));
+  } else {
+    app.append(el("p", { class: "lead" }, "Everything passed."));
+  }
+  if (rest.length) {
+    app.append(el("details", { class: "card", open: !problems.length && rest.length <= 12 },
+      el("summary", {}, `${rest.length} ${problems.length ? "other" : ""} ${rest.length === 1 ? "check" : "checks"}`),
+      table(headers, rows(rest))));
   }
 }
 

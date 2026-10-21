@@ -16,7 +16,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from portal import auth, service
+from portal import auth, checklist, service, sphinx
 from portal.db import Database
 from portal.server import PortalServer
 
@@ -42,6 +42,10 @@ def main(argv=None):
     imp.add_argument("--create", action="store_true", help="create the machine, queue, and a weekday-daily schedule if missing")
     imp.add_argument("--pending", action="store_true", help="mark runs as awaiting review instead of historical")
     imp.add_argument("paths", nargs="+", help=".xls files or folders (searched recursively)")
+    chk = commands.add_parser("import-checklist", help="add the manual checks from a myQA daily-QA template to a queue")
+    chk.add_argument("--queue", required=True)
+    chk.add_argument("--user", required=True)
+    chk.add_argument("template", help="myQA template export (.xls)")
     args = parser.parse_args(argv)
 
     db = Database(args.db)
@@ -54,6 +58,8 @@ def main(argv=None):
 def run_command(db, args):
     if args.command == "import-sphinx":
         return import_sphinx(db, args)
+    if args.command == "import-checklist":
+        return import_checklist(db, args)
     if args.command == "create-admin":
         password = getpass.getpass("New admin password (10+ characters): ")
         if password != getpass.getpass("Repeat password: "):
@@ -79,6 +85,19 @@ def run_command(db, args):
         pass
     finally:
         server.server_close()
+
+
+def import_checklist(db, args):
+    user = db.one("SELECT id, username, full_name, role FROM users WHERE username = ? AND active = 1", (args.user,))
+    queue = db.one("SELECT id FROM queues WHERE name = ?", (args.queue,))
+    if not user or not queue:
+        sys.exit("User or queue not found.")
+    try:
+        parsed = checklist.parse_file(Path(args.template).read_bytes())
+        result = service.import_checklist(db, user, queue["id"], parsed)
+    except (service.PortalError, sphinx.SphinxError) as exc:
+        sys.exit(str(exc))
+    print(f"Added {len(result['added'])} check(s) to {args.queue}.")
 
 
 def import_sphinx(db, args):

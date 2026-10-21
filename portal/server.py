@@ -110,6 +110,11 @@ def edit_queue(db, user, m, body, q):
     return service.save_queue(db, user, body, int(m[1]))
 
 
+@route("POST", r"/api/queues/(\d+)/duplicate")
+def duplicate_queue(db, user, m, body, q):
+    return service.duplicate_queue(db, user, int(m[1]), body)
+
+
 @route("POST", "/api/assignments")
 def new_assignment(db, user, m, body, q):
     return service.save_assignment(db, user, body)
