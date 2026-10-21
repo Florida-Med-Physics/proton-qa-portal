@@ -1,0 +1,3 @@
+# The portal itself uses only the standard library.
+# xlrd reads the legacy .xls Sphinx exports (Sphinx import only).
+xlrd==2.0.1

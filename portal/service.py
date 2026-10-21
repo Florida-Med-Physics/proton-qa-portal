@@ -1,8 +1,10 @@
 """Portal operations. Each function takes the database, the acting user, and plain data."""
 
+import base64
+import binascii
 from datetime import date
 
-from . import auth, qa
+from . import auth, qa, sphinx
 from .db import now
 
 
@@ -362,22 +364,162 @@ def submit_run(db, user, assignment_id, data):
         raise PortalError("Missing results for: " + ", ".join(missing))
     if not results:
         raise PortalError("This queue has no tests.")
-    result_overall = qa.overall(r[2] for r in results)
+    source_ref = _text(data, "source_ref") or None
+    _check_not_imported(db, source_ref)
+    rows = [{"test_id": item["test_id"], "value_num": float(value) if item["type"] != "text" else None,
+             "value_text": value if item["type"] == "text" else None, "limits": item["limits"], "status": status, "comment": comment}
+            for item, value, status, comment in results]
+    return _insert_run(db, user, template, qa_date.isoformat(), rows, _text(data, "comment"),
+                       "sphinx" if source_ref else "manual", source_ref, "pending")
+
+
+def _check_not_imported(db, source_ref):
+    if source_ref:
+        existing = db.one("SELECT id, qa_date FROM runs WHERE source_ref = ?", (source_ref,))
+        if existing:
+            raise PortalError(f"This Sphinx file was already recorded as run #{existing['id']} ({existing['qa_date']}).")
+
+
+def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, review_status):
+    result_overall = qa.overall(r["status"] for r in rows)
     with db.transaction():
         run_id = db.run(
-            "INSERT INTO runs (assignment_id, machine_id, queue_id, performed_by, performed_at, qa_date, overall, comment) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (assignment_id, template["machine"]["id"], template["queue"]["id"], user["id"], now(), qa_date.isoformat(),
-             result_overall, _text(data, "comment")))
-        for item, value, status, comment in results:
-            limits = item["limits"]
+            "INSERT INTO runs (assignment_id, machine_id, queue_id, performed_by, performed_at, qa_date, overall, comment, source, "
+            "source_ref, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (template["assignment"]["id"], template["machine"]["id"], template["queue"]["id"], user["id"], now(), qa_date,
+             result_overall, comment, source, source_ref, review_status))
+        for r in rows:
+            limits = r["limits"]
             db.run("INSERT INTO results (run_id, test_id, value_num, value_text, expected, warn, fail, tol_mode, status, comment) "
                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                   (run_id, item["test_id"], float(value) if item["type"] != "text" else None,
-                    value if item["type"] == "text" else None,
-                    limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], status, comment))
-        db.audit(user["id"], "submit", "run", run_id, machine=template["machine"]["name"], queue=template["queue"]["name"], overall=result_overall)
+                   (run_id, r["test_id"], r["value_num"], r["value_text"], limits["expected"], limits["warn"], limits["fail"],
+                    limits["tol_mode"], r["status"], r["comment"]))
+        db.audit(user["id"], "import" if review_status == "imported" else "submit", "run", run_id,
+                 machine=template["machine"]["name"], queue=template["queue"]["name"], overall=result_overall, source=source)
     return {"id": run_id, "overall": result_overall}
+
+
+# ---- Sphinx exports ------------------------------------------------------------
+
+SPHINX_STATUS = {"Passed": "pass", "Warning": "warn", "Failed": "fail"}
+
+
+def _parse_sphinx(name, data):
+    try:
+        return sphinx.parse_file(data, name)
+    except sphinx.SphinxError as exc:
+        raise PortalError(f"{name}: {exc}")
+
+
+def _decode_upload(upload):
+    try:
+        return upload.get("name") or "upload.xls", base64.b64decode(upload.get("data") or "", validate=True)
+    except (binascii.Error, ValueError):
+        raise PortalError("The uploaded file could not be read.")
+
+
+def _file_limits(m):
+    return {"expected": m["expected"], "warn": m["warn"], "fail": m["fail"], "tol_mode": m["tol_mode"]}
+
+
+def _sphinx_test_ids(db, user, template, measurements, create):
+    """Map each measurement to a test in this queue, adding library tests and queue items if allowed."""
+    in_queue = {(i["category"], i["name"]): i["test_id"] for i in template["items"]}
+    ids, added = {}, []
+    for m in measurements:
+        key = (m["category"], m["name"])
+        if key in in_queue:
+            ids[key] = in_queue[key]
+            continue
+        if not create:
+            continue
+        require(user, "configure")
+        test = db.one("SELECT id FROM tests WHERE category = ? AND name = ?", key)
+        test_id = test["id"] if test else save_test(db, user, {
+            "category": m["category"], "name": m["name"], "unit": m["unit"], "expected": m["expected"], "warn": m["warn"],
+            "fail": m["fail"], "tol_mode": m["tol_mode"], "description": "Measured by Sphinx; imported from the daily QA export."})["id"]
+        position = db.one("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM queue_items WHERE queue_id = ?", (template["queue"]["id"],))["p"]
+        db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (template["queue"]["id"], test_id, position))
+        ids[key] = in_queue[key] = test_id
+        added.append(m["name"])
+    if added:
+        db.audit(user["id"], "add_sphinx_tests", "queue", template["queue"]["id"], tests=added)
+    return ids, added
+
+
+def sphinx_preview(db, user, assignment_id, upload):
+    """Match one Sphinx file to the queue so the entry form can be filled in."""
+    require(user, "perform")
+    name, data = _decode_upload(upload)
+    parsed = _parse_sphinx(name, data)
+    template = run_template(db, user, assignment_id)
+    items = {(i["category"], i["name"]): i for i in template["items"]}
+    matched, unmatched = [], []
+    for m in parsed["measurements"]:
+        item = items.get((m["category"], m["name"]))
+        if not item:
+            unmatched.append(m)
+            continue
+        file_limits = _file_limits(m)
+        differs = any(item["limits"][k] != file_limits[k] for k in file_limits)
+        matched.append({"test_id": item["test_id"], "value": m["result"], "sphinx_status": m["sphinx_status"],
+                        "file_limits": file_limits, "limits_differ": differs})
+    duplicate = db.one("SELECT id FROM runs WHERE source_ref = ?", (parsed["sha256"],))
+    return {"filename": name, "qa_date": parsed["qa_date"], "finished": parsed["finished"], "sphinx_user": parsed["sphinx_user"],
+            "source_ref": parsed["sha256"], "duplicate_run": duplicate["id"] if duplicate else None,
+            "matched": matched, "unmatched": [{"category": m["category"], "name": m["name"], "unit": m["unit"]} for m in unmatched]}
+
+
+def sphinx_add_tests(db, user, assignment_id, upload):
+    require(user, "configure")
+    name, data = _decode_upload(upload)
+    parsed = _parse_sphinx(name, data)
+    _, added = _sphinx_test_ids(db, user, run_template(db, user, assignment_id), parsed["measurements"], create=True)
+    return {"added": added}
+
+
+def import_sphinx(db, user, assignment_id, files, historical=True):
+    """Record Sphinx files as runs. Each result keeps the limits and verdict from its own file.
+
+    files: iterable of (filename, bytes). Duplicate files (same content) are skipped.
+    """
+    require(user, "configure")
+    template = run_template(db, user, assignment_id)
+    imported, skipped = [], []
+    for name, data in files:
+        try:
+            parsed = _parse_sphinx(name, data)
+            _check_not_imported(db, parsed["sha256"])
+            ids, added = _sphinx_test_ids(db, user, template, parsed["measurements"], create=True)
+        except PortalError as exc:
+            skipped.append({"file": name, "reason": str(exc).removeprefix(f"{name}: ")})
+            continue
+        if added:
+            template = run_template(db, user, assignment_id)
+        rows = []
+        for m in parsed["measurements"]:
+            limits = _file_limits(m)
+            try:
+                ours = qa.evaluate("numeric", m["result"], limits)
+            except ValueError:
+                ours = "recorded"
+            status = SPHINX_STATUS.get(m["sphinx_status"], ours)
+            note = f"Sphinx: {m['sphinx_status']}; portal rule on the rounded values gives {ours}." if status != ours else ""
+            rows.append({"test_id": ids[(m["category"], m["name"])], "value_num": m["result"], "value_text": None,
+                         "limits": limits, "status": status, "comment": note})
+        comment = f"Imported from {name}. Sphinx finished {parsed['finished'].replace('T', ' ')}" + \
+                  (f" by {parsed['sphinx_user']}." if parsed["sphinx_user"] else ".")
+        run = _insert_run(db, user, template, parsed["qa_date"], rows, comment, "sphinx", parsed["sha256"],
+                          "imported" if historical else "pending")
+        imported.append({"file": name, "run_id": run["id"], "qa_date": parsed["qa_date"], "overall": run["overall"]})
+    return {"imported": imported, "skipped": skipped}
+
+
+def import_sphinx_uploads(db, user, assignment_id, data):
+    files = [_decode_upload(u) for u in data.get("files") or []]
+    if not files:
+        raise PortalError("Choose one or more Sphinx .xls files.")
+    return import_sphinx(db, user, assignment_id, files, historical=bool(data.get("historical", True)))
 
 
 _RUN_SELECT = ("SELECT r.*, m.name AS machine_name, q.name AS queue_name, pu.full_name AS performer_name, pu.username AS performer, "

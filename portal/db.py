@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS runs (
     overall TEXT NOT NULL,
     comment TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'manual',
-    review_status TEXT NOT NULL DEFAULT 'pending' CHECK (review_status IN ('pending', 'approved', 'rejected')),
+    source_ref TEXT,
+    review_status TEXT NOT NULL DEFAULT 'pending' CHECK (review_status IN ('pending', 'approved', 'rejected', 'imported')),
     reviewed_by INTEGER REFERENCES users(id),
     reviewed_at TEXT,
     review_comment TEXT NOT NULL DEFAULT ''
@@ -119,6 +120,7 @@ CREATE TABLE IF NOT EXISTS audit (
 );
 CREATE INDEX IF NOT EXISTS runs_by_assignment ON runs (assignment_id, qa_date);
 CREATE INDEX IF NOT EXISTS results_by_test ON results (test_id);
+CREATE UNIQUE INDEX IF NOT EXISTS runs_by_source ON runs (source_ref) WHERE source_ref IS NOT NULL;
 """
 
 
@@ -138,6 +140,10 @@ class Database:
         self.conn.execute("PRAGMA foreign_keys = ON")
         if self.path != ":memory:":
             self.conn.execute("PRAGMA journal_mode = WAL")
+        run_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(runs)")}
+        if run_columns and "source_ref" not in run_columns:
+            raise RuntimeError(f"{self.path} was made by the first preview build and cannot be upgraded. "
+                               "Delete it and start again (for the demo, rerun seed_demo.py).")
         self.conn.executescript(SCHEMA)
         self.lock = threading.RLock()
 
@@ -153,6 +159,10 @@ class Database:
     def run(self, sql, params=()):
         with self.lock:
             return self.conn.execute(sql, params).lastrowid
+
+    def close(self):
+        with self.lock:
+            self.conn.close()
 
     def transaction(self):
         return _Transaction(self)

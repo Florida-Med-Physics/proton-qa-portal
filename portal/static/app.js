@@ -41,6 +41,21 @@ function chip(status, label) {
   return el("span", { class: `chip ${status || ""}` }, label || capitalize(status || "-"));
 }
 
+const REVIEW_LABEL = { pending: "Awaiting review", approved: "Approved", rejected: "Rejected", imported: "Historical import" };
+
+function reviewChip(status) {
+  return chip(status === "imported" ? "" : status, REVIEW_LABEL[status] || capitalize(status));
+}
+
+function readFileBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ name: file.name, data: String(reader.result).split(",")[1] || "" });
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+    reader.readAsDataURL(file);
+  });
+}
+
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
@@ -395,6 +410,7 @@ async function renderMachine(id) {
         route();
       }) }, "Schedule") : null,
       can("configure") ? el("a", { class: "button", href: `#/assignments/${a.id}/limits` }, "Adjust limits") : null,
+      can("configure") ? el("button", { onclick: () => importSphinxDialog(a) }, "Import Sphinx") : null,
       el("a", { class: "button", href: `#/runs?machine_id=${id}&queue_id=${a.queue_id}` }, "History"))))),
     "No QA queues scheduled on this machine yet."));
 }
@@ -468,8 +484,9 @@ async function renderPerform(assignmentId) {
     else if (item.type === "boolean") input = select("", [["", "Choose"], ["pass", "Pass"], ["fail", "Fail"]], "", { class: "result-input", "aria-label": item.name });
     else input = el("input", { type: "text", "aria-label": item.name });
     const comment = el("input", { type: "text", placeholder: "Comment", "aria-label": `${item.name} comment` });
+    const note = el("div", { class: "muted small" });
     const entry = {
-      item, input, comment, required: item.type !== "text",
+      item, input, comment, note, required: item.type !== "text",
       status() {
         const raw = input.value.trim();
         if (!raw) return null;
@@ -486,7 +503,7 @@ async function renderPerform(assignmentId) {
     input.addEventListener("change", update);
     inputs.push(entry);
     rows.push(el("tr", {},
-      el("td", {}, el("strong", {}, item.name), item.description ? el("div", { class: "muted small" }, item.description) : null),
+      el("td", {}, el("strong", {}, item.name), item.description ? el("div", { class: "muted small" }, item.description) : null, note),
       el("td", { class: "small muted" }, item.type === "numeric" ? limitsText(item.limits, item.unit) : item.type === "boolean" ? "Pass / fail" : "Record"),
       el("td", {}, el("div", { class: "row" }, input, item.type === "numeric" && item.unit ? el("span", { class: "muted" }, item.unit) : null)),
       statusCell,
@@ -494,11 +511,53 @@ async function renderPerform(assignmentId) {
   }
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This queue has no tests yet. ",
-      can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, "Add tests to it.") : ""));
-    return;
+      can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add tests to it"), ", or choose a Sphinx file below to add its measurements."] : ""), el("br"));
   }
   const qaDate = el("input", { type: "date", value: today(), max: today() });
   const runComment = el("textarea", { placeholder: "Notes for the reviewer (optional)" });
+  let sourceRef = null;
+  const sphinxInfo = el("div", { class: "small" });
+  const applySphinx = async () => {
+    const p = await api("POST", `/api/assignments/${assignmentId}/sphinx/preview`, { file: state.sphinxFile });
+    sourceRef = p.source_ref;
+    qaDate.value = p.qa_date;
+    const byTest = Object.fromEntries(inputs.map((i) => [i.item.test_id, i]));
+    for (const m of p.matched) {
+      const entry = byTest[m.test_id];
+      entry.input.value = m.value;
+      entry.input.dispatchEvent(new Event("input"));
+      entry.note.replaceChildren(`Sphinx: ${m.sphinx_status || "no status"}`,
+        m.limits_differ ? ` · file limits ${limitsText(m.file_limits, entry.item.unit)}` : "");
+    }
+    sphinxInfo.replaceChildren(el("div", {},
+      el("div", {}, `Filled ${p.matched.length} value(s) from ${p.filename}. Sphinx finished ${p.finished.replace("T", " ")}${p.sphinx_user ? " by " + p.sphinx_user : ""}.`),
+      p.duplicate_run ? el("div", { class: "error" }, "This file is already recorded as ", el("a", { href: `#/runs/${p.duplicate_run}` }, `run #${p.duplicate_run}`), ".") : null,
+      p.unmatched.length ? el("div", { class: "row" }, `${p.unmatched.length} measurement(s) in the file are not in this queue.`,
+        can("configure") ? el("button", { onclick: async () => {
+          try {
+            const r = await api("POST", `/api/assignments/${assignmentId}/sphinx/tests`, { file: state.sphinxFile });
+            toast(`Added ${r.added.length} test(s) to the queue`);
+            state.applySphinxOnLoad = true;
+            route();
+          } catch (err) {
+            toast(err.message, true);
+          }
+        } }, "Add them to this queue") : "Ask a physicist to add them.") : null));
+  };
+  const sphinxFile = el("input", { type: "file", accept: ".xls", "aria-label": "Sphinx export file" });
+  sphinxFile.addEventListener("change", async () => {
+    if (!sphinxFile.files[0]) return;
+    try {
+      state.sphinxFile = await readFileBase64(sphinxFile.files[0]);
+      await applySphinx();
+    } catch (err) {
+      sphinxInfo.replaceChildren(el("span", { class: "error" }, err.message));
+    }
+  });
+  app.append(el("div", { class: "card" }, el("h3", {}, "Fill from a Sphinx file"),
+    el("p", { class: "muted small" }, "Choose today's Sphinx .xls export to fill in the measured values, then complete the remaining checks."),
+    sphinxFile, sphinxInfo), el("br"));
+  if (!t.items.length) return;
   app.append(el("div", { class: "row" }, field("QA date", qaDate), el("div", { class: "spacer" }), overallChip));
   app.append(el("br"), table(["Test", "Expected / limits", "Result", "Status", "Comment"], rows));
   const error = el("p", { class: "error" });
@@ -507,7 +566,7 @@ async function renderPerform(assignmentId) {
     submit.disabled = true;
     try {
       const results = inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value.trim(), comment: i.comment.value }));
-      const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results });
+      const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef });
       toast(`Saved. Overall: ${capitalize(result.overall)}`);
       location.hash = `#/runs/${result.id}`;
     } catch (err) {
@@ -518,6 +577,38 @@ async function renderPerform(assignmentId) {
   } }, "Submit for review");
   app.append(el("h2", {}, "Notes"), runComment, error, el("div", { class: "row" }, el("a", { class: "button", href: "#/" }, "Cancel"), submit));
   refresh();
+  if (state.applySphinxOnLoad && state.sphinxFile) {
+    state.applySphinxOnLoad = false;
+    await applySphinx();
+  }
+}
+
+function importSphinxDialog(a) {
+  const files = el("input", { type: "file", accept: ".xls", multiple: true });
+  const progress = el("p", { class: "muted small" });
+  modal(`Import Sphinx files: ${a.queue_name}`, el("div", {},
+    el("p", { class: "muted" }, "Each file becomes a run with the values, limits and Sphinx verdicts recorded in that file. Files already imported are skipped, and tests not yet in the queue are added."),
+    field("Sphinx .xls exports", files),
+    el("br"),
+    el("label", { class: "check" }, el("input", { type: "checkbox", name: "historical", checked: true }), "Historical records (no review needed)"),
+    progress), async (data) => {
+    const list = [...files.files];
+    if (!list.length) throw new Error("Choose one or more files.");
+    const summary = { imported: [], skipped: [] };
+    for (let i = 0; i < list.length; i += 25) {
+      progress.textContent = `Importing ${i + 1}–${Math.min(i + 25, list.length)} of ${list.length}…`;
+      const batch = await Promise.all(list.slice(i, i + 25).map(readFileBase64));
+      const r = await api("POST", `/api/assignments/${a.id}/sphinx/import`, { files: batch, historical: data.historical });
+      summary.imported.push(...r.imported);
+      summary.skipped.push(...r.skipped);
+    }
+    const failed = summary.imported.filter((r) => r.overall === "fail").length;
+    modal("Import finished", el("div", {},
+      el("p", {}, `${summary.imported.length} run(s) imported, ${failed} with a failing result. ${summary.skipped.length} file(s) skipped.`),
+      summary.skipped.length ? el("ul", { class: "small" }, summary.skipped.map((s) => el("li", {}, `${s.file}: ${s.reason}`))) : null),
+    async () => {}, "OK");
+    route();
+  }, "Import");
 }
 
 // ---------------------------------------------------------------------------
@@ -653,7 +744,7 @@ async function renderRuns() {
   const filters = el("form", { class: "row" },
     select("machine_id", [["", "All machines"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
     select("queue_id", [["", "All queues"], ...queues.map((q) => [q.id, q.name])], params.get("queue_id")),
-    select("review_status", [["", "Any review status"], ["pending", "Awaiting review"], ["approved", "Approved"], ["rejected", "Rejected"]], params.get("review_status")));
+    select("review_status", [["", "Any review status"], ...Object.entries(REVIEW_LABEL)], params.get("review_status")));
   filters.addEventListener("change", () => {
     const next = new URLSearchParams(Object.entries(formData(filters)).filter(([, v]) => v));
     location.hash = `#/runs${next.toString() ? "?" + next : ""}`;
@@ -663,7 +754,7 @@ async function renderRuns() {
     el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
       el("td", {}, r.qa_date), el("td", {}, r.machine_name), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)), el("td", {}, personName(r.performer_name, r.performer)),
-      el("td", {}, chip(r.review_status, r.review_status === "pending" ? "Awaiting review" : capitalize(r.review_status))))), "No runs match."));
+      el("td", {}, reviewChip(r.review_status)))), "No runs match."));
 }
 
 async function renderRun(id) {
@@ -672,7 +763,8 @@ async function renderRun(id) {
   app.append(el("div", { class: "card summary" },
     el("div", {}, el("span", { class: "muted small" }, "Overall"), chip(run.overall)),
     el("div", {}, el("span", { class: "muted small" }, "Performed by"), `${personName(run.performer_name, run.performer)} · ${run.performed_at.replace("T", " ")}`),
-    el("div", {}, el("span", { class: "muted small" }, "Review"), chip(run.review_status, run.review_status === "pending" ? "Awaiting review" : capitalize(run.review_status)),
+    el("div", {}, el("span", { class: "muted small" }, "Source"), run.source === "sphinx" ? "Sphinx export" : "Manual entry"),
+    el("div", {}, el("span", { class: "muted small" }, "Review"), reviewChip(run.review_status),
       run.reviewed_by ? ` ${personName(run.reviewer_name, run.reviewer)} · ${run.reviewed_at.replace("T", " ")}` : ""),
     run.comment ? el("div", {}, el("span", { class: "muted small" }, "Notes"), run.comment) : null,
     run.review_comment ? el("div", {}, el("span", { class: "muted small" }, "Review comment"), run.review_comment) : null));
@@ -741,14 +833,15 @@ function trendChart(points, unit) {
   const ticks = [];
   for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) ticks.push(v);
   const labelEvery = Math.max(1, Math.ceil(points.length / 8));
+  const multiYear = points[0].qa_date.slice(0, 4) !== points[points.length - 1].qa_date.slice(0, 4);
   return svg("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Trend chart" },
     outer ? svg("polygon", { class: "band-fail", points: outer }) : null,
     inner ? svg("polygon", { class: "band-warn", points: inner }) : null,
     ticks.map((v) => [svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }), svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, fmt(v, decimals))]),
     svg("polyline", { class: "expected", points: points.filter((p) => p.expected !== null).map((p) => `${x(points.indexOf(p))},${y(p.expected)}`).join(" ") }),
     svg("polyline", { class: "series", points: points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ") }),
-    points.map((p, i) => svg("circle", { class: p.status, cx: x(i), cy: y(p.value), r: 4 }, svg("title", {}, `${p.qa_date}: ${fmt(p.value)} ${unit || ""} (${p.status})`))),
-    points.map((p, i) => (i % labelEvery === 0 ? svg("text", { x: x(i), y: H - B + 18, "text-anchor": "middle" }, p.qa_date.slice(5)) : null)));
+    points.map((p, i) => svg("circle", { class: p.status, cx: x(i), cy: y(p.value), r: points.length > 150 ? 2.5 : 4 }, svg("title", {}, `${p.qa_date}: ${fmt(p.value)} ${unit || ""} (${p.status})`))),
+    points.map((p, i) => (i % labelEvery === 0 ? svg("text", { x: x(i), y: H - B + 18, "text-anchor": "middle" }, multiYear ? p.qa_date.slice(0, 7) : p.qa_date.slice(5)) : null)));
 }
 
 async function renderTrends() {
@@ -758,7 +851,8 @@ async function renderTrends() {
   const numeric = tests.filter((t) => t.type === "numeric");
   const form = el("form", { class: "row" },
     select("machine_id", [["", "Choose a machine"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
-    select("test_id", [["", "Choose a test"], ...numeric.map((t) => [t.id, `${t.category ? t.category + " – " : ""}${t.name}`])], params.get("test_id")));
+    select("test_id", [["", "Choose a test"], ...numeric.map((t) => [t.id, `${t.category ? t.category + " – " : ""}${t.name}`])], params.get("test_id")),
+    select("range", [["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], params.get("range") || "365"));
   form.addEventListener("change", () => {
     const data = formData(form);
     location.hash = `#/trends?${new URLSearchParams(Object.entries(data).filter(([, v]) => v))}`;
@@ -769,8 +863,15 @@ async function renderTrends() {
     return;
   }
   const data = await api("GET", `/api/trend?machine_id=${params.get("machine_id")}&test_id=${params.get("test_id")}`);
+  const range = params.get("range") || "365";
+  if (range !== "all" && data.points.length) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - Number(range));
+    const from = cutoff.toISOString().slice(0, 10);
+    data.points = data.points.filter((p) => p.qa_date >= from);
+  }
   if (!data.points.length) {
-    app.append(el("div", { class: "card empty" }, "No results recorded for this test on this machine yet."));
+    app.append(el("div", { class: "card empty" }, "No results recorded for this test on this machine in this period."));
     return;
   }
   app.append(el("div", { class: "legend" },
@@ -779,7 +880,7 @@ async function renderTrends() {
     el("span", {}, el("span", { class: "swatch fail" }), "Within fail limit"),
     el("span", {}, "Dashed line: expected value")));
   app.append(trendChart(data.points, data.test.unit));
-  app.append(el("h2", {}, "Values"), table(["QA date", "#Value", "#Expected", "Status"], data.points.slice().reverse().map((p) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${p.run_id}`) },
+  app.append(el("h2", {}, data.points.length > 100 ? "Latest 100 values" : "Values"), table(["QA date", "#Value", "#Expected", "Status"], data.points.slice(-100).reverse().map((p) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${p.run_id}`) },
     el("td", {}, p.qa_date), el("td", { class: "num" }, `${fmt(p.value)} ${data.test.unit}`), el("td", { class: "num" }, fmt(p.expected)), el("td", {}, chip(p.status))))));
 }
 

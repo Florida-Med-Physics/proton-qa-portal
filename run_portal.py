@@ -3,6 +3,8 @@
   python run_portal.py create-admin         first-time setup (prompts for a password)
   python run_portal.py serve                local only, http://127.0.0.1:8790
   python run_portal.py serve --host 0.0.0.0 share on the network
+  python run_portal.py import-sphinx --machine G1 --queue "Sphinx Daily QA" --user admin --create "G:\\...\\G1 Sphinx"
+                                            load Sphinx .xls exports (files or folders) as historical runs
 
 The database location defaults to data/portal.db and can be set with --db or PROTON_QA_DB.
 """
@@ -14,7 +16,7 @@ import sys
 import webbrowser
 from pathlib import Path
 
-from portal import auth
+from portal import auth, service
 from portal.db import Database
 from portal.server import PortalServer
 
@@ -33,9 +35,25 @@ def main(argv=None):
     admin = commands.add_parser("create-admin")
     admin.add_argument("--username", default="admin")
     admin.add_argument("--full-name", default="")
+    imp = commands.add_parser("import-sphinx", help="import Sphinx daily QA .xls exports")
+    imp.add_argument("--machine", required=True, help="machine name in the portal")
+    imp.add_argument("--queue", required=True, help="queue name in the portal")
+    imp.add_argument("--user", required=True, help="portal username recorded as the importer (admin or physicist)")
+    imp.add_argument("--create", action="store_true", help="create the machine, queue, and a weekday-daily schedule if missing")
+    imp.add_argument("--pending", action="store_true", help="mark runs as awaiting review instead of historical")
+    imp.add_argument("paths", nargs="+", help=".xls files or folders (searched recursively)")
     args = parser.parse_args(argv)
 
     db = Database(args.db)
+    try:
+        run_command(db, args)
+    finally:
+        db.close()
+
+
+def run_command(db, args):
+    if args.command == "import-sphinx":
+        return import_sphinx(db, args)
     if args.command == "create-admin":
         password = getpass.getpass("New admin password (10+ characters): ")
         if password != getpass.getpass("Repeat password: "):
@@ -61,6 +79,46 @@ def main(argv=None):
         pass
     finally:
         server.server_close()
+
+
+def import_sphinx(db, args):
+    user = db.one("SELECT id, username, full_name, role FROM users WHERE username = ? AND active = 1", (args.user,))
+    if not user:
+        sys.exit(f"No active portal user '{args.user}'.")
+    try:
+        machine = db.one("SELECT id FROM machines WHERE name = ?", (args.machine,))
+        if not machine and args.create:
+            machine = {"id": service.save_machine(db, user, {"name": args.machine})["id"]}
+        queue = db.one("SELECT id FROM queues WHERE name = ?", (args.queue,))
+        if not queue and args.create:
+            queue = {"id": service.save_queue(db, user, {"name": args.queue, "description": "Sphinx daily QA (imported)."})["id"]}
+        if not machine or not queue:
+            sys.exit("Machine or queue not found. Check the names or add --create.")
+        assignment = db.one("SELECT id FROM assignments WHERE machine_id = ? AND queue_id = ?", (machine["id"], queue["id"]))
+        if not assignment and args.create:
+            assignment = service.save_assignment(db, user, {"machine_id": machine["id"], "queue_id": queue["id"], "frequency": "daily"})
+        if not assignment:
+            sys.exit(f"'{args.queue}' is not scheduled on {args.machine}. Schedule it in the portal or add --create.")
+    except service.PortalError as exc:
+        sys.exit(str(exc))
+
+    paths = []
+    for raw in args.paths:
+        p = Path(raw)
+        paths.extend(sorted(f for f in p.rglob("*") if f.is_file() and ".xls" in f.name.lower()) if p.is_dir() else [p])
+    print(f"Importing {len(paths)} file(s) into {args.queue} on {args.machine}...")
+    totals = {"imported": 0, "skipped": 0}
+    for start in range(0, len(paths), 50):
+        batch = [(p.name, p.read_bytes()) for p in paths[start:start + 50]]
+        try:
+            result = service.import_sphinx(db, user, assignment["id"], batch, historical=not args.pending)
+        except service.PortalError as exc:
+            sys.exit(str(exc))
+        totals["imported"] += len(result["imported"])
+        totals["skipped"] += len(result["skipped"])
+        for s in result["skipped"]:
+            print(f"  skipped {s['file']}: {s['reason']}")
+    print(f"Done: {totals['imported']} imported, {totals['skipped']} skipped.")
 
 
 if __name__ == "__main__":

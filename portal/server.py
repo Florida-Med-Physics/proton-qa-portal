@@ -12,7 +12,7 @@ from .service import PortalError
 
 STATIC = Path(__file__).with_name("static")
 COOKIE = "qa_portal_session"
-MAX_BODY = 2 * 1024 * 1024
+MAX_BODY = 16 * 1024 * 1024
 
 # (method, pattern, handler(db, user, match, body, query)); None user means login not required.
 ROUTES = []
@@ -133,6 +133,21 @@ def overrides(db, user, m, body, q):
 @route("POST", r"/api/assignments/(\d+)/runs")
 def submit(db, user, m, body, q):
     return service.submit_run(db, user, int(m[1]), body)
+
+
+@route("POST", r"/api/assignments/(\d+)/sphinx/preview")
+def sphinx_preview(db, user, m, body, q):
+    return service.sphinx_preview(db, user, int(m[1]), body.get("file") or {})
+
+
+@route("POST", r"/api/assignments/(\d+)/sphinx/tests")
+def sphinx_tests(db, user, m, body, q):
+    return service.sphinx_add_tests(db, user, int(m[1]), body.get("file") or {})
+
+
+@route("POST", r"/api/assignments/(\d+)/sphinx/import")
+def sphinx_import(db, user, m, body, q):
+    return service.import_sphinx_uploads(db, user, int(m[1]), body)
 
 
 @route("GET", "/api/runs")

@@ -1,9 +1,11 @@
 @echo off
 cd /d "%~dp0"
+set PY=python
+if exist ".venv\Scripts\python.exe" set PY=.venv\Scripts\python.exe
 if not exist "data\portal.db" (
   echo First run: create the admin account.
-  python run_portal.py create-admin || goto :end
+  %PY% run_portal.py create-admin || goto :end
 )
-python run_portal.py serve --open %*
+%PY% run_portal.py serve --open %*
 :end
 pause

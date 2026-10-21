@@ -6,11 +6,13 @@ A RadMachine-style QA portal for the proton gantries: user accounts, machines, a
 
 ## Running it
 
-Requires Python 3.11 or newer. The portal uses only the Python standard library, so there is nothing to install.
+Requires Python 3.11 or newer. The portal itself uses only the standard library; reading Sphinx `.xls` exports needs `xlrd` (pinned in `requirements.txt`).
 
 ```
-python run_portal.py create-admin
-python run_portal.py serve --open
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python run_portal.py create-admin
+.venv\Scripts\python run_portal.py serve --open
 ```
 
 `create-admin` prompts for a password; no passwords are stored in code or config. The database is `data/portal.db` (change it with `--db` or the `PROTON_QA_DB` environment variable).
@@ -22,6 +24,22 @@ By default the portal listens only on this computer at http://127.0.0.1:8790. To
 ### Demo data
 
 `python seed_demo.py` builds `data/demo.db` with two synthetic gantries, a month of synthetic results, and three demo accounts (credentials written to `data/demo-credentials.txt`). Then run `python run_portal.py --db data/demo.db serve`. Demo values are placeholders, not beam data.
+
+## Sphinx daily QA exports
+
+The portal reads the IBA myQA Sphinx report export (`.xls`, sheet `ReportTestRepositoryFlatS`) from both the G1 and G5 layouts. Each measured value becomes a test named after its item and metric, for example `Energy [100.81 MeV] – Distal Depth` or `100 MeV – Sigma X`.
+
+**Daily use.** On a queue's Perform page, choose that day's Sphinx file. The measured values and the QA date are filled in, with Sphinx's own verdict shown under each test and a note when the file's limits differ from the portal's. Complete the manual checks and submit for review. If the file has measurements the queue doesn't have yet, a physicist can add them with one click. Each file can be recorded only once.
+
+**History.** Load past exports from the machine page (**Import Sphinx** on a scheduled queue) or from the command line:
+
+```
+.venv\Scripts\python run_portal.py import-sphinx --machine G1 --queue "Sphinx Daily QA - G1" --user <physicist> --create "G:\My Drive\...\ProtonDaily\G1 Sphinx"
+```
+
+Folders are searched recursively; duplicate files, empty files, and sessions Sphinx marked Skipped are reported and skipped. Imported runs are marked **Historical import** (no review needed) unless `--pending` is given. Each imported result keeps the expected value, tolerances, and pass/warn/fail verdict from its own file.
+
+Checked against the full archive on 2026-10-21 (942 G1 and 201 G5 sessions, 74,998 values): the portal's rule matched Sphinx's verdict on all but 7 values, each sitting exactly on a tolerance in the one-decimal file values. Sphinx judges unrounded values, so imports keep Sphinx's verdict and add a comment where the two differ.
 
 ## How it fits together
 
@@ -54,14 +72,16 @@ A run must be reviewed by someone other than the person who performed it. Reject
 ## Development
 
 ```
-python -m unittest discover -s tests -v
+.venv\Scripts\python -m unittest discover -s . -p "test_*.py" -t .
 ```
 
-Code layout: `portal/db.py` (schema), `portal/auth.py` (passwords, sessions, roles), `portal/qa.py` (evaluation and scheduling), `portal/service.py` (operations), `portal/server.py` (HTTP API and static files), `portal/static/` (browser interface).
+Tests use synthetic data only; Sphinx tests use synthetic report grids in the export's layout.
+
+Code layout: `portal/db.py` (schema), `portal/auth.py` (passwords, sessions, roles), `portal/qa.py` (evaluation and scheduling), `portal/sphinx.py` (Sphinx export reader), `portal/service.py` (operations), `portal/server.py` (HTTP API and static files), `portal/static/` (browser interface).
 
 ## Not built yet
 
-- Importing the Sphinx daily `.xls` exports (G1/G5) into Daily QA runs.
-- Seeding the test library from the TG-224 daily template.
+- Seeding the manual checks from the TG-224 daily template.
+- Watching the Sphinx export folders and importing new files automatically.
 - Email or in-app notifications for overdue QA or failures.
 - Attachments (images, PDFs) on runs.
