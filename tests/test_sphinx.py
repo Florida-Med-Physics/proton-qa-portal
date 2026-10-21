@@ -15,7 +15,8 @@ from portal.service import PortalError
 from tests.test_portal import make_users
 
 
-def grid(offset=0, finished="10/21/2026 5:35:11 AM", intensity="71.75 %", intensity_status="Failed", dose="101.500 cGy"):
+def grid(offset=0, finished="10/21/2026 5:35:11 AM", intensity="71.75 %", intensity_status="Failed", dose="101.500 cGy",
+         energy_label="Energy [100.00 MeV]", depth_warn="± 0.9 mm"):
     """A small report. offset shifts the result columns, as the G5 export does relative to G1."""
     o = offset
 
@@ -32,8 +33,8 @@ def grid(offset=0, finished="10/21/2026 5:35:11 AM", intensity="71.75 %", intens
         [(4, "Integration Time"), (11, "90.000 sec")],
         [(4, "Energy")],
         [(28 + o, "Passed")],
-        [(4, "Energy [100.00 MeV]")],
-        measure("Distal Depth", "± 0.9 mm", "± 1.0 mm", "77.8 mm", "77.7 mm", "Passed", ("X Start", "71.0 mm")),
+        [(4, energy_label)],
+        measure("Distal Depth", depth_warn, "± 1.0 mm", "77.8 mm", "77.7 mm", "Passed", ("X Start", "71.0 mm")),
         measure("DFO", "± 0.9 mm", "± 1.0 mm", "2.1 mm", "2.1 mm", "Passed", ("X Stop", "98.0 mm")),
         [(4, "Wedge Thickness")],
         [(4, "34.0 mm / 58.0 mm")],
@@ -49,11 +50,11 @@ def grid(offset=0, finished="10/21/2026 5:35:11 AM", intensity="71.75 %", intens
 
 
 EXPECTED_NAMES = [
-    ("Energy", "Energy [100.00 MeV] – Distal Depth"),
-    ("Energy", "Energy [100.00 MeV] – DFO"),
-    ("Spot", "Spot 1 [120 MeV] – Intensity"),
-    ("Spot", "Spot 1 [120 MeV] – Skewness X"),
-    ("Output", "PPC-05 – Absolute Dose"),
+    ("Energy", "Energy 100 MeV – Distal Depth"),
+    ("Energy", "Energy 100 MeV – DFO"),
+    ("Spot", "Spot 120 MeV – Intensity"),
+    ("Spot", "Spot 120 MeV – Skewness X"),
+    ("Output", "Output – Absolute Dose"),
 ]
 
 
@@ -68,12 +69,34 @@ class ParserTests(unittest.TestCase):
             self.assertEqual([(m["category"], m["name"]) for m in parsed["measurements"]], EXPECTED_NAMES)
             self.assertEqual((parsed["qa_date"], parsed["sphinx_user"]), ("2026-10-21", "synthetic-user"))
         m = {x["name"]: x for x in parsed["measurements"]}
-        self.assertEqual(m["Energy [100.00 MeV] – Distal Depth"],
-                         {**m["Energy [100.00 MeV] – Distal Depth"], "expected": 77.8, "result": 77.7, "warn": 0.9, "fail": 1.0,
+        self.assertEqual(m["Energy 100 MeV – Distal Depth"],
+                         {**m["Energy 100 MeV – Distal Depth"], "expected": 77.8, "result": 77.7, "warn": 0.9, "fail": 1.0,
                           "unit": "mm", "tol_mode": "absolute", "sphinx_status": "Passed"})
-        self.assertEqual((m["Spot 1 [120 MeV] – Intensity"]["unit"], m["Spot 1 [120 MeV] – Intensity"]["tol_mode"]), ("%", "absolute"))
-        self.assertEqual(m["Spot 1 [120 MeV] – Skewness X"]["unit"], "")
-        self.assertEqual((m["PPC-05 – Absolute Dose"]["unit"], m["PPC-05 – Absolute Dose"]["tol_mode"]), ("cGy", "percent"))
+        self.assertEqual((m["Spot 120 MeV – Intensity"]["unit"], m["Spot 120 MeV – Intensity"]["tol_mode"]), ("%", "absolute"))
+        self.assertEqual(m["Spot 120 MeV – Skewness X"]["unit"], "")
+        self.assertEqual((m["Output – Absolute Dose"]["unit"], m["Output – Absolute Dose"]["tol_mode"]), ("cGy", "percent"))
+
+    def test_standard_names(self):
+        self.assertEqual(sphinx.standard_name("Energy", "Energy [100.81 MeV]", "Distal Depth"), "Energy 100 MeV – Distal Depth")
+        self.assertEqual(sphinx.standard_name("Energy", "100 MeV", "Distal Depth"), "Energy 100 MeV – Distal Depth")
+        self.assertEqual(sphinx.standard_name("Spot", "Spot 1 [226.18 MeV]", "Sigma X"), "Spot 225 MeV – Sigma X")
+        self.assertEqual(sphinx.standard_name("Spot", "Spot 6 [121.83 MeV]", "Sigma  X"), "Spot 120 MeV – Sigma X")
+        self.assertEqual(sphinx.standard_name("Coincidence", "IsoCentricity", "Distance X"), "Coincidence – Distance X")
+        self.assertEqual(sphinx.standard_name("Homogeneity", "Homogenity", "Flatness"), "Homogeneity – Flatness")
+        self.assertEqual(sphinx.standard_name("Couch Translation", "Couch Translation Vector", "Pitch"), "Couch Translation – Pitch")
+        g5 = sphinx.parse_rows(drop_empty(grid(1, energy_label="100 MeV")))
+        self.assertEqual([m["name"] for m in g5["measurements"]], [n for _, n in EXPECTED_NAMES])
+        self.assertEqual(g5["measurements"][0]["sphinx_label"], "100 MeV – Distal Depth")
+
+    def test_names_that_would_clash_keep_the_export_label(self):
+        rows = drop_empty(grid())
+        at = next(i for i, r in enumerate(rows) if r == [(4, "Spot")])
+        rows[at + 1:at + 1] = [[(4, "Spot 9 [119 MeV]")], [(9, "Intensity"), (16, "± 2.50 %"), (18, "± 3.00 %"), (22, "60.0 %"),
+                                                          (24, "60.1 %"), (28, "Passed")]]
+        names = [m["name"] for m in sphinx.parse_rows(rows)["measurements"]]
+        self.assertIn("Spot – Spot 9 [119 MeV] – Intensity", names)
+        self.assertIn("Spot – Spot 1 [120 MeV] – Intensity", names)
+        self.assertIn("Spot 120 MeV – Skewness X", names)
 
     def test_date_from_filename_and_errors(self):
         rows = drop_empty(grid(finished="not a date"))
@@ -153,7 +176,7 @@ class ImportTests(unittest.TestCase):
         self.assertIn("already recorded", result["skipped"][0]["reason"])
         run = service.get_run(self.db, self.users["admin"], result["imported"][0]["run_id"])
         self.assertEqual((run["review_status"], run["qa_date"], run["overall"]), ("imported", "2026-10-21", "fail"))
-        dose = next(r for r in run["results"] if r["name"] == "PPC-05 – Absolute Dose")
+        dose = next(r for r in run["results"] if r["name"] == "Output – Absolute Dose")
         # 101.5 vs 100 is outside the ±1 % warning on the rounded value, but Sphinx said Passed; Sphinx's verdict is kept.
         self.assertEqual((dose["status"], dose["tol_mode"], dose["warn"]), ("pass", "percent", 1.0))
         self.assertIn("portal rule", dose["comment"])
@@ -161,6 +184,21 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(service.dashboard(self.db, self.users["admin"])["machines"][0]["pending_review"], 0)
         with self.assertRaises(PortalError):
             service.import_sphinx(self.db, self.users["therapist"], self.assignment, files)
+
+    def test_shared_test_keeps_each_machines_limits(self, _):
+        admin = self.users["admin"]
+        machine = service.save_machine(self.db, admin, {"name": "Synthetic Gantry B"})["id"]
+        queue = service.save_queue(self.db, admin, {"name": "Daily QA – Synthetic B"})["id"]
+        other = service.save_assignment(self.db, admin, {"machine_id": machine, "queue_id": queue, "frequency": "daily"})["id"]
+        service.import_sphinx(self.db, admin, self.assignment, [("a.xls", fake_file("shared-a", energy_label="Energy [100.81 MeV]"))])
+        service.import_sphinx(self.db, admin, other, [("b.xls", fake_file("shared-b", offset=1, energy_label="100 MeV", depth_warn="± 0.8 mm"))])
+        self.assertEqual(self.db.one("SELECT COUNT(*) AS n FROM tests")["n"], 5)  # one set of tests serves both machines
+        limits = {i["test_id"]: i["limits"] for i in service.run_template(self.db, admin, other)["items"]}
+        depth = self.db.one("SELECT id, warn, description FROM tests WHERE name = 'Energy 100 MeV – Distal Depth'")
+        self.assertEqual((depth["warn"], limits[depth["id"]]["warn"]), (0.9, 0.8))
+        self.assertIn("Energy [100.81 MeV]", depth["description"])
+        first = {i["test_id"]: i["limits"] for i in service.run_template(self.db, admin, self.assignment)["items"]}
+        self.assertEqual(first[depth["id"]]["warn"], 0.9)
 
     def test_upload_endpoint_validation(self, _):
         with self.assertRaisesRegex(PortalError, "Choose"):

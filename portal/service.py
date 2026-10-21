@@ -434,12 +434,21 @@ def _sphinx_test_ids(db, user, template, measurements, create):
         if not create:
             continue
         require(user, "configure")
-        test = db.one("SELECT id FROM tests WHERE category = ? AND name = ?", key)
-        test_id = test["id"] if test else save_test(db, user, {
-            "category": m["category"], "name": m["name"], "unit": m["unit"], "expected": m["expected"], "warn": m["warn"],
-            "fail": m["fail"], "tol_mode": m["tol_mode"], "description": "Measured by Sphinx; imported from the daily QA export."})["id"]
+        file_limits = _file_limits(m)
+        test = db.one("SELECT * FROM tests WHERE category = ? AND name = ?", key)
+        if test:
+            # Shared with another machine: give this queue its own limits when they differ from the library's.
+            test_id = test["id"]
+            queue_limits = file_limits if any(test[k] != v for k, v in file_limits.items()) else dict.fromkeys(file_limits)
+        else:
+            test_id = save_test(db, user, {
+                "category": m["category"], "name": m["name"], "unit": m["unit"], **file_limits,
+                "description": f"Measured by Sphinx. Export label: {m['sphinx_label']}."})["id"]
+            queue_limits = dict.fromkeys(file_limits)
         position = db.one("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM queue_items WHERE queue_id = ?", (template["queue"]["id"],))["p"]
-        db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (template["queue"]["id"], test_id, position))
+        db.run("INSERT INTO queue_items (queue_id, test_id, position, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?, ?)",
+               (template["queue"]["id"], test_id, position, queue_limits["expected"], queue_limits["warn"], queue_limits["fail"],
+                queue_limits["tol_mode"]))
         ids[key] = in_queue[key] = test_id
         added.append(m["name"])
     if added:

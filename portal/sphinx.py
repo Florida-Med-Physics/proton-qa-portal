@@ -26,6 +26,27 @@ class SphinxError(ValueError):
     pass
 
 
+# Portal test names follow one pattern on every machine, whatever wording the export uses:
+#   '<Category> <energy> MeV – <Metric>' for energy-specific items, otherwise '<Category> – <Metric>'.
+# Energies are filed to the nearest ENERGY_STEP MeV (e.g. 100.81 -> 100); the exact label is kept in the
+# test description. This is a naming convention only; it does not change any measured value or limit.
+ENERGY_STEP = 5
+_ENERGY = re.compile(r"(\d+(?:\.\d+)?)\s*MeV", re.IGNORECASE)
+
+
+def nominal_energy(item):
+    match = _ENERGY.search(item or "")
+    if not match:
+        return None
+    return int(ENERGY_STEP * round(float(match[1]) / ENERGY_STEP))
+
+
+def standard_name(category, item, metric):
+    metric = re.sub(r"\s+", " ", metric).strip()
+    energy = nominal_energy(item)
+    return f"{category} {energy} MeV – {metric}" if energy is not None else f"{category} – {metric}"
+
+
 def quantity(text):
     """'± 0.9 mm' -> (0.9, 'mm'); '68.36 %' -> (68.36, '%'); None if not a number."""
     match = _QUANTITY.match(text or "")
@@ -113,8 +134,15 @@ def parse_rows(rows, filename=""):
                 category, item = setup_text, None
             elif category and setup_text not in SETUP_LABELS and not _SETUP_VALUE.match(setup_text):
                 item = _clean_item(setup_text)
+    seen = {}
     for m in measurements:
-        m["name"] = m["metric"] if m["item"] == m["category"] else f"{m['item']} – {m['metric']}"
+        m["sphinx_label"] = m["metric"] if m["item"] == m["category"] else f"{m['item']} – {m['metric']}"
+        m["name"] = standard_name(m["category"], m["item"], m["metric"])
+        seen.setdefault((m["category"], m["name"]), []).append(m)
+    for group in seen.values():
+        if len(group) > 1:  # two items would share a name (e.g. energies within one step): keep them apart
+            for m in group:
+                m["name"] = f"{m['category']} – {m['sphinx_label']}"
     if finished is None:
         match = _FILE_DATE.search(filename or "")
         if match:

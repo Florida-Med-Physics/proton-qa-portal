@@ -3,7 +3,7 @@
   python run_portal.py create-admin         first-time setup (prompts for a password)
   python run_portal.py serve                local only, http://127.0.0.1:8790
   python run_portal.py serve --host 0.0.0.0 share on the network
-  python run_portal.py import-sphinx --machine G1 --queue "Sphinx Daily QA" --user admin --create "G:\\...\\G1 Sphinx"
+  python run_portal.py import-sphinx --machine G1 --queue "Daily QA – G1" --user admin --create "G:\\...\\G1 Sphinx"
                                             load Sphinx .xls exports (files or folders) as historical runs
 
 The database location defaults to data/portal.db and can be set with --db or PROTON_QA_DB.

@@ -27,14 +27,23 @@ By default the portal listens only on this computer at http://127.0.0.1:8790. To
 
 ## Sphinx daily QA exports
 
-The portal reads the IBA myQA Sphinx report export (`.xls`, sheet `ReportTestRepositoryFlatS`) from both the G1 and G5 layouts. Each measured value becomes a test named after its item and metric, for example `Energy [100.81 MeV] – Distal Depth` or `100 MeV – Sigma X`.
+The portal reads the IBA myQA Sphinx report export (`.xls`, sheet `ReportTestRepositoryFlatS`) from both the G1 and G5 layouts.
+
+**Test names are standardized** so the same measurement has the same name on every machine, whatever wording the export uses:
+
+| Kind | Pattern | Example |
+| --- | --- | --- |
+| Energy-specific | `<Category> <energy> MeV – <Metric>` | `Energy 100 MeV – Distal Depth`, `Spot 140 MeV – Sigma X` |
+| Everything else | `<Category> – <Metric>` | `Coincidence – Distance X`, `Homogeneity – Flatness`, `Output – Absolute Dose` |
+
+Energies are filed to the nearest 5 MeV (`ENERGY_STEP` in `portal/sphinx.py`), so G1's `Energy [100.81 MeV]` and G5's `100 MeV` are the same test; the exact export label is kept in the test's description. If two items in one file would get the same name, both keep their export label instead. A test shared by several machines keeps each machine's own expected value and tolerances on that machine's queue. Queues follow `Daily QA – <machine>`.
 
 **Daily use.** On a queue's Perform page, choose that day's Sphinx file. The measured values and the QA date are filled in, with Sphinx's own verdict shown under each test and a note when the file's limits differ from the portal's. Complete the manual checks and submit for review. If the file has measurements the queue doesn't have yet, a physicist can add them with one click. Each file can be recorded only once.
 
 **History.** Load past exports from the machine page (**Import Sphinx** on a scheduled queue) or from the command line:
 
 ```
-.venv\Scripts\python run_portal.py import-sphinx --machine G1 --queue "Sphinx Daily QA - G1" --user <physicist> --create "G:\My Drive\...\ProtonDaily\G1 Sphinx"
+.venv\Scripts\python run_portal.py import-sphinx --machine G1 --queue "Daily QA – G1" --user <physicist> --create "G:\My Drive\...\ProtonDaily\G1 Sphinx"
 ```
 
 Folders are searched recursively; duplicate files, empty files, and sessions Sphinx marked Skipped are reported and skipped. Imported runs are marked **Historical import** (no review needed) unless `--pending` is given. Each imported result keeps the expected value, tolerances, and pass/warn/fail verdict from its own file.

@@ -56,6 +56,10 @@ function readFileBase64(file) {
   });
 }
 
+function testLabel(t) {
+  return !t.category || t.name.startsWith(t.category) ? t.name : `${t.category} – ${t.name}`;
+}
+
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
@@ -664,7 +668,7 @@ async function renderQueueEditor(id) {
       el("thead", {}, el("tr", {}, ["Test", "Expected", "Warning ±", "Fail ±", "Tolerance", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this queue yet."));
     picker.replaceChildren(el("option", { value: "" }, "Add a test from the library…"),
-      ...tests.filter((t) => t.active && !items.some((i) => i.test_id === t.id)).map((t) => el("option", { value: t.id }, `${t.category ? t.category + " – " : ""}${t.name}`)));
+      ...tests.filter((t) => t.active && !items.some((i) => i.test_id === t.id)).map((t) => el("option", { value: t.id }, testLabel(t))));
   };
   const picker = el("select", { onchange: (e) => { if (e.target.value) { items.push({ test_id: Number(e.target.value) }); draw(); } } });
   app.append(el("h2", {}, "Tests"), holder);
@@ -851,7 +855,7 @@ async function renderTrends() {
   const numeric = tests.filter((t) => t.type === "numeric");
   const form = el("form", { class: "row" },
     select("machine_id", [["", "Choose a machine"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
-    select("test_id", [["", "Choose a test"], ...numeric.map((t) => [t.id, `${t.category ? t.category + " – " : ""}${t.name}`])], params.get("test_id")),
+    select("test_id", [["", "Choose a test"], ...numeric.map((t) => [t.id, testLabel(t)])], params.get("test_id")),
     select("range", [["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], params.get("range") || "365"));
   form.addEventListener("change", () => {
     const data = formData(form);
