@@ -270,6 +270,22 @@ details.help summary, details.instructions summary { cursor: pointer; color: var
 label.inline { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; color: var(--text); font-size: 14px; }
 label.inline input { width: auto; }
 .review-box { display: grid; gap: 8px; margin-top: 12px; }
+.section-head { font-size: 18px; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+.directions { font-size: 13px; margin-top: 4px; }
+.spark-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 8px; }
+.spark-card { display: block; text-decoration: none; color: inherit; padding: 12px; border-left: 4px solid var(--border); }
+.spark-card.pass { border-left-color: var(--pass); }
+.spark-card.warn { border-left-color: var(--warn); }
+.spark-card.fail { border-left-color: var(--fail); }
+.spark-card:hover { border-color: var(--accent); }
+.spark-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.spark { width: 100%; height: 56px; display: block; }
+.spark .series { stroke: var(--accent); fill: none; stroke-width: 1.25; }
+.spark .band-warn { fill: var(--band-warn); }
+.spark circle.pass { fill: var(--pass); } .spark circle.warn { fill: var(--warn); } .spark circle.fail { fill: var(--fail); }
+.spark-foot { display: flex; justify-content: space-between; margin-top: 4px; }
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 12px; }
+.stat-value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .search { max-width: 360px; }
 .result-card { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: baseline; }
 .result-card dt { color: var(--muted); font-size: 12px; }

@@ -96,6 +96,8 @@ function toast(message, bad) {
 }
 
 async function api(method, path, body) {
+  // The browser-only build (GitHub Pages) answers every request from local storage instead of a server.
+  if (window.localApi) return window.localApi(method, path, body);
   const response = await fetch(path, {
     method,
     credentials: "same-origin",
@@ -234,11 +236,15 @@ function renderLogin() {
   const error = el("p", { class: "error" });
   const form = el("form", {},
     el("h1", {}, "Proton QA Portal"),
-    el("p", { class: "muted" }, "Sign in with your portal account."),
-    field("Username", el("input", { name: "username", autocomplete: "username", required: true, autofocus: true })),
-    field("Password", el("input", { name: "password", type: "password", autocomplete: "current-password", required: true })),
+    window.localApi
+      ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
+        field("Your name", el("input", { name: "username", autocomplete: "name", required: true, autofocus: true })),
+        field("Role", select("role", Object.entries(ROLE_LABEL), "physicist"))]
+      : [el("p", { class: "muted" }, "Sign in with your portal account."),
+        field("Username", el("input", { name: "username", autocomplete: "username", required: true, autofocus: true })),
+        field("Password", el("input", { name: "password", type: "password", autocomplete: "current-password", required: true }))],
     error,
-    el("button", { class: "primary", type: "submit" }, "Sign in"));
+    el("button", { class: "primary", type: "submit" }, window.localApi ? "Continue" : "Sign in"));
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
@@ -342,6 +348,32 @@ async function renderSetup() {
     card("#/tests", "Checks", "Every check, its expected value and its limits."),
     can("manage_users") ? card("#/users", "People", "Accounts and roles.") : null,
     card("#/audit", "Audit log", "Who changed what, and when.")));
+  if (window.localApi && can("configure")) {
+    const restore = el("input", { type: "file", accept: ".json", hidden: true });
+    restore.addEventListener("change", async () => {
+      const file = restore.files[0];
+      if (!file) return;
+      try {
+        const backup = JSON.parse(await file.text());
+        if (!confirm(`Replace everything in this browser with the backup from ${backup.exported_at || "unknown date"}?`)) return;
+        await api("POST", "/api/restore", backup);
+        toast("Backup restored");
+        route();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    app.append(el("h2", {}, "Backup"),
+      el("div", { class: "card" }, el("p", { class: "muted" }, "This build keeps all data in this browser on this computer. Save a backup file regularly, and restore it on another computer to move the data."),
+        el("div", { class: "row" },
+          el("button", { onclick: async () => {
+            const data = await api("GET", "/api/backup");
+            const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+            const a = el("a", { href: URL.createObjectURL(blob), download: `proton-qa-backup-${today()}.json` });
+            document.body.append(a); a.click(); a.remove();
+          } }, "Save backup"),
+          el("button", { onclick: () => restore.click() }, "Restore from backup"), restore)));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,14 +444,30 @@ async function renderMachine(id) {
       route();
     }) }, "Edit"));
     actions.push(el("button", { class: "primary", onclick: async () => {
-      const queues = (await api("GET", "/api/queues")).filter((q) => q.active && !assignments.some((a) => a.queue_id === q.id));
-      if (!queues.length) return toast("Every active QA list is already scheduled here. Create a list first.", true);
-      modal(`Schedule a QA list on ${machine.name}`, scheduleForm(null, queues), async (data, form) => {
-        await api("POST", "/api/assignments", { ...scheduleData(data, form), machine_id: Number(id) });
-        toast("QA list scheduled");
+      const all = await api("GET", "/api/queues");
+      const templates = all.filter((q) => q.active && q.is_template);
+      const free = all.filter((q) => q.active && !q.is_template && !assignments.some((a) => a.queue_id === q.id));
+      if (!templates.length && !free.length) return toast("No QA lists to add. Make a template first.", true);
+      const pick = el("div", { class: "form-grid" },
+        field("Start from", select("source", [...templates.map((q) => [`t${q.id}`, `Template: ${q.name}`]), ...free.map((q) => [`q${q.id}`, `Existing list: ${q.name}`])], templates[0] ? `t${templates[0].id}` : ""), "wide"),
+        field("Name for this machine's copy", el("input", { name: "name", placeholder: `Daily QA – ${machine.name}` }), "wide"),
+        scheduleForm(null));
+      const source = pick.querySelector("[name=source]");
+      const nameField = pick.querySelector("[name=name]").closest(".field");
+      const sync = () => (nameField.hidden = !source.value.startsWith("t"));
+      source.addEventListener("change", sync);
+      sync();
+      modal(`Add a QA list to ${machine.name}`, pick, async (data, form) => {
+        const schedule = { ...scheduleData(data, form), machine_id: Number(id) };
+        if (data.source.startsWith("t")) {
+          await api("POST", `/api/queues/${data.source.slice(1)}/duplicate`, { ...schedule, name: data.name || `Daily QA – ${machine.name}` });
+        } else {
+          await api("POST", "/api/assignments", { ...schedule, queue_id: Number(data.source.slice(1)) });
+        }
+        toast("QA list added");
         route();
-      });
-    } }, "Schedule a QA list"));
+      }, "Add");
+    } }, "Add a QA list"));
   }
   page(machine.name, [machine.kind, machine.location, machine.active ? null : "Retired"].filter(Boolean).join(" · "), actions);
   if (machine.notes) app.append(el("p", { class: "muted" }, machine.notes));
@@ -509,17 +557,33 @@ function passFailInput(name) {
   return { value, control: el("div", { class: "segmented" }, pass, fail, value) };
 }
 
+// Directions are shown with the check, numbered as in the TG-224 template (1.01, 2.04, ...).
 function helpText(description) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
+  const m = /^Template (\d+\.\d+)\.\s*/.exec(description);
   const text = description.replace(/^Template \d+\.\d+\.\s*/, "");
-  return text ? el("details", { class: "help" }, el("summary", {}, "How to"), el("div", { class: "pre" }, text)) : null;
+  return text ? el("div", { class: "directions pre" }, m ? el("span", { class: "muted" }, `${m[1]} · `) : null, text) : null;
+}
+
+// The template's sections. Sphinx measurements all belong to 3.0.
+function sectionOf(category) {
+  const c = (category || "").toLowerCase();
+  if (c.startsWith("safety")) return "1.0 Safety";
+  if (c.startsWith("mechanical") || c.includes("cbct") || c.includes("imaging")) return "2.0 Mechanical and imaging";
+  if (["energy", "spot", "coincidence", "homogeneity", "output", "couch translation", "dosimetry"].includes(c) || c.includes("sphinx")) return "3.0 Sphinx dosimetry";
+  return "4.0 Other";
+}
+
+function checkNumber(description) {
+  const m = /^Template (\d+\.\d+)\./.exec(description || "");
+  return m ? m[1] : "";
 }
 
 async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
   page(`${queueLabel(t.queue.name, t.machine.name)} · ${t.machine.name}`, t.assignment.schedule);
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions" }, el("summary", {}, "Setup instructions"), el("div", { class: "pre" }, t.queue.description)));
+    app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "0.0 Setup")), el("div", { class: "pre" }, t.queue.description)));
   }
   const inputs = [];
   const sections = [];
@@ -536,11 +600,15 @@ async function renderPerform(assignmentId) {
   };
   const byCategory = new Map();
   for (const item of t.items) {
-    const key = item.category || "General";
+    const key = `${sectionOf(item.category)}|${item.category || "General"}`;
     if (!byCategory.has(key)) byCategory.set(key, []);
     byCategory.get(key).push(item);
   }
-  for (const [category, items] of byCategory) {
+  let lastSection = null;
+  for (const [key, items] of [...byCategory].sort(([a], [b]) => a.split("|")[0].localeCompare(b.split("|")[0]))) {
+    const [section, category] = key.split("|");
+    const heading = section !== lastSection ? el("h2", { class: "section-head" }, section) : null;
+    lastSection = section;
     const rows = [];
     const entries = [];
     for (const item of items) {
@@ -572,7 +640,7 @@ async function renderPerform(assignmentId) {
       inputs.push(entry);
       entries.push(entry);
       rows.push(el("div", { class: "check-row" },
-        el("div", { class: "check-name" }, el("strong", {}, item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
+        el("div", { class: "check-name" }, el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)} ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
           item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note, helpText(item.description)),
         el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
         statusCell,
@@ -581,7 +649,7 @@ async function renderPerform(assignmentId) {
     const summary = el("span", { class: "section-summary" });
     const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, category), summary), rows);
     sections.push({
-      box, entries,
+      box, heading, entries,
       refresh() {
         const s = entries.map((e) => e.status());
         const req = entries.filter((e) => e.required);
@@ -646,7 +714,7 @@ async function renderPerform(assignmentId) {
       can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add checks"), ", or load a Sphinx file above."] : ""));
     return;
   }
-  app.append(...sections.map((s) => s.box));
+  app.append(...sections.flatMap((s) => [s.heading, s.box]));
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
@@ -839,22 +907,15 @@ function testForm(test) {
 async function renderTests() {
   const tests = await api("GET", "/api/tests");
   const editable = can("configure");
-  page("Checks", "Grouped by category. Limits here are the defaults; a QA list or a machine can override them.", editable ? [el("button", {
-    class: "primary",
-    onclick: () => modal("New check", testForm(), async (data) => {
-      await api("POST", "/api/tests", data);
-      toast("Check added");
-      route();
-    }),
-  }, "New check")] : []);
+  page("Checks", "Grouped by the QA list that owns them. To add a check, open its QA list.");
   const search = el("input", { type: "search", placeholder: "Filter checks…", "aria-label": "Filter checks", class: "search" });
   const holder = el("div", { class: "stack" });
   const draw = () => {
     const needle = search.value.trim().toLowerCase();
     const groups = new Map();
     for (const t of tests) {
-      if (needle && !`${t.category} ${t.name}`.toLowerCase().includes(needle)) continue;
-      const key = t.category || "General";
+      if (needle && !`${t.owner_name || ""} ${t.category} ${t.name}`.toLowerCase().includes(needle)) continue;
+      const key = `${t.owner_name || "Shared"} › ${t.category || "General"}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(t);
     }
@@ -862,16 +923,16 @@ async function renderTests() {
       el("summary", {}, el("strong", {}, category), el("span", { class: "section-summary" }, `${list.length}`)),
       table(["Check", "Type", "#Expected", "#Warn ±", "#Fail ±", ""], list.map((t) =>
         el("tr", { class: editable ? "clickable" : "", onclick: editable ? () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-          await api("PUT", `/api/tests/${t.id}`, data);
+          await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
           toast("Check saved");
           route();
         }) : null },
-          el("td", {}, el("strong", {}, t.name.startsWith(category + " – ") ? t.name.slice(category.length + 3) : t.name)),
+          el("td", {}, el("strong", {}, t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name)),
           el("td", { class: "muted" }, t.type === "boolean" ? "Pass / fail" : t.type === "text" ? "Text" : "Measured"),
           el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.expected)} ${t.unit}`.trim() : ""),
           el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.warn)}${t.tol_mode === "percent" ? " %" : ""}` : ""),
           el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.fail)}${t.tol_mode === "percent" ? " %" : ""}` : ""),
-          el("td", {}, t.active ? "" : chip("", "Inactive")))))));
+          el("td", {}, t.active ? "" : chip("", "Inactive"))))))));
     if (!groups.size) holder.replaceChildren(el("div", { class: "card empty" }, tests.length ? "No checks match." : "No checks yet."));
   };
   search.addEventListener("input", draw);
@@ -1008,44 +1069,137 @@ function trendChart(points, unit) {
     points.map((p, i) => (i % labelEvery === 0 ? svg("text", { x: x(i), y: H - B + 18, "text-anchor": "middle" }, multiYear ? p.qa_date.slice(0, 7) : p.qa_date.slice(5)) : null)));
 }
 
-async function renderTrends() {
-  const params = queryParams();
-  const [machines, tests] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/tests")]);
-  page("Trends", "Each result plotted against the limits that applied when it was recorded.");
-  const numeric = tests.filter((t) => t.type === "numeric");
-  const form = el("form", { class: "row" },
-    select("machine_id", [["", "Choose a machine"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
-    select("test_id", [["", "Choose a test"], ...numeric.map((t) => [t.id, testLabel(t)])], params.get("test_id")),
-    select("range", [["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], params.get("range") || "365"));
-  form.addEventListener("change", () => {
-    const data = formData(form);
-    location.hash = `#/trends?${new URLSearchParams(Object.entries(data).filter(([, v]) => v))}`;
-  });
-  app.append(form, el("br"));
-  if (!params.get("machine_id") || !params.get("test_id")) {
-    app.append(el("div", { class: "card empty" }, "Choose a machine and a test."));
+function filterRange(points, range) {
+  if (range === "all" || !points.length) return points;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - Number(range));
+  const from = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+  return points.filter((p) => p.qa_date >= from);
+}
+
+function stats(points) {
+  const values = points.map((p) => p.value);
+  const n = values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const sd = n > 1 ? Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)) : 0;
+  const fails = points.filter((p) => p.status === "fail"), warns = points.filter((p) => p.status === "warn");
+  const last = points[n - 1];
+  const dev = last.expected !== null && last.expected !== undefined ? last.value - last.expected : null;
+  return { n, mean, sd, min: Math.min(...values), max: Math.max(...values), fails, warns, last, dev,
+    inTol: Math.round((100 * (n - fails.length)) / n) };
+}
+
+// A tiny chart for the overview grid: the series against its warning band, last value emphasised.
+function sparkline(points, unit) {
+  const W = 220, H = 56, P = 4;
+  const vals = [];
+  for (const p of points) { vals.push(p.value); for (const s of [1, -1]) { const v = bandValue(p, "warn", s); if (v !== null) vals.push(v); } }
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const x = (i) => P + (points.length === 1 ? (W - 2 * P) / 2 : (i * (W - 2 * P)) / (points.length - 1));
+  const y = (v) => P + ((hi - v) * (H - 2 * P)) / (hi - lo);
+  const upper = [], lower = [];
+  points.forEach((p, i) => { const u = bandValue(p, "warn", 1), l = bandValue(p, "warn", -1); if (u !== null) { upper.push(`${x(i)},${y(u)}`); lower.unshift(`${x(i)},${y(l)}`); } });
+  const last = points[points.length - 1];
+  return svg("svg", { class: "spark", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${points.length} values` },
+    upper.length ? svg("polygon", { class: "band-warn", points: upper.concat(lower).join(" ") }) : null,
+    svg("polyline", { class: "series", points: points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ") }),
+    points.map((p, i) => (p.status === "fail" || p.status === "warn" ? svg("circle", { class: p.status, cx: x(i), cy: y(p.value), r: 2.5 }) : null)),
+    svg("circle", { class: last.status, cx: x(points.length - 1), cy: y(last.value), r: 3.5 }));
+}
+
+async function renderTrendOverview(machines, machineId, range) {
+  const machine = machines.find((m) => String(m.id) === String(machineId));
+  const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
+  const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
+  const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric").map((i) => ({ ...i, queue: t.queue.name })));
+  if (!numeric.length) {
+    app.append(el("div", { class: "card empty" }, `${machine.name} has no measured checks scheduled.`));
     return;
   }
-  const data = await api("GET", `/api/trend?machine_id=${params.get("machine_id")}&test_id=${params.get("test_id")}`);
-  const range = params.get("range") || "365";
-  if (range !== "all" && data.points.length) {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - Number(range));
-    const from = cutoff.toISOString().slice(0, 10);
-    data.points = data.points.filter((p) => p.qa_date >= from);
-  }
-  if (!data.points.length) {
-    app.append(el("div", { class: "card empty" }, "No results recorded for this test on this machine in this period."));
+  const trends = await Promise.all(numeric.map((i) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${i.test_id}`)));
+  const cards = numeric.map((item, k) => ({ item, points: filterRange(trends[k].points, range) })).filter((c) => c.points.length);
+  if (!cards.length) {
+    app.append(el("div", { class: "card empty" }, "No results in this period."));
     return;
   }
+  const worst = cards.filter((c) => c.points[c.points.length - 1].status === "fail").length;
+  const warn = cards.filter((c) => c.points[c.points.length - 1].status === "warn").length;
+  app.append(el("p", { class: "lead" }, `${cards.length} checks. `,
+    worst ? el("span", { class: "chip fail" }, `${worst} failing now`) : "", " ", warn ? el("span", { class: "chip warn" }, `${warn} in warning`) : "",
+    !worst && !warn ? el("span", { class: "chip pass" }, "All passing") : ""));
+  const bySection = new Map();
+  for (const c of cards) {
+    const key = `${sectionOf(c.item.category)}|${c.item.category}`;
+    if (!bySection.has(key)) bySection.set(key, []);
+    bySection.get(key).push(c);
+  }
+  let lastSection = null;
+  for (const [key, list] of [...bySection].sort(([a], [b]) => a.split("|")[0].localeCompare(b.split("|")[0]))) {
+    const [section, category] = key.split("|");
+    if (section !== lastSection) app.append(el("h2", { class: "section-head" }, section));
+    lastSection = section;
+    app.append(el("h3", { class: "muted" }, category));
+    // Problems first within each category.
+    list.sort((a, b) => STATUS_RANK[b.points[b.points.length - 1].status] - STATUS_RANK[a.points[a.points.length - 1].status]);
+    app.append(el("div", { class: "spark-grid" }, list.map(({ item, points }) => {
+      const s = stats(points);
+      const short = item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name.replace(category + " ", "");
+      return el("a", { class: `card spark-card ${s.last.status}`, href: `#/trends?machine_id=${machineId}&test_id=${item.test_id}&range=${range}` },
+        el("div", { class: "spark-head" }, el("strong", {}, short), chip(s.last.status)),
+        sparkline(points, item.unit),
+        el("div", { class: "spark-foot muted small" },
+          el("span", {}, `Last ${fmt(s.last.value)} ${item.unit}`.trim(), s.dev !== null ? ` (${s.dev >= 0 ? "+" : ""}${fmt(s.dev, 2)})` : ""),
+          el("span", {}, s.fails.length ? `${s.fails.length} fail` : s.warns.length ? `${s.warns.length} warn` : `${s.n} ok`)));
+    })));
+  }
+}
+
+function renderTrendDetail(data, points, unit, range, machineId) {
+  const s = stats(points);
+  const limitsNow = s.last;
+  app.append(el("div", { class: "card stat-row" },
+    stat("Latest", `${fmt(s.last.value)} ${unit}`.trim(), chip(s.last.status)),
+    stat("Expected", limitsNow.expected !== null ? `${fmt(limitsNow.expected)} ${unit}`.trim() : "—",
+      limitsNow.warn !== null ? `warn ±${fmt(limitsNow.warn)}${limitsNow.tol_mode === "percent" ? "%" : ""} · fail ±${fmt(limitsNow.fail)}${limitsNow.tol_mode === "percent" ? "%" : ""}` : ""),
+    stat("Mean ± SD", `${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)}`, `${s.n} values`),
+    stat("Range", `${fmt(s.min)} to ${fmt(s.max)}`, ""),
+    stat("Within limits", `${s.inTol}%`, s.fails.length ? `${s.fails.length} fail, last ${shortDate(s.fails[s.fails.length - 1].qa_date)}` : s.warns.length ? `${s.warns.length} warn` : "no fails")));
   app.append(el("div", { class: "legend" },
-    data.test.unit ? el("span", {}, `Units: ${data.test.unit}`) : null,
     el("span", {}, el("span", { class: "swatch warn" }), "Within warning"),
     el("span", {}, el("span", { class: "swatch fail" }), "Within fail limit"),
-    el("span", {}, "Dashed line: expected value")));
-  app.append(trendChart(data.points, data.test.unit));
-  app.append(el("h2", {}, data.points.length > 100 ? "Latest 100 values" : "Values"), table(["QA date", "#Value", "#Expected", "Status"], data.points.slice(-100).reverse().map((p) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${p.run_id}`) },
-    el("td", {}, p.qa_date), el("td", { class: "num" }, `${fmt(p.value)} ${data.test.unit}`), el("td", { class: "num" }, fmt(p.expected)), el("td", {}, chip(p.status))))));
+    el("span", {}, "Dashed line: expected value"),
+    el("span", {}, "Dots: ", el("span", { class: "chip pass" }, "pass"), " ", el("span", { class: "chip warn" }, "warn"), " ", el("span", { class: "chip fail" }, "fail"))));
+  app.append(trendChart(points, unit));
+  app.append(el("details", { class: "card", open: points.length <= 20 }, el("summary", {}, points.length > 100 ? "Latest 100 values" : "Values"),
+    table(["QA date", "#Value", "#Expected", "Status"], points.slice(-100).reverse().map((p) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${p.run_id}`) },
+      el("td", {}, p.qa_date), el("td", { class: "num" }, `${fmt(p.value)} ${unit}`.trim()), el("td", { class: "num" }, fmt(p.expected)), el("td", {}, chip(p.status)))))));
+}
+
+function stat(label, value, note) {
+  return el("div", { class: "stat" }, el("div", { class: "muted small" }, label), el("div", { class: "stat-value" }, value), el("div", { class: "small muted" }, note));
+}
+
+async function renderTrends() {
+  const params = queryParams();
+  const machines = (await api("GET", "/api/machines")).filter((m) => m.active);
+  const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (machines[0] && machines[0].id);
+  const range = params.get("range") || "90";
+  const testId = params.get("test_id");
+  page("Trends", testId ? "One check over time, against the limits in force when each value was recorded." : "Every measured check on this machine. Click one for detail.");
+  const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
+  const form = el("div", { class: "row" },
+    select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { onchange: (e) => go({ machine_id: e.target.value, range }) }),
+    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { onchange: (e) => go({ machine_id: machineId, test_id: testId, range: e.target.value }) }),
+    testId ? el("a", { class: "button", href: `#/trends?machine_id=${machineId}&range=${range}` }, "← All checks") : null);
+  app.append(form, el("br"));
+  if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
+  if (!testId) return renderTrendOverview(machines, machineId, range);
+  const data = await api("GET", `/api/trend?machine_id=${machineId}&test_id=${testId}`);
+  const points = filterRange(data.points, range);
+  app.append(el("h2", {}, data.test.name), el("p", { class: "muted small" }, [sectionOf(data.test.category), data.test.category].join(" · ")));
+  if (!points.length) return app.append(el("div", { class: "card empty" }, "No results for this check in this period."));
+  renderTrendDetail(data, points, data.test.unit, range, machineId);
 }
 
 // ---------------------------------------------------------------------------

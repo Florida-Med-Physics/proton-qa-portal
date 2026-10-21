@@ -4,7 +4,13 @@ A RadMachine-style QA portal for the proton gantries: user accounts, machines, a
 
 > **Draft software for review by a qualified medical physicist.** It is not validated or commissioned for clinical use. Every limit, schedule, and the pass/warn/fail logic must be checked before anyone relies on it.
 
-## Running it
+## Two ways to run it
+
+**In the browser, no server (GitHub Pages).** Open the published page. Everything you record is stored in that browser on that computer (IndexedDB); nothing is sent anywhere. Use *Setup → Backup* to save a backup file and to move the data to another computer. The page starts with the TG-224 daily template and three gantries (GTR1, GTR2, GTR5), each with its own copy of the template scheduled on weekdays. Sign in by name and role; this build has no passwords, so it suits a single QA workstation. The files live in `docs/`; `python build_pages.py` refreshes them from the shared interface.
+
+**On one host PC for the department (server).** The sections below. Accounts have passwords, several people can use it at once, and the data is one SQLite file you can back up. `python export_backup.py --db data/portal.db out.json` makes a file the browser build can restore.
+
+## Running the server
 
 Requires Python 3.11 or newer. The portal itself uses only the standard library; reading Sphinx `.xls` exports needs `xlrd` (pinned in `requirements.txt`).
 
@@ -50,6 +56,12 @@ Folders are searched recursively; duplicate files, empty files, and sessions Sph
 
 Checked against the full archive on 2026-10-21 (942 G1 and 201 G5 sessions, 74,998 values): the portal's rule matched Sphinx's verdict on all but 7 values, each sitting exactly on a tolerance in the one-decimal file values. Sphinx judges unrounded values, so imports keep Sphinx's verdict and add a comment where the two differ.
 
+## Templates and machine lists
+
+A **template** is the master QA list (for example "Daily QA template", built from the TG-224 daily template export with `import-checklist`). It is never scheduled directly. **Duplicate** it for a machine: every check is copied, so that machine's list owns its checks and their limits, and tuning one machine never changes another or the template. Sphinx measurements are added to a machine's list automatically the first time one of its exports is loaded.
+
+The entry form follows the template's sections: **0.0 Setup** instructions, **1.0 Safety**, **2.0 Mechanical and imaging**, **3.0 Sphinx dosimetry**, with each check's number and directions shown beside it.
+
 ## How it fits together
 
 | Concept | What it is |
@@ -90,7 +102,7 @@ Code layout: `portal/db.py` (schema), `portal/auth.py` (passwords, sessions, rol
 
 ## Not built yet
 
-- Seeding the manual checks from the TG-224 daily template.
 - Watching the Sphinx export folders and importing new files automatically.
+- Monthly and annual templates (the model supports them; only the daily template is seeded).
 - Email or in-app notifications for overdue QA or failures.
 - Attachments (images, PDFs) on runs.
