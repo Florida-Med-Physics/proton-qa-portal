@@ -761,3 +761,6 @@ button.chip-filter:hover { filter: brightness(0.95); }
 .measure-title strong { font-size: 20px; font-weight: 700; display: block; }
 .measure-title .qa-sub { font-size: 14px; color: var(--text); margin-top: 2px; }
 .measure-title .qa-limits { font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+/* "Spot 1 · 226.4 MeV" stays on one line in energy and axis tables. */
+.energy-table td.qa-label strong, .trend-table:not(.test-table) td.qa-label strong { white-space: nowrap; }
