@@ -3,6 +3,7 @@
 import base64
 import binascii
 import hashlib
+import json
 from datetime import date, datetime
 from pathlib import Path
 
@@ -266,6 +267,41 @@ def duplicate_queue(db, user, source_id, data):
     if data.get("machine_id"):
         result["assignment_id"] = save_assignment(db, user, {**data, "queue_id": queue_id})["id"]
     return result
+
+
+# ---- starting data ------------------------------------------------------------------
+
+SEED_FILE = Path(__file__).with_name("seed.json")
+
+
+def seed_defaults(db, user, seed=None):
+    """Create the templates, tests, machines and schedules from seed.json (the same data the browser build starts with).
+
+    Refuses to run on a database that already has machines or templates, so it cannot duplicate anything."""
+    require(user, "configure")
+    seed = seed if seed is not None else json.loads(SEED_FILE.read_text(encoding="utf-8"))
+    if db.one("SELECT id FROM machines LIMIT 1") or db.one("SELECT id FROM queues WHERE is_template = 1 LIMIT 1"):
+        raise PortalError("This database already has machines or templates; the starting data is only loaded into an empty one.")
+    by_kind = {}
+    with db.transaction():
+        for tpl in seed.get("templates", []):
+            queue_id = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, 1, 1)", (tpl["name"], tpl.get("setup", "")))
+            for position, c in enumerate(tpl.get("checks", [])):
+                test_id = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) "
+                                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                                 (c["name"], c.get("category", ""), c.get("type", "numeric"), c.get("unit", ""), c.get("description", ""),
+                                  c.get("expected"), c.get("warn"), c.get("fail"), c.get("tol_mode") or "absolute", queue_id))
+                db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (queue_id, test_id, position))
+            by_kind.setdefault(tpl.get("kind", ""), []).append({**tpl, "id": queue_id})
+        db.audit(user["id"], "seed", "portal", None, templates=[t["name"] for t in seed.get("templates", [])])
+    machines = []
+    for m in seed.get("machines", []):
+        machine_id = save_machine(db, user, {"name": m["name"], "kind": m.get("kind", ""), "location": m.get("location", ""), "notes": m.get("notes", "")})["id"]
+        machines.append(m["name"])
+        for tpl in by_kind.get(m.get("kind", ""), []):
+            duplicate_queue(db, user, tpl["id"], {"name": f"{tpl.get('list') or 'Daily QA'} – {m['name']}", "machine_id": machine_id,
+                                                 "frequency": tpl.get("frequency") or "daily", "weekdays": m.get("weekdays", [0, 1, 2, 3, 4])})
+    return {"templates": [t["name"] for t in seed.get("templates", [])], "machines": machines}
 
 
 # ---- machine assignments (scheduled queues) ---------------------------------

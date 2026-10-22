@@ -202,7 +202,7 @@ class PortalServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "ProtonQAPortal"
+    server_version = "PhysicsQAPortal"
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.log_date_time_string(), fmt % args))

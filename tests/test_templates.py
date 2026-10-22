@@ -66,6 +66,27 @@ class TemplateTests(unittest.TestCase):
 
 
 class MigrationTests(unittest.TestCase):
+    def test_seed_defaults_loads_every_machine_once(self):
+        db = Database(":memory:")
+        users = make_users(db)
+        result = service.seed_defaults(db, users["admin"])
+        self.assertEqual(result["machines"], ["GTR1", "GTR2", "GTR5", "TrueBeam", "CT Sim", "MRI Sim"])
+        lists = {q["name"]: q for q in service.list_queues(db, users["admin"])}
+        self.assertIn("Daily QA – TrueBeam", lists)
+        self.assertIn("SRS QA – TrueBeam", lists)
+        self.assertTrue(lists["Daily QA template – TrueBeam (TG-142 / TG-198)"]["is_template"])
+        truebeam = next(m for m in service.list_machines(db, users["admin"]) if m["name"] == "TrueBeam")
+        schedules = {a["queue_name"]: a for a in service.list_assignments(db, users["admin"], truebeam["id"])}
+        self.assertEqual(schedules["SRS QA – TrueBeam"]["frequency"], "asneeded")
+        self.assertEqual(schedules["Daily QA – TrueBeam"]["frequency"], "daily")
+        items = service.run_template(db, users["admin"], schedules["Daily QA – TrueBeam"]["id"])["items"]
+        self.assertEqual(len(items), 25)
+        self.assertEqual(items[0]["type"], "status")
+        with self.assertRaisesRegex(PortalError, "already has machines"):
+            service.seed_defaults(db, users["admin"])
+        with self.assertRaisesRegex(PortalError, "permission"):
+            service.seed_defaults(Database(":memory:"), users["therapist"])
+
     def test_old_tests_table_is_rebuilt(self):
         import sqlite3
         import tempfile

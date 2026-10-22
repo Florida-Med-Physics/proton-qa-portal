@@ -1,6 +1,7 @@
-"""Start the Proton QA Portal or manage its users.
+"""Start the Physics QA Portal or manage its users.
 
   python run_portal.py create-admin         first-time setup (prompts for a password)
+  python run_portal.py seed-defaults        load the machines and daily QA templates into an empty database
   python run_portal.py serve                local only, http://127.0.0.1:8790
   python run_portal.py serve --host 0.0.0.0 share on the network
   python run_portal.py import-sphinx --machine G1 --queue "Daily QA – G1" --user admin --create "G:\\...\\G1 Sphinx"
@@ -24,7 +25,7 @@ DEFAULT_DB = Path(__file__).resolve().parent / "data" / "portal.db"
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Proton QA Portal (draft; not validated for clinical use)")
+    parser = argparse.ArgumentParser(description="Physics QA Portal (draft; not validated for clinical use)")
     parser.add_argument("--db", default=os.environ.get("PROTON_QA_DB", str(DEFAULT_DB)))
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve")
@@ -35,6 +36,8 @@ def main(argv=None):
     admin = commands.add_parser("create-admin")
     admin.add_argument("--username", default="admin")
     admin.add_argument("--full-name", default="")
+    seed = commands.add_parser("seed-defaults", help="load the machines, templates and daily lists from portal/seed.json into an empty database")
+    seed.add_argument("--user", default="admin", help="portal username recorded as the creator")
     imp = commands.add_parser("import-sphinx", help="import Sphinx daily QA .xls exports")
     imp.add_argument("--machine", required=True, help="machine name in the portal")
     imp.add_argument("--queue", required=True, help="queue name in the portal")
@@ -60,6 +63,16 @@ def run_command(db, args):
         return import_sphinx(db, args)
     if args.command == "import-checklist":
         return import_checklist(db, args)
+    if args.command == "seed-defaults":
+        user = db.one("SELECT id, username, full_name, role FROM users WHERE username = ? AND active = 1", (args.user,))
+        if not user:
+            sys.exit(f"No active portal user '{args.user}'. Run create-admin first.")
+        try:
+            result = service.seed_defaults(db, user)
+        except service.PortalError as exc:
+            sys.exit(str(exc))
+        print(f"Loaded {len(result['templates'])} templates and {len(result['machines'])} machines: {', '.join(result['machines'])}")
+        return
     if args.command == "create-admin":
         password = getpass.getpass("New admin password (10+ characters): ")
         if password != getpass.getpass("Repeat password: "):
@@ -76,7 +89,7 @@ def run_command(db, args):
     server = PortalServer((args.host, args.port), db)
     server.secure_cookies = args.secure_cookies
     url = f"http://{'127.0.0.1' if args.host in ('0.0.0.0', '::') else args.host}:{args.port}/"
-    print(f"Proton QA Portal running at {url} (database: {args.db}). Press Ctrl+C to stop.")
+    print(f"Physics QA Portal running at {url} (database: {args.db}). Press Ctrl+C to stop.")
     if args.open:
         webbrowser.open(url)
     try:

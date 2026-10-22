@@ -1,6 +1,6 @@
 "use strict";
 
-// Browser-only backend for the Proton QA Portal (GitHub Pages build).
+// Browser-only backend for the Physics QA Portal (GitHub Pages build).
 // Answers the same /api/... requests as portal/server.py, but keeps everything in this
 // browser's IndexedDB. Nothing is sent anywhere. Rules mirror portal/qa.py and
 // portal/service.py; keep them in step.

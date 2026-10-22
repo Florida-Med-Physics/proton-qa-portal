@@ -6,9 +6,11 @@ A RadMachine-style machine QA portal for every treatment and imaging machine (pr
 
 ## Two ways to run it
 
-**In the browser, no server (GitHub Pages).** Open the published page. Everything you record is stored in that browser on that computer (IndexedDB); nothing is sent anywhere. Use *Setup → Backup* to save a backup file and to move the data to another computer. The page starts with one daily template per machine type (proton gantry per TG-224, TrueBeam per TG-142 / TG-198, CT simulator along TG-66, MRI placeholder) plus an SRS QA template for the TrueBeam, and six machines (GTR1, GTR2, GTR5, TrueBeam, CT Sim, MRI Sim), each with its own copy of its templates. Daily lists are scheduled on weekdays; the SRS list is "as needed". Under *Setup → Database location* you can pick a file (on a shared drive, say) that holds the whole database: every change is written there and the page loads from it. The seed lists are in `docs/seed-data.js`. Sign in by name and role; this build has no passwords, so it suits a single QA workstation. The files live in `docs/`; `python build_pages.py` refreshes them from the shared interface.
+**On one host PC for the department (server) — the intended deployment.** One Python process on a host PC keeps everything in a single SQLite file (`data/portal.db`): accounts with passwords, machines, lists, every run and its review. Other workstations use it through their browser at `http://<host-name>:8790`. Setup is in *Running the server* below; `Start Portal.bat` does the first-run steps on Windows (create the admin account, load the machines and daily QA templates, start serving).
 
-**On one host PC for the department (server).** The sections below. Accounts have passwords, several people can use it at once, and the data is one SQLite file you can back up. `python export_backup.py --db data/portal.db out.json` makes a file the browser build can restore.
+**In the browser, no server (GitHub Pages) — for trying it out.** Open the published page. Everything you record is stored in that browser on that computer (IndexedDB); nothing is sent anywhere. Use *Setup → Backup* to save a backup file and to move the data to another computer. The page starts with one daily template per machine type (proton gantry per TG-224, TrueBeam per TG-142 / TG-198, CT simulator along TG-66, MRI placeholder) plus an SRS QA template for the TrueBeam, and six machines (GTR1, GTR2, GTR5, TrueBeam, CT Sim, MRI Sim), each with its own copy of its templates. Daily lists are scheduled on weekdays; the SRS list is "as needed". Under *Setup → Database location* you can pick a file (on a shared drive, say) that holds the whole database: every change is written there and the page loads from it. The seed lists are in `docs/seed-data.js`. Sign in by name and role; this build has no passwords, so it suits a single QA workstation. The files live in `docs/`; `python build_pages.py` refreshes them from the shared interface.
+
+`python export_backup.py --db data/portal.db out.json` turns a server database into a file the browser build can restore.
 
 ## Running the server
 
@@ -18,14 +20,17 @@ Requires Python 3.11 or newer. The portal itself uses only the standard library;
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python run_portal.py create-admin
+.venv\Scripts\python run_portal.py seed-defaults --user admin
 .venv\Scripts\python run_portal.py serve --open
 ```
 
-`create-admin` prompts for a password; no passwords are stored in code or config. The database is `data/portal.db` (change it with `--db` or the `PROTON_QA_DB` environment variable).
+`create-admin` prompts for a password; no passwords are stored in code or config. `seed-defaults` loads `portal/seed.json` (the six machines, one daily template per machine type, the TrueBeam SRS list, and a scheduled copy of each on its machines) into an empty database; it refuses to run twice. After that, add people under *Test Setup → People*, and set each list's default import folder (a path on the host PC, or a network share the host can read) under *Change schedule*. The database is `data/portal.db` (change it with `--db` or the `PROTON_QA_DB` environment variable).
 
 By default the portal listens only on this computer at http://127.0.0.1:8790. To share it with other workstations, run it on one host PC with `--host 0.0.0.0` and have others browse to `http://<host-name>:8790`. On a shared network, put it behind HTTPS (for example IIS or a reverse proxy) and add `--secure-cookies`.
 
-`Start Portal.bat` starts the server and opens the browser on Windows.
+`Start Portal.bat` does all of this on Windows: on first run it creates the admin account and loads the starting data, then it serves and opens the browser. To keep the portal running on the host PC, run it as a scheduled task at log-on (or as a service), with `--host 0.0.0.0` so other workstations can reach it.
+
+**Backups.** The database is the one file `data/portal.db` (plus `-wal`/`-shm` journal files while running). Copy it with the host's normal backup, or run `python export_backup.py --db data/portal.db backup.json` for a portable copy.
 
 ### Demo data
 
