@@ -545,8 +545,9 @@ async function renderSetup() {
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "28%"], [second, "24%"], ["Tests", "7%"], ["Actions", "30%"], ["Last Modified", "11%"]];
-  const modified = (q) => el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—");
+  const SETUP_COLS = (first, second) => [[first, "26%"], [second, "21%"], ["Tests", "7%"], ["Actions", "27%"], ["Last Modified", "10%"], ["Modified By", "9%"]];
+  const modified = (q) => [el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—"),
+    el("td", { class: "small muted" }, q.modified_by || "—")];
   app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
@@ -571,7 +572,7 @@ async function renderSetup() {
   }
   const machineRows = [...byMachine].flatMap(([name, qs]) => {
     const m = machines.find((x) => x.name === name);
-    return [el("tr", { class: "machine-row" }, el("td", { colspan: 5 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
+    return [el("tr", { class: "machine-row" }, el("td", { colspan: 6 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...qs.map((q) => {
         const a = instanceOf(q);
         const live = !!(a && a.active);

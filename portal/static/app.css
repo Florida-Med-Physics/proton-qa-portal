@@ -117,7 +117,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
 
 table { width: 100%; border-collapse: collapse; background: var(--surface); }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+th { font-size: 14px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--surface-2); }
 tr.group td { background: var(--surface-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
@@ -487,11 +487,11 @@ tr.quick-trend .spark { max-width: 700px; }
 /* Portal name at the far right of the header, in a serif face like the UF Health wordmark. */
 .brand-title {
   order: -1; margin-right: 4px; padding-right: 16px; border-right: 1px solid rgba(255, 255, 255, 0.35);
-  text-decoration: none; color: #fff; white-space: nowrap;
+  text-decoration: none; color: var(--uf-orange); white-space: nowrap;   /* whole title in UF Health orange */
   font-family: Georgia, "Times New Roman", Times, serif; font-size: 19px; font-weight: 400; letter-spacing: 0.01em;
 }
-.brand-title:hover { color: var(--uf-orange); }
-.brand-uf { color: var(--uf-orange); font-weight: 700; }   /* "UF" in UF Health orange, the rest white */
+.brand-title:hover { color: var(--uf-orange); }   /* no colour change on hover */
+.brand-uf { font-weight: 700; }
 .who { margin-left: auto; }
 #nav { flex: 0 1 auto; }
 .topbar { gap: 16px; }
@@ -555,3 +555,4 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 .fixed-table tbody tr.machine-row td { padding-left: 12px; }
 .fixed-table tbody td.center { padding-left: 12px; }
 .measure-table tbody td, .table-wrap:not(.fixed-wrap) tbody td { padding-left: 20px; }
+.fixed-table th { white-space: normal; line-height: 1.2; }   /* headers may wrap now that they are larger */
