@@ -462,3 +462,36 @@ tr[draggable="true"]:hover .drag-handle { color: var(--accent); }
 tr.dragging td { opacity: 0.45; }
 tr.drop-before td { box-shadow: inset 0 3px 0 var(--uf-orange); }
 tr.drop-after td { box-shadow: inset 0 -3px 0 var(--uf-orange); }
+
+/* Perform: measurements repeated per energy / spot, as one table (energy, measurement, reference, tolerance, action, status, comment, history, trend). */
+.measure-block { padding: 10px 16px 14px; border-top: 1px solid var(--border); }
+.measure-title { margin-bottom: 8px; font-size: 14px; }
+.measure-wrap { display: block; width: 100%; }
+.measure-table { width: 100%; }
+.measure-table td, .measure-table th { padding: 6px 10px; max-width: none; }
+.measure-table .result-input { max-width: 110px; }
+.measure-table .note-input { max-width: 180px; min-width: 120px; }
+.history-cell { white-space: nowrap; }
+.hist { display: inline-block; min-width: 44px; text-align: center; padding: 1px 6px; margin-right: 4px; border-radius: 4px; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--pass-bg); color: var(--pass); }
+.hist.warn { background: var(--warn-bg); color: var(--warn); }
+.hist.fail { background: var(--fail-bg); color: var(--fail); }
+.hist.recorded { background: var(--info-bg); color: var(--info); }
+tr.quick-trend td { background: var(--surface-2); }
+tr.quick-trend .spark { max-width: 700px; }
+
+.rename-target { cursor: text; border-bottom: 1px dashed transparent; }
+.rename-target:hover { border-bottom-color: var(--accent); }
+.rename-input { font: inherit; font-weight: 700; width: 100%; min-width: 220px; }
+.auto-read { margin: 6px 0 8px; }
+
+/* Portal name at the far right of the header, in a serif face like the UF Health wordmark. */
+.brand-title {
+  order: -1; margin-right: 4px; padding-right: 16px; border-right: 1px solid rgba(255, 255, 255, 0.35);
+  text-decoration: none; color: #fff; white-space: nowrap;
+  font-family: Georgia, "Times New Roman", Times, serif; font-size: 19px; font-weight: 400; letter-spacing: 0.01em;
+}
+.brand-title:hover { color: var(--uf-orange); }
+.who { margin-left: auto; }
+#nav { flex: 0 1 auto; }
+.topbar { gap: 16px; }
+@media (max-width: 900px) { .brand-title { font-size: 15px; } }

@@ -570,6 +570,17 @@
     return { id };
   }
   // Archive hides a list and its schedules; delete is refused once any result exists (mirrors service.py).
+  function renameQueue(user, queueId, data) {
+    require(user, "configure");
+    const q = get("queues", queueId, "QA list");
+    const name = required(data, "name");
+    if (S.queues.some((x) => x.name.toLowerCase() === name.toLowerCase() && x.id !== q.id)) throw new Error(`A QA list named '${name}' already exists.`);
+    const was = q.name;
+    q.name = name;
+    save();
+    audit(user.id, "rename", "queue", q.id, { was, name });
+    return { id: q.id, name };
+  }
   function archiveQueue(user, queueId, data) {
     require(user, "configure");
     const q = get("queues", queueId, "QA list");
@@ -1112,6 +1123,7 @@
   route("POST", "/api/queues", (u, m, body) => saveQueue(u, body));
   route("PUT", "/api/queues/(\\d+)", (u, m, body) => saveQueue(u, body, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/duplicate", (u, m, body) => duplicateQueue(u, Number(m[1]), body));
+  route("POST", "/api/queues/(\\d+)/rename", (u, m, body) => renameQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/archive", (u, m, body) => archiveQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));
   route("POST", "/api/assignments", (u, m, body) => saveAssignment(u, body));

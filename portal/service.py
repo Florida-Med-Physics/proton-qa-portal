@@ -261,6 +261,18 @@ def save_queue(db, user, data, queue_id=None):
     return {"id": queue_id}
 
 
+def rename_queue(db, user, queue_id, data):
+    """Rename a QA list without touching its tests."""
+    require(user, "configure")
+    queue = _get(db, "queues", queue_id)
+    name = _text(data, "name", required=True)
+    if db.one("SELECT id FROM queues WHERE name = ? AND id != ?", (name, queue_id)):
+        raise PortalError(f"A QA list named '{name}' already exists.")
+    db.run("UPDATE queues SET name = ? WHERE id = ?", (name, queue_id))
+    db.audit(user["id"], "rename", "queue", queue_id, was=queue["name"], name=name)
+    return {"id": queue_id, "name": name}
+
+
 def archive_queue(db, user, queue_id, data):
     """Hide a QA list (and its schedules) without deleting anything; restoring brings both back."""
     require(user, "configure")

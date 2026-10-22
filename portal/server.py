@@ -110,6 +110,11 @@ def edit_queue(db, user, m, body, q):
     return service.save_queue(db, user, body, int(m[1]))
 
 
+@route("POST", r"/api/queues/(\d+)/rename")
+def rename_queue(db, user, m, body, q):
+    return service.rename_queue(db, user, int(m[1]), body)
+
+
 @route("POST", r"/api/queues/(\d+)/archive")
 def archive_queue(db, user, m, body, q):
     return service.archive_queue(db, user, int(m[1]), body)

@@ -449,6 +449,34 @@ async function renderDashboard() {
   }
 }
 
+// Click a list's name to rename it in place; Enter or clicking away saves, Escape cancels.
+function editableName(q, editable) {
+  const label = el("strong", { class: editable ? "rename-target" : "", title: editable ? "Click to rename" : null }, q.name);
+  if (!editable) return label;
+  label.addEventListener("click", () => {
+    const input = el("input", { value: q.name, class: "rename-input", "aria-label": "QA list name" });
+    const done = async (save) => {
+      const name = input.value.trim();
+      if (!save || !name || name === q.name) { input.replaceWith(label); return; }
+      try {
+        const r = await api("POST", `/api/queues/${q.id}/rename`, { name });
+        q.name = r.name;
+        label.textContent = r.name;
+        toast("Renamed");
+      } catch (err) {
+        toast(err.message, true);
+      }
+      input.replaceWith(label);
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); done(true); } if (e.key === "Escape") done(false); });
+    input.addEventListener("blur", () => done(true));
+    label.replaceWith(input);
+    input.focus();
+    input.select();
+  });
+  return label;
+}
+
 async function archiveList(q, archived) {
   try {
     await api("POST", `/api/queues/${q.id}/archive`, { archived });
@@ -495,7 +523,7 @@ async function renderSetup() {
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
   const SETUP_COLS = (first, second) => [[first, "36%"], [second, "20%"], ["#Tests", "8%"], ["", "36%"]];
   app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
-    el("td", {}, el("strong", {}, t.name)),
+    el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
     el("td", { class: "num" }, t.item_count),
     actions(t))))
@@ -506,13 +534,24 @@ async function renderSetup() {
   const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
   const rank = (q) => { const k = kindOf[(q.machines || "").split(", ")[0]]; const i = KIND_ORDER.indexOf(k); return q.machines ? (i < 0 ? KIND_ORDER.length : i) : 99; };
   const ordered = lists.slice().sort((x, y) => rank(x) - rank(y) || (x.machines || "").localeCompare(y.machines || "") || x.name.localeCompare(y.name));
-  app.append(el("h2", { class: "section-head" }, "Machine-Specific QA Lists"),
+  app.append(el("h2", { class: "section-head" }, "Machine-Assigned QA List Instances"),
     el("p", { class: "muted" }, "Each list here is that machine's own copy. Edits made here change only that machine's list; they do not affect the template it came from."));
-  app.append(fixedTable(SETUP_COLS("QA List", "Machine"), ordered.map((q) => el("tr", { class: q.active ? "" : "muted" },
-    el("td", {}, el("strong", {}, q.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
-    el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
-    el("td", { class: "num" }, q.item_count),
-    actions(q))), "No QA lists on machines yet. Copy a template to a machine."));
+  const byMachine = new Map();
+  for (const q of ordered) {
+    const key = (q.machines || "").split(", ")[0] || "Not on a machine";
+    if (!byMachine.has(key)) byMachine.set(key, []);
+    byMachine.get(key).push(q);
+  }
+  const machineRows = [...byMachine].flatMap(([name, qs]) => {
+    const m = machines.find((x) => x.name === name);
+    return [el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
+      ...qs.map((q) => el("tr", { class: q.active ? "" : "muted" },
+        el("td", { class: "indent" }, editableName(q, editable), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+        el("td", {}, qs.length > 1 ? el("span", { class: "muted small" }, name) : name),
+        el("td", { class: "num" }, q.item_count),
+        actions(q)))];
+  });
+  app.append(fixedTable(SETUP_COLS("QA List", "Machine"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));
 
   if (archivedLists.length) {
     app.append(el("details", { class: "archived" }, el("summary", {}, `Archived QA lists (${archivedLists.length})`),
@@ -757,6 +796,32 @@ function importFolderField(a) {
 }
 
 // The files waiting in a list's default folder, newest first, each with a button that loads it into the form.
+// Perform: the newest export not yet recorded is read in from the list's folder on its own; this is the one line that says so.
+function autoReadLine(assignmentId, onPick) {
+  const line = el("div", { class: "muted small auto-read" }, "Checking the folder for a new export…");
+  (async () => {
+    try {
+      const r = await api("GET", `/api/assignments/${assignmentId}/files`);
+      if (r.permission && r.permission !== "granted") {
+        line.replaceChildren(el("span", {}, `The folder "${r.folder}" needs permission again. `),
+          el("button", { class: "link small", onclick: async () => { await window.localFolders.request(assignmentId); route(); } }, "Allow"));
+        return;
+      }
+      const newest = r.files.find((f) => !f.run_id);
+      if (!newest) {
+        const last = r.files[0];
+        line.replaceChildren(el("span", {}, "No new export in the folder.", last ? [` Newest, ${last.name}, is already recorded as `, el("a", { href: `#/runs/${last.run_id}` }, `run #${last.run_id}`), "."] : ""));
+        return;
+      }
+      onPick(await api("GET", `/api/assignments/${assignmentId}/file?path=${encodeURIComponent(newest.path)}`));
+      line.replaceChildren(el("span", { class: "chip pass" }, "Read in"), ` ${newest.name} (${newest.modified.replace("T", " ")}) from the folder. Choose a different file below if that is not today's.`);
+    } catch (err) {
+      line.replaceChildren(el("span", { class: "error" }, err.message));
+    }
+  })();
+  return line;
+}
+
 function importFolderCard(assignmentId, onPick) {
   const body = el("div", { class: "small" }, "Looking in the folder…");
   const card = el("div", { class: "card step" }, el("strong", {}, "Files in the default folder"), body);
@@ -972,6 +1037,25 @@ function sectionOf(item) {
   return sectionTitle(n, n === 3 || n === 4 ? [] : [item.category]).replace(/^(\d)\.0 $/, (_, d) => `${d}.0 ${{ 3: "Dosimetry", 4: "Other" }[d]}`);
 }
 
+// What a Sphinx-style test measures, independent of wording (mirrors sphinx.canonical_key / local-backend canonicalKey).
+const MEASURE_RULES = [[/distal fall ?off|\bdfo\b/, "dfo"], [/distal depth/, "distal"], [/proximal depth/, "proximal"],
+  [/\bpos(ition)? x\b/, "pos_x"], [/\bpos(ition)? y\b/, "pos_y"], [/sigma x/, "sigma_x"], [/sigma y/, "sigma_y"],
+  [/skewness x/, "skew_x"], [/skewness y/, "skew_y"], [/intensity/, "intensity"], [/homogeneity|flatness/, "flatness"],
+  [/absolute dose/, "output"], [/coincidence.*(x offset|distance x)/, "coin_x"], [/coincidence.*(y offset|distance y)/, "coin_y"], [/\bwidth\b/, "width"]];
+function measureParts(name) {
+  const n = String(name || "").toLowerCase().replace(/\s+/g, " ");
+  const hit = MEASURE_RULES.find(([re]) => re.test(n));
+  if (!hit) return null;
+  const energy = /(\d+(?:\.\d+)?)\s*MeV/i.exec(name);
+  const spot = /spot ?(\d+)/i.exec(name);
+  if (!energy && !spot) return null;                       // one-off values (flatness, output) stay as single rows
+  // "GTR5_Energy [100.00 MeV]: Distal Depth [mm]" -> "Distal Depth [mm]"; "Energy [100 MeV] – Distal Depth" -> "Distal Depth".
+  const tail = name.includes(": ") ? name.slice(name.lastIndexOf(": ") + 2) : name.includes(" – ") ? name.slice(name.lastIndexOf(" – ") + 3) : name;
+  const metricLabel = tail.replace(/^spot\s*\d+\s*/i, "").trim();
+  const rowLabel = [spot ? `Spot ${spot[1]}` : null, energy ? `${Number(energy[1])} MeV` : null].filter(Boolean).join(" · ");
+  return { metric: hit[1], metricLabel, rowLabel, sortKey: (spot ? Number(spot[1]) : 0) * 10000 + (energy ? Number(energy[1]) : 0) };
+}
+
 function checkNumber(description) {
   const m = /^Template (\d+\.\d+)\./.exec(description || "");
   return m ? m[1] : "";
@@ -979,6 +1063,7 @@ function checkNumber(description) {
 
 async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
+  const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends`).catch(() => ({})) : {};
   page(t.queue.name, t.assignment.schedule);
   if (t.queue.description) {
     app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
@@ -1017,7 +1102,7 @@ async function renderPerform(assignmentId) {
     lastSection = section;
     const rows = [];
     const entries = [];
-    for (const item of items) {
+    const buildEntry = (item) => {
       let input, control;
       if (item.type === "boolean" || item.type === "status") ({ value: input, control } = passFailInput(item.name, item.type === "status", item.unit === "Yes/No"));
       else if (item.type === "numeric") control = input = el("input", { type: "number", step: "any", class: "result-input", "aria-label": item.name });
@@ -1045,16 +1130,73 @@ async function renderPerform(assignmentId) {
       input.addEventListener("change", update);
       inputs.push(entry);
       entries.push(entry);
-      // As in the myQA template: the numbered title, then its directions block, then the result.
+      return { entry, control, comment, noteToggle, note, statusCell };
+    };
+    // Measurements repeated per energy or spot (distal depth, sigma X, ...) are shown together as one table.
+    const families = new Map();
+    for (const item of items) {
+      const mp = item.type === "numeric" ? measureParts(item.name) : null;
+      if (!mp) continue;
+      const key = `${mp.metric}|${item.unit || ""}`;
+      if (!families.has(key)) families.set(key, []);
+      families.get(key).push({ item, mp });
+    }
+    const grouped = new Set([...families.values()].filter((f) => f.length > 1).flatMap((f) => f.map((x) => x.item.test_id)));
+    const drawn = new Set();
+    const limitText = (v, limits, unit) => (v === null || v === undefined ? el("span", { class: "muted" }, "—") : `±${fmt(v)} ${limits.tol_mode === "percent" ? "%" : unit || ""}`.trim());
+    for (const item of items) {
+      if (drawn.has(item.test_id)) continue;
+      if (!grouped.has(item.test_id)) {
+        const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(item);
+        // As in the myQA template: the numbered title, then its directions block, then the result.
+        const directions = helpText(item.description);
+        rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
+          el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, item.category) : null,
+            el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
+            item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
+          el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
+          statusCell,
+          el("div", { class: "check-note" }, noteToggle, comment),
+          directions));
+        continue;
+      }
+      const mp0 = measureParts(item.name);
+      const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
+      const unit = item.unit && item.unit !== "unitless" ? item.unit : "";
+      const trRows = family.map(({ item: it, mp }) => {
+        drawn.add(it.test_id);
+        const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
+        comment.hidden = false; noteToggle.hidden = true;          // the table has its own comment column
+        const past = (history[it.test_id] || []).slice(-5).reverse();
+        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+        const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
+          const pts = (history[it.test_id] || []).slice(-60);
+          if (!pts.length) return toast("No results yet for this test.", true);
+          if (chart.hidden) chart.firstChild.replaceChildren(
+            el("div", { class: "row" }, el("strong", {}, `${mp.rowLabel} · ${mp.metricLabel}`), el("span", { class: "spacer" }),
+              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
+            seriesChart([{ label: it.name, points: pts }], unit, { small: true }));
+          chart.hidden = !chart.hidden;
+        } }, "📈");
+        const row = el("tr", {},
+          el("td", {}, el("strong", {}, mp.rowLabel), note),
+          el("td", {}, el("div", { class: "row nowrap" }, control, unit ? el("span", { class: "muted small" }, unit) : null)),
+          el("td", { class: "num" }, it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—")),
+          el("td", { class: "num" }, limitText(it.limits.warn, it.limits, unit)),
+          el("td", { class: "num" }, limitText(it.limits.fail, it.limits, unit)),
+          el("td", {}, statusCell),
+          el("td", {}, comment),
+          el("td", { class: "history-cell" }, past.length ? past.map((h) => el("span", { class: `hist ${h.status}`, title: `${h.qa_date}: ${fmt(h.value)} ${unit}`.trim() }, fmt(h.value))) : el("span", { class: "muted small" }, "—")),
+          el("td", {}, trend));
+        return [row, chart];
+      });
       const directions = helpText(item.description);
-      rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
-        el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, item.category) : null,
-          el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
-          item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
-        el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
-        statusCell,
-        el("div", { class: "check-note" }, noteToggle, comment),
-        directions));
+      rows.push(el("div", { class: "measure-block" },
+        el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
+        directions,
+        el("div", { class: "table-wrap measure-wrap" }, el("table", { class: "measure-table" },
+          el("thead", {}, el("tr", {}, ["Energy", "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History (newest first)", ""].map((h) => el("th", {}, h)))),
+          el("tbody", {}, trRows.flat())))));
     }
     const summary = el("span", { class: "section-summary" });
     const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, category), summary), rows);
@@ -1120,10 +1262,10 @@ async function renderPerform(assignmentId) {
       sphinxInfo.replaceChildren(el("span", { class: "error" }, err.message));
     }
   };
-  if (t.assignment.import_folder) app.append(importFolderCard(assignmentId, useUpload));
+  const autoLine = t.assignment.import_folder ? autoReadLine(assignmentId, useUpload) : null;
   app.append(el("div", { class: "card step" }, el("strong", {}, "Measurement file"),
-    el("span", { class: "muted small" }, " Optional. A Sphinx export fills in every measured value. (DQA3 and MPC exports for the TrueBeam: importer not built yet.)"),
-    el("div", {}, sphinxFile), sphinxInfo));
+    el("span", { class: "muted small" }, " A Sphinx export fills in every measured value. (DQA3 and MPC exports for the TrueBeam: importer not built yet.)"),
+    autoLine, el("div", {}, sphinxFile), sphinxInfo));
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This list has no tests yet. ",
       can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add tests"), ", or load a Sphinx file above."] : ""));
