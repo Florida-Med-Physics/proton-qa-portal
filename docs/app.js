@@ -2044,6 +2044,34 @@ function axisParts(name) {
 const ROTATION_NAME = /^(.*\S)\s+(Pitch|Roll|Rotation)$/;
 const AXIS_ORDER = { X: 0, Y: 1, Z: 2, Pitch: 0, Roll: 1, Rotation: 2 };
 
+// History column: the latest QA dates in the header, each row's value under its date, trimmed to what fits one line.
+const histDateLabel = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+function histDateSlot(d) {
+  const dt = new Date(d + "T00:00");
+  return el("span", { class: "hist date", title: histDateLabel(d) },
+    el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear())));
+}
+function histChips(points, dates, unit) {
+  const byDate = new Map((points || []).map((h) => [h.qa_date, h]));
+  return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h
+    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value))
+    : el("span", { class: "hist empty" }, "—")));
+}
+function latestDates(pointLists, count = 5) {
+  return [...new Set(pointLists.flatMap((pts) => (pts || []).map((h) => h.qa_date)))].sort().slice(-count).reverse();
+}
+// Only as many date slots as fit on one line of the History column (re-checked when the window is resized).
+function fitHistoryRows(tableEl, nDates) {
+  const fit = () => {
+    const th = tableEl.querySelector("th.history-cell");
+    if (!th || !th.clientWidth) return;
+    const n = Math.max(1, Math.min(nDates, Math.floor((th.clientWidth - 10) / 58)));
+    tableEl.querySelectorAll(".hist-row").forEach((row) => [...row.children].forEach((c, i) => { c.hidden = i >= n; }));
+  };
+  requestAnimationFrame(fit);
+  window.addEventListener("resize", fit);
+}
+
 function axisGroups(items) {
   const groups = new Map();
   for (const item of items) {
@@ -2234,6 +2262,25 @@ async function renderTrendOverview(machines, machineId, range) {
   app.append(el("p", { class: "lead" }, `${withData.length} tests on ${groups.length} charts. `,
     failing ? el("span", { class: "chip fail" }, `${failing} at fail level`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} outside tolerance`) : "",
     !failing && !warning ? el("span", { class: "chip pass" }, "All passing") : ""));
+  const search = el("input", { type: "search", class: "filter-box", placeholder: "Search tests (e.g. spot 3 sigma)", "aria-label": "Search tests" });
+  search.addEventListener("input", () => {
+    const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const block of app.querySelectorAll(".trend-group")) {
+      let shown = 0;
+      for (const row of block.querySelectorAll("tr.trend-row")) {
+        const text = row.cells[0].textContent.toLowerCase();
+        row.hidden = !words.every((w) => text.includes(w));
+        if (!row.hidden) shown++;
+      }
+      block.hidden = !shown;
+    }
+    for (const head of app.querySelectorAll("h2.section-head")) {
+      let sib = head.nextElementSibling, any = false;
+      while (sib && !sib.classList.contains("section-head")) { if (sib.classList.contains("trend-group") && !sib.hidden) any = true; sib = sib.nextElementSibling; }
+      head.hidden = !any;
+    }
+  });
+  app.append(el("div", { class: "filter-row" }, search));
   const bySection = new Map();
   for (const g of groups) {
     const key = `${sectionOf(g.members[0])}|${g.category}`;
@@ -2245,11 +2292,12 @@ async function renderTrendOverview(machines, machineId, range) {
     const [section, category] = key.split("|");
     if (section !== lastSection) app.append(el("h2", { class: "section-head" }, section));
     lastSection = section;
-    app.append(el("h3", { class: "muted" }, categoryLabel(category)));
+    const block = el("div", { class: "trend-group" }, el("h3", { class: "muted" }, categoryLabel(category)));
+    app.append(block);
     list.sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]);
-    // One table per category, one row per chart (no card panels): name, latest values, status, then the chart.
-    app.append(table(["Test", "Measurement", "Reference", "Warn", "Fail", "Status", "Trends"], list.map((g) => {
-      const status = worstOf(g);
+    // One table per category, one row per chart (no card panels): name, limits, history under its dates, then the chart.
+    const dates = latestDates(list.flatMap((g) => g.members.map((m) => m.points)));
+    const rows = list.map((g) => {
       const unit = g.members[0].unit;
       const lim = (v, m) => (v === null || v === undefined ? el("span", { class: "muted" }, "—") : `±${fmt(v)} ${(m.limits || {}).tol_mode === "percent" ? "%" : unit}`.trim());
       const perAxis = (f) => g.members.map((m, k) => el("div", { class: g.members.length > 1 ? `axis-val axis-${k}` : "" }, f(m, latest(m.points))));
@@ -2259,13 +2307,20 @@ async function renderTrendOverview(machines, machineId, range) {
       const href = `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}`;
       return el("tr", { class: "clickable trend-row", onclick: () => (location.hash = href) },
         el("td", {}, el("a", { href }, el("strong", {}, short)), axisLegend(g), el("div", { class: "muted small" }, `${latest(g.members[0].points).qa_date}`)),
-        el("td", { class: "small num" }, perAxis((m, p) => [`${prefix(m)}${fmt(p.value)} ${unit}`.trim(), " ", deltaBadge(p.value, p, unit, p.status)])),
         el("td", { class: "small num" }, perAxis((m, p) => { const e = p.expected ?? (m.limits || {}).expected; return e === null || e === undefined ? el("span", { class: "muted" }, "—") : `${prefix(m)}${fmt(e)} ${unit}`.trim(); })),
         el("td", { class: "small num" }, perAxis((m, p) => lim(p.warn ?? (m.limits || {}).warn, m))),
         el("td", { class: "small num" }, perAxis((m, p) => lim(p.fail ?? (m.limits || {}).fail, m))),
-        el("td", {}, chip(status)),
+        el("td", { class: "history-cell" }, g.members.length > 1
+          ? g.members.map((m, k) => el("div", { class: "hist-axis" }, el("span", { class: `axis-key axis-${k}` }, m.axis), histChips(m.points, dates, unit)))
+          : histChips(g.members[0].points, dates, unit)),
         el("td", { class: "trend-cell" }, seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true })));
-    })));
+    });
+    const tableEl = sortable(el("table", { class: "trend-table" },
+      el("thead", {}, el("tr", {}, ["Test", "Reference", "Warn", "Fail", "History", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : "" }, h))),
+        dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 4 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {})) : null),
+      el("tbody", {}, rows)));
+    block.append(el("div", { class: "table-wrap" }, tableEl));
+    fitHistoryRows(tableEl, dates.length);
   }
 }
 

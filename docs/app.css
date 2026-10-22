@@ -687,3 +687,10 @@ th { overflow-wrap: normal; word-break: normal; }
 /* Perform QA: the list's title row is frozen at the top of the page while scrolling. */
 .sticky-head { position: sticky; top: 0; z-index: 6; background: var(--bg, var(--surface)); padding: 10px 0 8px; margin: -8px 0 12px; border-bottom: 2px solid var(--uf-orange); }
 .sticky-head h1 { font-size: 20px; margin: 0; }
+
+/* Machine Trends table: history column beside the chart. */
+.trend-table { width: 100%; table-layout: fixed; }
+.trend-table th:nth-child(1) { width: 20%; } .trend-table th:nth-child(2), .trend-table th:nth-child(3), .trend-table th:nth-child(4) { width: 8%; }
+.trend-table th:nth-child(5) { width: 24%; } .trend-table th:nth-child(6) { width: 32%; }
+.trend-table tr.hist-dates th { padding-top: 0; border-top: 0; }
+.trend-table td.trend-cell { width: auto; }
