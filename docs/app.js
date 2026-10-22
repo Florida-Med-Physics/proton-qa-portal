@@ -397,7 +397,7 @@ async function renderSetup() {
   const templates = queues.filter((q) => q.is_template);
   const lists = queues.filter((q) => !q.is_template);
   app.append(el("p", { class: "lead" },
-    `${templates.length} ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine ${lists.length === 1 ? "list" : "lists"}. `,
+    `${templates.length} QA list ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine QA ${lists.length === 1 ? "list" : "lists"}. `,
     el("span", { class: "muted small" }, "A template is the master copy; copying it to a machine gives that machine its own editable list.")));
 
   const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end" },
@@ -412,24 +412,18 @@ async function renderSetup() {
     actions(t))))
     : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
 
-  // Machine lists, grouped by the machine type they run on.
+  // Bottom table: every QA list instantiated on a machine (a copy of a template), one row each.
   const kindOf = Object.fromEntries(machines.map((m) => [m.name, m.kind || "Other"]));
-  const groups = new Map();
-  for (const q of lists) {
-    const first = (q.machines || "").split(", ")[0];
-    const kind = first ? kindOf[first] || "Other" : "Not on a machine";
-    if (!groups.has(kind)) groups.set(kind, []);
-    groups.get(kind).push(q);
-  }
-  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator", "Other", "Not on a machine"];
-  const rank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
-  for (const [kind, list] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
-    app.append(el("h2", { class: "section-head" }, kind), table(["QA list", "Machine", "#Tests", ""], list.map((q) => el("tr", { class: q.active ? "" : "muted" },
-      el("td", {}, el("strong", {}, q.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
-      el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
-      el("td", { class: "num" }, q.item_count),
-      actions(q)))));
-  }
+  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
+  const rank = (q) => { const k = kindOf[(q.machines || "").split(", ")[0]]; const i = KIND_ORDER.indexOf(k); return q.machines ? (i < 0 ? KIND_ORDER.length : i) : 99; };
+  const ordered = lists.slice().sort((x, y) => rank(x) - rank(y) || (x.machines || "").localeCompare(y.machines || "") || x.name.localeCompare(y.name));
+  app.append(el("h2", { class: "section-head" }, "Machine QA Lists"));
+  app.append(table(["QA List", "Machine", "From template", "#Tests", ""], ordered.map((q) => el("tr", { class: q.active ? "" : "muted" },
+    el("td", {}, el("strong", {}, q.name)),
+    el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
+    el("td", { class: "muted small" }, q.template_name || "—"),
+    el("td", { class: "num" }, q.item_count),
+    actions(q))), "No QA lists on machines yet. Copy a template to a machine."));
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
     el("a", { class: "button small", href: "#/tests" }, "All tests"),
