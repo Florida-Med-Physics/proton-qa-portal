@@ -381,3 +381,15 @@ td.center { text-align: center; }
 .tick { color: var(--pass); font-weight: 700; }
 .folder-cell { min-width: 320px; }
 .folder-cell input { min-width: 260px; }
+
+/* Tables size to their content instead of stretching across the page; long text wraps at a maximum column width. */
+.table-wrap { display: inline-block; max-width: 100%; vertical-align: top; }
+.table-wrap table { width: auto; }
+th, td { max-width: 340px; overflow-wrap: anywhere; }
+td .muted.small, td.small { overflow-wrap: break-word; }
+/* Tables whose last column holds a chart or editing controls still get the room they need. */
+.table-wrap:has(.trend-cell), .table-wrap:has(.tol-cell) { display: block; }
+.table-wrap:has(.trend-cell) table, .table-wrap:has(.tol-cell) table { width: 100%; }
+td.trend-cell, td.folder-cell { max-width: none; }
+.folder-cell button { white-space: nowrap; flex: none; }
+.folder-cell input { width: 360px; }

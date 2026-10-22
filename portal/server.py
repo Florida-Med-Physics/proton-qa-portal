@@ -180,6 +180,15 @@ def review(db, user, m, body, q):
     return service.review_run(db, user, int(m[1]), body)
 
 
+@route("GET", "/api/dbinfo")
+def dbinfo(db, user, m, body, q):
+    service.require(user, "configure")
+    from pathlib import Path
+    path = Path(db.path).resolve() if db.path != ":memory:" else None
+    return {"path": str(path) if path else ":memory:", "folder": str(path.parent) if path else "",
+            "size": path.stat().st_size if path and path.exists() else 0}
+
+
 @route("GET", r"/api/machines/(\d+)/trends")
 def machine_trends(db, user, m, body, q):
     return service.machine_trends(db, user, int(m[1]))

@@ -433,32 +433,7 @@ async function renderSetup() {
     can("manage_users") ? el("a", { class: "button small", href: "#/users" }, "People") : null,
     el("a", { class: "button small", href: "#/audit" }, "Audit log")));
 
-  if (window.localApi && editable) {
-    const restore = el("input", { type: "file", accept: ".json", hidden: true });
-    restore.addEventListener("change", async () => {
-      const file = restore.files[0];
-      if (!file) return;
-      try {
-        const backup = JSON.parse(await file.text());
-        if (!confirm(`Replace everything in this browser with the backup from ${backup.exported_at || "unknown date"}?`)) return;
-        await api("POST", "/api/restore", backup);
-        toast("Backup restored");
-        route();
-      } catch (err) {
-        toast(err.message, true);
-      }
-    });
-    app.append(el("h2", { class: "section-head" }, "Data"), databaseLocationCard(),
-      el("div", { class: "card" }, el("p", { class: "muted" }, "Save a backup file regularly, and restore it on another computer to move the data."),
-        el("div", { class: "row" },
-          el("button", { onclick: async () => {
-            const backup = await api("GET", "/api/backup");
-            const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
-            const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
-            document.body.append(link); link.click(); link.remove();
-          } }, "Save backup"),
-          el("button", { onclick: () => restore.click() }, "Restore from backup"), restore)));
-  }
+
 }
 
 // Browser-only build: the whole database can live in a file the user picks (a shared drive, say).
@@ -1772,6 +1747,43 @@ async function renderAdmin() {
     }
   }
   app.append(table(["Machine", "QA list", "Folder", "Status"], rows, "No QA lists are scheduled yet."));
+
+  // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
+  if (!window.localApi) {
+    const info = await api("GET", "/api/dbinfo").catch(() => null);
+    if (info) {
+      app.append(el("h2", { class: "section-head" }, "Database"), el("div", { class: "card" },
+        el("p", {}, el("strong", {}, info.path), el("span", { class: "muted small" }, ` · ${(info.size / 1048576).toFixed(1)} MB`)),
+        el("p", { class: "muted small" }, "All results are in this one file on the host PC. Back it up by copying it while the portal is stopped. To use a different folder, start the portal with --db \"<folder>\portal.db\" (or set PROTON_QA_DB).")));
+    }
+  }
+  // Browser build: where this browser keeps the database, and backups.
+  if (window.localApi && can("configure")) {
+    const restore = el("input", { type: "file", accept: ".json", hidden: true });
+    restore.addEventListener("change", async () => {
+      const file = restore.files[0];
+      if (!file) return;
+      try {
+        const backup = JSON.parse(await file.text());
+        if (!confirm(`Replace everything in this browser with the backup from ${backup.exported_at || "unknown date"}?`)) return;
+        await api("POST", "/api/restore", backup);
+        toast("Backup restored");
+        route();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+    app.append(el("h2", { class: "section-head" }, "Database and backup"), databaseLocationCard(),
+      el("div", { class: "card" }, el("p", { class: "muted" }, "Save a backup file regularly, and restore it on another computer to move the data."),
+        el("div", { class: "row" },
+          el("button", { onclick: async () => {
+            const backup = await api("GET", "/api/backup");
+            const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+            const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
+            document.body.append(link); link.click(); link.remove();
+          } }, "Save backup"),
+          el("button", { onclick: () => restore.click() }, "Restore from backup"), restore)));
+  }
 }
 
 async function renderUsers() {
