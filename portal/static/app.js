@@ -1373,52 +1373,7 @@ async function renderPerform(assignmentId) {
         return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
       };
       const numberCell = (it) => el("td", { class: "qa-n" }, checkNumber(it.description) || "");
-      const axisRow = (g) => {
-        const unit = g.axes[0].unit && g.axes[0].unit !== "unitless" ? g.axes[0].unit : "";
-        const parts = g.axes.map((it) => { drawn.add(it.test_id); return { it, ...buildEntry(it) }; });
-        const calc = g.calc ? (drawn.add(g.calc.test_id), { it: g.calc, ...buildEntry(g.calc) }) : null;
-        for (const x of [...parts, calc].filter(Boolean)) { x.comment.hidden = true; x.noteToggle.hidden = true; }
-        parts[0].noteToggle.hidden = false; parts[0].noteToggle.textContent = "✎"; parts[0].noteToggle.title = "Add a note"; parts[0].noteToggle.className = "icon-btn note-btn";
-        const statusCell = el("div", { class: "status-cell" });
-        const dlt = el("div", { class: "delta-slot" });
-        const refresh = () => {
-          const sts = parts.map((x) => x.entry.status()).filter(Boolean);
-          const worst = sts.reduce((w, st) => (STATUS_RANK[st] > STATUS_RANK[w] ? st : w), sts[0]);
-          statusCell.replaceChildren(sts.length ? chip(worst) : "");
-          dlt.replaceChildren(...present(parts.map((x, k) => x.control.value.trim() !== "" && deltaBadge(Number(x.control.value), x.it.limits, unit)
-            ? [el("span", { class: `axis-val axis-${k}` }, `${x.it.axis} `), deltaBadge(Number(x.control.value), x.it.limits, unit), " "] : null)));
-        };
-        parts.forEach((x) => x.control.addEventListener("input", refresh));
-        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
-        const trend = el("button", { type: "button", class: "icon-btn", title: "Show the X, Y and Z trend here", onclick: () => {
-          const series = parts.map((x) => ({ label: x.it.axis, points: (history[x.it.test_id] || []).slice(-60) })).filter((x) => x.points.length);
-          if (!series.length) return toast("No results yet for this test.", true);
-          if (chart.hidden) chart.firstChild.replaceChildren(
-            el("div", { class: "row" }, el("strong", {}, g.base), el("span", { class: "spacer" }),
-              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${parts.map((x) => x.it.test_id).join(",")}&range=365` }, "Full trend")),
-            seriesChart(series, unit, { small: true }));
-          chart.hidden = !chart.hidden;
-        } }, trendIcon(16));
-        const perAxis = (f) => parts.map((x, k) => el("div", { class: `axis-val axis-${k}` }, `${x.it.axis} `, f(x.it)));
-        const numbers = [checkNumber(g.axes[0].description), checkNumber((g.calc || g.axes[g.axes.length - 1]).description)].filter(Boolean);
-        const row = el("tr", {},
-          el("td", { class: "qa-n" }, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}` : ""),
-          el("td", { class: "qa-label" }, el("strong", {}, g.base, g.unitTag ? ` ${g.unitTag}` : ""), limitsLine(calc || g.axes[0], unit),
-            helpText((g.calc || g.axes[0]).description, { inline: true }), ...parts.map((x) => x.note), calc ? calc.note : null),
-          el("td", { class: "qa-unit" }, unit),
-          el("td", { class: "num" }, perAxis((it) => refCell(it, unit))),
-          el("td", { class: "qa-measured" }, el("div", { class: "axis-inputs" },
-            ...parts.map((x, k) => el("div", { class: `axis-field axis-${k}` }, el("span", { class: "axis-key" }, x.it.axis), x.control)),
-            calc ? el("div", { class: "axis-field axis-calc" }, el("span", { class: "axis-key" }, "3D"), calc.control) : null)),
-          el("td", { class: "qa-dev" }, dlt),
-          el("td", {}, statusCell),
-          el("td", { class: "qa-comment" }, parts[0].noteToggle, parts[0].comment),
-          el("td", { class: "history-cell" }, dates.length ? parts.map((x, k) => el("div", { class: "hist-axis" }, el("span", { class: `axis-key axis-${k}` }, x.it.axis), histChips(x.it, unit))) : el("span", { class: "muted small" }, "—")),
-          el("td", {}, trend));
-        return [row, chart];
-      };
       const trRows = members.map((it) => {
-        if (it.axes) return axisRow(it);
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
@@ -1438,7 +1393,7 @@ async function renderPerform(assignmentId) {
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           numberCell(it),
-          el("td", { class: "qa-label" }, firstCell(it), limitsLine(it, unit), note),
+          el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           el("td", { class: "qa-unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
           el("td", { class: "num" }, it.type === "numeric" ? refCell(it, unit) : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
@@ -1449,7 +1404,7 @@ async function renderPerform(assignmentId) {
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader === "Energy" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "22%", "5%", "7%", "15%", "8%", "8%", "5%", "23%", "4%"];
+      const widths = firstHeader !== "Test" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "22%", "5%", "7%", "15%", "8%", "8%", "5%", "23%", "4%"];
       const tableEl = sortable(el("table", { class: "measure-table" },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
@@ -1465,6 +1420,12 @@ async function renderPerform(assignmentId) {
       };
       requestAnimationFrame(fitHistory);
       window.addEventListener("resize", fitHistory);
+      // Axis and energy tables carry the shared limits in their title rather than on every row.
+      if (title && firstHeader !== "Test") {
+        const withLimits = members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null));
+        const line = withLimits && limitsLine(withLimits, withLimits.unit && withLimits.unit !== "unitless" ? withLimits.unit : "");
+        if (line) title.append(line);
+      }
       return el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
     };
     const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : it.name;
@@ -1485,9 +1446,28 @@ async function renderPerform(assignmentId) {
     };
     const flush = () => {
       if (!pending.length) return;
-      rows.push(measureTable(foldAxes(pending), { firstHeader: "Test", title: null, directions: null, label: shortName,
-        firstCell: (it) => [el("strong", {}, shortName(it)),
-          helpText(it.description, { inline: true })] }));
+      let plain = [];
+      const emitPlain = () => {
+        if (plain.length) rows.push(measureTable(plain, { firstHeader: "Test", title: null, directions: null, label: shortName,
+          firstCell: (it) => [el("strong", {}, shortName(it)), helpText(it.description, { inline: true })] }));
+        plain = [];
+      };
+      for (const m of foldAxes(pending)) {
+        if (!m.axes) { plain.push(m); continue; }
+        emitPlain();
+        // An X / Y / Z offset (and its 3D magnitude) as a titled table with one row per axis, like the Sphinx tables.
+        const members = [...m.axes.map((it, k) => ({ ...it, axisLabel: "XYZ"[k] })), ...(m.calc ? [{ ...m.calc, axisLabel: "3D" }] : [])];
+        const numbers = [checkNumber(m.axes[0].description), checkNumber((m.calc || m.axes[m.axes.length - 1]).description)].filter(Boolean);
+        rows.push(measureTable(members, {
+          firstHeader: "Axis",
+          title: el("div", { class: "measure-title" }, el("strong", {}, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}: ` : "", m.base, m.unitTag ? ` ${m.unitTag}` : ""),
+            helpText((m.calc || m.axes[0]).description, { inline: true })),
+          directions: null,
+          label: (it) => `${m.base} ${it.axisLabel}`,
+          firstCell: (it) => el("strong", { class: it.axisLabel === "3D" ? "" : `axis-val axis-${"XYZ".indexOf(it.axisLabel)}` }, it.axisLabel),
+        }));
+      }
+      emitPlain();
       pending = [];
     };
     for (const item of items) {
