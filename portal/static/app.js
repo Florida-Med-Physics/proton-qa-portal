@@ -65,7 +65,7 @@ function svg(tag, attrs, ...kids) {
   return node;
 }
 
-const STATUS_LABEL = { warn: "Warn", fail: "Fail" };
+const STATUS_LABEL = { pass: "PASS", warn: "WARNING", fail: "ACTION", recorded: "Recorded" };
 function chip(status, label) {
   return el("span", { class: `chip ${status || ""}` }, label || STATUS_LABEL[status] || capitalize(status || "-"));
 }
@@ -257,13 +257,13 @@ function limitsText(limits, unit) {
   }
   const suffix = limits.tol_mode === "percent" ? "%" : unit ? ` ${unit}` : "";
   const parts = [`${fmt(limits.expected)}${unit ? " " + unit : ""}`];
-  if (limits.warn !== null && limits.warn !== undefined) parts.push(`warn ±${fmt(limits.warn)}${suffix}`);
-  if (limits.fail !== null && limits.fail !== undefined) parts.push(`fail ±${fmt(limits.fail)}${suffix}`);
+  if (limits.warn !== null && limits.warn !== undefined) parts.push(`warning ±${fmt(limits.warn)}${suffix}`);
+  if (limits.fail !== null && limits.fail !== undefined) parts.push(`action ±${fmt(limits.fail)}${suffix}`);
   return parts.join(" · ");
 }
 
 const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text" };
-const STATUS_WORDS = { pass: "Pass", warn: "Warning", fail: "Fail" };
+const STATUS_WORDS = { pass: "PASS", warn: "WARNING", fail: "ACTION" };
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
 // "Δ +0.30 mm" badge beside a numeric result, green / yellow / red by its status against the limits.
@@ -301,8 +301,7 @@ function evaluate(type, value, limits) {
 const NAV = [
   ["#/", "Dashboard", null, ["#/", "#"], "Dashboard"],
   ["#/perform-qa", "Perform QA", null, ["#/perform-qa", "#/perform", "#/runs"]],
-  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit"]],
-  ["#/machines", "Machines", "configure", ["#/machines", "#/assignments"]],
+  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit", "#/machines", "#/assignments"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
   ["#/admin", "Data Administration", "configure", ["#/admin", "#/users"]],
 ];
@@ -666,7 +665,7 @@ async function renderSetup() {
   }
   const machineRows = [...byMachine].flatMap(([name, qs]) => {
     const m = machines.find((x) => x.name === name);
-    return [el("tr", { class: "machine-row" }, el("td", { colspan: 6 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
+    return [el("tr", { class: "machine-row" }, el("td", { colspan: 6 }, m ? el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" }, el("strong", {}, name)) : el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...qs.map((q) => {
         const a = instanceOf(q);
         const live = !!(a && a.active);
@@ -1092,7 +1091,7 @@ async function renderLimits(assignmentId) {
       el("td", {}, el("input", { name: "fail", type: "number", step: "any", min: 0, value: o.fail ?? "", placeholder: fmt(q.fail) })),
       el("td", {}, select("tol_mode", [["", `List (${q.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || "")));
   });
-  app.append(table(["Test", "Expected", "Warn ±", "Fail ±", "Limits are"], rows));
+  app.append(table(["Test", "Expected", "Warning ±", "Action ±", "Limits are"], rows));
   const error = el("p", { class: "error" });
   app.append(error, el("div", { class: "row" },
     el("a", { class: "button", href: `#/machines/${t.machine.id}` }, "Back"),
@@ -1139,12 +1138,17 @@ function passFailInput(name, withWarning, yesNo) {
 const TEMPLATE_NUMBER = /^Template (\d+)\.(\d+)\.\s*/;
 // Lists copied from RadMachine keep its own section names: "Template 1.04. [Section: PBS DailyQA GTR5 - Sphinx] ...".
 const SECTION_NAME = /\[Section: ([^\]]+)\]\s*/;
-const MARKER = /\[(auto|calc): ([^\]]+)\]\s*/;         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
+const MARKER = /\[(auto|calc): ((?:[^\[\]]|\[[^\]]*\])+)\]\s*/;   // the rule may itself contain "[mm]"         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
-function helpText(description) {
+function helpText(description, { inline = false } = {}) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
   const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").trim();
-  return text ? el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text) : null;
+  if (!text) return null;
+  if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
+    const one = text.replace(/\s+/g, " ");
+    return el("span", { class: "qa-sub", title: text }, one.length > 150 ? `${one.slice(0, 148)}…` : one);
+  }
+  return el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text);
 }
 
 // Which numbered section a test belongs to: the template number in its directions ("Template 2.03.") when
@@ -1228,9 +1232,20 @@ function wireCalculations(entries) {
       sources = entries.slice(Math.max(0, i - 3), i).filter((x) => x.item.type === "numeric");
       compute = (v) => Math.sqrt(v.reduce((a, b) => a + b * b, 0));
     } else if (kind === "ktp") {
-      sources = [byName(/chamber temperature/i), byName(/air pressure/i)].filter(Boolean);
-      compute = ([t, pr]) => ((273.15 + t) / (273.15 + 22)) * (101.325 / pr);
+      sources = [byName(/chamber temperature|air temperature|temperature \[/i), byName(/air pressure|pressure \[/i)].filter(Boolean);
+      const hPa = sources[1] && /hpa/i.test(sources[1].item.unit || "");
+      compute = ([t, pr]) => ((273.15 + t) / (273.15 + 22)) * ((hPa ? 1013.25 : 101.325) / pr);   // TG-51 reference conditions
       decimals = 4;
+    } else if (kind === "dose-ndw") {
+      // Monthly output: dose [cGy] = M [nC] × kTP × N_Dw [cGy/nC] × k_Q × k_s × k_pol, with M the charge entered just above.
+      const charge = entries.slice(0, i).filter((x) => x.item.type === "numeric").slice(-1);
+      sources = [...charge, byName(/temp\.? & press\.? correction|k_?tp/i), byName(/n_?dw/i), byName(/\bk_?q\b/i), byName(/\bk_?s\b/i), byName(/\bk_?pol\b/i)].filter(Boolean);
+      compute = (v) => v.reduce((a, b) => a * b, 1);
+    } else if (/^(max|range):/.test(kind)) {
+      // "[calc: max:<text>:N]" / "[calc: range:<text>:N]": over the last N fields above whose name contains <text>.
+      const [, op, text, count] = /^(max|range):(.*):(\d+)$/.exec(kind) || [];
+      sources = entries.slice(0, i).filter((x) => x.item.type === "numeric" && x.item.name.includes(text)).slice(-Number(count || 0));
+      compute = (v) => (op === "max" ? Math.max(...v.map(Math.abs)) : Math.max(...v) - Math.min(...v));
     } else if (kind === "product") {
       sources = [byName(/chamber cal\.? factor/i), byName(/electrometer calibration factor/i)].filter(Boolean);
       compute = ([a, b]) => a * b;
@@ -1313,7 +1328,7 @@ async function renderPerform(assignmentId) {
       };
       const update = () => {
         const s = entry.status();
-        statusCell.replaceChildren(s && item.type !== "boolean" && item.type !== "status" ? chip(s) : "");
+        statusCell.replaceChildren(s ? chip(s) : "");
         if (s === "warn" || s === "fail") { comment.hidden = false; noteToggle.hidden = true; }
         refresh();
       };
@@ -1348,12 +1363,22 @@ async function renderPerform(assignmentId) {
         return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
+      const limitsLine = (it, unit) => {
+        if (it.type !== "numeric") return null;
+        const l = it.limits || {};
+        const suf = l.tol_mode === "percent" ? "%" : unit;
+        const parts = [];
+        if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
+        if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
+        return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
+      };
+      const numberCell = (it) => el("td", { class: "qa-n" }, checkNumber(it.description) || "");
       const axisRow = (g) => {
         const unit = g.axes[0].unit && g.axes[0].unit !== "unitless" ? g.axes[0].unit : "";
         const parts = g.axes.map((it) => { drawn.add(it.test_id); return { it, ...buildEntry(it) }; });
         const calc = g.calc ? (drawn.add(g.calc.test_id), { it: g.calc, ...buildEntry(g.calc) }) : null;
         for (const x of [...parts, calc].filter(Boolean)) { x.comment.hidden = true; x.noteToggle.hidden = true; }
-        parts[0].comment.hidden = false;                       // one comment for the whole offset
+        parts[0].noteToggle.hidden = false; parts[0].noteToggle.textContent = "✎"; parts[0].noteToggle.title = "Add a note"; parts[0].noteToggle.className = "icon-btn note-btn";
         const statusCell = el("div", { class: "status-cell" });
         const dlt = el("div", { class: "delta-slot" });
         const refresh = () => {
@@ -1364,7 +1389,7 @@ async function renderPerform(assignmentId) {
             ? [el("span", { class: `axis-val axis-${k}` }, `${x.it.axis} `), deltaBadge(Number(x.control.value), x.it.limits, unit), " "] : null)));
         };
         parts.forEach((x) => x.control.addEventListener("input", refresh));
-        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the X, Y and Z trend here", onclick: () => {
           const series = parts.map((x) => ({ label: x.it.axis, points: (history[x.it.test_id] || []).slice(-60) })).filter((x) => x.points.length);
           if (!series.length) return toast("No results yet for this test.", true);
@@ -1377,17 +1402,17 @@ async function renderPerform(assignmentId) {
         const perAxis = (f) => parts.map((x, k) => el("div", { class: `axis-val axis-${k}` }, `${x.it.axis} `, f(x.it)));
         const numbers = [checkNumber(g.axes[0].description), checkNumber((g.calc || g.axes[g.axes.length - 1]).description)].filter(Boolean);
         const row = el("tr", {},
-          el("td", {}, el("strong", {}, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}: ` : "", g.base, g.unitTag ? ` ${g.unitTag}` : ""),
-            named && g.axes[0].category ? el("div", { class: "category-tag" }, categoryLabel(g.axes[0].category)) : null,
-            (() => { const d = helpText((g.calc || g.axes[0]).description); if (d) d.classList.add("in-cell"); return d; })(), ...parts.map((x) => x.note), calc ? calc.note : null),
-          el("td", {}, el("div", { class: "axis-inputs" },
-            ...parts.map((x, k) => el("div", { class: `axis-field axis-${k}` }, el("span", { class: "axis-key" }, x.it.axis), x.control, unit ? el("span", { class: "muted small" }, unit) : null)),
-            calc ? el("div", { class: "axis-field axis-calc" }, el("span", { class: "axis-key" }, "3D"), calc.control, unit ? el("span", { class: "muted small" }, unit) : null) : null), dlt),
+          el("td", { class: "qa-n" }, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}` : ""),
+          el("td", { class: "qa-label" }, el("strong", {}, g.base, g.unitTag ? ` ${g.unitTag}` : ""), limitsLine(calc || g.axes[0], unit),
+            helpText((g.calc || g.axes[0]).description, { inline: true }), ...parts.map((x) => x.note), calc ? calc.note : null),
+          el("td", { class: "qa-unit" }, unit),
           el("td", { class: "num" }, perAxis((it) => refCell(it, unit))),
-          el("td", { class: "num" }, perAxis((it) => limitText(it.limits.warn, it.limits, unit))),
-          el("td", { class: "num" }, perAxis((it) => limitText(it.limits.fail, it.limits, unit))),
+          el("td", { class: "qa-measured" }, el("div", { class: "axis-inputs" },
+            ...parts.map((x, k) => el("div", { class: `axis-field axis-${k}` }, el("span", { class: "axis-key" }, x.it.axis), x.control)),
+            calc ? el("div", { class: "axis-field axis-calc" }, el("span", { class: "axis-key" }, "3D"), calc.control) : null)),
+          el("td", { class: "qa-dev" }, dlt),
           el("td", {}, statusCell),
-          el("td", {}, parts[0].comment),
+          el("td", { class: "qa-comment" }, parts[0].noteToggle, parts[0].comment),
           el("td", { class: "history-cell" }, dates.length ? parts.map((x, k) => el("div", { class: "hist-axis" }, el("span", { class: `axis-key axis-${k}` }, x.it.axis), histChips(x.it, unit))) : el("span", { class: "muted small" }, "—")),
           el("td", {}, trend));
         return [row, chart];
@@ -1397,8 +1422,8 @@ async function renderPerform(assignmentId) {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
-        comment.hidden = false; noteToggle.hidden = true;          // the table has its own comment column
-        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+        noteToggle.textContent = "✎"; noteToggle.title = "Add a note"; noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
+        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
           const pts = (history[it.test_id] || []).slice(-60);
           if (!pts.length) return toast("No results yet for this test.", true);
@@ -1412,22 +1437,23 @@ async function renderPerform(assignmentId) {
         const showDelta = () => { const v = Number(control.value); dlt.replaceChildren(...present([control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : null])); };
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
-          el("td", {}, firstCell(it), note),
-          el("td", {}, el("div", { class: "row nowrap" }, control, unit ? el("span", { class: "muted small" }, unit) : null), dlt),
-          el("td", { class: "num" }, it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—")),
-          el("td", { class: "num" }, limitText(it.limits.warn, it.limits, unit)),
-          el("td", { class: "num" }, limitText(it.limits.fail, it.limits, unit)),
+          numberCell(it),
+          el("td", { class: "qa-label" }, firstCell(it), limitsLine(it, unit), note),
+          el("td", { class: "qa-unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
+          el("td", { class: "num" }, it.type === "numeric" ? refCell(it, unit) : el("span", { class: "muted" }, "—")),
+          el("td", { class: "qa-measured" }, control),
+          el("td", { class: "qa-dev" }, dlt),
           el("td", {}, statusCell),
-          el("td", {}, comment),
+          el("td", { class: "qa-comment" }, noteToggle, comment),
           el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader === "Energy" ? ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"] : ["21%", "17%", "8%", "8%", "8%", "7%", "10%", "17%", "4%"];
+      const widths = firstHeader === "Energy" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "22%", "5%", "7%", "15%", "8%", "8%", "5%", "23%", "4%"];
       const tableEl = sortable(el("table", { class: "measure-table" },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, [firstHeader, "Measurement", "Reference", "Warn", "Fail", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
-            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
+          el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
+            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
       // Only as many history dates as fit on one line of the History column (re-checked when the window is resized).
@@ -1460,35 +1486,20 @@ async function renderPerform(assignmentId) {
     const flush = () => {
       if (!pending.length) return;
       rows.push(measureTable(foldAxes(pending), { firstHeader: "Test", title: null, directions: null, label: shortName,
-        firstCell: (it) => [el("strong", {}, checkNumber(it.description) ? `${checkNumber(it.description)}: ` : "", shortName(it)),
-          named && it.category ? el("div", { class: "category-tag" }, categoryLabel(it.category)) : null,
-          (() => { const d = helpText(it.description); if (d) d.classList.add("in-cell"); return d; })()] }));
+        firstCell: (it) => [el("strong", {}, shortName(it)),
+          helpText(it.description, { inline: true })] }));
       pending = [];
     };
     for (const item of items) {
       if (drawn.has(item.test_id)) continue;
-      if (!grouped.has(item.test_id)) {
-        if (item.type === "numeric") { pending.push(item); continue; }
-        flush();
-        const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(item);
-        // As in the myQA template: the numbered title, then its directions block, then the result.
-        const directions = helpText(item.description);
-        rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
-          el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, categoryLabel(item.category)) : null,
-            el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", shortName(item)), note),
-          el("div", { class: "check-input" }, control),
-          statusCell,
-          el("div", { class: "check-note" }, noteToggle, comment),
-          directions));
-        continue;
-      }
+      if (!grouped.has(item.test_id)) { pending.push(item); continue; }
       flush();
       const mp0 = measureParts(item.name);
       const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
       rows.push(measureTable(family.map((f) => f.item), {
         firstHeader: "Energy",
-        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
-        directions: helpText(item.description),
+        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), helpText(item.description, { inline: true })),
+        directions: null,
         firstCell: (it) => el("strong", {}, measureParts(it.name).rowLabel),
         label: (it) => { const mp = measureParts(it.name); return `${mp.rowLabel} · ${mp.metricLabel}`; },
       }));
@@ -1505,7 +1516,7 @@ async function renderPerform(assignmentId) {
         const bad = s.filter((x) => x === "fail").length;
         const warn = s.filter((x) => x === "warn").length;
         summary.replaceChildren(left ? `${left} to do` : "All done",
-          bad ? [" · ", chip("fail", `${bad} fail`)] : "", warn ? [" · ", chip("warn", `${warn} warn`)] : "");
+          bad ? [" · ", chip("fail", `${bad} action`)] : "", warn ? [" · ", chip("warn", `${warn} warning`)] : "");
       },
       settled() {
         return entries.every((e) => !e.required || e.status() === "pass" || e.status() === "recorded");
@@ -1759,8 +1770,8 @@ async function renderQueueEditor(id) {
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
-          el("label", { class: "inline small" }, "Warn ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
-          el("label", { class: "inline small" }, "Fail ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, "Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           select("", [["", `Default (${t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], item.tol_mode || "",
             { disabled: !editable, onchange: (e) => { item.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
         el("td", { class: "small" }, m.modified_at ? m.modified_at.slice(0, 16).replace("T", " ") : el("span", { class: "muted" }, "—")),
@@ -1776,7 +1787,7 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Warn / Fail", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
+      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Warning / Action", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
@@ -1840,8 +1851,8 @@ function testForm(test) {
   const limits = el("div", { class: "form-grid wide" },
     field("Unit", el("input", { name: "unit", value: t.unit || "", placeholder: "mm, %, cGy, °" })),
     field("Expected value", el("input", { name: "expected", type: "number", step: "any", value: t.expected ?? "" })),
-    field("Warn ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
-    field("Fail ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
+    field("Warning ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
+    field("Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
     field("Limits are", select("tol_mode", [["absolute", "Absolute (same units)"], ["percent", "Percent of expected"]], t.tol_mode)));
   const sync = () => (limits.hidden = type.value !== "numeric");
   type.addEventListener("change", sync);
@@ -1898,7 +1909,7 @@ async function renderTests() {
       }
       holder.replaceChildren(...[...groups].map(([heading, list]) => el("details", { class: "card section", open: !!needle || !!listPick.value || groups.size <= 3 },
         el("summary", {}, el("strong", {}, heading), el("span", { class: "section-summary" }, `${list.length}`)),
-        table(["Test", "QA list", "Type", "#Expected", "#Warn ±", "#Fail ±", ""], list.map((t) =>
+        table(["Test", "QA list", "Type", "#Expected", "#Warning ±", "#Action ±", ""], list.map((t) =>
           el("tr", { class: editable ? "clickable" : "", onclick: edit(t) }, el("td", {}, el("strong", {}, shortName(t))),
             el("td", { class: "muted" }, t.owner_name || "Shared"), ...limitCells(t)))))));
       return;
@@ -1907,7 +1918,7 @@ async function renderTests() {
     const keys = { name: (t) => shortName(t), category: (t) => t.category || "General", type: (t) => TYPE_LABELS[t.type] };
     const key = keys[sortPick.value];
     const sorted = shown.slice().sort((a, b) => key(a).localeCompare(key(b)) || (a.owner_name || "").localeCompare(b.owner_name || "") || shortName(a).localeCompare(shortName(b)));
-    holder.replaceChildren(table(["Test", "QA list", "Category", "Type", "#Expected", "#Warn ±", "#Fail ±", ""], sorted.map((t) =>
+    holder.replaceChildren(table(["Test", "QA list", "Category", "Type", "#Expected", "#Warning ±", "#Action ±", ""], sorted.map((t) =>
       el("tr", { class: editable ? "clickable" : "", onclick: edit(t) },
         el("td", {}, el("strong", {}, shortName(t))),
         el("td", { class: "muted" }, t.owner_name || "Shared"),
@@ -2134,8 +2145,8 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
     const key = el("div", { class: "chart-key" },
       series.map((x, k) => el("span", { class: "key-item" }, el("span", { class: `key-swatch line ${multi ? `axis-${k}` : "single"}` }), `${x.label}${delta ? " (Δ)" : ""}`)),
       drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
-      drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Warn ±") : null,
-      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Fail ±") : null);
+      drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Warning ±") : null,
+      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Action ±") : null);
     box.replaceChildren(buttons, drawSeries(series, unit, { small, delta }), key);
   };
   draw();
@@ -2260,7 +2271,7 @@ async function renderTrendOverview(machines, machineId, range) {
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
   app.append(el("p", { class: "lead" }, `${withData.length} tests on ${groups.length} charts. `,
-    failing ? el("span", { class: "chip fail" }, `${failing} at fail level`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} outside tolerance`) : "",
+    failing ? el("span", { class: "chip fail" }, `${failing} at action level`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} outside tolerance`) : "",
     !failing && !warning ? el("span", { class: "chip pass" }, "All passing") : ""));
   const search = el("input", { type: "search", class: "filter-box", placeholder: "Search tests (e.g. spot 3 sigma)", "aria-label": "Search tests" });
   search.addEventListener("input", () => {
@@ -2316,7 +2327,7 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "trend-cell" }, seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true })));
     });
     const tableEl = sortable(el("table", { class: "trend-table" },
-      el("thead", {}, el("tr", {}, ["Test", "Reference", "Warn", "Fail", "History", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : "" }, h))),
+      el("thead", {}, el("tr", {}, ["Test", "Baseline", "Warning ±", "Action ±", "History", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : "" }, h))),
         dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 4 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {})) : null),
       el("tbody", {}, rows)));
     block.append(el("div", { class: "table-wrap" }, tableEl));
@@ -2331,16 +2342,16 @@ function renderTrendDetail(group, range) {
     const s = stats(m.points), d = asDeviation(s.last);
     return stat(multi ? `${m.axis} latest` : "Latest", `${fmt(s.last.value)} ${unit}`.trim(),
       [chip(s.last.status), " ", s.last.expected !== null ? `${signed(d.dev)} ${unit} from ${fmt(s.last.expected)} ${unit}`.replace(/ +/g, " ") : "", el("br"),
-        `${s.inTol}% within fail level · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)} ${unit}`.trim()]);
+        `${s.inTol}% within action level · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)} ${unit}`.trim()]);
   }), (() => {
     const p = latest(group.members[0].points);
     const u = p.tol_mode === "percent" ? " %" : unit ? ` ${unit}` : "";
-    return p.warn !== null ? stat("Limits", `Warn ±${fmt(p.warn)}${u}`, `Fail ±${fmt(p.fail)}${u}`) : null;
+    return p.warn !== null ? stat("Limits", `Warning ±${fmt(p.warn)}${u}`, `Action ±${fmt(p.fail)}${u}`) : null;
   })()));
   app.append(el("div", { class: "legend" },
     multi ? el("span", {}, "Lines: ", axisLegend(group), ` deviation from each axis's expected value${unit ? ` (${unit})` : ""}`) : el("span", {}, "Dashed line: expected value"),
-    el("span", {}, el("span", { class: "swatch warn" }), "Within warn"),
-    el("span", {}, el("span", { class: "swatch fail" }), "Within fail"),
+    el("span", {}, el("span", { class: "swatch warn" }), "Within warning"),
+    el("span", {}, el("span", { class: "swatch fail" }), "Within action"),
     el("span", {}, "Dots: ", el("span", { class: "chip pass" }, "pass"), " ", el("span", { class: "chip warn" }, "warn"), " ", el("span", { class: "chip fail" }, "fail"))));
   app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit));
   // One row per date, one column per axis.
@@ -2450,6 +2461,8 @@ async function renderAdmin() {
   const [users, machines] = await Promise.all([can("manage_users") ? api("GET", "/api/users") : null, api("GET", "/api/machines")]);
 
   // 1. Users and rights (admins only; others see what each role may do).
+  app.append(el("h2", { class: "section-head" }, "Machines"),
+    el("p", { class: "muted" }, "Add or edit machines and their schedules on the ", el("a", { href: "#/machines" }, "machines page"), ". Machine names in Setup QA open the same page."));
   app.append(el("h2", { class: "section-head" }, "Users and rights"));
   if (!users) {
     app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"),

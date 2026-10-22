@@ -2609,6 +2609,1270 @@
      "description": "Template 5.05. [Section: Safety]"
     }
    ]
+  },
+  {
+   "name": "Monthly QA template – Proton gantry (TG-224)",
+   "kind": "Proton gantry",
+   "list": "Monthly QA",
+   "frequency": "monthly",
+   "setup": "From the GTR5 Monthly QA worksheet (GTR5_Monthly_QA_Worksheet.xlsx, structure and tolerances per AAPM TG-224 Table III), as extracted for the floridaphysics.com Monthly QA page. Baselines the worksheet fixes are filled in; baselines set once from commissioning (ranges, output dose, imaging) are blank until entered in Setup QA. Pass / Fail checks have no N/A here.",
+   "checks": [
+    {
+     "category": "Conditions",
+     "name": "Spot QA performed this month (quarterly items)",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 0.01. [Section: Chamber and conditions] Quarterly spot QA (Lynx, two gantry angles): answer No in months when it is not performed and leave those rows blank."
+    },
+    {
+     "category": "Conditions",
+     "name": "Chamber temperature [°C]",
+     "type": "numeric",
+     "unit": "°C",
+     "expected": 22,
+     "tol_mode": "absolute",
+     "description": "Template 0.02. [Section: Chamber and conditions] PPC05 temperature. Reference 22 °C."
+    },
+    {
+     "category": "Conditions",
+     "name": "Air pressure [hPa]",
+     "type": "numeric",
+     "unit": "hPa",
+     "expected": 1013.25,
+     "tol_mode": "absolute",
+     "description": "Template 0.03. [Section: Chamber and conditions] PPC05 pressure. Reference 1013.25 hPa."
+    },
+    {
+     "category": "Conditions",
+     "name": "Temp. & Press. Correction kTP",
+     "type": "numeric",
+     "unit": "",
+     "tol_mode": "absolute",
+     "description": "Template 0.04. [Section: Chamber and conditions] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 1013.25 / P (worksheet cell F6)."
+    },
+    {
+     "category": "Conditions",
+     "name": "Chamber (model / serial)",
+     "type": "text",
+     "description": "Template 0.05. [Section: Chamber and conditions]"
+    },
+    {
+     "category": "Conditions",
+     "name": "N_Dw [cGy/nC]",
+     "type": "numeric",
+     "unit": "cGy/nC",
+     "tol_mode": "absolute",
+     "description": "Template 0.06. [Section: Chamber and conditions] Chamber calibration coefficient; enter once."
+    },
+    {
+     "category": "Conditions",
+     "name": "k_Q",
+     "type": "numeric",
+     "unit": "",
+     "tol_mode": "absolute",
+     "description": "Template 0.07. [Section: Chamber and conditions] Beam quality factor; enter once."
+    },
+    {
+     "category": "Conditions",
+     "name": "k_s",
+     "type": "numeric",
+     "unit": "",
+     "tol_mode": "absolute",
+     "description": "Template 0.08. [Section: Chamber and conditions] Ion recombination factor; enter once."
+    },
+    {
+     "category": "Conditions",
+     "name": "k_pol",
+     "type": "numeric",
+     "unit": "",
+     "tol_mode": "absolute",
+     "description": "Template 0.09. [Section: Chamber and conditions] Polarity factor; enter once."
+    },
+    {
+     "category": "Safety",
+     "name": "Door interlock",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.01. [Section: Safety] Also verified at daily QA; the monthly record documents functional status. Enter Pass / Fail / N/A.\nOpen treatment room door during delivery — verify beam terminates\nTG-224: Functional"
+    },
+    {
+     "category": "Safety",
+     "name": "MU chamber interlocks",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.02. [Section: Safety] Deliver test field — verify termination on MU1 and on MU2\nTG-224: Functional"
+    },
+    {
+     "category": "Safety",
+     "name": "Beam pause / hold and resume",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.03. [Section: Safety] Pause mid-delivery — verify hold, correct resume and MU accounting\nTG-224: Functional"
+    },
+    {
+     "category": "Safety",
+     "name": "Audio intercom and video monitoring",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.04. [Section: Safety] Two-way audio and all room cameras from console\nTG-224: Functional"
+    },
+    {
+     "category": "Safety",
+     "name": "“Beam ON” indicator",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.05. [Section: Safety] Console, room entrance and in-room indicators\nTG-224: Functional"
+    },
+    {
+     "category": "Safety",
+     "name": "“X-ray ON” indicator",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.06. [Section: Safety] Console and room entrance indicators during kV / CBCT\nTG-224: Functional"
+    },
+    {
+     "category": "Safety",
+     "name": "Room search / clearance chime",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 1.07. [Section: Safety] Full search sequence — verify chime and interlock set\nTG-224: Functional"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch translational accuracy — X (lateral) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 65,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.01. [Section: Mechanical] Applied shift verified against the machinist rule in each axis; rotation against digital level / protractor.\nApply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch translational accuracy — Y (longitudinal) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 65,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.02. [Section: Mechanical] Apply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch translational accuracy — Z (vertical) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 65,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.03. [Section: Mechanical] Apply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch rotational accuracy — T090 [deg]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 90,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.04. [Section: Mechanical] Digital level / protractor at nominal angle\nTG-224: 1°"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch pitch accuracy [deg]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 2,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.05. [Section: Mechanical] Apply 2.0° pitch correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1°"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch roll accuracy [deg]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 2,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.06. [Section: Mechanical] Apply 2.0° roll correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1°"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch yaw accuracy [deg]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 2,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.07. [Section: Mechanical] Apply 2.0° yaw correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1°"
+    },
+    {
+     "category": "Patient positioner",
+     "name": "Couch trueness (vertical sag) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.08. [Section: Mechanical] Deviation of vertical axis over full travel — AI monthly composite\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "IGRT re-positioning",
+     "name": "CBCT match residual — X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.09. [Section: Mechanical] Residual after applying the correction; enter the residual, not the applied shift.\nTOFU phantom, CBCT registration residual after correction\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "IGRT re-positioning",
+     "name": "CBCT match residual — Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.10. [Section: Mechanical] TOFU phantom, CBCT registration residual after correction\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "IGRT re-positioning",
+     "name": "CBCT match residual — Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.11. [Section: Mechanical] TOFU phantom, CBCT registration residual after correction\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "IGRT re-positioning",
+     "name": "kV-kV match residual — X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.12. [Section: Mechanical] TOFU phantom, kV-kV registration residual after correction\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "IGRT re-positioning",
+     "name": "kV-kV match residual — Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.13. [Section: Mechanical] TOFU phantom, kV-kV registration residual after correction\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "IGRT re-positioning",
+     "name": "kV-kV match residual — Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.14. [Section: Mechanical] TOFU phantom, kV-kV registration residual after correction\nTG-224: ≤1 mm"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 0° – BB walkout X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.15. [Section: Mechanical] Align a BB (TOFU or any BB phantom) at isocentre and zero the position: T000 is the 0,0,0 reference. Rotate the couch to each angle, acquire an image, and record how the BB moves in each axis. Couch angles are editable. TG-224 gives ≤2 mm as a circle diameter — scored here as radial displacement ≤1 mm and per-axis range ≤2 mm.\nReference position — BB aligned at isocentre, zero the readout\nLimits are set on the summary row below.\nTG-224: R ≤ 1 mm"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 0° – BB walkout Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.16. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 0° – BB walkout Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.17. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 0° – BB walkout [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.18. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 315° – BB walkout X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.19. [Section: Mechanical] Rotate couch, re-image, record BB shift from the T000 position\nTG-224: R ≤ 1 mm"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 315° – BB walkout Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.20. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 315° – BB walkout Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.21. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 315° – BB walkout [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.22. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 270° – BB walkout X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.23. [Section: Mechanical] Rotate couch, re-image, record BB shift from the T000 position\nTG-224: R ≤ 1 mm"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 270° – BB walkout Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.24. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 270° – BB walkout Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.25. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 270° – BB walkout [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.26. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 225° – BB walkout X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.27. [Section: Mechanical] Rotate couch, re-image, record BB shift from the T000 position\nTG-224: R ≤ 1 mm"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 225° – BB walkout Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.28. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 225° – BB walkout Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.29. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 225° – BB walkout [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.30. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 180° – BB walkout X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.31. [Section: Mechanical] Rotate couch, re-image, record BB shift from the T000 position\nTG-224: R ≤ 1 mm"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 180° – BB walkout Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.32. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 180° – BB walkout Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "tol_mode": "absolute",
+     "description": "Template 2.33. [Section: Mechanical]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch angle 180° – BB walkout [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.34. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch isocentricity — max radial displacement [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.35. [Section: Mechanical] [calc: max:BB walkout [mm]:5] Calculated here: max of the 5 rows above. Worst case of the couch angles above (sets the limits used by those rows)\nRadius form of the TG-224 ≤2 mm circle-diameter limit.\nTG-224: ≤2 mm dia"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch isocentricity — range of ΔX (max − min) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.36. [Section: Mechanical] [calc: range:BB walkout X [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch isocentricity — range of ΔY (max − min) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.37. [Section: Mechanical] [calc: range:BB walkout Y [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch isocentricity — range of ΔZ (max − min) [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.38. [Section: Mechanical] [calc: range:BB walkout Z [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia"
+    },
+    {
+     "category": "Snout",
+     "name": "Snout extension accuracy [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "absolute",
+     "description": "Template 2.39. [Section: Mechanical] Machinist rule at one nominal position\nEnter the nominal snout position as the baseline (set once).\nTG-224: ±10 mm"
+    },
+    {
+     "category": "XRV-124 coincidence",
+     "name": "XRV ISO difference — G000 [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.40. [Section: Mechanical] Energy sweep matches the range list: 70–220 MeV in 10 MeV steps plus 225 MeV. Phantom set up by kV / CBCT, then verified by delivered radiation. Enter the worst-case ISO difference at each angle.\nMax |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+    },
+    {
+     "category": "XRV-124 coincidence",
+     "name": "XRV ISO difference — G060 [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.41. [Section: Mechanical] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+    },
+    {
+     "category": "XRV-124 coincidence",
+     "name": "XRV ISO difference — G120 [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.42. [Section: Mechanical] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+    },
+    {
+     "category": "XRV-124 coincidence",
+     "name": "XRV ISO difference — G180 [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.43. [Section: Mechanical] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+    },
+    {
+     "category": "XRV-124 coincidence",
+     "name": "XRV — max over all angles [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.44. [Section: Mechanical] [calc: max:XRV ISO difference:4] Calculated here: max of the 4 rows above. Worst case of the four gantry angles above\nTG-224: ±2 mm"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 70 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.01. [Section: Dosimetry] Enter the chamber constants once, then the raw charge each month. Dose = M(nC) × k_TP × N_Dw × k_Q × k_s × k_pol, with k_TP taken from cell F6. Proteus ONE permits gantry 0° and 90° only; the four energies are editable and intended to be cycled.\nGantry 0° · PPC05 in solid water at reference depth\nReference dose = commissioned dose at this energy (set once).\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 70 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.02. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 120 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.03. [Section: Dosimetry] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 120 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.04. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 180 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.05. [Section: Dosimetry] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 180 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.06. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 225 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.07. [Section: Dosimetry] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 225 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.08. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 70 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.09. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 70 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.10. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 120 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.11. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 120 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.12. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 180 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.13. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 180 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.14. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 225 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 3.15. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 225 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 3.16. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 70 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.17. [Section: Dosimetry] Stand-alone acquisition. Enter measured R80; baselines are filled once from commissioning.\nR90 depth in water (Zebra)\nFill baseline once from commissioning R80.\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 80 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.18. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 90 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.19. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 100 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.20. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 110 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.21. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 120 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.22. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 130 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.23. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 140 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.24. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 150 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.25. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 160 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.26. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 170 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.27. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 180 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.28. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 190 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.29. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 200 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.30. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 210 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.31. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 220 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.32. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Range verification (Zebra)",
+     "name": "Range R90 (Zebra) – 225 MeV [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 3.33. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 100 MeV – position deviation [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 3.34. [Section: Dosimetry] Set cell C7 to NO in months when this is not performed — every row below then reads SKIPPED. Daily Sphinx QA already covers spot position and size; this is the quarterly two-angle check. Energy layers are editable (blue).\nGantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 100 MeV – σx [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.35. [Section: Dosimetry] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 100 MeV – σy [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.36. [Section: Dosimetry] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 100 MeV – skewness",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0,
+     "warn": 0.1,
+     "fail": 0.15,
+     "tol_mode": "absolute",
+     "description": "Template 3.37. [Section: Dosimetry] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 160 MeV – position deviation [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 3.38. [Section: Dosimetry] Gantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 160 MeV – σx [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.39. [Section: Dosimetry] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 160 MeV – σy [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.40. [Section: Dosimetry] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 160 MeV – skewness",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0,
+     "warn": 0.1,
+     "fail": 0.15,
+     "tol_mode": "absolute",
+     "description": "Template 3.41. [Section: Dosimetry] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 220 MeV – position deviation [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 3.42. [Section: Dosimetry] Gantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 220 MeV – σx [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.43. [Section: Dosimetry] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 220 MeV – σy [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.44. [Section: Dosimetry] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G0 – 220 MeV – skewness",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0,
+     "warn": 0.1,
+     "fail": 0.15,
+     "tol_mode": "absolute",
+     "description": "Template 3.45. [Section: Dosimetry] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 100 MeV – position deviation [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 3.46. [Section: Dosimetry] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 100 MeV – σx [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.47. [Section: Dosimetry] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 100 MeV – σy [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.48. [Section: Dosimetry] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 100 MeV – skewness",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0,
+     "warn": 0.1,
+     "fail": 0.15,
+     "tol_mode": "absolute",
+     "description": "Template 3.49. [Section: Dosimetry] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 160 MeV – position deviation [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 3.50. [Section: Dosimetry] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 160 MeV – σx [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.51. [Section: Dosimetry] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 160 MeV – σy [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.52. [Section: Dosimetry] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 160 MeV – skewness",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0,
+     "warn": 0.1,
+     "fail": 0.15,
+     "tol_mode": "absolute",
+     "description": "Template 3.53. [Section: Dosimetry] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 220 MeV – position deviation [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 1,
+     "fail": 2,
+     "tol_mode": "absolute",
+     "description": "Template 3.54. [Section: Dosimetry] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 220 MeV – σx [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.55. [Section: Dosimetry] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 220 MeV – σy [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": 7.5,
+     "fail": 10,
+     "tol_mode": "percent",
+     "description": "Template 3.56. [Section: Dosimetry] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Spot QA (quarterly)",
+     "name": "Spot QA G90 – 220 MeV – skewness",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0,
+     "warn": 0.1,
+     "fail": 0.15,
+     "tol_mode": "absolute",
+     "description": "Template 3.57. [Section: Dosimetry] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "kV planar imaging",
+     "name": "Spatial resolution (high contrast)",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.01. [Section: Imaging] Per TG-142 / TG-179. myQA imaging licence under investigation; until then, score against the baseline image.\nCompare against the baseline phantom image\nTG-224: baseline"
+    },
+    {
+     "category": "kV planar imaging",
+     "name": "Low-contrast detectability",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.02. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
+    },
+    {
+     "category": "kV planar imaging",
+     "name": "Uniformity and noise",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.03. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
+    },
+    {
+     "category": "kV planar imaging",
+     "name": "Artefacts / dead pixels",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.04. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
+    },
+    {
+     "category": "kV planar imaging",
+     "name": "Geometric accuracy / scaling [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 4.05. [Section: Imaging] Known phantom length measured on the image\nBaseline = true phantom length (set once).\nTG-224: ±1 mm"
+    },
+    {
+     "category": "CBCT (CATPHAN)",
+     "name": "HU constancy — water insert [HU]",
+     "type": "numeric",
+     "unit": "HU",
+     "expected": null,
+     "warn": 30,
+     "fail": 40,
+     "tol_mode": "absolute",
+     "description": "Template 4.06. [Section: Imaging] Mean HU in the water ROI\nBaseline = commissioned water HU (set once).\nTG-224: baseline ±40 HU"
+    },
+    {
+     "category": "CBCT (CATPHAN)",
+     "name": "Uniformity [HU]",
+     "type": "numeric",
+     "unit": "HU",
+     "expected": 0,
+     "warn": 30,
+     "fail": 40,
+     "tol_mode": "absolute",
+     "description": "Template 4.07. [Section: Imaging] Max HU difference between peripheral and central ROIs\nTG-224: baseline"
+    },
+    {
+     "category": "CBCT (CATPHAN)",
+     "name": "Geometric distortion / scaling [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": null,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 4.08. [Section: Imaging] Known phantom distance measured on the reconstruction\nBaseline = true phantom distance (set once).\nTG-224: ±1 mm"
+    },
+    {
+     "category": "CBCT (CATPHAN)",
+     "name": "Spatial resolution",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.09. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
+    },
+    {
+     "category": "CBCT (CATPHAN)",
+     "name": "Low-contrast detectability",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.10. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
+    },
+    {
+     "category": "CBCT (CATPHAN)",
+     "name": "Noise / SNR",
+     "type": "boolean",
+     "unit": "Pass/Fail",
+     "description": "Template 4.11. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
+    }
+   ]
   }
  ],
  "machines": [
