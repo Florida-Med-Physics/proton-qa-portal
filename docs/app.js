@@ -226,7 +226,7 @@ function evaluate(type, value, limits) {
 
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
-  ["#/", "⌂", null, ["#/", "#"], "Home"],
+  ["#/", "Dashboard", null, ["#/", "#"], "Dashboard"],
   ["#/perform-qa", "Perform QA", null, ["#/perform-qa", "#/perform", "#/runs"]],
   ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit"]],
   ["#/machines", "Machines", "configure", ["#/machines", "#/assignments"]],
@@ -246,10 +246,10 @@ function homeIcon() {
     svg("path", { d: "M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linejoin": "round" }));
 }
 
-// Home: one look at every machine — today's QA, last result, and what is waiting for review.
+// Dashboard: one look at every machine — today's QA, last result, and what is waiting for review.
 async function renderHome() {
   const data = await api("GET", "/api/dashboard");
-  page("Home", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
+  page("Dashboard", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
   const queues = data.machines.flatMap((m) => m.queues);
   const todo = queues.filter((q) => q.state === "due" || q.state === "overdue");
   const overdue = queues.filter((q) => q.state === "overdue").length;
@@ -302,7 +302,7 @@ function renderShell() {
   const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
   document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns, title]) =>
     el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
-      title ? homeIcon() : label)));
+      title ? [homeIcon(), " ", label] : label)));
   document.getElementById("who").replaceChildren(
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),

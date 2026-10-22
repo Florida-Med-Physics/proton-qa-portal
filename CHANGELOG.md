@@ -12,7 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
-- Setup QA: Set Active / Set Inactive button on each machine-assigned list with an (Active) tag by the name; a Modified By column; templates are "Instantiate"d onto machines; table rows are indented under their (larger) headers; the portal is now "UFHPTI Machine QA Portal" in UF orange.
+- Setup QA: Set Active / Set Inactive button on each machine-assigned list with an (Active) tag by the name; a Modified By column; templates are "Instantiate"d onto machines; table rows are indented under their (larger) headers; the portal is now "UFHPTI Machine QA Portal" in UF orange; the Home tab is now Dashboard.
 - Portal with user accounts, machines, scheduled QA queues, results review, and trend charts.
 - **[Physics review]** Import of Sphinx daily QA exports (G1/G5): fills in the entry form, imports history in bulk, and has a command-line tool.
 - **[Physics review]** Template QA lists with per-list tests, GTR naming, and import of the TG-224 checklist.
