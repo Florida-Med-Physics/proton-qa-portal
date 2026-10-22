@@ -341,6 +341,8 @@ function homeIcon() {
 }
 
 // Dashboard: one look at every machine — today's QA, last result, and what is waiting for review.
+const FREQ_ORDER = { daily: 0, weekly: 1, monthly: 2, quarterly: 3, semiannual: 4, annual: 5, custom: 6, asneeded: 7 };
+
 async function renderHome() {
   const data = await api("GET", "/api/dashboard");
   page("Dashboard", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
@@ -376,7 +378,7 @@ async function renderHome() {
       const lastRun = lasts.sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""))[0];
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
         el("td", {}, el("strong", {}, m.name)),
-        el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small list-line" },
+        el("td", {}, m.queues.length ? [...m.queues].sort((p, q) => (FREQ_ORDER[p.frequency] ?? 9) - (FREQ_ORDER[q.frequency] ?? 9) || p.queue_name.localeCompare(q.queue_name)).map((q) => el("div", { class: "small list-line" },
           can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}`, onclick: (e) => e.stopPropagation() }, "▶") : null,
           q.queue_name)) : el("span", { class: "muted small" }, "None")),
         el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? (([q]) => dueIn(q.next_due, q.frequency))(m.queues.filter((q) => q.state === "due").sort((x, y) => x.next_due.localeCompare(y.next_due))) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),

@@ -841,4 +841,10 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .last-result-row .ring.mini .ring-svg { width: 44px; height: 44px; }
 .last-result-text { flex: 1; min-width: 0; }
 .list-line { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.list-line + .list-line { margin-top: 10px; }
 .list-line .start-dot { width: 20px; height: 20px; font-size: 8px; }
+
+/* Dashboard tiles: number and label centred. */
+.home-stat { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.home-stat-value { font-size: 34px; font-weight: 700; line-height: 1.1; }
+.home-stat-label { max-width: 90%; }
