@@ -110,6 +110,16 @@ def edit_queue(db, user, m, body, q):
     return service.save_queue(db, user, body, int(m[1]))
 
 
+@route("POST", r"/api/queues/(\d+)/archive")
+def archive_queue(db, user, m, body, q):
+    return service.archive_queue(db, user, int(m[1]), body)
+
+
+@route("POST", r"/api/queues/(\d+)/delete")
+def delete_queue(db, user, m, body, q):
+    return service.delete_queue(db, user, int(m[1]))
+
+
 @route("POST", r"/api/queues/(\d+)/duplicate")
 def duplicate_queue(db, user, m, body, q):
     return service.duplicate_queue(db, user, int(m[1]), body)
@@ -180,6 +190,40 @@ def review(db, user, m, body, q):
     return service.review_run(db, user, int(m[1]), body)
 
 
+@route("POST", "/api/dbswitch")
+def dbswitch(db, user, m, body, q):
+    """Admin: point the portal at another SQLite file (created empty if new; the admin's account is copied in)."""
+    service.require(user, "manage_users")
+    import json
+    from pathlib import Path
+    from .db import Database
+    target = Path(str(body.get("path") or "").strip().strip('"')).expanduser()
+    if not target.name.lower().endswith(".db"):
+        raise PortalError(r"Give the full path of a .db file, e.g. U:\Physics\QA\portal.db")
+    if not target.parent.is_dir():
+        raise PortalError(f"Folder not found: {target.parent}")
+    target = target.resolve()
+    if db.path != ":memory:" and Path(db.path).resolve() == target:
+        raise PortalError("The portal is already using that file.")
+    try:
+        new = Database(str(target))
+    except Exception as exc:
+        raise PortalError(f"Could not open that database: {exc}")
+    me = db.one("SELECT * FROM users WHERE id = ?", (user["id"],))
+    mine = new.one("SELECT id FROM users WHERE username = ?", (me["username"],))
+    if not mine:  # never lock the admin out of the new database
+        new.run("INSERT INTO users (username, full_name, role, password_hash, active, created_at) VALUES (?, ?, 'admin', ?, 1, ?)",
+                (me["username"], me["full_name"], me["password_hash"], me["created_at"]))
+        mine = new.one("SELECT id FROM users WHERE username = ?", (me["username"],))
+    new.audit(mine["id"], "switch_database", "portal", None, previous=db.path)
+    db.audit(user["id"], "switch_database", "portal", None, to=str(target))
+    PortalServer.current.db = new
+    settings = Path(__file__).resolve().parent.parent / "data" / "portal-settings.json"
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    settings.write_text(json.dumps({"db": str(target)}), encoding="utf-8")
+    return {"path": str(target), "relogin": True}
+
+
 @route("GET", "/api/dbinfo")
 def dbinfo(db, user, m, body, q):
     service.require(user, "configure")
@@ -210,9 +254,12 @@ def audit(db, user, m, body, q):
 class PortalServer(ThreadingHTTPServer):
     daemon_threads = True
 
+    current = None  # the running server, so an admin can switch its database
+
     def __init__(self, address, db):
         super().__init__(address, Handler)
         self.db = db
+        PortalServer.current = self
 
 
 class Handler(BaseHTTPRequestHandler):

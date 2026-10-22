@@ -256,14 +256,15 @@ async function renderHome() {
       const lasts = m.queues.filter((q) => q.last_run);
       const lastRun = lasts.sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""))[0];
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
-        el("td", {}, el("strong", {}, m.name), el("div", { class: "muted small" }, m.kind)),
+        el("td", {}, el("strong", {}, m.name)),
+        el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small" }, q.queue_name)) : el("span", { class: "muted small" }, "None")),
         el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? "Due today" : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
         el("td", {}, lastRun ? [chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`)] : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}`, onclick: (e) => e.stopPropagation() }, "Trends")));
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "22%"], ["Today", "18%"], ["Last result", "36%"], ["#To review", "12%"], ["", "12%"]], rows));
+      fixedTable([["Machine", "14%"], ["Active QA lists", "26%"], ["Today", "14%"], ["Last result", "26%"], ["#To review", "10%"], ["", "10%"]], rows));
   }
 }
 
@@ -429,12 +430,12 @@ async function renderDashboard() {
     const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
     if (!machines.length) continue;
     const rows = machines.flatMap((machine) => {
-      if (!machine.queues.length) return [el("tr", {}, el("td", {}, el("strong", {}, machine.name), el("div", { class: "muted small" }, machine.kind)), el("td", { class: "muted", colspan: 4 }, "Nothing scheduled."))];
+      if (!machine.queues.length) return [el("tr", {}, el("td", {}, el("strong", {}, machine.name)), el("td", { class: "muted", colspan: 4 }, "Nothing scheduled."))];
       return machine.queues.map((q, i) => {
         const due = startable(q.state);
         const last = q.last_run;
         return el("tr", { class: `${q.state === "overdue" ? "row-overdue" : ""} ${i === 0 ? "first-of-machine" : ""}` },
-          el("td", {}, el("strong", {}, machine.name), el("div", { class: "muted small" }, machine.kind)),
+          el("td", {}, el("strong", {}, machine.name)),
           el("td", {}, q.queue_name, el("div", { class: "muted small" }, q.schedule)),
           el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
@@ -447,21 +448,48 @@ async function renderDashboard() {
   }
 }
 
-/// Setup QA: the QA lists themselves (templates and each machine's copy), all editable. Same layout as Perform QA.
+async function archiveList(q, archived) {
+  try {
+    await api("POST", `/api/queues/${q.id}/archive`, { archived });
+    toast(archived ? `${q.name} archived` : `${q.name} restored`);
+    route();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+async function deleteList(q) {
+  if (!confirm(`Permanently delete "${q.name}" and its tests?
+
+This cannot be undone. Lists with recorded results cannot be deleted; archive them instead.`)) return;
+  try {
+    await api("POST", `/api/queues/${q.id}/delete`, {});
+    toast(`${q.name} deleted`);
+    route();
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
+// Setup QA: the QA lists themselves (templates and each machine's copy), all editable. Same layout as Perform QA.
 async function renderSetup() {
   const editable = can("configure");
   page("Setup QA", "The QA lists and the tests in them. Open a list to edit its tests, order and limits.",
     editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
   const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
-  const templates = queues.filter((q) => q.is_template);
-  const lists = queues.filter((q) => !q.is_template);
+  // Archived lists are hidden here and everywhere else; they come back from the Archived section below.
+  const archivedLists = queues.filter((q) => !q.active);
+  const templates = queues.filter((q) => q.is_template && q.active);
+  const lists = queues.filter((q) => !q.is_template && q.active);
   app.append(el("p", { class: "lead" },
     `${templates.length} QA list ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine-specific QA ${lists.length === 1 ? "list" : "lists"}. `,
     el("span", { class: "muted small" }, "A template is the master copy; copying it to a machine gives that machine its own editable list.")));
 
   const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end" },
     el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
-    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Copy to a machine" : "Duplicate") : null));
+    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Copy to a machine" : "Duplicate") : null,
+    editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
+    editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
   app.append(templates.length ? table(["QA List Template", "#Tests", "Copies on", ""], templates.map((t) => el("tr", {},
@@ -484,6 +512,16 @@ async function renderSetup() {
     el("td", { class: "muted small" }, q.template_name || "—"),
     el("td", { class: "num" }, q.item_count),
     actions(q))), "No QA lists on machines yet. Copy a template to a machine."));
+
+  if (archivedLists.length) {
+    app.append(el("details", { class: "archived" }, el("summary", {}, `Archived QA lists (${archivedLists.length})`),
+      el("p", { class: "muted small" }, "Hidden from Perform QA, Machines and Trends. Their tests and results are kept."),
+      table(["QA list", "Kind", "#Tests", ""], archivedLists.map((q) => el("tr", { class: "muted" },
+        el("td", {}, el("strong", {}, q.name)), el("td", {}, q.is_template ? "Template" : "Machine list"), el("td", { class: "num" }, q.item_count),
+        el("td", { class: "right" }, editable ? el("div", { class: "row nowrap end" },
+          el("button", { class: "small primary", onclick: () => archiveList(q, false) }, "Restore"),
+          el("button", { class: "small danger", onclick: () => deleteList(q) }, "Delete")) : null))))));
+  }
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
     el("a", { class: "button small", href: "#/tests" }, "All tests"),
@@ -526,6 +564,31 @@ function databaseLocationCard() {
   };
   refresh().catch((err) => body.replaceChildren(el("span", { class: "error" }, err.message)));
   return card;
+}
+
+// Admin (server build): switch the portal to another database file, e.g. one on the shared drive.
+function dbSwitchForm(current) {
+  const input = el("input", { placeholder: "e.g. U:\Physics\QA\portal.db", value: "" });
+  const go = el("button", { class: "primary", onclick: async () => {
+    const path = input.value.trim();
+    if (!path) return toast("Enter the full path of a .db file.", true);
+    if (!confirm(`Switch the portal from
+${current}
+to
+${path}?
+
+Everyone will need to sign in again. If the file does not exist yet, an empty database is created and your admin account is copied into it. The current database is not changed or deleted.`)) return;
+    try {
+      const r = await api("POST", "/api/dbswitch", { path });
+      toast(`Now using ${r.path}. Please sign in again.`);
+      state.user = null;
+      setTimeout(() => location.reload(), 1200);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  } }, "Switch database");
+  return el("div", {}, el("label", {}, "Use a different database file"), el("div", { class: "row nowrap" }, input, go),
+    el("p", { class: "muted small" }, "The choice is remembered when the portal restarts (unless it is started with --db or PROTON_QA_DB)."));
 }
 
 // Shown on Today when a database file is set but this page may not read it yet (after a restart, say).
@@ -609,7 +672,7 @@ async function renderMachines() {
       .sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
     if (!list.length) continue;
     const rows = list.flatMap((machine) => {
-      const mine = assignments[machine.id];
+      const mine = assignments[machine.id].filter((a) => (queues[a.queue_id] || {}).active !== 0);  // archived lists stay hidden
       const head = el("tr", { class: "machine-row" },
         el("td", { colspan: 4 }, el("strong", {}, machine.name), el("span", { class: "muted small" }, ` · ${[machine.kind, machine.location].filter(Boolean).join(" · ")}`),
           machine.active ? null : [" ", chip("", "Retired")]),
@@ -1821,7 +1884,8 @@ async function renderAdmin() {
     if (info) {
       app.append(el("h2", { class: "section-head" }, "Database"), el("div", { class: "card" },
         el("p", {}, el("strong", {}, info.path), el("span", { class: "muted small" }, ` · ${(info.size / 1048576).toFixed(1)} MB`)),
-        el("p", { class: "muted small" }, "All results are in this one file on the host PC. Back it up by copying it while the portal is stopped. To use a different folder, start the portal with --db \"<folder>\portal.db\" (or set PROTON_QA_DB).")));
+        el("p", { class: "muted small" }, "All results are in this one file on the host PC. Back it up by copying it while the portal is stopped."),
+        can("manage_users") ? dbSwitchForm(info.path) : null));
     }
   }
   // Browser build: where this browser keeps the database, and backups.

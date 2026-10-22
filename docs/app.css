@@ -441,3 +441,6 @@ h2.section-head { font-size: 20px; }
 .home-stat-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .home-stat-label { font-size: 12px; color: var(--muted); }
 .table-wrap.fixed-wrap table.fixed-table { width: 100%; }
+/* Action buttons never squash into the column. */
+td.right { max-width: none; white-space: nowrap; }
+td.right .row.nowrap.end { flex-wrap: nowrap; }

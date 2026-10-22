@@ -261,6 +261,37 @@ def save_queue(db, user, data, queue_id=None):
     return {"id": queue_id}
 
 
+def archive_queue(db, user, queue_id, data):
+    """Hide a QA list (and its schedules) without deleting anything; restoring brings both back."""
+    require(user, "configure")
+    queue = _get(db, "queues", queue_id)
+    archived = bool(data.get("archived", True))
+    with db.transaction():
+        db.run("UPDATE queues SET active = ? WHERE id = ?", (0 if archived else 1, queue_id))
+        db.run("UPDATE assignments SET active = ? WHERE queue_id = ?", (0 if archived else 1, queue_id))
+        db.audit(user["id"], "archive" if archived else "restore", "queue", queue_id, name=queue["name"])
+    return {"ok": True}
+
+
+def delete_queue(db, user, queue_id):
+    """Permanently delete a QA list, its schedules and its own tests. Refused once any result exists,
+    so QA history can never be deleted this way (archive the list instead)."""
+    require(user, "configure")
+    queue = _get(db, "queues", queue_id)
+    runs = db.one("SELECT COUNT(*) AS n FROM runs WHERE queue_id = ?", (queue_id,))["n"]
+    if runs:
+        raise PortalError(f"'{queue['name']}' has {runs} recorded QA run(s), so it cannot be deleted. Archive it instead to hide it.")
+    with db.transaction():
+        db.run("DELETE FROM assignment_overrides WHERE assignment_id IN (SELECT id FROM assignments WHERE queue_id = ?)", (queue_id,))
+        db.run("DELETE FROM assignments WHERE queue_id = ?", (queue_id,))
+        db.run("DELETE FROM queue_items WHERE queue_id = ?", (queue_id,))
+        db.run("DELETE FROM tests WHERE owner_queue_id = ? AND id NOT IN (SELECT test_id FROM results)", (queue_id,))
+        db.run("UPDATE queues SET template_id = NULL WHERE template_id = ?", (queue_id,))
+        db.run("DELETE FROM queues WHERE id = ?", (queue_id,))
+        db.audit(user["id"], "delete", "queue", queue_id, name=queue["name"])
+    return {"ok": True}
+
+
 def duplicate_queue(db, user, source_id, data):
     """Copy a QA list (usually a template). Every check is copied, so the copy owns its own limits."""
     require(user, "configure")

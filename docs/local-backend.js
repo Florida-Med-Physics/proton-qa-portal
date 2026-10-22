@@ -554,6 +554,33 @@
     }
     return { id };
   }
+  // Archive hides a list and its schedules; delete is refused once any result exists (mirrors service.py).
+  function archiveQueue(user, queueId, data) {
+    require(user, "configure");
+    const q = get("queues", queueId, "QA list");
+    const archived = data.archived !== false;
+    q.active = archived ? 0 : 1;
+    for (const a of S.assignments) if (a.queue_id === q.id) a.active = archived ? 0 : 1;
+    save();
+    audit(user.id, archived ? "archive" : "restore", "queue", q.id, { name: q.name });
+    return { ok: true };
+  }
+  function deleteQueue(user, queueId) {
+    require(user, "configure");
+    const q = get("queues", queueId, "QA list");
+    const runs = S.runs.filter((r) => r.queue_id === q.id).length;
+    if (runs) throw new Error(`'${q.name}' has ${runs} recorded QA run(s), so it cannot be deleted. Archive it instead to hide it.`);
+    const assignmentIds = new Set(S.assignments.filter((a) => a.queue_id === q.id).map((a) => a.id));
+    S.overrides = S.overrides.filter((o) => !assignmentIds.has(o.assignment_id));
+    S.assignments = S.assignments.filter((a) => a.queue_id !== q.id);
+    S.queue_items = S.queue_items.filter((i) => i.queue_id !== q.id);
+    S.tests = S.tests.filter((t) => t.owner_queue_id !== q.id || S.results.some((r) => r.test_id === t.id));
+    for (const other of S.queues) if (other.template_id === q.id) other.template_id = null;
+    S.queues = S.queues.filter((x) => x.id !== q.id);
+    save();
+    audit(user.id, "delete", "queue", q.id, { name: q.name });
+    return { ok: true };
+  }
   function duplicateQueue(user, sourceId, data) {
     require(user, "configure");
     const source = getQueue(sourceId);
@@ -1045,6 +1072,8 @@
   route("POST", "/api/queues", (u, m, body) => saveQueue(u, body));
   route("PUT", "/api/queues/(\\d+)", (u, m, body) => saveQueue(u, body, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/duplicate", (u, m, body) => duplicateQueue(u, Number(m[1]), body));
+  route("POST", "/api/queues/(\\d+)/archive", (u, m, body) => archiveQueue(u, Number(m[1]), body));
+  route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));
   route("POST", "/api/assignments", (u, m, body) => saveAssignment(u, body));
   route("PUT", "/api/assignments/(\\d+)", (u, m, body) => saveAssignment(u, body, Number(m[1])));
   route("GET", "/api/assignments/(\\d+)/template", (u, m) => runTemplate(Number(m[1])));

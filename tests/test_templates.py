@@ -117,3 +117,34 @@ class MigrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ArchiveDeleteTests(unittest.TestCase):
+    def setUp(self):
+        self.db = Database(":memory:")
+        self.users = make_users(self.db)
+        self.admin = self.users["admin"]
+        self.machine = service.save_machine(self.db, self.admin, {"name": "Synthetic GTR"})["id"]
+        self.queue = service.save_queue(self.db, self.admin, {"name": "Synthetic list"})["id"]
+        test = service.save_test(self.db, self.admin, {"name": "Door", "type": "boolean", "owner_queue_id": self.queue})["id"]
+        service.save_queue(self.db, self.admin, {"name": "Synthetic list", "items": [{"test_id": test}]}, self.queue)
+        self.assignment = service.save_assignment(self.db, self.admin, {"machine_id": self.machine, "queue_id": self.queue, "frequency": "daily",
+                                                                        "weekdays": list(range(7)), "start_date": "2026-01-01"})["id"]
+        self.test = test
+
+    def test_archive_hides_and_restore_brings_back(self):
+        service.archive_queue(self.db, self.admin, self.queue, {"archived": True})
+        self.assertEqual(service.dashboard(self.db, self.admin)["machines"][0]["queues"], [])
+        self.assertEqual(self.db.one("SELECT active FROM queues WHERE id = ?", (self.queue,))["active"], 0)
+        service.archive_queue(self.db, self.admin, self.queue, {"archived": False})
+        self.assertEqual(len(service.dashboard(self.db, self.admin)["machines"][0]["queues"]), 1)
+        with self.assertRaises(PortalError):
+            service.archive_queue(self.db, self.users["therapist"], self.queue, {"archived": True})
+
+    def test_delete_only_without_results(self):
+        service.submit_run(self.db, self.users["therapist"], self.assignment, {"results": [{"test_id": self.test, "value": "pass"}]})
+        with self.assertRaisesRegex(PortalError, "Archive it instead"):
+            service.delete_queue(self.db, self.admin, self.queue)
+        empty = service.save_queue(self.db, self.admin, {"name": "Unused list"})["id"]
+        service.delete_queue(self.db, self.admin, empty)
+        self.assertIsNone(self.db.one("SELECT id FROM queues WHERE id = ?", (empty,)))

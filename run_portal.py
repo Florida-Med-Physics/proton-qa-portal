@@ -22,11 +22,21 @@ from portal.db import Database
 from portal.server import PortalServer
 
 DEFAULT_DB = Path(__file__).resolve().parent / "data" / "portal.db"
+SETTINGS = Path(__file__).resolve().parent / "data" / "portal-settings.json"
+
+
+def remembered_db():
+    """The database an admin chose under Data Administration, if any."""
+    try:
+        import json
+        return json.loads(SETTINGS.read_text(encoding="utf-8")).get("db") or None
+    except (OSError, ValueError):
+        return None
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Physics QA Portal (draft; not validated for clinical use)")
-    parser.add_argument("--db", default=os.environ.get("PROTON_QA_DB", str(DEFAULT_DB)))
+    parser.add_argument("--db", default=os.environ.get("PROTON_QA_DB") or remembered_db() or str(DEFAULT_DB))
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve")
     serve.add_argument("--host", default="127.0.0.1")
