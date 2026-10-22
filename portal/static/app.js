@@ -1396,14 +1396,19 @@ function stats(points) {
 
 /// Tests that differ only by a final X, Y or Z ("Spot 140 MeV – Position X" / "… Y") share one chart.
 const AXIS_NAME = /^(.*\S)\s+([XYZ])$/;
-const AXIS_ORDER = { X: 0, Y: 1, Z: 2 };
+// Rotations of one thing (couch pitch, roll, rotation) also share a chart.
+const ROTATION_NAME = /^(.*\S)\s+(Pitch|Roll|Rotation)$/;
+const AXIS_ORDER = { X: 0, Y: 1, Z: 2, Pitch: 0, Roll: 1, Rotation: 2 };
 
 function axisGroups(items) {
   const groups = new Map();
   for (const item of items) {
-    const m = AXIS_NAME.exec(item.name);
-    const key = m ? `${item.category}|${m[1].replace(/\s*–$/, "")}` : `${item.category}|#${item.test_id}`;
-    if (!groups.has(key)) groups.set(key, { base: m ? m[1].replace(/\s*–$/, "") : item.name, category: item.category, members: [] });
+    const r = ROTATION_NAME.exec(item.name);
+    const m = AXIS_NAME.exec(item.name) || r;
+    const prefix = m ? m[1].replace(/\s*–$/, "") : "";
+    const key = m ? `${item.category}|${prefix}|${r ? "rot" : "xyz"}` : `${item.category}|#${item.test_id}`;
+    const base = !m ? item.name : r ? `${prefix} – Pitch, Roll and Rotation` : prefix;
+    if (!groups.has(key)) groups.set(key, { base, category: item.category, members: [] });
     groups.get(key).members.push({ ...item, axis: m ? m[2] : "" });
   }
   // A lone "X" with no partner is just a single test.
@@ -1457,6 +1462,7 @@ function seriesChart(series, unit, { small = false } = {}) {
     for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
       kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }), svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, (multi && v > 0 ? "+" : "") + fmt(v, decimals)));
     }
+    if (unit) kids.push(svg("text", { x: L - 6, y: T - 4, "text-anchor": "end", class: "unit-label" }, multi ? `Δ ${unit}` : unit));
     const every = Math.max(1, Math.ceil(dates.length / 8));
     const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
     dates.forEach((d, i) => { if (i % every === 0) kids.push(svg("text", { x: x(d), y: H - B + 18, "text-anchor": "middle" }, multiYear ? d.slice(0, 7) : d.slice(5))); });
@@ -1524,7 +1530,7 @@ async function renderTrendOverview(machines, machineId, range) {
       const ids = g.members.map((m) => m.test_id).join(",");
       const foot = g.members.length > 1
         ? g.members.map((m, k) => { const d = asDeviation(latest(m.points)); return el("span", { class: `axis-val axis-${k}` }, `${m.axis} ${signed(d.dev)}`); })
-        : (() => { const p = latest(g.members[0].points), d = asDeviation(p); return [el("span", {}, `Last ${fmt(p.value)} ${unit}`.trim()), p.expected !== null ? el("span", {}, `(${signed(d.dev)})`) : null]; })();
+        : (() => { const p = latest(g.members[0].points), d = asDeviation(p); return [el("span", {}, `Last ${fmt(p.value)} ${unit}`.trim()), p.expected !== null ? el("span", {}, `(${signed(d.dev)} ${unit})`.replace(" )", ")")) : null]; })();
       return el("a", { class: `card spark-card ${status}`, href: `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}` },
         el("div", { class: "spark-head" }, el("strong", {}, short), axisLegend(g), chip(status)),
         seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true }),
@@ -1539,11 +1545,12 @@ function renderTrendDetail(group, range) {
   app.append(el("div", { class: "card stat-row" }, group.members.map((m) => {
     const s = stats(m.points), d = asDeviation(s.last);
     return stat(multi ? `${m.axis} latest` : "Latest", `${fmt(s.last.value)} ${unit}`.trim(),
-      [chip(s.last.status), " ", s.last.expected !== null ? `${signed(d.dev)} from ${fmt(s.last.expected)}` : "", el("br"),
-        `${s.inTol}% within limits · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)}`]);
+      [chip(s.last.status), " ", s.last.expected !== null ? `${signed(d.dev)} ${unit} from ${fmt(s.last.expected)} ${unit}`.replace(/ +/g, " ") : "", el("br"),
+        `${s.inTol}% within limits · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)} ${unit}`.trim()]);
   }), (() => {
     const p = latest(group.members[0].points);
-    return p.warn !== null ? stat("Limits", `warn ±${fmt(p.warn)}${p.tol_mode === "percent" ? "%" : ""}`, `fail ±${fmt(p.fail)}${p.tol_mode === "percent" ? "%" : ""}`) : null;
+    const u = p.tol_mode === "percent" ? " %" : unit ? ` ${unit}` : "";
+    return p.warn !== null ? stat("Limits", `warn ±${fmt(p.warn)}${u}`, `fail ±${fmt(p.fail)}${u}`) : null;
   })()));
   app.append(el("div", { class: "legend" },
     multi ? el("span", {}, "Lines: ", axisLegend(group), ` deviation from each axis's expected value${unit ? ` (${unit})` : ""}`) : el("span", {}, "Dashed line: expected value"),

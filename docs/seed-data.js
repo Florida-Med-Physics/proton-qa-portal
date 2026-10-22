@@ -456,7 +456,7 @@ window.PORTAL_SEED = {
      "name": "CT Geometry – CT BB position x (BB)",
      "type": "numeric",
      "description": "Template 4.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
-     "unit": "",
+     "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute"
     },
@@ -465,7 +465,7 @@ window.PORTAL_SEED = {
      "name": "CT Geometry – CT BB position y (BB)",
      "type": "numeric",
      "description": "Template 4.02. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
-     "unit": "",
+     "unit": "mm",
      "expected": 101.5,
      "tol_mode": "absolute"
     },
@@ -474,7 +474,7 @@ window.PORTAL_SEED = {
      "name": "CT Geometry – CT BB distance Left-Right (BB)",
      "type": "numeric",
      "description": "Template 4.03. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
-     "unit": "",
+     "unit": "mm",
      "expected": 203.5,
      "tol_mode": "absolute"
     },
@@ -483,7 +483,7 @@ window.PORTAL_SEED = {
      "name": "CT Geometry – CT BB distance Left-Top (BB)",
      "type": "numeric",
      "description": "Template 4.04. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
-     "unit": "",
+     "unit": "mm",
      "expected": 144.5,
      "tol_mode": "absolute"
     },
@@ -492,7 +492,7 @@ window.PORTAL_SEED = {
      "name": "CT Geometry – CT BB distance Top-Right (BB)",
      "type": "numeric",
      "description": "Template 4.05. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
-     "unit": "",
+     "unit": "mm",
      "expected": 144.5,
      "tol_mode": "absolute"
     }

@@ -120,7 +120,7 @@ def parse_rows(rows, filename=""):
                 "category": category,
                 "item": item or category,
                 "metric": texts[first - 1].strip(),
-                "unit": unit,
+                "unit": unit or "unitless",  # e.g. skewness: say so rather than leave it blank
                 "expected": expected,
                 "result": result,
                 "warn": warn[0],

@@ -382,7 +382,7 @@
         const warn = quantity(texts[first]), fail = quantity(texts[second]);
         const [expected, unit] = numbers[0], [result] = numbers[1];
         measurements.push({
-          category, item: item || category, metric: texts[first - 1].trim(), unit, expected, result,
+          category, item: item || category, metric: texts[first - 1].trim(), unit: unit || "unitless", expected, result,
           warn: warn[0], fail: fail[0], tol_mode: warn[1] === "%" && unit !== "%" ? "percent" : "absolute",
           sphinx_status: after.find((t) => SPHINX_STATUSES.includes(t)) || null,
         });
@@ -877,7 +877,16 @@
     else if (stored) S = stored;
     else { seed(); save(); }
     upgradeCtList();
+    upgradeBbUnits();
   })();
+
+  // CT BB geometry tests came in without a unit; they are millimetres.
+  function upgradeBbUnits() {
+    let changed = 0;
+    for (const t of S.tests) if (/\(BB\)$/.test(t.name) && !t.unit) { t.unit = "mm"; changed++; }
+    for (const t of S.tests) if (/Skewness [XY]$/.test(t.name) && !t.unit) { t.unit = "unitless"; changed++; }
+    if (changed) { audit(null, "upgrade", "tests", null, { unit: "mm", tests: changed }); save(); }
+  }
 
   // 2026-10-22: the CT simulator became "Big Bore CT (7064)" running "Bigbore CT Daily" (the RadMachine list).
   // Browsers seeded earlier still hold the old placeholder; swap it in place, but only if no CT results exist.
