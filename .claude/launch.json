@@ -1,0 +1,7 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "pages-build", "url": "http://127.0.0.1:8791" },
+    { "name": "server", "url": "http://127.0.0.1:8790" }
+  ]
+}
