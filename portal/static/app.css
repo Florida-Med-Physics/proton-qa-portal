@@ -543,3 +543,6 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 .who { flex: none; gap: 10px; font-size: 13px; }
 .theme-toggle { padding: 4px 8px; font-size: 12px; }
 @media (max-width: 1000px) { .topbar { flex-wrap: nowrap; } .brand-title { font-size: 14px; } #nav a { padding: 15px 8px; font-size: 13px; } }
+
+.who .person { display: inline-flex; align-items: center; gap: 5px; }
+.person-icon { display: block; }

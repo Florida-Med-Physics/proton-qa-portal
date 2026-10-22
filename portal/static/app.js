@@ -234,6 +234,12 @@ const NAV = [
   ["#/admin", "Data Administration", "configure", ["#/admin", "#/users"]],
 ];
 
+function personIcon() {
+  return svg("svg", { viewBox: "0 0 24 24", width: 16, height: 16, "aria-hidden": "true", class: "person-icon" },
+    svg("circle", { cx: 12, cy: 8, r: 4, fill: "currentColor" }),
+    svg("path", { d: "M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5", fill: "currentColor" }));
+}
+
 function homeIcon() {
   return svg("svg", { viewBox: "0 0 24 24", width: 20, height: 20, "aria-hidden": "true", class: "home-icon" },
     svg("path", { d: "M3 11.5 12 4l9 7.5", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }),
@@ -298,7 +304,7 @@ function renderShell() {
     el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
       title ? homeIcon() : label)));
   document.getElementById("who").replaceChildren(
-    el("a", { href: "#/account", title: ROLE_LABEL[state.user.role] }, personName(state.user.full_name, state.user.username)),
+    el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
     themeToggle());
 }
