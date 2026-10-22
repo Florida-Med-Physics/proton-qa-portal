@@ -534,3 +534,12 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 @media (max-width: 1000px) { .brand { display: none; } .topbar { flex-wrap: wrap; } }
 #nav a { white-space: nowrap; }
 .topbar { flex-wrap: wrap; }
+
+/* One bar, always: nothing wraps; the tabs scroll sideways if the window is too narrow. */
+.topbar { flex-wrap: nowrap; overflow: hidden; }
+#nav { overflow-x: auto; scrollbar-width: none; min-width: 0; }
+#nav::-webkit-scrollbar { display: none; }
+.brand-title { flex: none; font-size: 16px; }
+.who { flex: none; gap: 10px; font-size: 13px; }
+.theme-toggle { padding: 4px 8px; font-size: 12px; }
+@media (max-width: 1000px) { .topbar { flex-wrap: nowrap; } .brand-title { font-size: 14px; } #nav a { padding: 15px 8px; font-size: 13px; } }
