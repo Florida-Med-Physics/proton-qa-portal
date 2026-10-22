@@ -1460,7 +1460,7 @@ async function renderPerform(assignmentId) {
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader !== "Test" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "30%", "5%", "7%", "13%", "8%", "8%", "5%", "17%", "4%"];
+      const widths = firstHeader !== "Test" ? ["3%", "15%", "5%", "9%", "13%", "9%", "8%", "6%", "28%", "4%"] : ["3%", "30%", "5%", "7%", "13%", "8%", "8%", "5%", "17%", "4%"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
@@ -2396,7 +2396,7 @@ async function renderTrendOverview(machines, machineId, range) {
       ];
       return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
     });
-    const widths = firstHeader === "Test" ? ["3%", "27%", "4%", "8%", "9%", "9%", "8%", "27%", "5%"] : ["3%", "13%", "4%", "8%", "9%", "9%", "8%", "41%", "5%"];
+    const widths = firstHeader === "Test" ? ["3%", "27%", "4%", "8%", "9%", "9%", "8%", "27%", "5%"] : ["3%", "19%", "4%", "8%", "9%", "9%", "8%", "35%", "5%"];
     const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}` },
       el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
       el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : "" }, h))),
