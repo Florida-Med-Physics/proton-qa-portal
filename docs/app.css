@@ -664,3 +664,21 @@ th { overflow-wrap: normal; word-break: normal; }
 .key-swatch.ref { height: 0; border-top: 2px dashed var(--muted); }
 .key-swatch.band-warn { background: var(--band-warn); }
 .key-swatch.band-fail { background: var(--band-fail); }
+
+.changed-note { color: var(--uf-orange); font-weight: 600; }
+
+/* X, Y, Z and 3D stacked in one column, one per line. */
+.axis-inputs { flex-direction: column; align-items: stretch; gap: 3px; }
+.axis-field { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 4px; }
+.axis-field .result-input, .axis-field.axis-calc .result-input { width: 100%; min-width: 0; max-width: 90px; }
+.axis-field.axis-calc .axis-key { background: var(--muted); font-size: 9px; }
+
+/* History: one line of equal slots separated by lines; the header dates line up above the values. */
+.hist-row { display: inline-flex; white-space: nowrap; }
+.hist-row .hist { width: 56px; min-width: 56px; margin: 0; border-radius: 0; padding: 2px 3px; }
+.hist-row .hist + .hist { border-left: 1px solid var(--border); }
+.hist-row .hist:first-child { border-radius: 4px 0 0 4px; }
+.hist-row .hist:last-child { border-radius: 0 4px 4px 0; }
+.hist-row .hist[hidden] { display: none; }
+.history-cell { white-space: nowrap; }
+.hist-axis .hist-row { vertical-align: middle; }

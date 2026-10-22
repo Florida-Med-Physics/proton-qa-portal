@@ -190,7 +190,41 @@ def save_test(db, user, data, test_id=None):
 
 # ---- queues ----------------------------------------------------------------
 
+def _signature(db, queue_id):
+    """What each test of a list looks like, by position: name plus the settings a copy can change."""
+    rows = db.all("SELECT qi.position, qi.expected, qi.warn, qi.fail, qi.tol_mode, t.name, t.unit, t.description, "
+                  "t.expected AS t_expected, t.warn AS t_warn, t.fail AS t_fail, t.tol_mode AS t_tol_mode "
+                  "FROM queue_items qi JOIN tests t ON t.id = qi.test_id WHERE qi.queue_id = ? ORDER BY qi.position", (queue_id,))
+    out = []
+    for r in rows:
+        limits = qa.resolve_limits({"expected": r["t_expected"], "warn": r["t_warn"], "fail": r["t_fail"], "tol_mode": r["t_tol_mode"]},
+                                   {"expected": r["expected"], "warn": r["warn"], "fail": r["fail"], "tol_mode": r["tol_mode"]})
+        out.append((r["name"], r["unit"] or "", r["description"] or "", limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
+    return out
+
+
+def changes_from_template(db, queue_id, template_id):
+    """Number of tests that differ between a machine's list and the template it came from (None without a template)."""
+    if not template_id:
+        return None
+    mine, theirs = _signature(db, queue_id), _signature(db, template_id)
+    by_name_mine = {s[0]: s for s in mine}
+    by_name_theirs = {s[0]: s for s in theirs}
+    changed = sum(1 for n, s in by_name_mine.items() if n in by_name_theirs and s != by_name_theirs[n])
+    added = sum(1 for n in by_name_mine if n not in by_name_theirs)
+    removed = sum(1 for n in by_name_theirs if n not in by_name_mine)
+    reordered = 0 if [s[0] for s in mine if s[0] in by_name_theirs] == [s[0] for s in theirs if s[0] in by_name_mine] else 1
+    return changed + added + removed + reordered
+
+
 def list_queues(db, user):
+    queues = _list_queues(db)
+    for q in queues:
+        q["changes"] = changes_from_template(db, q["id"], q.get("template_id"))
+    return queues
+
+
+def _list_queues(db):
     return db.all(
         "SELECT q.*, (SELECT COUNT(*) FROM queue_items qi WHERE qi.queue_id = q.id) AS item_count, "
         "(SELECT COUNT(*) FROM assignments a WHERE a.queue_id = q.id AND a.active = 1) AS machine_count, "

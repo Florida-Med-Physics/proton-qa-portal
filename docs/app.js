@@ -672,7 +672,8 @@ async function renderSetup() {
         const live = !!(a && a.active);
         return el("tr", { class: live ? "" : "muted" },
           el("td", { class: "indent" }, editableName(q, editable), live ? el("span", { class: "active-tag" }, " (Active)") : a ? el("span", { class: "inactive-tag" }, " (Inactive)") : null),
-          el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
+          el("td", {}, q.template_name ? [q.template_name, el("div", { class: `small ${q.changes ? "changed-note" : "muted"}` },
+            q.changes ? `Changed (${q.changes} ${q.changes === 1 ? "test" : "tests"})` : "No changes")] : el("span", { class: "muted" }, "—")),
           el("td", { class: "center" }, q.item_count),
           el("td", { class: "right" }, el("div", { class: "row nowrap end" },
             el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
@@ -1219,7 +1220,11 @@ function wireCalculations(entries) {
       return;
     }
     let sources = [], compute = null, decimals = 2;
-    if (kind === "3d-offset") {
+    if (kind.startsWith("sum")) {                              // "[calc: sum:3]": the sum of the N numeric fields above
+      const count = Number(kind.split(":")[1]) || 2;
+      sources = entries.slice(0, i).filter((x) => x.item.type === "numeric").slice(-count);
+      compute = (v) => v.reduce((a, b) => a + b, 0);
+    } else if (kind === "3d-offset") {
       sources = entries.slice(Math.max(0, i - 3), i).filter((x) => x.item.type === "numeric");
       compute = (v) => Math.sqrt(v.reduce((a, b) => a + b * b, 0));
     } else if (kind === "ktp") {
@@ -1339,7 +1344,7 @@ async function renderPerform(assignmentId) {
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        return dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—"));
+        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const axisRow = (g) => {
@@ -1374,9 +1379,9 @@ async function renderPerform(assignmentId) {
           el("td", {}, el("strong", {}, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}: ` : "", g.base, g.unitTag ? ` ${g.unitTag}` : ""),
             named && g.axes[0].category ? el("div", { class: "category-tag" }, categoryLabel(g.axes[0].category)) : null,
             (() => { const d = helpText((g.calc || g.axes[0]).description); if (d) d.classList.add("in-cell"); return d; })(), ...parts.map((x) => x.note), calc ? calc.note : null),
-          el("td", {}, el("div", { class: "axis-inputs" }, ...parts.map((x, k) => el("label", { class: `axis-field axis-${k}` }, el("span", { class: "axis-key" }, x.it.axis), x.control)),
-            unit ? el("span", { class: "muted small" }, unit) : null),
-            calc ? el("div", { class: "axis-calc muted small" }, "3D ", calc.control, unit ? ` ${unit}` : "") : null, dlt),
+          el("td", {}, el("div", { class: "axis-inputs" },
+            ...parts.map((x, k) => el("div", { class: `axis-field axis-${k}` }, el("span", { class: "axis-key" }, x.it.axis), x.control, unit ? el("span", { class: "muted small" }, unit) : null)),
+            calc ? el("div", { class: "axis-field axis-calc" }, el("span", { class: "axis-key" }, "3D"), calc.control, unit ? el("span", { class: "muted small" }, unit) : null) : null), dlt),
           el("td", { class: "num" }, perAxis((it) => refCell(it, unit))),
           el("td", { class: "num" }, perAxis((it) => limitText(it.limits.warn, it.limits, unit))),
           el("td", { class: "num" }, perAxis((it) => limitText(it.limits.fail, it.limits, unit))),
@@ -1418,13 +1423,22 @@ async function renderPerform(assignmentId) {
         return [row, chart];
       });
       const widths = firstHeader === "Energy" ? ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"] : ["21%", "17%", "8%", "8%", "8%", "7%", "10%", "17%", "4%"];
-      return el("div", { class: "measure-block" }, title, directions,
-        el("div", { class: "table-wrap measure-wrap" }, sortable(el("table", { class: "measure-table" },
+      const tableEl = sortable(el("table", { class: "measure-table" },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, [firstHeader, "Measurement", "Reference", "Warn", "Fail", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
-              el("th", { class: "history-cell" }, dates.map(dateSlot)), el("th", {})) : null),
-          el("tbody", {}, trRows.flat())))));
+              el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
+          el("tbody", {}, trRows.flat())));
+      // Only as many history dates as fit on one line of the History column (re-checked when the window is resized).
+      const fitHistory = () => {
+        const th = tableEl.querySelector("th.history-cell");
+        if (!th || !th.clientWidth) return;
+        const n = Math.max(1, Math.min(dates.length, Math.floor((th.clientWidth - 10) / 58)));
+        tableEl.querySelectorAll(".hist-row").forEach((row) => [...row.children].forEach((c, i) => { c.hidden = i >= n; }));
+      };
+      requestAnimationFrame(fitHistory);
+      window.addEventListener("resize", fitHistory);
+      return el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
     };
     const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : it.name;
     // Single measurements that follow one another share one table; the row carries the number, name and directions.

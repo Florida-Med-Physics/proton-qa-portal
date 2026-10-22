@@ -524,9 +524,29 @@
     const q = get("queues", id, "QA list");
     return { ...q, items: queueItems(q.id) };
   }
+  // What each test of a list looks like, by position (name plus what a copy can change), to count differences from its template.
+  function signature(queueId) {
+    return S.queue_items.filter((i) => i.queue_id === queueId).sort((a, b) => a.position - b.position).map((i) => {
+      const t = byId("tests", i.test_id) || {};
+      const l = resolveLimits(t, i);
+      return [t.name, t.unit || "", t.description || "", l.expected, l.warn, l.fail, l.tol_mode].map((v) => (v === undefined ? null : v)).join("\u0001");
+    });
+  }
+  function changesFromTemplate(queueId, templateId) {
+    if (!templateId || !byId("queues", templateId)) return null;
+    const mine = signature(queueId), theirs = signature(templateId);
+    const name = (s) => s.split("\u0001")[0];
+    const mineBy = new Map(mine.map((s) => [name(s), s])), theirsBy = new Map(theirs.map((s) => [name(s), s]));
+    let n = 0;
+    for (const [k, s] of mineBy) n += theirsBy.has(k) ? (theirsBy.get(k) !== s ? 1 : 0) : 1;
+    for (const k of theirsBy.keys()) if (!mineBy.has(k)) n++;
+    const orderMine = mine.map(name).filter((k) => theirsBy.has(k)).join("|"), orderTheirs = theirs.map(name).filter((k) => mineBy.has(k)).join("|");
+    return n + (orderMine === orderTheirs ? 0 : 1);
+  }
   function listQueues() {
     return S.queues.map((q) => ({
       ...q,
+      changes: changesFromTemplate(q.id, q.template_id),
       item_count: S.queue_items.filter((i) => i.queue_id === q.id).length,
       machine_count: S.assignments.filter((a) => a.queue_id === q.id && a.active).length,
       template_name: q.template_id ? (byId("queues", q.template_id) || {}).name || null : null,
@@ -957,7 +977,26 @@
     addSeedMachines();
     spellOutNames();
     reassignSphinx();
+    instantiateSeedTemplates();
   })();
+
+  // Templates added to the starting data later (e.g. the Eyeline lists) get their machine instance once, as a fresh seed would.
+  function instantiateSeedTemplates() {
+    const admin = S.users.find((u) => u.role === "admin") || S.users[0];
+    let made = 0;
+    for (const t of (window.PORTAL_SEED || {}).templates || []) {
+      if (!t.kind) continue;
+      const tpl = S.queues.find((q) => q.is_template && q.name === t.name);
+      if (!tpl) continue;
+      for (const m of S.machines.filter((x) => x.kind === t.kind && x.active)) {
+        const name = `${t.list || "Daily QA"} – ${m.name}`;
+        if (S.queues.some((q) => q.name === name) || S.queues.some((q) => q.template_id === tpl.id && S.assignments.some((a) => a.queue_id === q.id && a.machine_id === m.id))) continue;
+        duplicateQueue(admin, tpl.id, { name, machine_id: m.id, frequency: t.frequency || "daily", weekdays: [0, 1, 2, 3, 4] });
+        made++;
+      }
+    }
+    if (made) { audit(null, "upgrade", "queues", null, { instantiated: made }); save(); }
+  }
 
   // "Distal Fall Off" spelled out and the GTR5_ prefix dropped from measurement names (mirrors the starting data).
   // RadMachine transcription notes -> the action itself (markers drive the Perform page) or nothing.

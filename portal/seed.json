@@ -2221,6 +2221,481 @@
      "description": "Template 4.06. [Section: Final safety checks]"
     }
    ]
+  },
+  {
+   "name": "Eyeline Daily QA – Dosimetry: PDD template",
+   "kind": "Proton eyeline",
+   "list": "Eyeline Daily QA – Dosimetry: PDD",
+   "frequency": "daily",
+   "setup": "Transcribed from the RadMachine list 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Dosimetry: PDD' (October 2026). References are RadMachine's; no warn / fail limits were shown, so values are recorded, not judged, until limits are entered.",
+   "checks": [
+    {
+     "category": "Administrative",
+     "name": "Last Edited By:",
+     "type": "text",
+     "description": "Template 1.01. [Section: Eyeline Daily QA – Dosimetry: PDD] [auto: user]"
+    },
+    {
+     "category": "Administrative",
+     "name": "QA Performed By:",
+     "type": "text",
+     "description": "Template 1.02. [Section: Eyeline Daily QA – Dosimetry: PDD]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_RM Wheel ID",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.01. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_RM Block ID",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.02. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Aperture (diameter in cm)",
+     "type": "text",
+     "description": "Template 2.03. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_Exp_Range (D90) [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.04. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_Exp_P90 [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.05. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_Exp_MOD [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.06. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_Exp_IsoDepth [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.07. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Chamber",
+     "type": "text",
+     "description": "Template 2.08. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Eyeline Phantom",
+     "type": "text",
+     "description": "Template 2.09. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Chamber Offset [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.10. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Phantom Offset [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.11. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Record User offset (feeler gauge or gauge block) [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.12. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Total Offset [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.13. [Section: Eyeline_DailyQA_Ref1_PDD_module] [calc: sum:3] Calculated here: chamber offset + phantom offset + user offset."
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Measured Range (D90) without offset [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.14. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Measured Range Eyeline Field 1 (D90) [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": 2.5,
+     "tol_mode": "absolute",
+     "description": "Template 2.15. [Section: Eyeline_DailyQA_Ref1_PDD_module] [calc: sum:2] Calculated here: measured range without offset + total offset."
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Record MLIC Range - Field1 [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": 2.5,
+     "tol_mode": "absolute",
+     "description": "Template 2.16. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Measured P90 [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.17. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Relative Dose at the expected P90 (at 0.1 cm) [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 90,
+     "tol_mode": "absolute",
+     "description": "Template 2.18. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Measured Modulation Eyeline Field 1 [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": 2,
+     "tol_mode": "absolute",
+     "description": "Template 2.19. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Max relative dose Eyeline [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 100,
+     "tol_mode": "absolute",
+     "description": "Template 2.20. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Min relative dose Eyeline [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 100,
+     "tol_mode": "absolute",
+     "description": "Template 2.21. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Flatness [%]",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "tol_mode": "absolute",
+     "description": "Template 2.22. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+    }
+   ]
+  },
+  {
+   "name": "Eyeline Daily QA – Dosimetry: Output template",
+   "kind": "Proton eyeline",
+   "list": "Eyeline Daily QA – Dosimetry: Output",
+   "frequency": "daily",
+   "setup": "PARTIAL. The RadMachine screenshot of 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Dosimetry: Output' was too small to read in full; only the items that could be read with confidence are here. Add the rest from a readable screenshot or export.",
+   "checks": [
+    {
+     "category": "Administrative",
+     "name": "Last Edited By:",
+     "type": "text",
+     "description": "Template 1.01. [Section: Eyeline Daily QA – Dosimetry: Output] [auto: user]"
+    },
+    {
+     "category": "Administrative",
+     "name": "QA Performed By:",
+     "type": "text",
+     "description": "Template 1.02. [Section: Eyeline Daily QA – Dosimetry: Output]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_RM Wheel ID",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.01. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_RM Block ID",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.02. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Aperture (diameter in cm)",
+     "type": "text",
+     "description": "Template 2.03. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Beam_Parameters",
+     "name": "Field1_Exp_IsoDepth [cm]",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.04. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Eyeline Phantom",
+     "type": "text",
+     "description": "Template 2.05. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Temp & Pressure",
+     "name": "Air Temperature [°C]",
+     "type": "numeric",
+     "unit": "°C",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.06. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Temp & Pressure",
+     "name": "Air Pressure [kPa]",
+     "type": "numeric",
+     "unit": "kPa",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.07. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Temp & Pressure",
+     "name": "Temp. & Press. Correction",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.08. [Section: Eyeline_DailyQA_Ref1_Output_module] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
+    },
+    {
+     "category": "Device Selection",
+     "name": "Chamber",
+     "type": "text",
+     "description": "Template 2.09. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Chamber Cal. Factor [Gy/C]",
+     "type": "numeric",
+     "unit": "Gy/C",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.10. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Electrometer",
+     "type": "text",
+     "description": "Template 2.11. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Device Selection",
+     "name": "Electrometer Calibration Factor",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "tol_mode": "absolute",
+     "description": "Template 2.12. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+    },
+    {
+     "category": "Dosimetry",
+     "name": "Remaining output items",
+     "type": "text",
+     "description": "Template 2.13. [Section: Eyeline_DailyQA_Ref1_Output_module] Placeholder: the output measurements (background, MU, charge, irradiation time, dose and dose rate per run, averaging) still need to be added from a readable copy of the RadMachine list."
+    }
+   ]
+  },
+  {
+   "name": "Eyeline Daily QA – Imaging template",
+   "kind": "Proton eyeline",
+   "list": "Eyeline Daily QA – Imaging",
+   "frequency": "daily",
+   "setup": "Transcribed from the RadMachine list 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Imaging' (October 2026). References are RadMachine's; no warn / fail limits were shown, so values are recorded, not judged, until limits are entered.",
+   "checks": [
+    {
+     "category": "Administrative",
+     "name": "Last Edited By:",
+     "type": "text",
+     "description": "Template 1.01. [Section: Eyeline Daily QA – Imaging] [auto: user]"
+    },
+    {
+     "category": "Administrative",
+     "name": "QA Performed By:",
+     "type": "text",
+     "description": "Template 1.02. [Section: Eyeline Daily QA – Imaging]"
+    },
+    {
+     "category": "Alignment",
+     "name": "1st Correction vector from the offset position - X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 5,
+     "tol_mode": "absolute",
+     "description": "Template 2.01. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "1st Correction vector from the offset position - Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 5,
+     "tol_mode": "absolute",
+     "description": "Template 2.02. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "1st Correction vector from the offset position - Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 5,
+     "tol_mode": "absolute",
+     "description": "Template 2.03. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "2nd Correction vector after chair adjustment - X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "tol_mode": "absolute",
+     "description": "Template 2.04. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "2nd Correction vector after chair adjustment - Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "tol_mode": "absolute",
+     "description": "Template 2.05. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "2nd Correction vector after chair adjustment - Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "tol_mode": "absolute",
+     "description": "Template 2.06. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "Eyeline phantom diameter - Axial [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 25,
+     "tol_mode": "absolute",
+     "description": "Template 2.07. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "Eyeline phantom diameter - Lateral [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 25,
+     "tol_mode": "absolute",
+     "description": "Template 2.08. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "After correcting a chair position with imaging, check laser alignment (< 1 mm)",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 2.09. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Alignment",
+     "name": "After installing a pin-hole aperture, check light field projection (< 1 mm)",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 2.10. [Section: Eyeline Daily alignment]"
+    },
+    {
+     "category": "Safety",
+     "name": "Light-pen system functional?",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 3.01. [Section: Safety]"
+    },
+    {
+     "category": "Safety",
+     "name": "Eye cameras and monitors functional?",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 3.02. [Section: Safety]"
+    },
+    {
+     "category": "Safety",
+     "name": "Gazing light functional?",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 3.03. [Section: Safety]"
+    },
+    {
+     "category": "Safety",
+     "name": "Panic button functional?",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 3.04. [Section: Safety]"
+    },
+    {
+     "category": "Safety",
+     "name": "QA reviewed by therapist?",
+     "type": "boolean",
+     "unit": "Yes/No",
+     "description": "Template 3.05. [Section: Safety]"
+    }
+   ]
   }
  ],
  "machines": [
@@ -2235,6 +2710,11 @@
   {
    "name": "GTR5",
    "kind": "Proton gantry"
+  },
+  {
+   "name": "Eyeline GTR4",
+   "kind": "Proton eyeline",
+   "notes": "Eyeline (PAT006-FSTR4): fixed proton beam line for ocular treatments."
   },
   {
    "name": "TrueBeam",
