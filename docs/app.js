@@ -2233,7 +2233,10 @@ function seriesStats(values) {
   const n = values.length;
   const mean = values.reduce((a, b) => a + b, 0) / n;
   const sd = n > 1 ? Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)) : 0;
-  return { n, mean, sd, min: Math.min(...values), max: Math.max(...values) };
+  const half = n > 1 ? 1.96 * sd / Math.sqrt(n) : 0;             // 95 % confidence interval of the mean
+  let outlier = 0;
+  values.forEach((v, i) => { if (Math.abs(v - mean) > Math.abs(values[outlier] - mean)) outlier = i; });
+  return { n, mean, sd, ciLow: mean - half, ciHigh: mean + half, min: Math.min(...values), max: Math.max(...values), outlier };
 }
 
 // One chart for one or more series. Single series: actual values, with the expected line and limit bands.
@@ -2248,7 +2251,7 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
   const draw = () => {
     const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
-        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? `Absolute${unit ? ` ${unit}` : ""}` : "Delta from Reference"))) : null;
+        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? `Absolute${unit ? ` ${unit}` : ""}` : "Δ from Reference"))) : null;
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);
@@ -2320,12 +2323,12 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
       svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  const yTitle = delta ? (unit ? `Delta from Reference (${unit})` : "Delta from Reference") : unit ? `Absolute (${unit})` : "Value";   // the unit never changes between the two views
+  const yTitle = delta ? (unit ? `Δ from Reference (${unit})` : "Δ from Reference") : unit ? `Absolute (${unit})` : "Value";   // the unit never changes between the two views
   kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
 
   // X axis: dates, and the axis title.
   kids.push(svg("line", { class: "axis-base", x1: L, x2: W - R, y1: plotBottom, y2: plotBottom }));
-  const labels = small ? 4 : 7;
+  const labels = small ? 4 : 6;
   const every = Math.max(1, Math.ceil(dates.length / labels));
   const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
   const fmtDate = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -2348,7 +2351,8 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
         svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`)));
     }
   });
-  kids.push(svg("g", { "clip-path": `url(#${clipId})` }, plot));
+  const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
+  kids.push(plotGroup);
 
   // Statistics block under the key, one line per series.
   const u = unit && unit !== "unitless" ? ` ${unit}` : "";
@@ -2356,9 +2360,15 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     const st = seriesStats(s.points.map(val));
     const name = multi ? `${s.label}${delta ? " (Δ)" : ""}: ` : delta ? "Δ: " : "";
     const cls = `stats-line ${multi ? `axis-${k}` : ""}`;
-    const a = `${name}n ${st.n} · mean ${fmt(st.mean, 2)}${u} · SD ${fmt(st.sd, 2)}${u}`;
-    const b = `range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u}`;
-    return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, `${a} · ${b}`)];
+    const o = s.points[st.outlier];
+    const oDate = o ? new Date(o.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+    // The biggest outlier gets a ring on the chart.
+    if (o && st.n > 2) plotGroup.append(svg("circle", { class: `outlier ${multi ? `axis-${k}` : "single"}`, cx: x(o.qa_date), cy: y(val(o)), r: small ? 6 : 9 },
+      svg("title", {}, `Biggest outlier: ${fmt(val(o), 2)}${u} on ${oDate}`)));
+    const text = small
+      ? `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · n ${st.n} · outlier ${fmt(val(o), 2)}${u} (${oDate})`
+      : `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · n ${st.n} · range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u} · biggest outlier ${fmt(val(o), 2)}${u} on ${oDate}`;
+    return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, text)];
   });
   kids.push(...statLines);
   return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H + statH}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);

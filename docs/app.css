@@ -801,3 +801,9 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 :root { --band-warn: rgba(29, 122, 70, 0.22); --band-fail: rgba(243, 112, 33, 0.28); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --band-warn: rgba(80, 200, 120, 0.22); --band-fail: rgba(243, 140, 60, 0.26); } }
 :root[data-theme="dark"] { --band-warn: rgba(80, 200, 120, 0.22); --band-fail: rgba(243, 140, 60, 0.26); }
+
+/* Within-warning band in baby blue; the biggest outlier ringed. */
+:root { --band-warn: rgba(120, 180, 230, 0.30); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --band-warn: rgba(120, 180, 230, 0.26); } }
+:root[data-theme="dark"] { --band-warn: rgba(120, 180, 230, 0.26); }
+.chart .outlier, .spark .outlier { fill: none; stroke: var(--fail); stroke-width: 2; }

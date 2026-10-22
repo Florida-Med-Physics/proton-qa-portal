@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Trend charts: "Δ" is never spelled out; the statistics read "Mean ± SD · 95% CI · n · range · biggest outlier (date)", the biggest outlier is ringed on the chart, and the within-warning band is baby blue.
 - Trend charts: the two views are "Absolute <unit>" and "Delta from Reference", the axis keeps the unit in both, the band inside the warning limits is green and the band between warning and action is orange, named "Within Warning" and "Warning to Action" in the key.
 - Fewer words: the chart legend line on the trend page is gone (the chart has its own key) and the "Calculated here: …" / "Filled in from the Sphinx export file" notes are removed from every test; calculations still run.
 - Every font size steps up two sizes across the portal; the pass rings are thicker and read green (passed) or red (warning or action).
