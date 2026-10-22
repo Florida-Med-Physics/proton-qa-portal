@@ -823,3 +823,15 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .subplot { margin-top: 6px; }
 .subplot-title { font-weight: 700; font-size: 15px; margin: 4px 0 2px; }
 .chart-box.small .subplot-title { font-size: 13px; }
+
+/* Setup QA row actions: three icons and a quiet more-menu. */
+.icon-actions { gap: 4px; }
+.icon-action { width: 32px; height: 32px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 17px; line-height: 1; cursor: pointer; color: var(--text); }
+.icon-action:hover { background: var(--surface-2); }
+.icon-action.danger { color: var(--fail); }
+.more-wrap { position: relative; display: inline-block; }
+.more-menu { position: absolute; right: 0; top: 36px; z-index: 20; min-width: 160px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); padding: 4px; display: flex; flex-direction: column; }
+.more-menu[hidden] { display: none; }
+.more-item { text-align: left; background: none; border: 0; padding: 7px 10px; border-radius: 5px; cursor: pointer; color: var(--text); font: inherit; font-size: 14px; }
+.more-item:hover { background: var(--surface-2); }
+.icon-actions { flex-wrap: nowrap !important; }

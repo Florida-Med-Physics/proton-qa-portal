@@ -645,14 +645,22 @@ async function renderSetup() {
     `${templates.length} QA list ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine-specific QA ${lists.length === 1 ? "list" : "lists"}. `,
     el("span", { class: "muted small" }, "A template is the master copy; instantiating it on a machine gives that machine its own editable list.")));
 
-  const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end" },
-    el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
-    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Instantiate on a Machine" : "Duplicate") : null,
-    editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
-    editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
+  const iconBtn = (glyph, title, onclick, cls = "") => el("button", { type: "button", class: `icon-action ${cls}`, title, "aria-label": title, onclick }, glyph);
+  const moreMenu = (items) => {
+    const menu = el("div", { class: "more-menu", hidden: true }, ...items.filter(Boolean).map(([label, fn, title]) =>
+      el("button", { type: "button", class: "more-item", title: title || null, onclick: () => { menu.hidden = true; fn(); } }, label)));
+    const wrap = el("span", { class: "more-wrap" }, iconBtn("⋯", "More actions", (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; }), menu);
+    document.addEventListener("click", () => { menu.hidden = true; });
+    return wrap;
+  };
+  const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
+    iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
+    editable ? iconBtn("＋", q.is_template ? "Instantiate on a machine" : "Duplicate", () => duplicateDialog(q, machines)) : null,
+    editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
+    editable ? moreMenu([["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"]]) : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "26%"], [second, "21%"], ["Tests", "7%"], ["Actions", "27%"], ["Last Modified", "10%"], ["Modified By", "9%"]];
+  const SETUP_COLS = (first, second) => [[first, "29%"], [second, "25%"], ["Tests", "7%"], ["Actions", "18%"], ["Last Modified", "11%"], ["Modified By", "10%"]];
   const modified = (q) => [el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—"),
     el("td", { class: "small muted" }, q.modified_by || "—")];
   const templateTable = templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
@@ -689,19 +697,20 @@ async function renderSetup() {
           el("td", {}, q.template_name ? [q.template_name, el("div", { class: `small ${q.changes ? "changed-note" : "muted"}` },
             q.changes ? `Changed (${q.changes} ${q.changes === 1 ? "test" : "tests"})` : "No changes")] : el("span", { class: "muted" }, "—")),
           el("td", { class: "center" }, q.item_count),
-          el("td", { class: "right" }, el("div", { class: "row nowrap end" },
-            el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
-            editable && a ? el("button", { class: `small${live ? "" : " primary"}`, title: live ? "Stop scheduling this list on the machine (nothing is deleted)" : "Schedule this list on the machine",
-              onclick: () => setActive(a, !live) }, live ? "Set Inactive" : "Set Active") : null,
-            editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, "Duplicate") : null,
-            editable ? el("button", { class: "small", title: "Save a copy of this list as a new template", onclick: () => templateDialog(q) }, "Make Template") : null,
-            editable ? el("button", { class: "small", title: "Re-judge every recorded result on this list against its current limits (logged in the audit trail)", onclick: async () => {
-              if (!confirm(`Re-evaluate every recorded result on "${q.name}" against the limits it has now? Verdicts and stored limits are rewritten; this is logged.`)) return;
-              try { const r = await api("POST", `/api/queues/${q.id}/reevaluate`, {}); toast(`Re-evaluated ${r.runs} runs; ${r.changed} verdicts changed.`); route(); }
-              catch (err) { toast(err.message, true); }
-            } }, "Re-evaluate") : null,
-            editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
-            editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null)),
+          el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
+            iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
+            editable ? iconBtn("＋", "Duplicate onto a machine", () => duplicateDialog(q, machines)) : null,
+            editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
+            editable ? moreMenu([
+              a ? [live ? "Set Inactive" : "Set Active", () => setActive(a, !live), live ? "Stop scheduling this list on the machine" : "Schedule this list on the machine"] : null,
+              ["Make Template", () => templateDialog(q), "Save a copy of this list as a new template"],
+              ["Re-evaluate", async () => {
+                if (!confirm(`Re-evaluate every recorded result on "${q.name}" against the limits it has now? Verdicts and stored limits are rewritten; this is logged.`)) return;
+                try { const r = await api("POST", `/api/queues/${q.id}/reevaluate`, {}); toast(`Re-evaluated ${r.runs} runs; ${r.changed} verdicts changed.`); route(); }
+                catch (err) { toast(err.message, true); }
+              }, "Re-judge every recorded result against the current limits (logged)"],
+              ["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"],
+            ]) : null)),
           modified(q));
       })];
   });
@@ -2401,8 +2410,8 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     if (o && st.n > 2) plotGroup.append(svg("circle", { class: `outlier ${multi ? `axis-${k}` : "single"}`, cx: x(o.qa_date), cy: y(val(o)), r: small ? 6 : 9 },
       svg("title", {}, `Biggest outlier: ${fmt(val(o), 2)}${u} on ${oDate}`)));
     const text = small
-      ? `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · n ${st.n} · outlier ${fmt(val(o), 2)}${u} (${oDate})`
-      : `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · n ${st.n} · range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u} · biggest outlier ${fmt(val(o), 2)}${u} on ${oDate}`;
+      ? `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Outlier ${fmt(val(o), 2)}${u} (${oDate})`
+      : `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u} · Biggest Outlier ${fmt(val(o), 2)}${u} on ${oDate}`;
     return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, text)];
   });
   kids.push(...statLines);
