@@ -1055,6 +1055,7 @@
   // "Distal Fall Off" spelled out and the GTR5_ prefix dropped from measurement names (mirrors the starting data).
   // RadMachine transcription notes -> the action itself (markers drive the Perform page) or nothing.
   const NOTE_REWRITES = [
+      ["Reference and limits from the Sphinx reference sheet (2026-10-22).", ""],
       ["A choice list in RadMachine.", ""],
       ["Filled automatically in RadMachine.", "[auto: user]"],
       ["[auto: user] Filled in with the signed-in user.", "[auto: user]"],
