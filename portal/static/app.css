@@ -650,3 +650,17 @@ th { overflow-wrap: normal; word-break: normal; }
 .axis-field .axis-key { display: inline-block; min-width: 14px; text-align: center; padding: 1px 4px; border-radius: 3px; background: var(--axis); color: #fff; }
 .axis-field .result-input { width: 56px; }
 .axis-inputs { gap: 4px; }
+
+/* Chart key as ordinary text under the drawing. */
+.chart-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 2px; font-size: 13px; color: var(--text); }
+.chart-box.small .chart-key { font-size: 12px; gap: 2px 10px; }
+.key-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.key-swatch { display: inline-block; width: 18px; height: 10px; border-radius: 2px; }
+.key-swatch.line { height: 0; border-top: 2px solid var(--accent); position: relative; }
+.key-swatch.line::after { content: ""; position: absolute; left: 6px; top: -4px; width: 6px; height: 6px; border-radius: 50%; background: inherit; background-color: var(--accent); }
+.key-swatch.line.axis-0, .key-swatch.line.axis-0::after { border-color: var(--accent); background-color: var(--accent); }
+.key-swatch.line.axis-1, .key-swatch.line.axis-1::after { border-color: #d9822b; background-color: #d9822b; }
+.key-swatch.line.axis-2, .key-swatch.line.axis-2::after { border-color: #8e6bd1; background-color: #8e6bd1; }
+.key-swatch.ref { height: 0; border-top: 2px dashed var(--muted); }
+.key-swatch.band-warn { background: var(--band-warn); }
+.key-swatch.band-fail { background: var(--band-fail); }

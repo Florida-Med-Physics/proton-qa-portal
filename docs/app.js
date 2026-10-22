@@ -2050,7 +2050,16 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
     const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
         onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? "Absolute" : "Δ from reference"))) : null;
-    box.replaceChildren(buttons, drawSeries(series, unit, { small, delta: mode === "delta" }));
+    const delta = mode === "delta";
+    const multi = series.length > 1;
+    const pts = series.flatMap((x) => x.points);
+    const drawRef = hasRef && !(multi && !delta);
+    const key = el("div", { class: "chart-key" },
+      series.map((x, k) => el("span", { class: "key-item" }, el("span", { class: `key-swatch line ${multi ? `axis-${k}` : "single"}` }), `${x.label}${delta ? " (Δ)" : ""}`)),
+      drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
+      drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Tolerance ±") : null,
+      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Action ±") : null);
+    box.replaceChildren(buttons, drawSeries(series, unit, { small, delta }), key);
   };
   draw();
   return box;
@@ -2061,7 +2070,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   const W = small ? 560 : 900, H = small ? 120 : 360;
   const L = small ? 56 : 70, R = small ? 40 : 40, T = small ? 8 : 20, B = small ? 34 : 52;
   const lineH = small ? 13 : 16;
-  const keyH = (small ? 22 : lineH) + 4;                     // the key (what each colour and band means) sits between the plot and the statistics
+  const keyH = 0;                                            // the key is HTML under the chart (see seriesChart)
   const statH = keyH + lineH * series.length + 6;
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
@@ -2133,19 +2142,6 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     }
   });
   kids.push(svg("g", { "clip-path": `url(#${clipId})` }, plot));
-
-  // Key: one entry per series (dot and line), then the reference line and the Tolerance / Action bands when drawn.
-  const keyY = H + lineH - 2;
-  let kx = L;
-  const keyItem = (swatch, label, width) => { kids.push(svg("g", { transform: `translate(${kx} ${keyY})` }, ...swatch, svg("text", { class: "key-text", x: 22, y: 4 }, label))); kx += width; };
-  series.forEach((s, k) => {
-    const cls = multi ? `axis-${k}` : "single";
-    keyItem([svg("line", { class: `series ${cls}`, x1: 0, x2: 18, y1: 0, y2: 0 }), svg("circle", { class: `dot ${cls} st-pass`, cx: 9, cy: 0, r: 3 })],
-      `${s.label}${delta ? " (Δ)" : ""}`, 30 + (s.label.length + (delta ? 4 : 0)) * (small ? 9.5 : 7.5));
-  });
-  if (ref.length) keyItem([svg("line", { class: "expected", x1: 0, x2: 18, y1: 0, y2: 0 })], delta ? "Reference (0)" : "Reference", small ? 140 : 110);
-  if (warn) keyItem([svg("rect", { class: "band-warn", x: 0, y: -5, width: 18, height: 10 })], "Tolerance ±", small ? 130 : 105);
-  if (fail) keyItem([svg("rect", { class: "band-fail", x: 0, y: -5, width: 18, height: 10 })], "Action ±", small ? 110 : 90);
 
   // Statistics block under the key, one line per series.
   const u = unit && unit !== "unitless" ? ` ${unit}` : "";
