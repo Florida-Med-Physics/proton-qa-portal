@@ -732,3 +732,4 @@ th { overflow-wrap: normal; word-break: normal; }
 /* An X / Y / Z table reads as one item: no lines between its rows. */
 .axis-table tbody tr:not(:last-child) td { border-bottom: 0; }
 .axis-table tbody td { padding-top: 4px; padding-bottom: 4px; }
+.measure-table td.qa-n-span { vertical-align: middle; text-align: center; }

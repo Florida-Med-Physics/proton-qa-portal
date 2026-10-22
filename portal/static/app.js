@@ -1372,7 +1372,9 @@ async function renderPerform(assignmentId) {
         if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
         return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
       };
-      const numberCell = (it) => el("td", { class: "qa-n" }, firstHeader === "Axis" ? (it === members[0] ? checkNumber(it.description) || "" : "") : checkNumber(it.description) || "");
+      const numberCell = (it) => (firstHeader === "Axis"
+        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, checkNumber(it.description) || "") : null)
+        : el("td", { class: "qa-n" }, checkNumber(it.description) || ""));
       const trRows = members.map((it) => {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
