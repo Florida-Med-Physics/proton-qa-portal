@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DOCS = ROOT / "docs"
 
-for name in ("app.js", "app.css"):
+for name in ("app.js", "app.css", "theme.js", "uf-proton-logo.png"):
     shutil.copyfile(ROOT / "portal" / "static" / name, DOCS / name)
     print("copied", name)
 seed = json.loads((ROOT / "portal" / "seed.json").read_text(encoding="utf-8"))

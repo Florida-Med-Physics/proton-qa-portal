@@ -480,10 +480,17 @@
   }
 
   function queueItems(queueId) {
+    // Last change to each test, from the audit log; untouched tests show when the list was made (mirrors service.get_queue).
+    const last = {};
+    for (const a of S.audit) if (a.entity === "test") last[a.entity_id] = a;
+    const made = S.audit.find((a) => a.entity === "queue" && a.entity_id === queueId) || S.audit.find((a) => a.action === "seed");
+    const who = (a) => { if (!a) return null; const u = a.user_id ? byId("users", a.user_id) : null; return u ? (u.full_name || u.username) : "starting data"; };
     return S.queue_items.filter((i) => i.queue_id === queueId).sort((a, b) => a.position - b.position).map((i) => {
       const t = byId("tests", i.test_id);
+      const a = last[i.test_id] || made;
       return { ...i, name: t.name, category: t.category, type: t.type, unit: t.unit,
-        default_expected: t.expected, default_warn: t.warn, default_fail: t.fail, default_tol_mode: t.tol_mode };
+        default_expected: t.expected, default_warn: t.warn, default_fail: t.fail, default_tol_mode: t.tol_mode,
+        modified_at: a ? a.at : null, modified_by: who(a) };
     });
   }
   function getQueue(id) {
@@ -520,10 +527,19 @@
     } else {
       Object.assign(existing, fields);
       id = existing.id;
+      var before = Object.fromEntries(S.queue_items.filter((i) => i.queue_id === id).map((i) => [i.test_id, i]));
       S.queue_items = S.queue_items.filter((i) => i.queue_id !== id);
     }
     for (const i of items) insert("queue_items", { queue_id: id, ...i });
     audit(user.id, existing ? "update" : "create", "queue", id, { name, tests: items.map((i) => i.test_id) });
+    if (existing) {
+      for (const i of items) {
+        const old = before[i.test_id];
+        if (!old || ["expected", "warn", "fail", "tol_mode"].some((k) => (old[k] ?? null) !== (i[k] ?? null))) {
+          audit(user.id, old ? "update_limits" : "add_to_list", "test", i.test_id, { queue: name });
+        }
+      }
+    }
     return { id };
   }
   function duplicateQueue(user, sourceId, data) {

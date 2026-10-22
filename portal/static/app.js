@@ -225,6 +225,20 @@ const NAV = [
   ["#/trends", "Machine Trends", null, ["#/trends"]],
 ];
 
+// Dark mode on/off, remembered on this computer (same control as the TrueBeam Service Log).
+function themeToggle() {
+  const dark = () => document.documentElement.dataset.theme === "dark";
+  const button = el("button", { type: "button", class: "theme-toggle", "aria-pressed": String(dark()) }, `Dark mode: ${dark() ? "On" : "Off"}`);
+  button.addEventListener("click", () => {
+    const next = dark() ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("qa-portal-theme", next); } catch { /* private window: still switches for this visit */ }
+    button.textContent = `Dark mode: ${next === "dark" ? "On" : "Off"}`;
+    button.setAttribute("aria-pressed", String(next === "dark"));
+  });
+  return button;
+}
+
 function renderShell() {
   const bar = document.getElementById("topbar");
   bar.hidden = !state.user;
@@ -234,7 +248,8 @@ function renderShell() {
     el("a", { href, class: owns.includes(current) ? "active" : "" }, label)));
   document.getElementById("who").replaceChildren(
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role] }, personName(state.user.full_name, state.user.username)),
-    el("button", { class: "link", onclick: logout }, "Sign out"));
+    el("button", { class: "link", onclick: logout }, "Sign out"),
+    themeToggle());
 }
 
 function shortDate(iso) {
@@ -245,6 +260,7 @@ function renderLogin() {
   renderShell();
   const error = el("p", { class: "error" });
   const form = el("form", {},
+    el("img", { class: "brand-logo", src: "uf-proton-logo.png", alt: "UF Health Proton Therapy Institute" }),
     el("h1", {}, "Physics QA Portal"),
     window.localApi
       ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
@@ -1120,6 +1136,7 @@ async function renderQueueEditor(id) {
 
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));
   let items = q.items.map((i) => ({ test_id: i.test_id, expected: i.expected, warn: i.warn, fail: i.fail, tol_mode: i.tol_mode }));
+  const changed = Object.fromEntries(q.items.map((i) => [i.test_id, i]));
   const body = el("tbody");
   const holder = el("div");
   const draw = () => {
@@ -1128,13 +1145,21 @@ async function renderQueueEditor(id) {
       const numeric = t.type === "numeric";
       const input = (name, props) => el("input", { type: "number", step: "any", value: item[name] ?? "", placeholder: fmt(t[name]), disabled: !editable || !numeric,
         oninput: (e) => (item[name] = e.target.value), ...(props || {}) });
+      const m = changed[item.test_id] || {};
+      const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
+      const tolUnit = (item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       return el("tr", { class: "compact" },
-        el("td", {}, el("strong", {}, t.name), el("div", { class: "muted small" }, [t.category, t.type === "numeric" ? t.unit : TYPE_LABELS[t.type].toLowerCase()].filter(Boolean).join(" · "))),
-        el("td", {}, input("expected")),
-        el("td", {}, input("warn", { min: 0 })),
-        el("td", {}, input("fail", { min: 0 })),
-        el("td", {}, select("", [["", `Default (${t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], item.tol_mode || "",
-          { disabled: !editable || !numeric, onchange: (e) => (item.tol_mode = e.target.value) })),
+        el("td", {}, el("strong", {}, shortName)),
+        el("td", {}, t.category || el("span", { class: "muted" }, "—")),
+        el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : null)
+          : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
+        el("td", {}, numeric ? el("div", { class: "tol-cell" },
+          el("label", { class: "inline small" }, "warn ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, "fail ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          select("", [["", `Default (${t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], item.tol_mode || "",
+            { disabled: !editable, onchange: (e) => { item.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
+        el("td", { class: "small" }, m.modified_at ? m.modified_at.slice(0, 16).replace("T", " ") : el("span", { class: "muted" }, "—")),
+        el("td", { class: "small" }, m.modified_by || el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; draw(); } }, "↓"),
@@ -1146,7 +1171,7 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null));
     }));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Test", "Expected", "Warning ±", "Fail ±", "Tolerance", ""].map((h) => el("th", {}, h)))), body))
+      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Tolerance", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),

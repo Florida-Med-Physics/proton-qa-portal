@@ -205,6 +205,16 @@ def get_queue(db, user, queue_id):
         "SELECT qi.test_id, qi.position, qi.expected, qi.warn, qi.fail, qi.tol_mode, t.name, t.category, t.type, t.unit, "
         "t.expected AS default_expected, t.warn AS default_warn, t.fail AS default_fail, t.tol_mode AS default_tol_mode "
         "FROM queue_items qi JOIN tests t ON t.id = qi.test_id WHERE qi.queue_id = ? ORDER BY qi.position", (queue_id,))
+    # Last change to each test, from the audit log; tests never edited since the list was made show when it was made.
+    changed = {r["entity_id"]: r for r in db.all(
+        "SELECT a.entity_id, a.at, u.username, u.full_name FROM audit a LEFT JOIN users u ON u.id = a.user_id "
+        "WHERE a.entity = 'test' AND a.id IN (SELECT MAX(id) FROM audit WHERE entity = 'test' GROUP BY entity_id)")}
+    made = db.one("SELECT a.at, u.username, u.full_name FROM audit a LEFT JOIN users u ON u.id = a.user_id "
+                  "WHERE (a.entity = 'queue' AND a.entity_id = ?) OR a.action = 'seed' ORDER BY (a.entity = 'queue') DESC, a.id LIMIT 1", (queue_id,))
+    for item in queue["items"]:
+        row = changed.get(item["test_id"]) or made or {}
+        item["modified_at"] = row.get("at")
+        item["modified_by"] = row.get("full_name") or row.get("username") or ("starting data" if row else None)
     return queue
 
 
@@ -235,12 +245,19 @@ def save_queue(db, user, data, queue_id=None):
         else:
             db.run("UPDATE queues SET name = ?, description = ?, active = ?, is_template = ? WHERE id = ?",
                    (name, _text(data, "description"), _flag(data, "active"), is_template, queue_id))
+            before = {r["test_id"]: r for r in db.all("SELECT * FROM queue_items WHERE queue_id = ?", (queue_id,))}
             db.run("DELETE FROM queue_items WHERE queue_id = ?", (queue_id,))
             action = "update"
         for test_id, position, limits in items:
             db.run("INSERT INTO queue_items (queue_id, test_id, position, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?, ?)",
                    (queue_id, test_id, position, limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
         db.audit(user["id"], action, "queue", queue_id, name=name, tests=[i[0] for i in items])
+        if action == "update":
+            # Record each test whose limits on this list changed, so Setup QA can show who changed it and when.
+            for test_id, _, limits in items:
+                old = before.get(test_id)
+                if old is None or any(old[k] != limits[k] for k in limits):
+                    db.audit(user["id"], "update_limits" if old else "add_to_list", "test", test_id, queue=name, **limits)
     return {"id": queue_id}
 
 
