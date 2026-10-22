@@ -1372,7 +1372,7 @@ async function renderPerform(assignmentId) {
         if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
         return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
       };
-      const numberCell = (it) => el("td", { class: "qa-n" }, firstHeader === "Axis" ? "" : checkNumber(it.description) || "");
+      const numberCell = (it) => el("td", { class: "qa-n" }, firstHeader === "Axis" ? (it === members[0] ? checkNumber(it.description) || "" : "") : checkNumber(it.description) || "");
       const trRows = members.map((it) => {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
@@ -1460,7 +1460,7 @@ async function renderPerform(assignmentId) {
         const numbers = [checkNumber(m.axes[0].description), checkNumber((m.calc || m.axes[m.axes.length - 1]).description)].filter(Boolean);
         rows.push(measureTable(members, {
           firstHeader: "Axis",
-          title: el("div", { class: "measure-title" }, el("strong", {}, numbers.length ? `${numbers[0]}: ` : "", m.base, m.unitTag ? ` ${m.unitTag}` : ""),
+          title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : ""),
             helpText((m.calc || m.axes[0]).description, { inline: true })),
           directions: null,
           label: (it) => `${m.base} ${it.axisLabel}`,

@@ -696,7 +696,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .trend-table td.trend-cell { width: auto; }
 
 /* Perform QA rows in the Monthly QA layout. */
-.measure-table td.qa-n { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
+.measure-table td.qa-n { color: var(--text); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; white-space: nowrap; }
 .measure-table td.qa-label strong { display: block; }
 .qa-limits { display: block; font-size: 11px; color: var(--uf-navy); margin-top: 2px; }
 .measure-table td.qa-unit { color: var(--muted); font-size: 12px; }
