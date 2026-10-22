@@ -521,7 +521,7 @@ async function renderSetup() {
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "36%"], [second, "20%"], ["#Tests", "8%"], ["", "36%"]];
+  const SETUP_COLS = (first, second) => [[first, "30%"], [second, "26%"], ["#Tests", "8%"], ["", "36%"]];
   app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
@@ -546,12 +546,12 @@ async function renderSetup() {
     const m = machines.find((x) => x.name === name);
     return [el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...qs.map((q) => el("tr", { class: q.active ? "" : "muted" },
-        el("td", { class: "indent" }, editableName(q, editable), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
-        el("td", {}, qs.length > 1 ? el("span", { class: "muted small" }, name) : name),
+        el("td", { class: "indent" }, editableName(q, editable)),
+        el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
         el("td", { class: "num" }, q.item_count),
         actions(q)))];
   });
-  app.append(fixedTable(SETUP_COLS("QA List", "Machine"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));
+  app.append(fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));
 
   if (archivedLists.length) {
     app.append(el("details", { class: "archived" }, el("summary", {}, `Archived QA lists (${archivedLists.length})`),

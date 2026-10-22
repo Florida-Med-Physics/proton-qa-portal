@@ -39,7 +39,7 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - **[Physics review]** Units on the proton template's 2.02–2.06 measurements (laser/kV alignment offsets, CBCT and kV/kV correction vectors, kV/kV-to-CBCT deltas): mm. The myQA table has no unit column; the values are millimetres (a −5 cm shift is entered as 50). The editor now flags any measured test without a unit.
 - Perform QA: measurements repeated per energy or spot (distal depth, DFO, sigma X, …) are shown as one table per measurement: energy, measurement, reference, tolerance, action, status, comment, the last five results, and a button that plots the trend in place.
 - Perform QA no longer lists the folder's files; the newest unrecorded export is read in automatically and one line says which.
-- Setup QA: click a QA list's name to rename it; the machine lists are grouped under each machine ("Machine-Assigned QA List Instances").
+- Setup QA: click a QA list's name to rename it; the machine lists are grouped under each machine ("Machine-Assigned QA List Instances"), with a "Generated from" column naming the template each came from.
 - Header: the portal name sits at the far left in a serif face like the UF Health wordmark; the UF Health logo moved to the right end, beside the signed-in person. Tables have light column separators.
 - QA list editor: drag a test by its ⠿ handle to reorder it (or use ↑/↓); Save keeps the new order.
 - **[Physics review]** Limits are named as in RadMachine: "Tolerance ±" (was warning) and "Action ±" (was fail); results outside tolerance read "Tolerance", beyond the action level "Action". Pass/fail checks keep Pass/Fail (or Yes/No).
