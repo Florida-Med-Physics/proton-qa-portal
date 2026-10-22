@@ -388,8 +388,8 @@ async function renderSetup() {
     el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
     editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Copy to a machine" : "Duplicate") : null));
 
-  app.append(el("h2", { class: "section-head" }, "Templates"));
-  app.append(templates.length ? table(["Template", "#Tests", "Copies on", ""], templates.map((t) => el("tr", {},
+  app.append(el("h2", { class: "section-head" }, "QA List Templates"));
+  app.append(templates.length ? table(["QA List Template", "#Tests", "Copies on", ""], templates.map((t) => el("tr", {},
     el("td", {}, el("strong", {}, t.name)),
     el("td", { class: "num" }, t.item_count),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
@@ -1097,8 +1097,8 @@ async function renderQueues() {
     el("td", {}, q.is_template ? el("span", { class: "muted" }, "—") : q.machines || el("span", { class: "muted" }, "not scheduled")),
     el("td", {}, q.active ? "" : chip("", "Inactive")),
     el("td", {}, can("configure") ? el("button", { onclick: (e) => { e.stopPropagation(); duplicateDialog(q, machines); } }, "Duplicate") : null));
-  app.append(el("h2", {}, "Templates"));
-  app.append(templates.length ? table(["Template", "#Tests", "Machines", "", ""], templates.map(row))
+  app.append(el("h2", {}, "QA List Templates"));
+  app.append(templates.length ? table(["QA List Template", "#Tests", "Machines", "", ""], templates.map(row))
     : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
   app.append(el("h2", {}, "Machine lists"));
   app.append(table(["QA list", "#Tests", "Scheduled on", "", ""], lists.map(row), "No machine lists yet. Duplicate a template to make one."));
