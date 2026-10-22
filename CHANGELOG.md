@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- **[Physics review]** Machine Trends shows, with each table, the WARNING / ACTION limits its latest results were actually judged against (not the list's current limits), so the verdicts and deltas read consistently. Setup QA gains a logged admin "Re-evaluate" action that re-judges every recorded result on a machine list against its current limits and rewrites the stored limits, verdicts and run overalls.
 - Test numbers are one per block and sequential within a section (a single test, a per-energy / per-spot table or an X/Y/Z table each count once), computed from the list itself so Perform QA and Machine Trends show the same numbers. Energy / axis tables give the Energy column more room.
 - Machine Trends: the "N at action level" and "N outside tolerance" chips are buttons that narrow the tables to those tests (click again to show everything).
 - Machine Trends uses the Perform QA layout: a heading per section, a box per category, Sphinx energy tables with one row per energy, X / Y / Z axis tables, and columns # · Test · Unit · Baseline · Latest · Deviation · Result · History · Trends, with the chart opening under the row from the dot icon. Perform QA: the Start column is gone — the green arrow in front of every list opens it — and due lists sort to the top.

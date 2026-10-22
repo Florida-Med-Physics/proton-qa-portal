@@ -610,6 +610,33 @@
     audit(user.id, "rename", "queue", q.id, { was, name });
     return { id: q.id, name };
   }
+  function reevaluateQueue(user, queueId) {
+    require(user, "configure");
+    const q = get("queues", queueId, "QA list");
+    const rank = { pass: 0, recorded: 0, warn: 1, fail: 2 };
+    const runs = new Set();
+    let changed = 0;
+    for (const item of S.queue_items.filter((i) => i.queue_id === q.id)) {
+      const test = byId("tests", item.test_id);
+      if (!test) continue;
+      const limits = resolveLimits(test, item);
+      for (const res of S.results.filter((r) => r.test_id === test.id && (byId("runs", r.run_id) || {}).queue_id === q.id)) {
+        const value = test.type === "text" ? res.value_text : res.value_num;
+        if (value === null || value === undefined) continue;
+        const status = evaluate(test.type, test.type === "boolean" ? (res.value_num ? "pass" : "fail") : value, limits);
+        if (status !== res.status) changed++;
+        Object.assign(res, { expected: limits.expected, warn: limits.warn, fail: limits.fail, tol_mode: limits.tol_mode, status });
+        runs.add(res.run_id);
+      }
+    }
+    for (const runId of runs) {
+      const run = byId("runs", runId);
+      if (run) run.overall = S.results.filter((r) => r.run_id === runId).reduce((w, r) => (rank[r.status] > rank[w] ? r.status : w), "pass");
+    }
+    save();
+    audit(user.id, "reevaluate", "queue", q.id, { name: q.name, runs: runs.size, verdicts_changed: changed });
+    return { runs: runs.size, changed };
+  }
   function archiveQueue(user, queueId, data) {
     require(user, "configure");
     const q = get("queues", queueId, "QA list");
@@ -1272,6 +1299,7 @@
   route("PUT", "/api/queues/(\\d+)", (u, m, body) => saveQueue(u, body, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/duplicate", (u, m, body) => duplicateQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/rename", (u, m, body) => renameQueue(u, Number(m[1]), body));
+  route("POST", "/api/queues/(\\d+)/reevaluate", (u, m) => reevaluateQueue(u, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/archive", (u, m, body) => archiveQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));
   route("POST", "/api/assignments", (u, m, body) => saveAssignment(u, body));

@@ -311,6 +311,34 @@ def rename_queue(db, user, queue_id, data):
     return {"id": queue_id, "name": name}
 
 
+def reevaluate_queue(db, user, queue_id):
+    """Re-judge every recorded result on this list against the limits in force now (a deliberate, logged admin step).
+    Each result's stored expected / warning / action / mode and status are rewritten, and each run's overall with them."""
+    require(user, "configure")
+    queue = _get(db, "queues", queue_id)
+    changed = 0
+    runs = set()
+    with db.transaction():
+        for item in db.all("SELECT qi.*, t.type FROM queue_items qi JOIN tests t ON t.id = qi.test_id WHERE qi.queue_id = ?", (queue_id,)):
+            test = _get(db, "tests", item["test_id"])
+            limits = qa.resolve_limits(test, item)
+            for res in db.all("SELECT res.id, res.run_id, res.value_num, res.value_text, res.status FROM results res JOIN runs r ON r.id = res.run_id "
+                              "WHERE res.test_id = ? AND r.queue_id = ?", (test["id"], queue_id)):
+                value = res["value_num"] if test["type"] == "numeric" else (res["value_num"] if test["type"] == "boolean" else res["value_text"])
+                if value is None:
+                    continue
+                status = qa.evaluate(test["type"], value, limits)
+                db.run("UPDATE results SET expected = ?, warn = ?, fail = ?, tol_mode = ?, status = ? WHERE id = ?",
+                       (limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], status, res["id"]))
+                if status != res["status"]:
+                    changed += 1
+                runs.add(res["run_id"])
+        for run_id in runs:
+            db.run("UPDATE runs SET overall = ? WHERE id = ?", (qa.overall(r["status"] for r in db.all("SELECT status FROM results WHERE run_id = ?", (run_id,))), run_id))
+        db.audit(user["id"], "reevaluate", "queue", queue_id, name=queue["name"], runs=len(runs), verdicts_changed=changed)
+    return {"runs": len(runs), "changed": changed}
+
+
 def archive_queue(db, user, queue_id, data):
     """Hide a QA list (and its schedules) without deleting anything; restoring brings both back."""
     require(user, "configure")

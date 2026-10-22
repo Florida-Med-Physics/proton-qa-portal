@@ -682,6 +682,11 @@ async function renderSetup() {
               onclick: () => setActive(a, !live) }, live ? "Set Inactive" : "Set Active") : null,
             editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, "Duplicate") : null,
             editable ? el("button", { class: "small", title: "Save a copy of this list as a new template", onclick: () => templateDialog(q) }, "Make Template") : null,
+            editable ? el("button", { class: "small", title: "Re-judge every recorded result on this list against its current limits (logged in the audit trail)", onclick: async () => {
+              if (!confirm(`Re-evaluate every recorded result on "${q.name}" against the limits it has now? Verdicts and stored limits are rewritten; this is logged.`)) return;
+              try { const r = await api("POST", `/api/queues/${q.id}/reevaluate`, {}); toast(`Re-evaluated ${r.runs} runs; ${r.changed} verdicts changed.`); route(); }
+              catch (err) { toast(err.message, true); }
+            } }, "Re-evaluate") : null,
             editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
             editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null)),
           modified(q));
@@ -2385,7 +2390,7 @@ async function renderTrendOverview(machines, machineId, range) {
       } }, trendIcon(16));
       const cells = [
         firstHeader !== "Test" ? (k === 0 ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null) : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""),
-        el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null),
+        el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine({ limits: { warn: p.warn, fail: p.fail, tol_mode: p.tol_mode } }, unit) : null),
         el("td", { class: "qa-unit" }, unit),
         el("td", { class: "num" }, baseline === null || baseline === undefined ? el("span", { class: "muted" }, "—") : `${fmt(baseline)} ${unit}`.trim()),
         el("td", { class: "num" }, `${fmt(p.value)} ${unit}`.trim()),
@@ -2403,8 +2408,9 @@ async function renderTrendOverview(machines, machineId, range) {
         dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {})) : null),
       el("tbody", {}, rows)));
     if (title && firstHeader !== "Test") {
-      const withLimits = members.find((it) => it.limits && (it.limits.warn !== null || it.limits.fail !== null));
-      if (withLimits) { const line = limitsLine(withLimits, unitOf(withLimits)); if (line) title.append(line); }
+      const p0 = latest(members[0].points);
+      const line = limitsLine({ limits: { warn: p0.warn, fail: p0.fail, tol_mode: p0.tol_mode } }, unitOf(members[0]));
+      if (line) title.append(line);
     }
     fitHistoryRows(tableEl, dates.length);
     return el("div", { class: "measure-block" }, title, el("div", { class: "table-wrap measure-wrap" }, tableEl));
