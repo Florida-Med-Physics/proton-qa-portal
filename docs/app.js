@@ -219,12 +219,53 @@ function evaluate(type, value, limits) {
 
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
-  ["#/", "Perform QA", null, ["#/", "#", "#/perform", "#/runs"]],
+  ["#/", "⌂", null, ["#/", "#"], "Home"],
+  ["#/perform-qa", "Perform QA", null, ["#/perform-qa", "#/perform", "#/runs"]],
   ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit"]],
   ["#/machines", "Machines", "configure", ["#/machines", "#/assignments"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
-  ["#/admin", "Admin", "configure", ["#/admin", "#/users"]],
+  ["#/admin", "Data Administration", "configure", ["#/admin", "#/users"]],
 ];
+
+function homeIcon() {
+  return svg("svg", { viewBox: "0 0 24 24", width: 20, height: 20, "aria-hidden": "true", class: "home-icon" },
+    svg("path", { d: "M3 11.5 12 4l9 7.5", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }),
+    svg("path", { d: "M5.5 10v9.5h4.5v-5.5h4v5.5h4.5V10", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linejoin": "round" }));
+}
+
+// Home: one look at every machine — today's QA, last result, and what is waiting for review.
+async function renderHome() {
+  const data = await api("GET", "/api/dashboard");
+  page("Home", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
+  const queues = data.machines.flatMap((m) => m.queues);
+  const todo = queues.filter((q) => q.state === "due" || q.state === "overdue");
+  const overdue = queues.filter((q) => q.state === "overdue").length;
+  const failing = data.machines.filter((m) => m.queues.some((q) => q.last_run && q.last_run.overall === "fail"));
+  const toReview = data.machines.reduce((n, m) => n + m.pending_review, 0);
+  const stat = (label, value, cls, href) => el("a", { class: `home-stat ${cls || ""}`, href }, el("div", { class: "home-stat-value" }, String(value)), el("div", { class: "home-stat-label" }, label));
+  app.append(el("div", { class: "home-stats" },
+    stat("QA lists to do today", todo.length, todo.length ? "due" : "pass", "#/perform-qa"),
+    stat("Overdue", overdue, overdue ? "fail" : "pass", "#/perform-qa"),
+    stat("Machines with a failing last result", failing.length, failing.length ? "fail" : "pass", "#/trends"),
+    can("review") ? stat("Waiting for review", toReview, toReview ? "due" : "pass", "#/runs?review_status=pending") : null));
+  for (const modality of MODALITIES) {
+    const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
+    if (!machines.length) continue;
+    const rows = machines.map((m) => {
+      const worst = m.queues.reduce((w, q) => (q.state === "overdue" ? "overdue" : w === "overdue" ? w : q.state === "due" ? "due" : w), "done");
+      const lasts = m.queues.filter((q) => q.last_run);
+      const lastRun = lasts.sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""))[0];
+      return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
+        el("td", {}, el("strong", {}, m.name), el("div", { class: "muted small" }, m.kind)),
+        el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? "Due today" : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
+        el("td", {}, lastRun ? [chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`)] : el("span", { class: "muted small" }, "No runs yet")),
+        el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
+        el("td", { class: "right" }, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}`, onclick: (e) => e.stopPropagation() }, "Trends")));
+    });
+    app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
+      fixedTable([["Machine", "22%"], ["Today", "18%"], ["Last result", "36%"], ["#To review", "12%"], ["", "12%"]], rows));
+  }
+}
 
 // Dark mode on/off, remembered on this computer (same control as the TrueBeam Service Log).
 function themeToggle() {
@@ -245,8 +286,9 @@ function renderShell() {
   bar.hidden = !state.user;
   if (!state.user) return;
   const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
-  document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns]) =>
-    el("a", { href, class: owns.includes(current) ? "active" : "" }, label)));
+  document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns, title]) =>
+    el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
+      title ? homeIcon() : label)));
   document.getElementById("who").replaceChildren(
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role] }, personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
@@ -293,7 +335,8 @@ async function logout() {
 }
 
 const ROUTES = [
-  [/^#?\/?$/, renderDashboard],
+  [/^#?\/?$/, renderHome],
+  [/^#\/perform-qa$/, renderDashboard],
   [/^#\/setup$/, renderSetup],
   [/^#\/admin$/, renderAdmin],
   [/^#\/machines$/, renderMachines],
@@ -337,12 +380,31 @@ function queryParams() {
 // Dashboard
 // ---------------------------------------------------------------------------
 
+// Proton gantries first, then every other machine (TrueBeam, CT and MRI simulators) under Photon.
+const MODALITIES = ["Proton", "Photon"];
+const modalityOf = (kind) => (/proton/i.test(kind || "") ? "Proton" : "Photon");
+const KIND_RANK = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
+const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RANK.length : i; };
+
+// A table with fixed column widths, so the Proton and Photon tables line up at the same width.
+function fixedTable(columns, rows, emptyText) {
+  if (!rows.length) return el("div", { class: "card empty" }, emptyText || "Nothing here yet.");
+  return el("div", { class: "table-wrap fixed-wrap" }, el("table", { class: "fixed-table" },
+    el("colgroup", {}, columns.map(([, width]) => { const col = el("col"); if (width) col.style.width = width; return col; })),
+    el("thead", {}, el("tr", {}, columns.map(([h]) => el("th", { class: h.startsWith("#") ? "num" : "" }, h.replace(/^#/, ""))))),
+    el("tbody", {}, rows)));
+}
+
+function modalityHead(name, count) {
+  return el("h2", { class: `section-head modality-head ${name.toLowerCase()}` }, name, el("span", { class: "modality-count" }, count));
+}
+
 async function renderDashboard() {
   const data = await api("GET", "/api/dashboard");
   const queues = data.machines.flatMap((m) => m.queues);
   const todo = queues.filter((q) => q.state === "due" || q.state === "overdue").length;
   const toReview = data.machines.reduce((n, m) => n + m.pending_review, 0);
-  page("Perform QA", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }));
+  page("Perform QA", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
   if (!data.machines.length) {
     app.append(el("div", { class: "card empty" }, "No machines yet. ",
       can("configure") ? el("a", { href: "#/machines" }, "Add your first machine.") : "Ask a physicist to add one."));
@@ -362,23 +424,17 @@ async function renderDashboard() {
         el("td", {}, chip(r.overall)), el("td", { class: "muted" }, personName(r.performer_name, r.performer)),
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/runs/${r.id}` }, "Review"))))));
   }
-  // One compact table per machine type; each row is a QA list on a machine, with its status and last result.
-  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
-  const groups = new Map();
-  for (const machine of data.machines) {
-    const kind = machine.kind || "Other";
-    if (!groups.has(kind)) groups.set(kind, []);
-    groups.get(kind).push(machine);
-  }
-  const rank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
-  for (const [kind, machines] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
+  // Two tables, Proton then Photon, at the same width; each row is a QA list on a machine.
+  for (const modality of MODALITIES) {
+    const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
+    if (!machines.length) continue;
     const rows = machines.flatMap((machine) => {
-      if (!machine.queues.length) return [el("tr", {}, el("td", {}, el("strong", {}, machine.name)), el("td", { class: "muted", colspan: 4 }, "Nothing scheduled."))];
+      if (!machine.queues.length) return [el("tr", {}, el("td", {}, el("strong", {}, machine.name), el("div", { class: "muted small" }, machine.kind)), el("td", { class: "muted", colspan: 4 }, "Nothing scheduled."))];
       return machine.queues.map((q, i) => {
         const due = startable(q.state);
         const last = q.last_run;
-        return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
-          el("td", {}, el("strong", {}, machine.name)),
+        return el("tr", { class: `${q.state === "overdue" ? "row-overdue" : ""} ${i === 0 ? "first-of-machine" : ""}` },
+          el("td", {}, el("strong", {}, machine.name), el("div", { class: "muted small" }, machine.kind)),
           el("td", {}, q.queue_name, el("div", { class: "muted small" }, q.schedule)),
           el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
@@ -386,7 +442,8 @@ async function renderDashboard() {
             : last ? el("a", { class: "button small", href: `#/runs/${last.id}` }, "View") : null));
       });
     });
-    app.append(el("h2", { class: "section-head" }, kind), table(["Machine", "QA list", "Status", "Last result", ""], rows));
+    app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
+      fixedTable([["Machine", "20%"], ["QA list", "30%"], ["Status", "18%"], ["Last result", "20%"], ["", "12%"]], rows));
   }
 }
 
@@ -546,19 +603,15 @@ async function renderMachines() {
   app.append(el("p", { class: "lead" }, `${active.length} machines · ${scheduled} scheduled QA ${scheduled === 1 ? "list" : "lists"}.`));
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
 
-  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
-  const groups = new Map();
-  for (const m of machines) {
-    const kind = m.active ? m.kind || "Other" : "Retired";
-    if (!groups.has(kind)) groups.set(kind, []);
-    groups.get(kind).push(m);
-  }
-  const rank = (k) => (k === "Retired" ? 99 : (KIND_ORDER.indexOf(k) + 1 || KIND_ORDER.length + 1));
-  for (const [kind, list] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
+  // Proton, then Photon (then any retired machines), all at the same width.
+  for (const group of [...MODALITIES, "Retired"]) {
+    const list = machines.filter((m) => (m.active ? modalityOf(m.kind) : "Retired") === group)
+      .sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
+    if (!list.length) continue;
     const rows = list.flatMap((machine) => {
       const mine = assignments[machine.id];
       const head = el("tr", { class: "machine-row" },
-        el("td", { colspan: 4 }, el("strong", {}, machine.name), machine.location ? el("span", { class: "muted small" }, ` · ${machine.location}`) : null,
+        el("td", { colspan: 4 }, el("strong", {}, machine.name), el("span", { class: "muted small" }, ` · ${[machine.kind, machine.location].filter(Boolean).join(" · ")}`),
           machine.active ? null : [" ", chip("", "Retired")]),
         el("td", { class: "right" }, editable ? el("div", { class: "row nowrap end" },
           el("button", { class: "small", onclick: () => addListDialog(machine, mine) }, "Add a QA list"),
@@ -586,7 +639,8 @@ async function renderMachines() {
       }) : [el("tr", {}, el("td", { class: "indent muted", colspan: 5 }, "No QA lists yet."))];
       return [head, ...lines];
     });
-    app.append(el("h2", { class: "section-head" }, kind), table(["QA list", "Schedule", "Status", "#Tests", ""], rows));
+    app.append(modalityHead(group, `${list.length} ${list.length === 1 ? "machine" : "machines"}`),
+      fixedTable([["QA list", "28%"], ["Schedule", "17%"], ["Status", "14%"], ["#Tests", "7%"], ["", "34%"]], rows));
   }
 }
 
@@ -1023,7 +1077,7 @@ async function renderPerform(assignmentId) {
   } }, "Submit for review");
   app.append(el("details", { class: "card" }, el("summary", {}, "Notes for the reviewer"), runComment), error);
   app.append(el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
-    el("div", { class: "spacer" }), el("a", { class: "button", href: "#/" }, "Cancel"), submit));
+    el("div", { class: "spacer" }), el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), submit));
   refresh();
   if (state.applySphinxOnLoad && state.sphinxFile) {
     state.applySphinxOnLoad = false;
@@ -1685,7 +1739,7 @@ const RIGHTS = [
 const ROLE_RIGHTS = { admin: ["perform", "review", "configure", "manage_users"], physicist: ["perform", "review", "configure"], therapist: ["perform"] };
 
 async function renderAdmin() {
-  page("Admin", "Users and their rights, and the folders export files are read from.");
+  page("Data Administration", "Users and their rights, the folders export files are read from, and the database.");
   const [users, machines] = await Promise.all([can("manage_users") ? api("GET", "/api/users") : null, api("GET", "/api/machines")]);
 
   // 1. Users and rights (admins only; others see what each role may do).

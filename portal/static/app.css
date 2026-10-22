@@ -415,3 +415,29 @@ tr.before-directions td { border-bottom: 0; }
 /* Perform: section headings stand out more than the items in them. */
 .section > summary strong { font-size: 16px; }
 h2.section-head { font-size: 20px; }
+
+/* Perform QA and Machines: Proton and Photon tables share one width and column layout. */
+.fixed-wrap { display: block; width: 100%; max-width: 1080px; }
+.fixed-table { width: 100%; table-layout: fixed; }
+.fixed-table td, .fixed-table th { max-width: none; }
+.fixed-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+.fixed-table tbody tr:hover td { background: var(--surface-2); }
+.fixed-table tr.first-of-machine td { border-top: 1px solid var(--border); }
+.fixed-table td { padding: 10px 12px; }
+.fixed-table .row.nowrap.end { flex-wrap: wrap; justify-content: flex-end; }
+.modality-head { display: flex; align-items: baseline; gap: 10px; max-width: 1080px; }
+.modality-head .modality-count { font-size: 13px; font-weight: 500; color: var(--muted); }
+.modality-head.proton { border-bottom-color: var(--uf-orange); }
+.modality-head.photon { border-bottom-color: #3a7bd5; }
+.lead { max-width: 1080px; }
+
+/* Home icon (far left of the tabs) and the home dashboard. */
+#nav a.home-link { display: inline-flex; align-items: center; padding: 6px 10px; }
+.home-icon { display: block; }
+.home-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; max-width: 1080px; margin-bottom: 8px; }
+.home-stat { display: block; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+.home-stat:hover { background: var(--surface-2); }
+.home-stat.pass { border-left-color: var(--pass); } .home-stat.due { border-left-color: var(--warn); } .home-stat.fail { border-left-color: var(--fail); }
+.home-stat-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.home-stat-label { font-size: 12px; color: var(--muted); }
+.table-wrap.fixed-wrap table.fixed-table { width: 100%; }

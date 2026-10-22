@@ -37,6 +37,9 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Machine Trends: the overview is a table (one row per chart) instead of card panels; charts plot dots instead of lines (one colour per axis, warning/fail ringed); all dates show the year.
 - **[Physics review]** Built like the myQA sheet: every numbered item is its title, then a Directions block, then the result. "0.01 Daily QA Setup" is now a pass/fail test with its directions (it was loose setup text); the protocol note stays at the top.
 - **[Physics review]** Units on the proton template's 2.02–2.06 measurements (laser/kV alignment offsets, CBCT and kV/kV correction vectors, kV/kV-to-CBCT deltas): mm. The myQA table has no unit column; the values are millimetres (a −5 cm shift is entered as 50). The editor now flags any measured test without a unit.
+- New Home dashboard (house icon at the far left of the tabs): QA to do today, overdue, machines whose last result failed, runs waiting for review, then every machine with today's status and last result. Perform QA moved to its own tab address.
+- Perform QA, Machines and Home group machines into two tables, Proton and Photon (TrueBeam, CT and MRI simulators), with the same width and column layout.
+- Admin is renamed Data Administration.
 - Section headings (0.0 Setup, 1.0 Safety, …) stand out more than the items in them, and each item's directions run the full width directly below its labelled test, in both the QA list editor and Perform.
 - The QA list editor in Setup QA follows the same layout: section headings (0.0 Setup, 1.0 Safety, …), each item numbered ("0.01: Daily QA Setup") with its Directions block, then its result type and limits.
 - Perform QA shows the machine name on every row (e.g. both TrueBeam lists).
