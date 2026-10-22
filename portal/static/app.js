@@ -220,8 +220,8 @@ function evaluate(type, value, limits) {
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
   ["#/", "Perform QA", null, ["#/", "#", "#/perform", "#/runs"]],
-  ["#/setup", "QA Test Setup", "configure", ["#/setup", "#/machines", "#/queues", "#/tests", "#/users", "#/audit", "#/assignments"]],
-  ["#/trends", "QA Trends", null, ["#/trends"]],
+  ["#/setup", "Test Setup", "configure", ["#/setup", "#/machines", "#/queues", "#/tests", "#/users", "#/audit", "#/assignments"]],
+  ["#/trends", "Machine Trends", null, ["#/trends"]],
 ];
 
 function renderShell() {
@@ -377,7 +377,7 @@ async function renderDashboard() {
 }
 
 async function renderSetup() {
-  page("QA Test Setup", "Machines, what gets tested, and who can sign in.");
+  page("Test Setup", "Machines, what gets tested, and who can sign in.");
   const card = (href, title, text) => el("a", { class: "card setup-card", href }, el("h3", {}, title), el("p", { class: "muted" }, text));
   app.append(el("div", { class: "grid" },
     card("#/machines", "Machines", "Gantries and the QA lists scheduled on each."),
@@ -1396,7 +1396,7 @@ async function renderTrends() {
   const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (machines[0] && machines[0].id);
   const range = params.get("range") || "90";
   const testId = params.get("test_id");
-  page("QA Trends", testId ? "One test over time, against the limits in force when each value was recorded." : "Every measured test on this machine. Click one for detail.");
+  page("Machine Trends", testId ? "One test over time, against the limits in force when each value was recorded." : "Every measured test on this machine. Click one for detail.");
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   const form = el("div", { class: "row" },
     select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { onchange: (e) => go({ machine_id: e.target.value, range }) }),
