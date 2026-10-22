@@ -1138,11 +1138,12 @@ function passFailInput(name, withWarning, yesNo) {
 const TEMPLATE_NUMBER = /^Template (\d+)\.(\d+)\.\s*/;
 // Lists copied from RadMachine keep its own section names: "Template 1.04. [Section: PBS DailyQA GTR5 - Sphinx] ...".
 const SECTION_NAME = /\[Section: ([^\]]+)\]\s*/;
-const MARKER = /\[(auto|calc): ((?:[^\[\]]|\[[^\]]*\])+)\]\s*/;   // the rule may itself contain "[mm]"         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
+const MARKER = /\[(auto|calc): ((?:[^\[\]]|\[[^\]]*\])+)\]\s*/;
+const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist]": the value a text field starts with   // the rule may itself contain "[mm]"         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function helpText(description, { inline = false } = {}) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").trim();
   if (!text) return null;
   if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
     const one = text.replace(/\s+/g, " ");
@@ -1214,6 +1215,11 @@ function wireCalculations(entries) {
   const lock = (e, title) => { e.input.readOnly = true; e.input.classList.add("from-file"); e.input.placeholder = "calculated"; e.input.title = title; };
   const set = (e, v, decimals) => { e.input.value = Number.isFinite(v) ? v.toFixed(decimals) : ""; e.input.dispatchEvent(new Event("input")); };
   entries.forEach((e, i) => {
+    if (e.item.type === "text" && !e.input.value) {
+      const d = DEFAULT_MARK.exec(e.item.description || "");
+      const start = e.item.last_text || (d && d[1].trim());
+      if (start) { e.input.value = start; e.input.title = e.item.last_text ? "As recorded last time; change it if different" : "Usual value; change it if different"; }
+    }
     const m = MARKER.exec(e.item.description || "");
     if (!m) return;
     const kind = m[2].trim();

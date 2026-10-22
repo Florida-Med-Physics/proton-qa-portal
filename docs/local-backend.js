@@ -718,7 +718,9 @@
       const o = overrides[test.id];
       return { test_id: test.id, name: test.name, category: test.category, type: test.type, unit: test.unit, description: test.description,
         limits: resolveLimits(test, item, o), queue_limits: resolveLimits(test, item),
-        override: o ? { expected: o.expected, warn: o.warn, fail: o.fail, tol_mode: o.tol_mode } : null };
+        override: o ? { expected: o.expected, warn: o.warn, fail: o.fail, tol_mode: o.tol_mode } : null,
+        last_text: test.type === "text" ? (S.results.filter((r) => r.test_id === test.id && r.value_text).map((r) => ({ r, run: byId("runs", r.run_id) }))
+          .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
     });
     return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description }, items };
   }

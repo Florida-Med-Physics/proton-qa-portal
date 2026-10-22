@@ -541,6 +541,8 @@ def run_template(db, user, assignment_id):
             "limits": qa.resolve_limits(test, item, override),
             "queue_limits": qa.resolve_limits(test, item),
             "override": {k: override[k] for k in ("expected", "warn", "fail", "tol_mode")} if override else None,
+            "last_text": (db.one("SELECT res.value_text FROM results res JOIN runs r ON r.id = res.run_id WHERE res.test_id = ? AND res.value_text <> '' "
+                                 "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"],)) or {}).get("value_text") if test["type"] == "text" else None,
         })
     assignment["schedule"] = qa.describe_schedule(assignment)
     return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"]}, "items": items}
