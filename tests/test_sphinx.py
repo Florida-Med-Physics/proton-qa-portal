@@ -98,6 +98,14 @@ class ParserTests(unittest.TestCase):
         self.assertIn("Spot – Spot 1 [120 MeV] – Intensity", names)
         self.assertIn("Spot 120 MeV – Skewness X", names)
 
+    def test_couch_translation_is_not_imported(self):
+        rows = drop_empty(grid())
+        at = len(rows) - 1
+        rows[at:at] = [[(4, "Couch Translation")], [(4, "Couch Translation Vector"), (9, "Position X"), (16, "± 1.0 mm"), (18, "± 1.5 mm"),
+                                                    (22, "10.0 mm"), (24, "10.0 mm"), (28, "Passed")]]
+        names = [m["name"] for m in sphinx.parse_rows(rows)["measurements"]]
+        self.assertEqual(names, [n for _, n in EXPECTED_NAMES])
+
     def test_date_from_filename_and_errors(self):
         rows = drop_empty(grid(finished="not a date"))
         self.assertEqual(sphinx.parse_rows(rows, "GTR1_DailyQA_09152026_b.xls")["qa_date"], "2026-09-15")

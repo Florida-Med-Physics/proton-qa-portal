@@ -13,6 +13,8 @@ import re
 from datetime import datetime
 
 CATEGORIES = ("Energy", "Spot", "Coincidence", "Homogeneity", "Output", "Couch Translation")
+# Read (so the sections parse) but not imported: couch translation is documented in RadMachine, not from Sphinx.
+NOT_IMPORTED = {"Couch Translation"}
 SETUP_LABELS = {"X Start", "X Stop", "Y Start", "Y Stop", "Wedge Thickness", "Additional Thickness"}
 SPHINX_STATUSES = ("Passed", "Failed", "Warning")
 _QUANTITY = re.compile(r"^±?\s*([-+]?\d+(?:\.\d+)?)\s*(.*?)\s*$")
@@ -102,7 +104,7 @@ def parse_rows(rows, filename=""):
         tolerances = [i for i, t in enumerate(texts) if t.startswith("±")]
         setup_text = dict(cells).get(setup_col) if setup_col is not None else None
         if len(tolerances) >= 2:
-            if category is None:
+            if category is None or category in NOT_IMPORTED:
                 continue
             if setup_text and setup_text not in SETUP_LABELS and not _SETUP_VALUE.match(setup_text):
                 item = _clean_item(setup_text)

@@ -313,6 +313,8 @@
   // ---- Sphinx export reader (sphinx.py) ---------------------------------------
 
   const CATEGORIES = ["Energy", "Spot", "Coincidence", "Homogeneity", "Output", "Couch Translation"];
+  // Read (so the sections parse) but not imported: couch translation is documented in RadMachine, not from Sphinx.
+  const NOT_IMPORTED = new Set(["Couch Translation"]);
   const SETUP_LABELS = new Set(["X Start", "X Stop", "Y Start", "Y Stop", "Wedge Thickness", "Additional Thickness"]);
   const SPHINX_STATUSES = ["Passed", "Failed", "Warning"];
   const QUANTITY = /^±?\s*([-+]?\d+(?:\.\d+)?)\s*(.*?)\s*$/;
@@ -372,7 +374,7 @@
       const tolerances = texts.map((t, i) => (t.startsWith("±") ? i : -1)).filter((i) => i >= 0);
       const setupText = setupCol !== null ? cols[setupCol] : undefined;
       if (tolerances.length >= 2) {
-        if (category === null) return;
+        if (category === null || NOT_IMPORTED.has(category)) return;
         if (setupText && !SETUP_LABELS.has(setupText) && !SETUP_VALUE.test(setupText)) item = cleanItem(setupText);
         const [first, second] = tolerances;
         if (first === 0) throw new Error(`Row ${index + 1}: tolerance without a metric name.`);
@@ -878,7 +880,17 @@
     else { seed(); save(); }
     upgradeCtList();
     upgradeBbUnits();
+    dropSphinxCouch();
   })();
+
+  // Couch translation is documented in RadMachine, not imported from Sphinx: take any Sphinx-imported couch
+  // tests off their lists (their stored values are kept).
+  function dropSphinxCouch() {
+    const ids = new Set(S.tests.filter((t) => t.category === "Couch Translation" && /^Measured by Sphinx/.test(t.description || "")).map((t) => t.id));
+    const before = S.queue_items.length;
+    S.queue_items = S.queue_items.filter((i) => !ids.has(i.test_id));
+    if (S.queue_items.length !== before) { audit(null, "remove_from_list", "tests", null, { reason: "Couch translation is documented in RadMachine" }); save(); }
+  }
 
   // CT BB geometry tests came in without a unit; they are millimetres.
   function upgradeBbUnits() {

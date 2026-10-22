@@ -34,6 +34,7 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - The Templates section is now called "QA List Templates".
 - Setup QA has two tables: QA List Templates on top, and Machine-Specific QA Lists (each machine's own copy of a template; edits there do not affect the template) below.
 - Machine Trends: couch Pitch, Roll and Rotation share one chart, like X/Y/Z.
+- **[Physics review]** Couch translation is no longer imported from Sphinx exports (it is documented in RadMachine). Couch tests already imported from Sphinx are taken off their lists; their stored values are kept.
 - Every trend chart now shows its statistics (n, mean, SD, range, with units), a y axis titled with the unit and auto-scaled to the data (limit bands are clipped to fit), and a dated x axis titled "Date".
 - Units shown everywhere: chart axes, limits, deviations, means. CT BB geometry tests are in mm (RadMachine labels them "(BB)"), and spot skewness is labelled "unitless".
 - QA list editor columns: Test Name, Category, Expected (with units), Tolerance (warning and fail, with units), Modified Date and Modified By. Saving a list now records each test whose limits changed.
