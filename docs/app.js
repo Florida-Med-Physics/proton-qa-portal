@@ -1296,47 +1296,6 @@ function bandValue(point, key, sign) {
   return point.expected + sign * tol;
 }
 
-function trendChart(points, unit) {
-  const W = 900, H = 320, L = 60, R = 16, T = 16, B = 40;
-  const values = [];
-  for (const p of points) {
-    values.push(p.value);
-    for (const key of ["warn", "fail"]) for (const s of [1, -1]) { const v = bandValue(p, key, s); if (v !== null) values.push(v); }
-    if (p.expected !== null) values.push(p.expected);
-  }
-  let lo = Math.min(...values), hi = Math.max(...values);
-  if (lo === hi) { lo -= 1; hi += 1; }
-  const pad = (hi - lo) * 0.08;
-  lo -= pad; hi += pad;
-  const x = (i) => L + (points.length === 1 ? (W - L - R) / 2 : (i * (W - L - R)) / (points.length - 1));
-  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
-  const band = (key) => {
-    const upper = [], lower = [];
-    points.forEach((p, i) => {
-      const u = bandValue(p, key, 1), l = bandValue(p, key, -1);
-      if (u !== null) { upper.push(`${x(i)},${y(u)}`); lower.unshift(`${x(i)},${y(l)}`); }
-    });
-    return upper.length ? upper.concat(lower).join(" ") : null;
-  };
-  const outer = band("fail"), inner = band("warn");
-  const raw = (hi - lo) / 4;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * magnitude).find((s) => s >= raw);
-  const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9) + (step / magnitude === 2.5 ? 1 : 0));
-  const ticks = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) ticks.push(v);
-  const labelEvery = Math.max(1, Math.ceil(points.length / 8));
-  const multiYear = points[0].qa_date.slice(0, 4) !== points[points.length - 1].qa_date.slice(0, 4);
-  return svg("svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Trend chart" },
-    outer ? svg("polygon", { class: "band-fail", points: outer }) : null,
-    inner ? svg("polygon", { class: "band-warn", points: inner }) : null,
-    ticks.map((v) => [svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }), svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, fmt(v, decimals))]),
-    svg("polyline", { class: "expected", points: points.filter((p) => p.expected !== null).map((p) => `${x(points.indexOf(p))},${y(p.expected)}`).join(" ") }),
-    svg("polyline", { class: "series", points: points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ") }),
-    points.map((p, i) => svg("circle", { class: p.status, cx: x(i), cy: y(p.value), r: points.length > 150 ? 2.5 : 4 }, svg("title", {}, `${p.qa_date}: ${fmt(p.value)} ${unit || ""} (${p.status})`))),
-    points.map((p, i) => (i % labelEvery === 0 ? svg("text", { x: x(i), y: H - B + 18, "text-anchor": "middle" }, multiYear ? p.qa_date.slice(0, 7) : p.qa_date.slice(5)) : null)));
-}
-
 function filterRange(points, range) {
   if (range === "all" || !points.length) return points;
   const cutoff = new Date();
@@ -1357,24 +1316,95 @@ function stats(points) {
     inTol: Math.round((100 * (n - fails.length)) / n) };
 }
 
-// A tiny chart for the overview grid: the series against its warning band, last value emphasised.
-function sparkline(points, unit) {
-  const W = 220, H = 56, P = 4;
-  const vals = [];
-  for (const p of points) { vals.push(p.value); for (const s of [1, -1]) { const v = bandValue(p, "warn", s); if (v !== null) vals.push(v); } }
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (lo === hi) { lo -= 1; hi += 1; }
-  const x = (i) => P + (points.length === 1 ? (W - 2 * P) / 2 : (i * (W - 2 * P)) / (points.length - 1));
-  const y = (v) => P + ((hi - v) * (H - 2 * P)) / (hi - lo);
-  const upper = [], lower = [];
-  points.forEach((p, i) => { const u = bandValue(p, "warn", 1), l = bandValue(p, "warn", -1); if (u !== null) { upper.push(`${x(i)},${y(u)}`); lower.unshift(`${x(i)},${y(l)}`); } });
-  const last = points[points.length - 1];
-  return svg("svg", { class: "spark", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${points.length} values` },
-    upper.length ? svg("polygon", { class: "band-warn", points: upper.concat(lower).join(" ") }) : null,
-    svg("polyline", { class: "series", points: points.map((p, i) => `${x(i)},${y(p.value)}`).join(" ") }),
-    points.map((p, i) => (p.status === "fail" || p.status === "warn" ? svg("circle", { class: p.status, cx: x(i), cy: y(p.value), r: 2.5 }) : null)),
-    svg("circle", { class: last.status, cx: x(points.length - 1), cy: y(last.value), r: 3.5 }));
+/// Tests that differ only by a final X, Y or Z ("Spot 140 MeV – Position X" / "… Y") share one chart.
+const AXIS_NAME = /^(.*\S)\s+([XYZ])$/;
+const AXIS_ORDER = { X: 0, Y: 1, Z: 2 };
+
+function axisGroups(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const m = AXIS_NAME.exec(item.name);
+    const key = m ? `${item.category}|${m[1].replace(/\s*–$/, "")}` : `${item.category}|#${item.test_id}`;
+    if (!groups.has(key)) groups.set(key, { base: m ? m[1].replace(/\s*–$/, "") : item.name, category: item.category, members: [] });
+    groups.get(key).members.push({ ...item, axis: m ? m[2] : "" });
+  }
+  // A lone "X" with no partner is just a single test.
+  return [...groups.values()].map((g) => (g.members.length === 1 ? { ...g, base: g.members[0].name, members: [{ ...g.members[0], axis: "" }] } : g))
+    .map((g) => ({ ...g, members: g.members.sort((a, b) => (AXIS_ORDER[a.axis] ?? 9) - (AXIS_ORDER[b.axis] ?? 9)) }));
 }
+
+// Deviation from expected, in the test's own units, with the tolerances in the same units.
+function asDeviation(p) {
+  if (p.expected === null || p.expected === undefined) return { ...p, dev: p.value, warnAbs: null, failAbs: null };
+  const scale = p.tol_mode === "percent" ? Math.abs(p.expected) / 100 : 1;
+  return { ...p, dev: p.value - p.expected, warnAbs: p.warn === null ? null : p.warn * scale, failAbs: p.fail === null ? null : p.fail * scale };
+}
+
+const latest = (points) => points[points.length - 1];
+
+// One chart for one or more series. Single series: actual values with expected line and bands.
+// Several series: deviation from expected, so X, Y and Z share one scale and one band.
+function seriesChart(series, unit, { small = false } = {}) {
+  const multi = series.length > 1;
+  const W = small ? 260 : 900, H = small ? 70 : 320, L = small ? 4 : 60, R = small ? 4 : 16, T = small ? 4 : 16, B = small ? 4 : 40;
+  const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
+  const xi = Object.fromEntries(dates.map((d, i) => [d, i]));
+  const x = (d) => L + (dates.length === 1 ? (W - L - R) / 2 : (xi[d] * (W - L - R)) / (dates.length - 1));
+  const val = (p) => (multi ? asDeviation(p).dev : p.value);
+  // Band per date from the first series (axes of one test share tolerances).
+  const ref = series[0].points.map((p) => {
+    if (multi) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
+    return { d: p.qa_date, w: p.warn === null ? null : bandValue(p, "warn", 1) - p.expected, f: p.fail === null ? null : bandValue(p, "fail", 1) - p.expected, c: p.expected };
+  }).filter((b) => b.c !== null && b.c !== undefined);
+  const values = series.flatMap((s) => s.points.map(val));
+  for (const b of ref) for (const t of small ? [b.w] : [b.w, b.f]) if (t !== null && t !== undefined) values.push(b.c + t, b.c - t);
+  let lo = Math.min(...values), hi = Math.max(...values);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.08;
+  lo -= pad; hi += pad;
+  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
+  const band = (key) => {
+    const up = [], dn = [];
+    for (const b of ref) if (b[key] !== null && b[key] !== undefined) { up.push(`${x(b.d)},${y(b.c + b[key])}`); dn.unshift(`${x(b.d)},${y(b.c - b[key])}`); }
+    return up.length ? up.concat(dn).join(" ") : null;
+  };
+  const kids = [];
+  const fail = small ? null : band("f"), warn = band("w");
+  if (fail) kids.push(svg("polygon", { class: "band-fail", points: fail }));
+  if (warn) kids.push(svg("polygon", { class: "band-warn", points: warn }));
+  if (!small) {
+    const raw = (hi - lo) / 4, mag = 10 ** Math.floor(Math.log10(raw));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+    const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9) + (step / mag === 2.5 ? 1 : 0));
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+      kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }), svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, (multi && v > 0 ? "+" : "") + fmt(v, decimals)));
+    }
+    const every = Math.max(1, Math.ceil(dates.length / 8));
+    const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
+    dates.forEach((d, i) => { if (i % every === 0) kids.push(svg("text", { x: x(d), y: H - B + 18, "text-anchor": "middle" }, multiYear ? d.slice(0, 7) : d.slice(5))); });
+  }
+  if (ref.length) kids.push(svg("polyline", { class: "expected", points: ref.map((b) => `${x(b.d)},${y(b.c)}`).join(" ") }));
+  series.forEach((s, k) => {
+    const cls = multi ? `axis-${k}` : "";
+    kids.push(svg("polyline", { class: `series ${cls}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
+    for (const p of s.points) {
+      const show = !small || p.status === "fail" || p.status === "warn";
+      if (show) kids.push(svg("circle", { class: p.status, cx: x(p.qa_date), cy: y(val(p)), r: small ? 2.5 : (dates.length > 150 ? 2.5 : 3.5) },
+        svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${p.status})`)));
+    }
+    const last = latest(s.points);
+    if (small && last) kids.push(svg("circle", { class: `${last.status} last ${cls}`, cx: x(last.qa_date), cy: y(val(last)), r: 3.5 }));
+  });
+  return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
+}
+
+function axisLegend(group) {
+  return group.members.length > 1
+    ? el("span", { class: "axis-legend" }, group.members.map((m, k) => el("span", { class: `axis-key axis-${k}` }, m.axis)))
+    : null;
+}
+
+const signed = (v, d = 2) => `${v >= 0 ? "+" : "−"}${fmt(Math.abs(v), d)}`;
 
 async function renderTrendOverview(machines, machineId, range) {
   const machine = machines.find((m) => String(m.id) === String(machineId));
@@ -1382,30 +1412,25 @@ async function renderTrendOverview(machines, machineId, range) {
   app.append(loading);
   const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
   const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
-  const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric").map((i) => ({ ...i, queue: t.queue.name })));
-  if (!numeric.length) {
-    loading.remove();
-    app.append(el("div", { class: "card empty" }, `${machine.name} has no measured tests scheduled.`));
-    return;
-  }
-  const all = await api("GET", `/api/machines/${machineId}/trends`);
-  const trends = numeric.map((i) => ({ points: all[i.test_id] || [] }));
+  const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric"));
+  const all = numeric.length ? await api("GET", `/api/machines/${machineId}/trends`) : {};
   loading.remove();
-  const cards = numeric.map((item, k) => ({ item, points: filterRange(trends[k].points, range) })).filter((c) => c.points.length);
-  if (!cards.length) {
-    app.append(el("div", { class: "card empty" }, "No results in this period."));
+  const withData = numeric.map((i) => ({ ...i, points: filterRange(all[i.test_id] || [], range) })).filter((i) => i.points.length);
+  if (!withData.length) {
+    app.append(el("div", { class: "card empty" }, numeric.length ? "No results in this period." : `${machine.name} has no measured tests scheduled.`));
     return;
   }
-  const worst = cards.filter((c) => c.points[c.points.length - 1].status === "fail").length;
-  const warn = cards.filter((c) => c.points[c.points.length - 1].status === "warn").length;
-  app.append(el("p", { class: "lead" }, `${cards.length} tests. `,
-    worst ? el("span", { class: "chip fail" }, `${worst} failing now`) : "", " ", warn ? el("span", { class: "chip warn" }, `${warn} in warning`) : "",
-    !worst && !warn ? el("span", { class: "chip pass" }, "All passing") : ""));
+  const groups = axisGroups(withData);
+  const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
+  const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
+  app.append(el("p", { class: "lead" }, `${withData.length} tests on ${groups.length} charts. `,
+    failing ? el("span", { class: "chip fail" }, `${failing} failing now`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} in warning`) : "",
+    !failing && !warning ? el("span", { class: "chip pass" }, "All passing") : ""));
   const bySection = new Map();
-  for (const c of cards) {
-    const key = `${sectionOf(c.item)}|${c.item.category}`;
+  for (const g of groups) {
+    const key = `${sectionOf(g.members[0])}|${g.category}`;
     if (!bySection.has(key)) bySection.set(key, []);
-    bySection.get(key).push(c);
+    bySection.get(key).push(g);
   }
   let lastSection = null;
   for (const [key, list] of [...bySection].sort(([a], [b]) => a.split("|")[0].localeCompare(b.split("|")[0]))) {
@@ -1413,40 +1438,57 @@ async function renderTrendOverview(machines, machineId, range) {
     if (section !== lastSection) app.append(el("h2", { class: "section-head" }, section));
     lastSection = section;
     app.append(el("h3", { class: "muted" }, category));
-    // Problems first within each category.
-    list.sort((a, b) => STATUS_RANK[b.points[b.points.length - 1].status] - STATUS_RANK[a.points[a.points.length - 1].status]);
-    app.append(el("div", { class: "spark-grid" }, list.map(({ item, points }) => {
-      const s = stats(points);
-      const short = item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name.replace(category + " ", "");
-      return el("a", { class: `card spark-card ${s.last.status}`, href: `#/trends?machine_id=${machineId}&test_id=${item.test_id}&range=${range}` },
-        el("div", { class: "spark-head" }, el("strong", {}, short), chip(s.last.status)),
-        sparkline(points, item.unit),
-        el("div", { class: "spark-foot muted small" },
-          el("span", {}, `Last ${fmt(s.last.value)} ${item.unit}`.trim(), s.dev !== null ? ` (${s.dev >= 0 ? "+" : ""}${fmt(s.dev, 2)})` : ""),
-          el("span", {}, s.fails.length ? `${s.fails.length} fail` : s.warns.length ? `${s.warns.length} warn` : `${s.n} ok`)));
+    list.sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]);
+    app.append(el("div", { class: "spark-grid" }, list.map((g) => {
+      const status = worstOf(g);
+      const unit = g.members[0].unit;
+      const short = g.base.startsWith(category + " – ") ? g.base.slice(category.length + 3) : g.base.replace(category + " ", "");
+      const ids = g.members.map((m) => m.test_id).join(",");
+      const foot = g.members.length > 1
+        ? g.members.map((m, k) => { const d = asDeviation(latest(m.points)); return el("span", { class: `axis-val axis-${k}` }, `${m.axis} ${signed(d.dev)}`); })
+        : (() => { const p = latest(g.members[0].points), d = asDeviation(p); return [el("span", {}, `Last ${fmt(p.value)} ${unit}`.trim()), p.expected !== null ? el("span", {}, `(${signed(d.dev)})`) : null]; })();
+      return el("a", { class: `card spark-card ${status}`, href: `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}` },
+        el("div", { class: "spark-head" }, el("strong", {}, short), axisLegend(g), chip(status)),
+        seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true }),
+        el("div", { class: "spark-foot muted small" }, foot, g.members.length > 1 ? el("span", {}, unit ? `${unit} from expected` : "from expected") : null));
     })));
   }
 }
 
-function renderTrendDetail(data, points, unit, range, machineId) {
-  const s = stats(points);
-  const limitsNow = s.last;
-  app.append(el("div", { class: "card stat-row" },
-    stat("Latest", `${fmt(s.last.value)} ${unit}`.trim(), chip(s.last.status)),
-    stat("Expected", limitsNow.expected !== null ? `${fmt(limitsNow.expected)} ${unit}`.trim() : "—",
-      limitsNow.warn !== null ? `warn ±${fmt(limitsNow.warn)}${limitsNow.tol_mode === "percent" ? "%" : ""} · fail ±${fmt(limitsNow.fail)}${limitsNow.tol_mode === "percent" ? "%" : ""}` : ""),
-    stat("Mean ± SD", `${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)}`, `${s.n} values`),
-    stat("Range", `${fmt(s.min)} to ${fmt(s.max)}`, ""),
-    stat("Within limits", `${s.inTol}%`, s.fails.length ? `${s.fails.length} fail, last ${shortDate(s.fails[s.fails.length - 1].qa_date)}` : s.warns.length ? `${s.warns.length} warn` : "no fails")));
+function renderTrendDetail(group, range) {
+  const unit = group.members[0].unit;
+  const multi = group.members.length > 1;
+  app.append(el("div", { class: "card stat-row" }, group.members.map((m) => {
+    const s = stats(m.points), d = asDeviation(s.last);
+    return stat(multi ? `${m.axis} latest` : "Latest", `${fmt(s.last.value)} ${unit}`.trim(),
+      [chip(s.last.status), " ", s.last.expected !== null ? `${signed(d.dev)} from ${fmt(s.last.expected)}` : "", el("br"),
+        `${s.inTol}% within limits · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)}`]);
+  }), (() => {
+    const p = latest(group.members[0].points);
+    return p.warn !== null ? stat("Limits", `warn ±${fmt(p.warn)}${p.tol_mode === "percent" ? "%" : ""}`, `fail ±${fmt(p.fail)}${p.tol_mode === "percent" ? "%" : ""}`) : null;
+  })()));
   app.append(el("div", { class: "legend" },
+    multi ? el("span", {}, "Lines: ", axisLegend(group), ` deviation from each axis's expected value${unit ? ` (${unit})` : ""}`) : el("span", {}, "Dashed line: expected value"),
     el("span", {}, el("span", { class: "swatch warn" }), "Within warning"),
     el("span", {}, el("span", { class: "swatch fail" }), "Within fail limit"),
-    el("span", {}, "Dashed line: expected value"),
     el("span", {}, "Dots: ", el("span", { class: "chip pass" }, "pass"), " ", el("span", { class: "chip warn" }, "warn"), " ", el("span", { class: "chip fail" }, "fail"))));
-  app.append(trendChart(points, unit));
-  app.append(el("details", { class: "card", open: points.length <= 20 }, el("summary", {}, points.length > 100 ? "Latest 100 values" : "Values"),
-    table(["QA date", "#Value", "#Expected", "Status"], points.slice(-100).reverse().map((p) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${p.run_id}`) },
-      el("td", {}, p.qa_date), el("td", { class: "num" }, `${fmt(p.value)} ${unit}`.trim()), el("td", { class: "num" }, fmt(p.expected)), el("td", {}, chip(p.status)))))));
+  app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit));
+  // One row per date, one column per axis.
+  const byDate = new Map();
+  group.members.forEach((m, k) => m.points.forEach((p) => {
+    if (!byDate.has(p.qa_date)) byDate.set(p.qa_date, { run_id: p.run_id, cells: [] });
+    byDate.get(p.qa_date).cells[k] = p;
+  }));
+  const dates = [...byDate.keys()].sort().reverse().slice(0, 100);
+  app.append(el("details", { class: "card", open: dates.length <= 20 }, el("summary", {}, byDate.size > 100 ? "Latest 100 days" : "Values"),
+    table(["QA date", ...group.members.map((m) => `#${m.axis || "Value"}`)], dates.map((d) => {
+      const row = byDate.get(d);
+      return el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${row.run_id}`) },
+        el("td", {}, d), group.members.map((m, k) => {
+          const p = row.cells[k];
+          return el("td", { class: "num" }, p ? [`${fmt(p.value)} ${unit}`.trim(), " ", chip(p.status)] : "");
+        }));
+    }))));
 }
 
 function stat(label, value, note) {
@@ -1459,21 +1501,24 @@ async function renderTrends() {
   const fallback = machines.find((m) => m.kind === "Proton gantry") || machines[0];
   const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (fallback && fallback.id);
   const range = params.get("range") || "90";
-  const testId = params.get("test_id");
-  page("Machine Trends", testId ? "One test over time, against the limits in force when each value was recorded." : "Every measured test on this machine. Click one for detail.");
+  const testIds = (params.get("test_id") || "").split(",").filter(Boolean);
+  page("Machine Trends", testIds.length ? "Over time, against the limits in force when each value was recorded." : "Every measured test on this machine. X, Y and Z share a chart. Click one for detail.");
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   const form = el("div", { class: "row" },
     select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { onchange: (e) => go({ machine_id: e.target.value, range }) }),
-    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { onchange: (e) => go({ machine_id: machineId, test_id: testId, range: e.target.value }) }),
-    testId ? el("a", { class: "button", href: `#/trends?machine_id=${machineId}&range=${range}` }, "← All tests") : null);
+    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { onchange: (e) => go({ machine_id: machineId, test_id: testIds.join(","), range: e.target.value }) }),
+    testIds.length ? el("a", { class: "button", href: `#/trends?machine_id=${machineId}&range=${range}` }, "← All tests") : null);
   app.append(form, el("br"));
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
-  if (!testId) return renderTrendOverview(machines, machineId, range);
-  const data = await api("GET", `/api/trend?machine_id=${machineId}&test_id=${testId}`);
-  const points = filterRange(data.points, range);
-  app.append(el("h2", {}, data.test.name), el("p", { class: "muted small" }, [sectionOf(data.test), data.test.category].join(" · ")));
-  if (!points.length) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
-  renderTrendDetail(data, points, data.test.unit, range, machineId);
+  if (!testIds.length) return renderTrendOverview(machines, machineId, range);
+  const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
+  const items = data.map((d) => ({ ...d.test, test_id: d.test.id, points: filterRange(d.points, range) })).filter((i) => i.points.length);
+  const head = data[0].test;
+  const group = axisGroups(items)[0];
+  app.append(el("h2", {}, group ? group.base : head.name, group ? axisLegend(group) : null),
+    el("p", { class: "muted small" }, [sectionOf(head), head.category].join(" · ")));
+  if (!group) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
+  renderTrendDetail(group, range);
 }
 
 // ---------------------------------------------------------------------------

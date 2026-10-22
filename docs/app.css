@@ -308,3 +308,17 @@ td.right { text-align: right; }
 a.button.small { padding: 4px 12px; font-size: 13px; }
 tr.row-overdue td:first-child { border-left: 3px solid var(--fail); }
 .row.end { justify-content: flex-end; }
+
+/* Several axes on one chart: X, Y, Z each get their own line colour. */
+.chart .series.axis-0, .spark .series.axis-0 { stroke: var(--accent); }
+.chart .series.axis-1, .spark .series.axis-1 { stroke: #d9822b; }
+.chart .series.axis-2, .spark .series.axis-2 { stroke: #8e6bd1; }
+.axis-legend { display: inline-flex; gap: 6px; margin-left: 8px; }
+.axis-key { font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 4px; color: #fff; }
+.axis-key.axis-0, .axis-val.axis-0 { --axis: var(--accent); }
+.axis-key.axis-1, .axis-val.axis-1 { --axis: #d9822b; }
+.axis-key.axis-2, .axis-val.axis-2 { --axis: #8e6bd1; }
+.axis-key { background: var(--axis); }
+.axis-val { color: var(--axis); font-weight: 600; }
+.spark-head .axis-legend { margin-left: auto; margin-right: 6px; }
+h2 .axis-legend { vertical-align: middle; }
