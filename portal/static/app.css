@@ -604,7 +604,6 @@ th[data-sort] .sort-arrow { opacity: 1; color: var(--uf-orange); }
 .hist { width: 54px; min-width: 54px; margin: 1px 2px 1px 0; padding: 1px 3px; font-size: 11px; }
 .hist.date { line-height: 1.1; }
 .hist.date .yr { font-weight: 400; font-size: 10px; }
-td.trend-cell { width: 34%; }
 td.trend-cell svg { max-width: 100%; height: auto; }
 td.history-cell, th.history-cell { padding-left: 6px; }
 
@@ -690,10 +689,7 @@ th { overflow-wrap: normal; word-break: normal; }
 
 /* Machine Trends table: history column beside the chart. */
 .trend-table { width: 100%; table-layout: fixed; }
-.trend-table th:nth-child(1) { width: 20%; } .trend-table th:nth-child(2), .trend-table th:nth-child(3), .trend-table th:nth-child(4) { width: 8%; }
-.trend-table th:nth-child(5) { width: 24%; } .trend-table th:nth-child(6) { width: 32%; }
 .trend-table tr.hist-dates th { padding-top: 0; border-top: 0; }
-.trend-table td.trend-cell { width: auto; }
 
 /* Perform QA rows in the Monthly QA layout. */
 .measure-table td.qa-n { color: var(--text); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; white-space: nowrap; }
@@ -737,3 +733,20 @@ th { overflow-wrap: normal; word-break: normal; }
 /* Axis labels (X, Y, Z, Pitch, Roll, Rotation) are never coloured as text; only the chart lines carry colour. */
 .axis-key, .axis-val, .axis-legend .axis-key, .hist-axis .axis-key, .axis-field .axis-key, .stats-line.axis-0, .stats-line.axis-1, .stats-line.axis-2 { color: inherit; fill: currentColor; font-weight: 600; }
 .axis-val { font-weight: 500; }
+
+/* Machine Trends tables share the Perform QA look; the chart sits in the last column. */
+.trend-table td.trend-cell { padding: 4px 6px; vertical-align: middle; }
+.trend-table td.trend-cell .chart-box .chart-mode { font-size: 11px; }
+.trend-table tr.trend-row td { cursor: pointer; }
+
+/* Green start dot in front of a due QA list. */
+td.list-cell { display: flex; align-items: center; gap: 8px; }
+.start-dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--pass); color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding-left: 2px; }
+.start-dot:hover { filter: brightness(1.1); }
+
+/* Trend tables: the chart fits its column; a one-series chart needs no key (the row is the name). */
+.trend-table .chart-key .key-item { white-space: normal; }
+.trend-table .chart-box:not(.multi) .chart-key { display: none; }
+.trend-table .chart-box .chart-mode { font-size: 11px; gap: 6px; }
+.trend-table td.num { white-space: nowrap; }
+.trend-table td.trend-cell .chart-box svg { min-width: 0; }
