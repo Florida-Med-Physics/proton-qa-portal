@@ -311,7 +311,8 @@ function evaluate(type, value, limits) {
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
   ["#/", "Dashboard", null, ["#/", "#"], "Dashboard"],
-  ["#/perform-qa", "Perform QA", null, ["#/perform-qa", "#/perform", "#/runs"]],
+  ["#/perform-qa", "Perform QA", null, ["#/perform-qa", "#/perform"]],
+  ["#/review", "Review QA", null, ["#/review", "#/runs"]],
   ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit", "#/machines", "#/assignments"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
   ["#/admin", "Data Administration", "configure", ["#/admin", "#/users"]],
@@ -462,6 +463,7 @@ const ROUTES = [
   [/^#\/queues$/, renderQueues],
   [/^#\/queues\/(new|\d+)$/, renderQueueEditor],
   [/^#\/tests$/, renderTests],
+  [/^#\/review$/, renderReview],
   [/^#\/runs$/, renderRuns],
   [/^#\/runs\/(\d+)$/, renderRun],
   [/^#\/trends$/, renderTrends],
@@ -1998,6 +2000,29 @@ async function renderTests() {
 // ---------------------------------------------------------------------------
 // History, review, trends
 // ---------------------------------------------------------------------------
+
+// Review QA: what is waiting for a physicist's sign-off, then what was reviewed recently.
+async function renderReview() {
+  const runs = await api("GET", "/api/runs?limit=400");
+  page("Review QA", "Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
+  const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
+    el("td", {}, el("a", { href: `#/runs/${r.id}` }, `${shortDate(r.qa_date)} ${r.qa_date.slice(0, 4)}`)),
+    el("td", {}, el("strong", {}, r.machine_name)),
+    el("td", {}, r.queue_name),
+    el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
+    el("td", {}, chip(r.overall)),
+    el("td", {}, r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)),
+    el("td", { class: "center" }, r.review_status === "pending" && can("review")
+      ? el("a", { class: "button primary small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Review")
+      : el("a", { class: "button small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Open")));
+  const cols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "9%"], ["Review", "13%"], ["", "10%"]];
+  const pending = runs.filter((r) => r.review_status === "pending");
+  const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
+  app.append(el("h2", { class: "section-head modality-head" }, "Awaiting review", el("span", { class: "modality-count" }, String(pending.length))),
+    fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
+  app.append(el("h2", { class: "section-head" }, "Recently reviewed"),
+    fixedTable(cols, decided.map(row), "No reviews yet."));
+}
 
 async function renderRuns() {
   const params = queryParams();
