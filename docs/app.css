@@ -779,7 +779,7 @@ button.chip-filter:hover { filter: brightness(0.95); }
 /* Per-test pass ring in the "30 days" column. */
 .ring.mini { width: auto; }
 .ring.mini .ring-svg { width: 44px; height: 44px; }
-.ring.mini .ring-pct { font-size: 24px; }
+.ring.mini .ring-pct { font-size: 17px; }
 td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 
 /* Rings: thick, green for passed and red for the rest. */
