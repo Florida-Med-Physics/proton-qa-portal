@@ -2555,11 +2555,7 @@ function renderTrendDetail(group, range) {
     const u = p.tol_mode === "percent" ? " %" : unit ? ` ${unit}` : "";
     return p.warn !== null ? stat("Limits", `Warning ±${fmt(p.warn)}${u}`, `Action ±${fmt(p.fail)}${u}`) : null;
   })()));
-  app.append(el("div", { class: "legend" },
-    multi ? el("span", {}, "Lines: ", axisLegend(group), ` deviation from each axis's expected value${unit ? ` (${unit})` : ""}`) : el("span", {}, "Dashed line: expected value"),
-    el("span", {}, el("span", { class: "swatch warn" }), "Within warning"),
-    el("span", {}, el("span", { class: "swatch fail" }), "Within action"),
-    el("span", {}, "Dots: ", el("span", { class: "chip pass" }, "pass"), " ", el("span", { class: "chip warn" }, "warn"), " ", el("span", { class: "chip fail" }, "fail"))));
+
   app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit));
   // One row per date, one column per axis.
   const byDate = new Map();

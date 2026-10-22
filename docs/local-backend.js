@@ -1100,6 +1100,7 @@
       if (name !== t.name) { t.name = name; n++; }
       let d = (t.description || "").replace(/\s*Reference: Yes\.?/g, "").trimEnd();   // "Reference: Yes" is not a direction
       for (const [o, nw] of NOTE_REWRITES) d = d.split(o).join(nw).trimEnd();            // transcription notes become actions
+      d = d.replace(/\s*Calculated here:.*$/, "").replace(/\s*Filled in from the Sphinx export file\.?/, "").replace(/\s*Load the Sphinx export in the Measurement file step above; it fills in every Sphinx value\.?/, "").trimEnd();
       if (d !== (t.description || "")) { t.description = d; n++; }
     }
     if (n) { audit(null, "upgrade", "tests", null, { renamed: n }); save(); }

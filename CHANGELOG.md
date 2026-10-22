@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Fewer words: the chart legend line on the trend page is gone (the chart has its own key) and the "Calculated here: …" / "Filled in from the Sphinx export file" notes are removed from every test; calculations still run.
 - Every font size steps up two sizes across the portal; the pass rings are thicker and read green (passed) or red (warning or action).
 - Machine Trends: a "30 days" column right of History holds an open-circle ring per test with the share of its results that passed in the last 30 days (warning and action arcs in their colours).
 - New "Review QA" tab to the right of Perform QA: submitted runs awaiting a physicist's sign-off (with a Review button), then recent decisions, and a link to all past results.

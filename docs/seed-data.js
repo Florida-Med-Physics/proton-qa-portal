@@ -1283,7 +1283,7 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.07. [Section: Setup and Safety] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P, with T in °C and P in kPa (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
+     "description": "Template 1.07. [Section: Setup and Safety] [calc: ktp]"
     },
     {
      "category": "Safety",
@@ -1361,7 +1361,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.05. [Section: Mechanical and Imaging] [calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."
+     "description": "Template 2.05. [Section: Mechanical and Imaging] [calc: 3d-offset]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1404,7 +1404,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.10. [Section: Mechanical and Imaging] [calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."
+     "description": "Template 2.10. [Section: Mechanical and Imaging] [calc: 3d-offset]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1454,7 +1454,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.16. [Section: Mechanical and Imaging] [calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."
+     "description": "Template 2.16. [Section: Mechanical and Imaging] [calc: 3d-offset]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1522,7 +1522,7 @@ window.PORTAL_SEED = {
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product] Calculated here: chamber calibration factor × electrometer calibration factor."
+     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product]"
     },
     {
      "category": "Daily_PBS_Dosimetry",
@@ -1540,13 +1540,13 @@ window.PORTAL_SEED = {
      "unit": "cGy",
      "expected": 150,
      "tol_mode": "absolute",
-     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] Calculated here: dose [cGy] = charge [nC] × 10⁻⁹ × overall calibration factor [Gy/C] × kTP × 100 (physicist to confirm the formula matches RadMachine)."
+     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose]"
     },
     {
      "category": "Data",
      "name": "Sphinx acquisition date and time",
      "type": "text",
-     "description": "Template 3.10. [Section: Sphinx Measurements] [auto: sphinx-finished] Filled in from the Sphinx export file."
+     "description": "Template 3.10. [Section: Sphinx Measurements] [auto: sphinx-finished]"
     },
     {
      "category": "Dosimetry",
@@ -2344,7 +2344,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.13. [Section: Dosimetry: PDD] [calc: sum:3] Calculated here: chamber offset + phantom offset + user offset."
+     "description": "Template 2.13. [Section: Dosimetry: PDD] [calc: sum:3]"
     },
     {
      "category": "Dosimetry",
@@ -2362,7 +2362,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 2.5,
      "tol_mode": "absolute",
-     "description": "Template 2.15. [Section: Dosimetry: PDD] [calc: sum:2] Calculated here: measured range without offset + total offset."
+     "description": "Template 2.15. [Section: Dosimetry: PDD] [calc: sum:2]"
     },
     {
      "category": "Dosimetry",
@@ -2452,7 +2452,7 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.03. [Section: Dosimetry: Output] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
+     "description": "Template 3.03. [Section: Dosimetry: Output] [calc: ktp]"
     },
     {
      "category": "Device Selection",
@@ -2645,7 +2645,7 @@ window.PORTAL_SEED = {
      "type": "numeric",
      "unit": "",
      "tol_mode": "absolute",
-     "description": "Template 0.04. [Section: Chamber and conditions] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 1013.25 / P (worksheet cell F6)."
+     "description": "Template 0.04. [Section: Chamber and conditions] [calc: ktp]"
     },
     {
      "category": "Conditions",
@@ -2921,7 +2921,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.18. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+     "description": "Template 2.18. [Section: Mechanical] [calc: 3d-offset]"
     },
     {
      "category": "Couch isocentricity",
@@ -2956,7 +2956,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.22. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+     "description": "Template 2.22. [Section: Mechanical] [calc: 3d-offset]"
     },
     {
      "category": "Couch isocentricity",
@@ -2991,7 +2991,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.26. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+     "description": "Template 2.26. [Section: Mechanical] [calc: 3d-offset]"
     },
     {
      "category": "Couch isocentricity",
@@ -3026,7 +3026,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.30. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+     "description": "Template 2.30. [Section: Mechanical] [calc: 3d-offset]"
     },
     {
      "category": "Couch isocentricity",
@@ -3061,7 +3061,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.34. [Section: Mechanical] [calc: 3d-offset] Calculated here: √(ΔX² + ΔY² + ΔZ²) of the three offsets above."
+     "description": "Template 2.34. [Section: Mechanical] [calc: 3d-offset]"
     },
     {
      "category": "Couch isocentricity",
@@ -3190,7 +3190,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.02. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.02. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3209,7 +3209,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.04. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.04. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3228,7 +3228,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.06. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.06. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3247,7 +3247,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.08. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.08. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3266,7 +3266,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.10. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.10. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3285,7 +3285,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.12. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.12. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3304,7 +3304,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.14. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.14. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Output constancy",
@@ -3323,7 +3323,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.16. [Section: Dosimetry] [calc: dose-ndw] Calculated here: dose = M [nC] × kTP × N_Dw × k_Q × k_s × k_pol. Baseline = commissioned dose at this energy (set once in Setup QA)."
+     "description": "Template 3.16. [Section: Dosimetry] [calc: dose-ndw]"
     },
     {
      "category": "Range verification (Zebra)",
