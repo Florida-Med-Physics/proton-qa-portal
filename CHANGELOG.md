@@ -12,7 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
-- Machine Trends uses the Perform QA layout: a heading per section, a box per category, Sphinx energy tables with one row per energy, X / Y / Z axis tables, and columns # · Test · Unit · Baseline · Latest · Deviation · Result · History · Trends, with the chart opening under the row from the dot icon. Perform QA: the Start column is gone — the green arrow in front of each due list opens it — and due lists sort to the top.
+- Machine Trends uses the Perform QA layout: a heading per section, a box per category, Sphinx energy tables with one row per energy, X / Y / Z axis tables, and columns # · Test · Unit · Baseline · Latest · Deviation · Result · History · Trends, with the chart opening under the row from the dot icon. Perform QA: the Start column is gone — the green arrow in front of every list opens it — and due lists sort to the top.
 - Monthly (and quarterly / semi-annual / annual) lists fall due on the last day of the month — the start month at first, then the month one period after the last run — and say so in their schedule.
 - Text fields on Perform QA (QA Performed By, PTS Version, PTS Config Version, …) start from the value recorded last time on that list, or from a "[default: …]" set in the test's directions; either can be overtyped.
 - Sphinx list: the file-name item (old 3.10) is gone and "Sphinx acquisition date and time" is filled from the export itself (read-only); section 3 renumbered. Test column widened; section summaries no longer print "[object HTMLSpanElement]".

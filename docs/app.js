@@ -543,7 +543,7 @@ async function renderDashboard() {
         const due = startable(q.state);
         const last = q.last_run;
         // A small green start button in front of the list name opens the list, like the Start button.
-        const go = due && can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}` }, "▶") : null;
+        const go = can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}` }, "▶") : null;
         return el("tr", { class: `${q.state === "overdue" ? "row-overdue" : ""} ${i === 0 || flat[i - 1].machine !== machine ? "first-of-machine" : ""}` },
           el("td", {}, el("strong", {}, machine.name)),
           el("td", { class: "list-cell" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
