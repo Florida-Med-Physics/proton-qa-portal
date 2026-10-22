@@ -314,11 +314,11 @@ tr.row-overdue td:first-child { border-left: 3px solid var(--fail); }
 .chart .series.axis-1, .spark .series.axis-1 { stroke: #d9822b; }
 .chart .series.axis-2, .spark .series.axis-2 { stroke: #8e6bd1; }
 .axis-legend { display: inline-flex; gap: 6px; margin-left: 8px; }
-.axis-key { font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 4px; color: #fff; }
+.axis-key { font-size: 12px; font-weight: 700; padding: 0; color: var(--axis); }   /* a coloured letter, no box */
 .axis-key.axis-0, .axis-val.axis-0 { --axis: var(--accent); }
 .axis-key.axis-1, .axis-val.axis-1 { --axis: #d9822b; }
 .axis-key.axis-2, .axis-val.axis-2 { --axis: #8e6bd1; }
-.axis-key { background: var(--axis); }
+.axis-legend .axis-key + .axis-key { margin-left: 6px; }
 .axis-val { color: var(--axis); font-weight: 600; }
 .spark-head .axis-legend { margin-left: auto; margin-right: 6px; }
 h2 .axis-legend { vertical-align: middle; }
@@ -648,7 +648,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .hist-axis { white-space: nowrap; }
 .hist-axis .axis-key { display: inline-block; width: 12px; }
 
-.axis-field .axis-key { display: inline-block; min-width: 14px; text-align: center; padding: 1px 4px; border-radius: 3px; background: var(--axis); color: #fff; }
+.axis-field .axis-key { display: inline-block; min-width: 14px; text-align: center; color: var(--axis); }
 .axis-field .result-input { width: 56px; }
 .axis-inputs { gap: 4px; }
 
@@ -672,7 +672,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .axis-inputs { flex-direction: column; align-items: stretch; gap: 3px; }
 .axis-field { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 4px; }
 .axis-field .result-input, .axis-field.axis-calc .result-input { width: 100%; min-width: 0; max-width: 90px; }
-.axis-field.axis-calc .axis-key { background: var(--muted); font-size: 9px; }
+.axis-field.axis-calc .axis-key { color: var(--muted); font-size: 10px; }
 
 /* History: one line of equal slots separated by lines; the header dates line up above the values. */
 .hist-row { display: inline-flex; white-space: nowrap; }
