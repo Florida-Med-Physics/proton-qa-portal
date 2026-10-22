@@ -402,7 +402,7 @@
         const warn = quantity(texts[first]), fail = quantity(texts[second]);
         const [expected, unit] = numbers[0], [result] = numbers[1];
         measurements.push({
-          category, item: item || category, metric: texts[first - 1].trim(), unit: unit || "unitless", expected, result,
+          category, item: item || category, metric: texts[first - 1].trim(), unit: unit || "", expected, result,
           warn: warn[0], fail: fail[0], tol_mode: warn[1] === "%" && unit !== "%" ? "percent" : "absolute",
           sphinx_status: after.find((t) => SPHINX_STATUSES.includes(t)) || null,
         });
@@ -1096,7 +1096,7 @@
   function upgradeBbUnits() {
     let changed = 0;
     for (const t of S.tests) if (/\(BB\)$/.test(t.name) && !t.unit) { t.unit = "mm"; changed++; }
-    for (const t of S.tests) if (/Skewness [XY]$/.test(t.name) && !t.unit) { t.unit = "unitless"; changed++; }
+    for (const t of S.tests) if (t.unit === "unitless") { t.unit = ""; changed++; }   // a blank unit, not the word
     for (const t of S.tests) if (t.type === "numeric" && !t.unit && /^(Mechanical|CBCT kv\/MV) – /.test(t.name)) { t.unit = "mm"; changed++; }
     if (changed) { audit(null, "upgrade", "tests", null, { unit: "mm", tests: changed }); save(); }
   }

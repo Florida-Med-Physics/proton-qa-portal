@@ -73,7 +73,7 @@ class ParserTests(unittest.TestCase):
                          {**m["Energy [100 MeV] – Distal Depth"], "expected": 77.8, "result": 77.7, "warn": 0.9, "fail": 1.0,
                           "unit": "mm", "tol_mode": "absolute", "sphinx_status": "Passed"})
         self.assertEqual((m["Spot 1 [120 MeV] – Intensity"]["unit"], m["Spot 1 [120 MeV] – Intensity"]["tol_mode"]), ("%", "absolute"))
-        self.assertEqual(m["Spot 1 [120 MeV] – Skewness X"]["unit"], "unitless")
+        self.assertEqual(m["Spot 1 [120 MeV] – Skewness X"]["unit"], "")
         self.assertEqual((m["Output – Absolute Dose"]["unit"], m["Output – Absolute Dose"]["tol_mode"]), ("cGy", "percent"))
 
     def test_standard_names(self):

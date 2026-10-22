@@ -399,7 +399,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 1 [225 MeV] – Skewness X",
      "expected": 0.0,
      "warn": 0.8,
@@ -410,7 +410,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 1 [225 MeV] – Skewness Y",
      "expected": 0.0,
      "warn": 0.8,
@@ -476,7 +476,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 2 [200 MeV] – Skewness X",
      "expected": 0.0,
      "warn": 0.8,
@@ -487,7 +487,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 2 [200 MeV] – Skewness Y",
      "expected": 0.0,
      "warn": 0.8,
@@ -553,7 +553,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 3 [180 MeV] – Skewness X",
      "expected": 0.0,
      "warn": 0.8,
@@ -564,7 +564,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 3 [180 MeV] – Skewness Y",
      "expected": 0.0,
      "warn": 0.8,
@@ -630,7 +630,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 4 [160 MeV] – Skewness X",
      "expected": 0.235,
      "warn": 0.25,
@@ -641,7 +641,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 4 [160 MeV] – Skewness Y",
      "expected": 0.0,
      "warn": 0.25,
@@ -707,7 +707,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 5 [140 MeV] – Skewness X",
      "expected": 0.184,
      "warn": 0.25,
@@ -718,7 +718,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 5 [140 MeV] – Skewness Y",
      "expected": 0.421,
      "warn": 0.25,
@@ -784,7 +784,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 6 [120 MeV] – Skewness X",
      "expected": 0.535,
      "warn": 0.25,
@@ -795,7 +795,7 @@ window.PORTAL_SEED = {
     {
      "category": "Spot",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "name": "Spot 6 [120 MeV] – Skewness Y",
      "expected": 0.535,
      "warn": 0.25,
@@ -1280,7 +1280,7 @@ window.PORTAL_SEED = {
      "category": "Dosimetry",
      "name": "Temp. & Press. Correction (Output)",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "expected": null,
      "tol_mode": "absolute",
      "description": "Template 1.07. [Section: Setup and Safety] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P, with T in °C and P in kPa (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
@@ -1510,7 +1510,7 @@ window.PORTAL_SEED = {
      "category": "Device Selection",
      "name": "Electrometer Calibration Factor",
      "type": "numeric",
-     "unit": "unitless",
+     "unit": "",
      "expected": null,
      "tol_mode": "absolute",
      "description": "Template 3.06. [Section: Sphinx Measurements]"

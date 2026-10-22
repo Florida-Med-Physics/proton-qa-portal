@@ -2023,7 +2023,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
       svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  const yTitle = delta ? `Δ from reference (${unit || "unitless"})` : `${unit || "unitless"}`;
+  const yTitle = delta ? (unit ? `Δ from reference (${unit})` : "Δ from reference") : unit || "Value";
   kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
 
   // X axis: dates, and the axis title.
