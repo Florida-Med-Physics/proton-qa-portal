@@ -48,8 +48,9 @@ function svg(tag, attrs, ...kids) {
   return node;
 }
 
+const STATUS_LABEL = { warn: "Tolerance", fail: "Action" };
 function chip(status, label) {
-  return el("span", { class: `chip ${status || ""}` }, label || capitalize(status || "-"));
+  return el("span", { class: `chip ${status || ""}` }, label || STATUS_LABEL[status] || capitalize(status || "-"));
 }
 
 const REVIEW_LABEL = { pending: "Awaiting review", approved: "Approved", rejected: "Rejected", imported: "Historical import" };
@@ -186,8 +187,8 @@ function limitsText(limits, unit) {
   }
   const suffix = limits.tol_mode === "percent" ? "%" : unit ? ` ${unit}` : "";
   const parts = [`${fmt(limits.expected)}${unit ? " " + unit : ""}`];
-  if (limits.warn !== null && limits.warn !== undefined) parts.push(`warn ±${fmt(limits.warn)}${suffix}`);
-  if (limits.fail !== null && limits.fail !== undefined) parts.push(`fail ±${fmt(limits.fail)}${suffix}`);
+  if (limits.warn !== null && limits.warn !== undefined) parts.push(`tolerance ±${fmt(limits.warn)}${suffix}`);
+  if (limits.fail !== null && limits.fail !== undefined) parts.push(`action ±${fmt(limits.fail)}${suffix}`);
   return parts.join(" · ");
 }
 
@@ -246,7 +247,7 @@ async function renderHome() {
   app.append(el("div", { class: "home-stats" },
     stat("QA lists to do today", todo.length, todo.length ? "due" : "pass", "#/perform-qa"),
     stat("Overdue", overdue, overdue ? "fail" : "pass", "#/perform-qa"),
-    stat("Machines with a failing last result", failing.length, failing.length ? "fail" : "pass", "#/trends"),
+    stat("Machines whose last result reached Action", failing.length, failing.length ? "fail" : "pass", "#/trends"),
     can("review") ? stat("Waiting for review", toReview, toReview ? "due" : "pass", "#/runs?review_status=pending") : null));
   for (const modality of MODALITIES) {
     const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
@@ -890,7 +891,7 @@ async function renderLimits(assignmentId) {
       el("td", {}, el("input", { name: "fail", type: "number", step: "any", min: 0, value: o.fail ?? "", placeholder: fmt(q.fail) })),
       el("td", {}, select("tol_mode", [["", `List (${q.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || "")));
   });
-  app.append(table(["Test", "Expected", "Warning ±", "Fail ±", "Tolerance"], rows));
+  app.append(table(["Test", "Expected", "Tolerance ±", "Action ±", "Limits are"], rows));
   const error = el("p", { class: "error" });
   app.append(error, el("div", { class: "row" },
     el("a", { class: "button", href: `#/machines/${t.machine.id}` }, "Back"),
@@ -992,7 +993,7 @@ async function renderPerform(assignmentId) {
     const required = inputs.filter((i) => i.required);
     const done = required.filter((i) => i.status()).length;
     progress.textContent = `${done} of ${required.length} done`;
-    overallChip.replaceChildren(done && done === required.length ? chip(worst, capitalize(worst)) : statuses.some((s) => s === "fail" || s === "warn") ? chip(worst, `${capitalize(worst)} so far`) : "");
+    overallChip.replaceChildren(done && done === required.length ? chip(worst) : statuses.some((s) => s === "fail" || s === "warn") ? chip(worst, `${STATUS_LABEL[worst] || capitalize(worst)} so far`) : "");
     for (const s of sections) s.refresh();
   };
   const named = t.items.some((i) => sectionNameOf(i));
@@ -1066,7 +1067,7 @@ async function renderPerform(assignmentId) {
         const bad = s.filter((x) => x === "fail").length;
         const warn = s.filter((x) => x === "warn").length;
         summary.replaceChildren(left ? `${left} to do` : "All done",
-          bad ? [" · ", chip("fail", `${bad} fail`)] : "", warn ? [" · ", chip("warn", `${warn} warn`)] : "");
+          bad ? [" · ", chip("fail", `${bad} action`)] : "", warn ? [" · ", chip("warn", `${warn} tolerance`)] : "");
       },
       settled() {
         return entries.every((e) => !e.required || e.status() === "pass" || e.status() === "recorded");
@@ -1259,24 +1260,25 @@ async function renderQueueEditor(id) {
       const n = sectionNumber(t);
       const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
       const directions = helpText(t.description);
-      const dirRow = directions ? el("tr", { class: "directions-row" }, el("td", { colspan: 7 }, directions)) : null;
+      const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 7 }, directions)) : null;
       lastSection = n;
       const number = checkNumber(t.description);
-      return [head, el("tr", { class: `compact${dirRow ? " before-directions" : ""}` },
-        el("td", { class: "item-cell" }, el("strong", {}, number ? `${number}: ` : "", shortName)),
+      return [head, el("tr", { class: `compact${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable ? "true" : null },
+        el("td", { class: "item-cell" }, editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
+          el("strong", {}, number ? `${number}: ` : "", shortName)),
         el("td", {}, t.category || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
-          el("label", { class: "inline small" }, "warn ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
-          el("label", { class: "inline small" }, "fail ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, "Tolerance ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           select("", [["", `Default (${t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], item.tol_mode || "",
             { disabled: !editable, onchange: (e) => { item.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
         el("td", { class: "small" }, m.modified_at ? m.modified_at.slice(0, 16).replace("T", " ") : el("span", { class: "muted" }, "—")),
         el("td", { class: "small" }, m.modified_by || el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },
-          el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; draw(); } }, "↑"),
-          el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; draw(); } }, "↓"),
+          el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
+          el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
           el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
             await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
             toast("Test saved");
@@ -1285,7 +1287,7 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Tolerance", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
+      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Tolerance / Action", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
@@ -1293,6 +1295,33 @@ async function renderQueueEditor(id) {
         .map((t) => el("option", { value: t.id }, testLabel(t))));
   };
   const picker = el("select", { onchange: (e) => { if (e.target.value) { items.push({ test_id: Number(e.target.value) }); draw(); } } });
+  // Drag and drop: drag a test row (by its handle) onto another test to move it there; Save keeps the new order.
+  let dragFrom = null;
+  const unsaved = el("span", { class: "chip due", hidden: true }, "Order changed: Save to keep it");
+  function dragProps(index) {
+    if (!editable) return {};
+    return {
+      ondragstart: (e) => { dragFrom = index; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); e.currentTarget.classList.add("dragging"); },
+      ondragend: (e) => { e.currentTarget.classList.remove("dragging"); body.querySelectorAll(".drop-before, .drop-after").forEach((r) => r.classList.remove("drop-before", "drop-after")); },
+      ondragover: (e) => {
+        if (dragFrom === null) return;
+        e.preventDefault();
+        const below = index > dragFrom;
+        e.currentTarget.classList.toggle("drop-after", below);
+        e.currentTarget.classList.toggle("drop-before", !below);
+      },
+      ondragleave: (e) => e.currentTarget.classList.remove("drop-before", "drop-after"),
+      ondrop: (e) => {
+        e.preventDefault();
+        if (dragFrom === null || dragFrom === index) return;
+        const [moved] = items.splice(dragFrom, 1);
+        items.splice(index, 0, moved);
+        dragFrom = null;
+        unsaved.hidden = false;
+        draw();
+      },
+    };
+  }
   app.append(el("h2", {}, "Tests"), holder);
   if (editable) {
     const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => modal("New test for this list", testForm(), async (data) => {
@@ -1311,7 +1340,7 @@ async function renderQueueEditor(id) {
     };
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
     app.append(error, el("div", { class: "row" }, el("a", { class: "button", href: "#/queues" }, "Back"),
-      el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save")));
+      el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
   }
   draw();
 }
@@ -1322,8 +1351,8 @@ function testForm(test) {
   const limits = el("div", { class: "form-grid wide" },
     field("Unit", el("input", { name: "unit", value: t.unit || "", placeholder: "mm, %, cGy, °" })),
     field("Expected value", el("input", { name: "expected", type: "number", step: "any", value: t.expected ?? "" })),
-    field("Warning ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
-    field("Fail ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
+    field("Tolerance ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
+    field("Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
     field("Tolerance is", select("tol_mode", [["absolute", "Absolute (same units)"], ["percent", "Percent of expected"]], t.tol_mode)));
   const sync = () => (limits.hidden = type.value !== "numeric");
   type.addEventListener("change", sync);
@@ -1380,7 +1409,7 @@ async function renderTests() {
       }
       holder.replaceChildren(...[...groups].map(([heading, list]) => el("details", { class: "card section", open: !!needle || !!listPick.value || groups.size <= 3 },
         el("summary", {}, el("strong", {}, heading), el("span", { class: "section-summary" }, `${list.length}`)),
-        table(["Test", "QA list", "Type", "#Expected", "#Warn ±", "#Fail ±", ""], list.map((t) =>
+        table(["Test", "QA list", "Type", "#Expected", "#Tolerance ±", "#Action ±", ""], list.map((t) =>
           el("tr", { class: editable ? "clickable" : "", onclick: edit(t) }, el("td", {}, el("strong", {}, shortName(t))),
             el("td", { class: "muted" }, t.owner_name || "Shared"), ...limitCells(t)))))));
       return;
@@ -1389,7 +1418,7 @@ async function renderTests() {
     const keys = { name: (t) => shortName(t), category: (t) => t.category || "General", type: (t) => TYPE_LABELS[t.type] };
     const key = keys[sortPick.value];
     const sorted = shown.slice().sort((a, b) => key(a).localeCompare(key(b)) || (a.owner_name || "").localeCompare(b.owner_name || "") || shortName(a).localeCompare(shortName(b)));
-    holder.replaceChildren(table(["Test", "QA list", "Category", "Type", "#Expected", "#Warn ±", "#Fail ±", ""], sorted.map((t) =>
+    holder.replaceChildren(table(["Test", "QA list", "Category", "Type", "#Expected", "#Tolerance ±", "#Action ±", ""], sorted.map((t) =>
       el("tr", { class: editable ? "clickable" : "", onclick: edit(t) },
         el("td", {}, el("strong", {}, shortName(t))),
         el("td", { class: "muted" }, t.owner_name || "Shared"),
@@ -1634,7 +1663,7 @@ function seriesChart(series, unit, { small = false } = {}) {
     const r = small ? (dates.length > 120 ? 1.8 : 2.4) : (dates.length > 150 ? 2.6 : 3.6);
     for (const p of s.points) {
       plot.push(svg("circle", { class: `dot ${multi ? cls : "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
-        svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${p.status})`)));
+        svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`)));
     }
   });
   kids.push(svg("g", { "clip-path": `url(#${clipId})` }, plot));
@@ -1679,7 +1708,7 @@ async function renderTrendOverview(machines, machineId, range) {
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
   app.append(el("p", { class: "lead" }, `${withData.length} tests on ${groups.length} charts. `,
-    failing ? el("span", { class: "chip fail" }, `${failing} failing now`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} in warning`) : "",
+    failing ? el("span", { class: "chip fail" }, `${failing} at action level`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} outside tolerance`) : "",
     !failing && !warning ? el("span", { class: "chip pass" }, "All passing") : ""));
   const bySection = new Map();
   for (const g of groups) {
@@ -1723,16 +1752,16 @@ function renderTrendDetail(group, range) {
     const s = stats(m.points), d = asDeviation(s.last);
     return stat(multi ? `${m.axis} latest` : "Latest", `${fmt(s.last.value)} ${unit}`.trim(),
       [chip(s.last.status), " ", s.last.expected !== null ? `${signed(d.dev)} ${unit} from ${fmt(s.last.expected)} ${unit}`.replace(/ +/g, " ") : "", el("br"),
-        `${s.inTol}% within limits · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)} ${unit}`.trim()]);
+        `${s.inTol}% within action level · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)} ${unit}`.trim()]);
   }), (() => {
     const p = latest(group.members[0].points);
     const u = p.tol_mode === "percent" ? " %" : unit ? ` ${unit}` : "";
-    return p.warn !== null ? stat("Limits", `warn ±${fmt(p.warn)}${u}`, `fail ±${fmt(p.fail)}${u}`) : null;
+    return p.warn !== null ? stat("Limits", `Tolerance ±${fmt(p.warn)}${u}`, `Action ±${fmt(p.fail)}${u}`) : null;
   })()));
   app.append(el("div", { class: "legend" },
     multi ? el("span", {}, "Lines: ", axisLegend(group), ` deviation from each axis's expected value${unit ? ` (${unit})` : ""}`) : el("span", {}, "Dashed line: expected value"),
-    el("span", {}, el("span", { class: "swatch warn" }), "Within warning"),
-    el("span", {}, el("span", { class: "swatch fail" }), "Within fail limit"),
+    el("span", {}, el("span", { class: "swatch warn" }), "Within tolerance"),
+    el("span", {}, el("span", { class: "swatch fail" }), "Within action level"),
     el("span", {}, "Dots: ", el("span", { class: "chip pass" }, "pass"), " ", el("span", { class: "chip warn" }, "warn"), " ", el("span", { class: "chip fail" }, "fail"))));
   app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit));
   // One row per date, one column per axis.
