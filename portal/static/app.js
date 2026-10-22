@@ -1204,6 +1204,44 @@ function measureParts(name) {
   return { metric: hit[1], metricLabel, rowLabel, sortKey: (spot ? Number(spot[1]) : 0) * 10000 + (energy ? Number(energy[1]) : 0) };
 }
 
+function blockNumbers(items) {
+  const out = new Map();
+  const counter = {};
+  const next = (item) => { const n = sectionNumber(item); counter[n] = (counter[n] || 0) + 1; return `${n}.${String(counter[n]).padStart(2, "0")}`; };
+  const bySection = new Map();
+  for (const it of items) { const n = sectionNumber(it); if (!bySection.has(n)) bySection.set(n, []); bySection.get(n).push(it); }
+  for (const list of bySection.values()) {
+    const families = new Map();
+    for (const it of list) {
+      const mp = it.type === "numeric" ? measureParts(it.name) : null;
+      if (!mp) continue;
+      const key = `${mp.metric}|${it.unit || ""}|${it.category || ""}`;
+      if (!families.has(key)) families.set(key, []);
+      families.get(key).push(it);
+    }
+    const familyOf = new Map();
+    for (const f of families.values()) if (f.length > 1) for (const it of f) familyOf.set(it.test_id, f);
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i];
+      if (out.has(it.test_id)) continue;
+      const fam = familyOf.get(it.test_id);
+      if (fam) { const n = next(it); for (const m of fam) out.set(m.test_id, n); continue; }
+      const a = axisParts(it.name), b = axisParts((list[i + 1] || {}).name), c = axisParts((list[i + 2] || {}).name);
+      if (a && b && c && a.axis === "X" && b.axis === "Y" && c.axis === "Z" && a.base === b.base && b.base === c.base) {
+        const n = next(it);
+        const group = [list[i], list[i + 1], list[i + 2]];
+        const calc = list[i + 3];
+        if (calc && /\[calc: 3d-offset\]/.test(calc.description || "")) group.push(calc);
+        for (const m of group) out.set(m.test_id, n);
+        i += group.length - 1;
+        continue;
+      }
+      out.set(it.test_id, next(it));
+    }
+  }
+  return out;
+}
+
 function checkNumber(description) {
   const m = /^Template (\d+\.\d+)\./.exec(description || "");
   return m ? m[1] : "";
@@ -1298,6 +1336,7 @@ async function renderPerform(assignmentId) {
     for (const s of sections) s.refresh();
   };
   const named = t.items.some((i) => sectionNameOf(i));
+  const numbers = blockNumbers(t.items);
   const byCategory = new Map();
   for (const item of t.items) {
     const key = named ? `${sectionNumber(item)}|${sectionNameOf(item) || ""}` : `${sectionNumber(item)}|${item.category || "General"}`;
@@ -1387,9 +1426,9 @@ async function renderPerform(assignmentId) {
         if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
         return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
       };
-      const numberCell = (it) => (firstHeader === "Axis"
-        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, checkNumber(it.description) || "") : null)
-        : el("td", { class: "qa-n" }, checkNumber(it.description) || ""));
+      const numberCell = (it) => (firstHeader !== "Test"
+        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null)
+        : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
       const trRows = members.map((it) => {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
@@ -1474,7 +1513,6 @@ async function renderPerform(assignmentId) {
         emitPlain();
         // An X / Y / Z offset (and its 3D magnitude) as a titled table with one row per axis, like the Sphinx tables.
         const members = [...m.axes.map((it, k) => ({ ...it, axisLabel: "XYZ"[k] })), ...(m.calc ? [{ ...m.calc, axisLabel: "3D" }] : [])];
-        const numbers = [checkNumber(m.axes[0].description), checkNumber((m.calc || m.axes[m.axes.length - 1]).description)].filter(Boolean);
         rows.push(measureTable(members, {
           firstHeader: "Axis",
           title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : ""),
@@ -2310,6 +2348,8 @@ async function renderTrendOverview(machines, machineId, range) {
   // The same shape as Perform QA: a heading per section, a box per category, and inside it the single tests as one
   // table, each repeated measurement (per energy / spot) as a titled table, and each X / Y / Z offset as an axis table.
   const named = withData.some((i) => sectionNameOf(i));
+  const numbers = new Map();
+  for (const tpl of templates) for (const [id, n] of blockNumbers(tpl.items)) numbers.set(id, n);
   const boxes = new Map();
   for (const item of withData) {
     const key = `${sectionNumber(item)}|${named ? sectionNameOf(item) || "" : item.category || "General"}`;
@@ -2344,7 +2384,7 @@ async function renderTrendOverview(machines, machineId, range) {
         chart.hidden = !chart.hidden;
       } }, trendIcon(16));
       const cells = [
-        firstHeader === "Axis" ? (k === 0 ? el("td", { class: "qa-n qa-n-span", rowspan: members.length }, checkNumber(it.description) || "") : null) : el("td", { class: "qa-n" }, checkNumber(it.description) || ""),
+        firstHeader !== "Test" ? (k === 0 ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null) : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""),
         el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null),
         el("td", { class: "qa-unit" }, unit),
         el("td", { class: "num" }, baseline === null || baseline === undefined ? el("span", { class: "muted" }, "—") : `${fmt(baseline)} ${unit}`.trim()),
@@ -2352,7 +2392,7 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
         el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit) : el("span", { class: "muted small" }, "—")),
-        chartTogether ? (k === 0 ? el("td", { rowspan: members.length }, trend) : null) : el("td", {}, trend),
+        chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
       return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
     });
