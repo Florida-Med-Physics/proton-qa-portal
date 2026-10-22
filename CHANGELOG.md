@@ -37,6 +37,8 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Machine Trends: the overview is a table (one row per chart) instead of card panels; charts plot dots instead of lines (one colour per axis, warning/fail ringed); all dates show the year.
 - **[Physics review]** Built like the myQA sheet: every numbered item is its title, then a Directions block, then the result. "0.01 Daily QA Setup" is now a pass/fail test with its directions (it was loose setup text); the protocol note stays at the top.
 - **[Physics review]** Units on the proton template's 2.02–2.06 measurements (laser/kV alignment offsets, CBCT and kV/kV correction vectors, kV/kV-to-CBCT deltas): mm. The myQA table has no unit column; the values are millimetres (a −5 cm shift is entered as 50). The editor now flags any measured test without a unit.
+- Setup QA tables: Tests column centred, a Last Modified column (from the audit log), and the buttons column titled Actions.
+- "Due today" now reads "Due in XX hours (date)", counting down to the end of the due day.
 - Perform QA: measurements repeated per energy or spot (distal depth, DFO, sigma X, …) are shown as one table per measurement: energy, measurement, reference, tolerance, action, status, comment, the last five results, and a button that plots the trend in place.
 - Perform QA no longer lists the folder's files; the newest unrecorded export is read in automatically and one line says which.
 - Setup QA: click a QA list's name to rename it; the machine lists are grouped under each machine ("Machine-Assigned QA List Instances"), with a "Generated from" column naming the template each came from.

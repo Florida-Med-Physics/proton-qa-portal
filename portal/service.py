@@ -195,6 +195,8 @@ def list_queues(db, user):
         "SELECT q.*, (SELECT COUNT(*) FROM queue_items qi WHERE qi.queue_id = q.id) AS item_count, "
         "(SELECT COUNT(*) FROM assignments a WHERE a.queue_id = q.id AND a.active = 1) AS machine_count, "
         "(SELECT name FROM queues t WHERE t.id = q.template_id) AS template_name, "
+        "(SELECT MAX(a.at) FROM audit a WHERE (a.entity = 'queue' AND a.entity_id = q.id) "
+        " OR (a.entity = 'test' AND a.entity_id IN (SELECT id FROM tests WHERE owner_queue_id = q.id))) AS modified_at, "
         "(SELECT GROUP_CONCAT(m.name, ', ') FROM assignments a JOIN machines m ON m.id = a.machine_id WHERE a.queue_id = q.id AND a.active = 1) AS machines "
         "FROM queues q ORDER BY q.is_template DESC, q.active DESC, q.name")
 

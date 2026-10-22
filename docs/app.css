@@ -504,3 +504,5 @@ tr.quick-trend .spark { max-width: 700px; }
 /* Light vertical separators between columns. */
 th + th, td + td { border-left: 1px solid var(--border); }
 tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, tr.group td { border-left: 0; }
+/* Setup QA action buttons wrap rather than overflow the table. */
+.fixed-table td.right .row.nowrap.end { flex-wrap: wrap; row-gap: 4px; }

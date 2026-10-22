@@ -8,15 +8,21 @@
 const state = { user: null, cache: {} };
 const app = document.getElementById("app");
 const ROLE_LABEL = { admin: "Admin", physicist: "Physicist", therapist: "Therapist" };
-const STATE_LABEL = { overdue: "Overdue", due: "Due today", done: "Done today", upcoming: "Upcoming" };
+const STATE_LABEL = { overdue: "Overdue", due: "Due", done: "Done today", upcoming: "Upcoming" };
 const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", semiannual: "Semiannual", annual: "Annual", custom: "Custom interval",
   asneeded: "As needed (e.g. SRS days)" };
 // A list can be started when it is due, overdue, or "as needed".
 const startable = (state) => state === "due" || state === "overdue" || state === "ready";
+// Hours left until the end of the due day (QA is due by the end of that day).
+function dueIn(iso) {
+  const end = new Date(iso + "T23:59:59");
+  const hours = Math.max(0, Math.round((end - Date.now()) / 3600000));
+  return `Due in ${hours} ${hours === 1 ? "hour" : "hours"} (${shortDate(iso)})`;
+}
 function scheduleStatus(a) {
   if (!a.active) return "Paused";
   if (a.state === "overdue") return `Overdue since ${shortDate(a.next_due)}`;
-  if (a.state === "due") return "Due today";
+  if (a.state === "due") return dueIn(a.next_due);
   if (a.state === "done") return "Done today";
   if (a.state === "ready") return a.last_done ? `As needed · last run ${shortDate(a.last_done)}` : "As needed";
   return `Next due ${shortDate(a.next_due)}`;
@@ -259,7 +265,7 @@ async function renderHome() {
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
         el("td", {}, el("strong", {}, m.name)),
         el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small" }, q.queue_name)) : el("span", { class: "muted small" }, "None")),
-        el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? "Due today" : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
+        el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? dueIn(m.queues.filter((q) => q.state === "due").map((q) => q.next_due).sort()[0]) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
         el("td", {}, lastRun ? [chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`)] : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}`, onclick: (e) => e.stopPropagation() }, "Trends")));
@@ -521,11 +527,12 @@ async function renderSetup() {
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "30%"], [second, "26%"], ["#Tests", "8%"], ["", "36%"]];
+  const SETUP_COLS = (first, second) => [[first, "28%"], [second, "24%"], ["Tests", "7%"], ["Last Modified", "11%"], ["Actions", "30%"]];
+  const modified = (q) => el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—");
   app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
-    el("td", { class: "num" }, t.item_count),
+    el("td", { class: "center" }, t.item_count), modified(t),
     actions(t))))
     : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
 
@@ -544,11 +551,11 @@ async function renderSetup() {
   }
   const machineRows = [...byMachine].flatMap(([name, qs]) => {
     const m = machines.find((x) => x.name === name);
-    return [el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
+    return [el("tr", { class: "machine-row" }, el("td", { colspan: 5 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...qs.map((q) => el("tr", { class: q.active ? "" : "muted" },
         el("td", { class: "indent" }, editableName(q, editable)),
         el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
-        el("td", { class: "num" }, q.item_count),
+        el("td", { class: "center" }, q.item_count), modified(q),
         actions(q)))];
   });
   app.append(fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));

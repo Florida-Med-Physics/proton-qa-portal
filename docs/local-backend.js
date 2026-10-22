@@ -530,6 +530,8 @@
       item_count: S.queue_items.filter((i) => i.queue_id === q.id).length,
       machine_count: S.assignments.filter((a) => a.queue_id === q.id && a.active).length,
       template_name: q.template_id ? (byId("queues", q.template_id) || {}).name || null : null,
+      modified_at: (() => { const own = new Set(S.tests.filter((t) => t.owner_queue_id === q.id).map((t) => t.id));
+        return S.audit.filter((a) => (a.entity === "queue" && a.entity_id === q.id) || (a.entity === "test" && own.has(a.entity_id))).reduce((m, a) => (a.at > m ? a.at : m), null); })(),
       machines: S.assignments.filter((a) => a.queue_id === q.id && a.active).map((a) => byId("machines", a.machine_id).name).join(", ") || null,
     })).sort((a, b) => (b.is_template - a.is_template) || (b.active - a.active) || a.name.localeCompare(b.name));
   }
