@@ -925,12 +925,12 @@ async function renderPerform(assignmentId) {
       // As in the myQA template: the numbered title, then its directions block, then the result.
       const directions = helpText(item.description);
       rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
-        directions,
         el("div", { class: "check-name" }, el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
           item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
         el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
         statusCell,
-        el("div", { class: "check-note" }, noteToggle, comment)));
+        el("div", { class: "check-note" }, noteToggle, comment),
+        directions));
     }
     const summary = el("span", { class: "section-summary" });
     const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, category), summary), rows);
@@ -1139,7 +1139,7 @@ async function renderQueueEditor(id) {
       const dirRow = directions ? el("tr", { class: "directions-row" }, el("td", { colspan: 7 }, directions)) : null;
       lastSection = n;
       const number = checkNumber(t.description);
-      return [head, dirRow, el("tr", { class: `compact${dirRow ? " after-directions" : ""}` },
+      return [head, el("tr", { class: `compact${dirRow ? " before-directions" : ""}` },
         el("td", { class: "item-cell" }, el("strong", {}, number ? `${number}: ` : "", shortName)),
         el("td", {}, t.category || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
@@ -1159,7 +1159,7 @@ async function renderQueueEditor(id) {
             toast("Test saved");
             route();
           }) }, "✎"),
-          el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null))];
+          el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
       el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Tolerance", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
