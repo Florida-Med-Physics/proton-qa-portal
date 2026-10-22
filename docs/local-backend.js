@@ -284,9 +284,13 @@
       while (!days.has(pyWeekday(c))) c = addDays(c, 1);
       return c;
     }
+    if (MONTH_STEPS[a.frequency]) {
+      // Due at the end of the month: the start month's end at first, then the end of the month one period after the last run.
+      const monthEnd = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      return maxDate(start, monthEnd(lastDone ? addMonths(lastDone, MONTH_STEPS[a.frequency]) : start));
+    }
     if (!lastDone) return start;
     if (a.frequency === "weekly") return maxDate(start, addDays(lastDone, 7));
-    if (MONTH_STEPS[a.frequency]) return maxDate(start, addMonths(lastDone, MONTH_STEPS[a.frequency]));
     return maxDate(start, addDays(lastDone, Number(a.interval_days || 1)));
   }
   function dueState(a, lastDone, today) {
@@ -307,7 +311,8 @@
     }
     if (a.frequency === "custom") return `Every ${a.interval_days || 1} days`;
     if (a.frequency === "asneeded") return "As needed (run on the days it applies)";
-    return a.frequency[0].toUpperCase() + a.frequency.slice(1);
+    const word = a.frequency[0].toUpperCase() + a.frequency.slice(1);
+    return MONTH_STEPS[a.frequency] ? `${word} (due at month end)` : word;
   }
 
   // ---- Sphinx export reader (sphinx.py) ---------------------------------------

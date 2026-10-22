@@ -72,9 +72,11 @@ class ScheduleTests(unittest.TestCase):
 
     def test_monthly_and_custom(self):
         monthly = {"frequency": "monthly", "start_date": "2026-01-01"}
-        self.assertEqual(qa.next_due(monthly, date(2026, 1, 31)), date(2026, 2, 28))
+        self.assertEqual(qa.next_due(monthly, date(2026, 1, 31)), date(2026, 2, 28))   # end of the following month
+        self.assertEqual(qa.next_due(monthly, date(2026, 1, 10)), date(2026, 2, 28))   # whenever in the month it was done
+        self.assertEqual(qa.next_due(monthly, None), date(2026, 1, 31))              # first due at the end of the start month
         annual = {"frequency": "annual", "start_date": "2026-01-01"}
-        self.assertEqual(qa.next_due(annual, date(2026, 3, 5)), date(2027, 3, 5))
+        self.assertEqual(qa.next_due(annual, date(2026, 3, 5)), date(2027, 3, 31))
         custom = {"frequency": "custom", "interval_days": 10, "start_date": "2026-01-01"}
         self.assertEqual(qa.next_due(custom, date(2026, 1, 5)), date(2026, 1, 15))
         future_start = {"frequency": "weekly", "start_date": "2026-12-01"}

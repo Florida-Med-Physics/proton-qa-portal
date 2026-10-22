@@ -79,6 +79,10 @@ def parse_weekdays(text):
     return days or set(range(7))
 
 
+def month_end(day):
+    return date(day.year, day.month, calendar.monthrange(day.year, day.month)[1])
+
+
 def add_months(day, months):
     month_index = day.month - 1 + months
     year, month = day.year + month_index // 12, month_index % 12 + 1
@@ -97,12 +101,15 @@ def next_due(assignment, last_done):
         while candidate.weekday() not in days:
             candidate += timedelta(days=1)
         return candidate
+    if freq in MONTH_STEPS:
+        # Monthly (and longer) lists are due at the end of the month: the start month's end at first, then the
+        # end of the month one period after the last run.
+        period_end = month_end(start) if last_done is None else month_end(add_months(last_done, MONTH_STEPS[freq]))
+        return max(start, period_end)
     if last_done is None:
         return start
     if freq == "weekly":
         return max(start, last_done + timedelta(days=7))
-    if freq in MONTH_STEPS:
-        return max(start, add_months(last_done, MONTH_STEPS[freq]))
     interval = assignment.get("interval_days") or 1
     return max(start, last_done + timedelta(days=int(interval)))
 
@@ -136,4 +143,6 @@ def describe_schedule(assignment):
         return f"Every {assignment.get('interval_days') or 1} days"
     if freq == "asneeded":
         return "As needed (run on the days it applies)"
+    if freq in MONTH_STEPS:
+        return f"{freq.capitalize()} (due at month end)"
     return freq.capitalize()
