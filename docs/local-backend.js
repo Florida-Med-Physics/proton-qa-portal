@@ -963,7 +963,8 @@
   // RadMachine transcription notes -> the action itself (markers drive the Perform page) or nothing.
   const NOTE_REWRITES = [
       ["A choice list in RadMachine.", ""],
-      ["Filled automatically in RadMachine.", "[auto: user] Filled in with the signed-in user."],
+      ["Filled automatically in RadMachine.", "[auto: user]"],
+      ["[auto: user] Filled in with the signed-in user.", "[auto: user]"],
       ["Calculated in RadMachine (3D offset from X, Y, Z).", "[calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."],
       ["Calculated in RadMachine (3D offset).", "[calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."],
       ["Calculated in RadMachine from temperature and pressure.", "[calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P, with T in °C and P in kPa (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."],

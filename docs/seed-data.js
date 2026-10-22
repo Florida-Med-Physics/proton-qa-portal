@@ -1238,7 +1238,7 @@ window.PORTAL_SEED = {
      "category": "Administrative",
      "name": "Last Edited By:",
      "type": "text",
-     "description": "Template 1.01. [Section: Setup and Safety] [auto: user] Filled in with the signed-in user."
+     "description": "Template 1.01. [Section: Setup and Safety] [auto: user]"
     },
     {
      "category": "Administrative",

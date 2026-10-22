@@ -611,7 +611,8 @@ td.history-cell, th.history-cell { padding-left: 6px; }
 /* Trend charts: lines between results, a key, and the Absolute / Δ toggle. */
 .chart .series, .spark .series { fill: none; stroke-width: 1.4; opacity: 0.75; }
 .chart .series.single, .spark .series.single { stroke: var(--accent); }
-.key-text { font-size: 11px; fill: var(--muted); }
+.key-text { font-size: 13px; fill: var(--text); font-weight: 600; }
+.spark .key-text { font-size: 17px; }   /* small charts are scaled down, so the key is drawn larger */
 .chart-box .chart-mode { display: flex; gap: 10px; justify-content: flex-end; margin: 0 0 2px; }
 .chart-box.small .chart-mode { gap: 6px; }
 .chart-mode .link.on { font-weight: 700; color: var(--uf-orange); text-decoration: none; }

@@ -2061,7 +2061,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   const W = small ? 560 : 900, H = small ? 120 : 360;
   const L = small ? 56 : 70, R = small ? 40 : 40, T = small ? 8 : 20, B = small ? 34 : 52;
   const lineH = small ? 13 : 16;
-  const keyH = lineH + 4;                     // the key (what each colour and band means) sits between the plot and the statistics
+  const keyH = (small ? 22 : lineH) + 4;                     // the key (what each colour and band means) sits between the plot and the statistics
   const statH = keyH + lineH * series.length + 6;
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
@@ -2141,11 +2141,11 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   series.forEach((s, k) => {
     const cls = multi ? `axis-${k}` : "single";
     keyItem([svg("line", { class: `series ${cls}`, x1: 0, x2: 18, y1: 0, y2: 0 }), svg("circle", { class: `dot ${cls} st-pass`, cx: 9, cy: 0, r: 3 })],
-      `${s.label}${delta ? " (Δ)" : ""}`, 28 + (s.label.length + (delta ? 4 : 0)) * (small ? 6 : 7));
+      `${s.label}${delta ? " (Δ)" : ""}`, 30 + (s.label.length + (delta ? 4 : 0)) * (small ? 9.5 : 7.5));
   });
-  if (ref.length) keyItem([svg("line", { class: "expected", x1: 0, x2: 18, y1: 0, y2: 0 })], delta ? "Reference (0)" : "Reference", small ? 92 : 100);
-  if (warn) keyItem([svg("rect", { class: "band-warn", x: 0, y: -5, width: 18, height: 10 })], "Tolerance ±", small ? 90 : 100);
-  if (fail) keyItem([svg("rect", { class: "band-fail", x: 0, y: -5, width: 18, height: 10 })], "Action ±", small ? 76 : 86);
+  if (ref.length) keyItem([svg("line", { class: "expected", x1: 0, x2: 18, y1: 0, y2: 0 })], delta ? "Reference (0)" : "Reference", small ? 140 : 110);
+  if (warn) keyItem([svg("rect", { class: "band-warn", x: 0, y: -5, width: 18, height: 10 })], "Tolerance ±", small ? 130 : 105);
+  if (fail) keyItem([svg("rect", { class: "band-fail", x: 0, y: -5, width: 18, height: 10 })], "Action ±", small ? 110 : 90);
 
   // Statistics block under the key, one line per series.
   const u = unit && unit !== "unitless" ? ` ${unit}` : "";
