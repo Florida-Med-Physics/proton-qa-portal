@@ -318,7 +318,7 @@ function renderLogin() {
   const error = el("p", { class: "error" });
   const form = el("form", {},
     el("img", { class: "brand-logo", src: "uf-proton-logo.png", alt: "UF Health Proton Therapy Institute" }),
-    el("h1", {}, "UF Proton Machine QA Portal"),
+    el("h1", {}, el("span", { class: "brand-uf" }, "UF"), "HPTI Machine QA Portal"),
     window.localApi
       ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
         field("Your name", el("input", { name: "username", autocomplete: "name", required: true, autofocus: true })),
@@ -518,17 +518,29 @@ async function renderSetup() {
   page("Setup QA", "The QA lists and the tests in them. Open a list to edit its tests, order and limits.",
     editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
   const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
+  const schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
+  const instanceOf = (q) => schedules.find((a) => a.queue_id === q.id);
+  const setActive = async (a, active) => {
+    try {
+      await api("PUT", `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(",").map(Number),
+        start_date: a.start_date, import_folder: a.import_folder || "", active });
+      toast(active ? "Set active: it is now scheduled on the machine" : "Set inactive: it stays on the machine but is not scheduled");
+      route();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  };
   // Archived lists are hidden here and everywhere else; they come back from the Archived section below.
   const archivedLists = queues.filter((q) => !q.active);
   const templates = queues.filter((q) => q.is_template && q.active);
   const lists = queues.filter((q) => !q.is_template && q.active);
   app.append(el("p", { class: "lead" },
     `${templates.length} QA list ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine-specific QA ${lists.length === 1 ? "list" : "lists"}. `,
-    el("span", { class: "muted small" }, "A template is the master copy; copying it to a machine gives that machine its own editable list.")));
+    el("span", { class: "muted small" }, "A template is the master copy; instantiating it on a machine gives that machine its own editable list.")));
 
   const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end" },
     el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
-    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Copy to a machine" : "Duplicate") : null,
+    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Instantiate" : "Duplicate") : null,
     editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
@@ -551,18 +563,31 @@ async function renderSetup() {
     el("p", { class: "muted" }, "Each list here is that machine's own copy. Edits made here change only that machine's list; they do not affect the template it came from."));
   const byMachine = new Map();
   for (const q of ordered) {
-    const key = (q.machines || "").split(", ")[0] || "Not on a machine";
+    const a = instanceOf(q);
+    const m = a ? machines.find((x) => x.id === a.machine_id) : null;
+    const key = m ? m.name : "Not on a machine";
     if (!byMachine.has(key)) byMachine.set(key, []);
     byMachine.get(key).push(q);
   }
   const machineRows = [...byMachine].flatMap(([name, qs]) => {
     const m = machines.find((x) => x.name === name);
     return [el("tr", { class: "machine-row" }, el("td", { colspan: 5 }, el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
-      ...qs.map((q) => el("tr", { class: q.active ? "" : "muted" },
-        el("td", { class: "indent" }, editableName(q, editable)),
-        el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
-        el("td", { class: "center" }, q.item_count),
-        actions(q), modified(q)))];
+      ...qs.map((q) => {
+        const a = instanceOf(q);
+        const live = !!(a && a.active);
+        return el("tr", { class: live ? "" : "muted" },
+          el("td", { class: "indent" }, editableName(q, editable), live ? el("span", { class: "active-tag" }, " (Active)") : null),
+          el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
+          el("td", { class: "center" }, q.item_count),
+          el("td", { class: "right" }, el("div", { class: "row nowrap end" },
+            el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
+            editable && a ? el("button", { class: `small${live ? "" : " primary"}`, title: live ? "Stop scheduling this list on the machine (nothing is deleted)" : "Schedule this list on the machine",
+              onclick: () => setActive(a, !live) }, live ? "Set Inactive" : "Set Active") : null,
+            editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, "Duplicate") : null,
+            editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
+            editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null)),
+          modified(q));
+      })];
   });
   app.append(fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));
 
@@ -1343,7 +1368,8 @@ function importSphinxDialog(a) {
 // ---------------------------------------------------------------------------
 
 function duplicateDialog(source, machines) {
-  // Name the copy, and optionally put it straight onto a machine.
+  // Name the copy, and optionally put it straight onto a machine. A template is "instantiated"; a machine's list is "duplicated".
+  const verb = source.is_template ? "Instantiate" : "Duplicate";
   const body = el("div", {},
     el("p", { class: "muted" }, `Every test in "${source.name}" is copied, so the new list's limits can be adjusted on its own.`),
     el("div", { class: "form-grid" },
@@ -1353,17 +1379,17 @@ function duplicateDialog(source, machines) {
   const machinePick = body.querySelector("[name=machine_id]");
   const schedulePart = body.querySelector(".schedule-part");
   machinePick.addEventListener("change", () => (schedulePart.hidden = !machinePick.value));
-  modal(`Duplicate ${source.name}`, body, async (data, form) => {
+  modal(`${verb} ${source.name}`, body, async (data, form) => {
     const payload = { name: data.name, machine_id: data.machine_id || null, ...(data.machine_id ? scheduleData(data, form) : {}) };
     const r = await api("POST", `/api/queues/${source.id}/duplicate`, payload);
     toast("QA list created");
     location.hash = r.assignment_id ? `#/machines/${data.machine_id}` : `#/queues/${r.id}`;
-  }, "Duplicate");
+  }, verb);
 }
 
 async function renderQueues() {
   const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
-  page("QA lists", "A template is the master copy. Duplicate it for each machine; each copy owns its tests and limits.",
+  page("QA lists", "A template is the master copy. Instantiate it on each machine; each instance owns its tests and limits.",
     can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
   const templates = queues.filter((q) => q.is_template);
   const lists = queues.filter((q) => !q.is_template);
