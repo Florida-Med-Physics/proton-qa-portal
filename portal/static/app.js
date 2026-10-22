@@ -240,6 +240,16 @@ function personIcon() {
     svg("path", { d: "M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5", fill: "currentColor" }));
 }
 
+function trendIcon(size = 18) {
+  const pts = [[14, 86], [32, 68], [50, 68], [68, 32], [86, 14]];                 // the rising spots, left to right
+  const on = new Set(pts.map(([x, y]) => `${x},${y}`));
+  const grid = [];
+  for (const y of [14, 32, 50, 68, 86]) for (const x of [14, 32, 50, 68, 86]) if (!on.has(`${x},${y}`)) grid.push(svg("circle", { cx: x, cy: y, r: 7 }));
+  return svg("svg", { viewBox: "0 0 100 100", width: size, height: size, "aria-hidden": "true", class: "trend-icon" },
+    svg("g", { fill: "currentColor", opacity: 0.5 }, ...grid),
+    svg("g", { fill: "#f37021" }, ...pts.map(([x, y]) => svg("circle", { cx: x, cy: y, r: 8 }))));
+}
+
 function homeIcon() {
   return svg("svg", { viewBox: "0 0 24 24", width: 20, height: 20, "aria-hidden": "true", class: "home-icon" },
     svg("path", { d: "M3 11.5 12 4l9 7.5", fill: "none", stroke: "currentColor", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }),
@@ -302,7 +312,7 @@ function renderShell() {
   const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
   document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns, title]) =>
     el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
-      title ? homeIcon() : label)));   // the Dashboard tab is the house icon alone
+      title ? homeIcon() : href === "#/trends" ? [trendIcon(), " ", label] : label)));   // the Dashboard tab is the house icon alone
   document.getElementById("who").replaceChildren(
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
@@ -1217,7 +1227,7 @@ async function renderPerform(assignmentId) {
               el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
             seriesChart([{ label: it.name, points: pts }], unit, { small: true }));
           chart.hidden = !chart.hidden;
-        } }, "📈");
+        } }, trendIcon(16));
         const row = el("tr", {},
           el("td", {}, el("strong", {}, mp.rowLabel), note),
           el("td", {}, el("div", { class: "row nowrap" }, control, unit ? el("span", { class: "muted small" }, unit) : null)),
