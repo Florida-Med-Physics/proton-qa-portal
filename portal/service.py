@@ -612,9 +612,12 @@ def _file_limits(m):
 def _sphinx_test_ids(db, user, template, measurements, create):
     """Map each measurement to a test in this queue, adding library tests and queue items if allowed."""
     in_queue = {(i["category"], i["name"]): i["test_id"] for i in template["items"]}
+    by_meaning = {sphinx.canonical_key(i["name"]): i["test_id"] for i in template["items"] if sphinx.canonical_key(i["name"])}
     ids, added = {}, []
     for m in measurements:
         key = (m["category"], m["name"])
+        if key not in in_queue and sphinx.canonical_key(m["name"]) in by_meaning:
+            in_queue[key] = by_meaning[sphinx.canonical_key(m["name"])]  # same measurement under the list's own wording
         if key in in_queue:
             ids[key] = in_queue[key]
             continue
@@ -643,9 +646,10 @@ def sphinx_preview(db, user, assignment_id, upload):
     parsed = _parse_sphinx(name, data)
     template = run_template(db, user, assignment_id)
     items = {(i["category"], i["name"]): i for i in template["items"]}
+    by_meaning = {sphinx.canonical_key(i["name"]): i for i in template["items"] if sphinx.canonical_key(i["name"])}
     matched, unmatched = [], []
     for m in parsed["measurements"]:
-        item = items.get((m["category"], m["name"]))
+        item = items.get((m["category"], m["name"])) or by_meaning.get(sphinx.canonical_key(m["name"]))
         if not item:
             unmatched.append(m)
             continue

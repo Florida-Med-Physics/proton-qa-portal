@@ -331,6 +331,21 @@
     return m ? Math.round(ENERGY_STEP * Math.round(Number(m[1]) / ENERGY_STEP)) : null;
   }
   // Names follow the myQA template: "Spot 1 [225 MeV] – Sigma X", "Energy [100 MeV] – Distal Depth" (mirrors sphinx.py).
+  // What a Sphinx value measures, independent of wording (mirrors sphinx.canonical_key), so one export fills
+  // "Spot 1 [100 MeV] – Position X" or RadMachine's "GTR5_Energy [100.00 MeV]: Spot1 Pos X [mm]".
+  function canonicalKey(name) {
+    const n = String(name || "").toLowerCase().replace(/\s+/g, " ");
+    const rules = [[/distal fall ?off|\bdfo\b/, "dfo"], [/distal depth/, "distal"], [/proximal depth/, "proximal"],
+      [/\bpos(ition)? x\b/, "pos_x"], [/\bpos(ition)? y\b/, "pos_y"], [/sigma x/, "sigma_x"], [/sigma y/, "sigma_y"],
+      [/skewness x/, "skew_x"], [/skewness y/, "skew_y"], [/intensity/, "intensity"], [/homogeneity|flatness/, "flatness"],
+      [/absolute dose/, "output"], [/coincidence.*(x offset|distance x)/, "coin_x"], [/coincidence.*(y offset|distance y)/, "coin_y"], [/\bwidth\b/, "width"]];
+    const hit = rules.find(([re]) => re.test(n));
+    if (!hit) return null;
+    const metric = hit[1];
+    const spot = /spot ?(\d+)/.exec(n);
+    const energy = ["dfo", "distal", "proximal", "width"].includes(metric) || spot ? nominalEnergy(name) : null;
+    return `${metric}|${energy ?? ""}|${spot ? spot[1] : ""}`;
+  }
   function standardName(category, item, metric, spot) {
     metric = metric.replace(/\s+/g, " ").trim();
     const e = nominalEnergy(item);
@@ -799,9 +814,11 @@
 
   function sphinxTestIds(user, t, measurements, create) {
     const inQueue = Object.fromEntries(t.items.map((i) => [`${i.category}|${i.name}`, i.test_id]));
+    const byMeaning = Object.fromEntries(t.items.filter((i) => canonicalKey(i.name)).map((i) => [canonicalKey(i.name), i.test_id]));
     const ids = {}, added = [];
     for (const m of measurements) {
       const key = `${m.category}|${m.name}`;
+      if (!inQueue[key] && byMeaning[canonicalKey(m.name)]) inQueue[key] = byMeaning[canonicalKey(m.name)];
       if (inQueue[key]) { ids[key] = inQueue[key]; continue; }
       if (!create) continue;
       require(user, "configure");
@@ -822,9 +839,10 @@
     const parsed = await parseUpload(upload);
     const t = runTemplate(assignmentId);
     const items = Object.fromEntries(t.items.map((i) => [`${i.category}|${i.name}`, i]));
+    const byMeaning = Object.fromEntries(t.items.filter((i) => canonicalKey(i.name)).map((i) => [canonicalKey(i.name), i]));
     const matched = [], unmatched = [];
     for (const m of parsed.measurements) {
-      const item = items[`${m.category}|${m.name}`];
+      const item = items[`${m.category}|${m.name}`] || byMeaning[canonicalKey(m.name)];
       if (!item) { unmatched.push({ category: m.category, name: m.name, unit: m.unit }); continue; }
       const fl = fileLimits(m);
       matched.push({ test_id: item.test_id, value: m.result, sphinx_status: m.sphinx_status, file_limits: fl,
@@ -926,6 +944,8 @@
   // Machines added to the starting data later (e.g. Linac 1 Synergy, Ethos) appear in browsers seeded before them.
   function addSeedMachines() {
     let added = 0;
+    const renamed = S.machines.find((x) => x.name === "Linac 1 Synergy");
+    if (renamed) { renamed.name = "Linac 1"; added++; }
     for (const m of (window.PORTAL_SEED || {}).machines || []) {
       if (S.machines.some((x) => x.name === m.name)) continue;
       if (m.name === "Big Bore CT (7064)" && S.machines.some((x) => x.name === "CT Sim")) continue;
@@ -941,8 +961,15 @@
     const seedTemplates = (window.PORTAL_SEED || {}).templates || [];
     let changed = 0;
     for (const t of seedTemplates) {
-      const q = S.queues.find((x) => x.is_template && x.name === t.name);
-      if (!q) continue;
+      let q = S.queues.find((x) => x.is_template && x.name === t.name);
+      if (!q) {
+        // A template added to the starting data later (e.g. PBS DailyQA GTR5 - Sphinx): create it once.
+        S.seededTemplates = S.seededTemplates || S.queues.filter((x) => x.is_template).map((x) => x.name);
+        if (S.seededTemplates.includes(t.name)) continue;   // it was here before and someone deleted it: leave it gone
+        const id = insert("queues", { name: t.name, description: t.setup || "", active: 1, is_template: 1, template_id: null });
+        S.seededTemplates.push(t.name);
+        q = byId("queues", id);
+      }
       const items = S.queue_items.filter((i) => i.queue_id === q.id).sort((a, b) => a.position - b.position).map((i) => byId("tests", i.test_id));
       const same = items.length === t.checks.length && items.every((x, k) => x && x.name === t.checks[k].name && (x.description || "") === (t.checks[k].description || "") && (x.unit || "") === (t.checks[k].unit || ""));
       if (same) continue;

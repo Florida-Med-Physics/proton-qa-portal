@@ -37,6 +37,9 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Machine Trends: the overview is a table (one row per chart) instead of card panels; charts plot dots instead of lines (one colour per axis, warning/fail ringed); all dates show the year.
 - **[Physics review]** Built like the myQA sheet: every numbered item is its title, then a Directions block, then the result. "0.01 Daily QA Setup" is now a pass/fail test with its directions (it was loose setup text); the protocol note stays at the top.
 - **[Physics review]** Units on the proton template's 2.02–2.06 measurements (laser/kV alignment offsets, CBCT and kV/kV correction vectors, kV/kV-to-CBCT deltas): mm. The myQA table has no unit column; the values are millimetres (a −5 cm shift is entered as 50). The editor now flags any measured test without a unit.
+- **[Physics review]** New template "PBS DailyQA GTR5 - Sphinx", transcribed from the RadMachine list (125 tests in RadMachine's order, wording and categories; three named sections; No/Yes checks; RadMachine references as expected values). Tolerances were not shown, so values are recorded, not judged; 30 spot references (spots 3–7) were not in the screenshots and are marked to be entered. Calculated RadMachine fields are entered by hand here.
+- Sphinx exports now fill tests by what they measure, so RadMachine-style names ("GTR5_Energy [100.00 MeV]: Spot1 Pos X [mm]") are filled as well as the portal's own.
+- "Linac 1 Synergy" renamed "Linac 1"; Setup QA action buttons line up between the two tables.
 - Renamed "UF Proton Machine QA Portal"; the header uses the UF Health deep navy (#0d1d3e) and orange (#f37021) sampled from the logo.
 - Machines are grouped Proton, Photon and Simulation (Big Bore CT, MRI Sim). Added Linac 1 Synergy and Ethos to Photon (no QA lists yet).
 - Setup QA's two tables share one width and column layout; on Machines, hovering a QA list row no longer matches the machine row colour.

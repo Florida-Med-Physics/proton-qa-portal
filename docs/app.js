@@ -915,7 +915,7 @@ async function renderLimits(assignmentId) {
 // Performing a QA list
 // ---------------------------------------------------------------------------
 
-function passFailInput(name, withWarning) {
+function passFailInput(name, withWarning, yesNo) {
   // A hidden value plus big buttons: one tap instead of opening a dropdown.
   // Pass / Fail for boolean tests; Pass / Warning / Fail for status tests (as on a RadMachine checklist).
   const value = el("input", { type: "hidden" });
@@ -925,7 +925,8 @@ function passFailInput(name, withWarning) {
     for (const b of buttons) b.classList.toggle("on", value.value === b.dataset.value);
     value.dispatchEvent(new Event("input"));
   };
-  const choices = withWarning ? [["pass", "Pass"], ["warn", "Warning"], ["fail", "Fail"]] : [["pass", "Pass"], ["fail", "Fail"]];
+  // Checks copied from RadMachine read No / Yes (Yes = pass); their unit is set to "Yes/No".
+  const choices = withWarning ? [["pass", "Pass"], ["warn", "Warning"], ["fail", "Fail"]] : yesNo ? [["fail", "No"], ["pass", "Yes"]] : [["pass", "Pass"], ["fail", "Fail"]];
   for (const [v, label] of choices) {
     buttons.push(el("button", { type: "button", class: `seg ${v}`, "data-value": v, "aria-label": `${name}: ${label.toLowerCase()}`, onclick: pick(v) }, label));
   }
@@ -934,10 +935,12 @@ function passFailInput(name, withWarning) {
 
 // Directions are shown with the test, numbered as in the template (1.01, 2.04, ...).
 const TEMPLATE_NUMBER = /^Template (\d+)\.(\d+)\.\s*/;
+// Lists copied from RadMachine keep its own section names: "Template 1.04. [Section: PBS DailyQA GTR5 - Sphinx] ...".
+const SECTION_NAME = /\[Section: ([^\]]+)\]\s*/;
+const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function helpText(description) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const m = TEMPLATE_NUMBER.exec(description);
-  const text = description.replace(TEMPLATE_NUMBER, "");
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").trim();
   return text ? el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text) : null;
 }
 
@@ -954,7 +957,8 @@ function sectionNumber(item) {
 }
 
 // Heading for a section: its number plus the categories in it (or a generic name when there are many).
-function sectionTitle(number, categories) {
+function sectionTitle(number, categories, named) {
+  if (named) return `${number}.0 ${named}`;
   const names = [...new Set(categories.map((c) => c || "General"))];
   const generic = { 0: "Setup", 1: "Safety", 2: "Mechanical and imaging", 3: "Dosimetry", 4: "Other" };
   const label = number === 0 ? generic[0] : names.length <= 2 ? names.join(" and ") : (generic[number] || "Other");
@@ -991,9 +995,10 @@ async function renderPerform(assignmentId) {
     overallChip.replaceChildren(done && done === required.length ? chip(worst, capitalize(worst)) : statuses.some((s) => s === "fail" || s === "warn") ? chip(worst, `${capitalize(worst)} so far`) : "");
     for (const s of sections) s.refresh();
   };
+  const named = t.items.some((i) => sectionNameOf(i));
   const byCategory = new Map();
   for (const item of t.items) {
-    const key = `${sectionNumber(item)}|${item.category || "General"}`;
+    const key = named ? `${sectionNumber(item)}|${sectionNameOf(item) || ""}` : `${sectionNumber(item)}|${item.category || "General"}`;
     if (!byCategory.has(key)) byCategory.set(key, []);
     byCategory.get(key).push(item);
   }
@@ -1006,14 +1011,14 @@ async function renderPerform(assignmentId) {
   let lastSection = null;
   for (const [key, items] of [...byCategory].sort(([a], [b]) => Number(a.split("|")[0]) - Number(b.split("|")[0]))) {
     const [n, category] = key.split("|");
-    const section = sectionTitle(Number(n), sectionCategories.get(n));
+    const section = sectionTitle(Number(n), sectionCategories.get(n), named ? category : null);
     const heading = section !== lastSection ? el("h2", { class: "section-head" }, section) : null;
     lastSection = section;
     const rows = [];
     const entries = [];
     for (const item of items) {
       let input, control;
-      if (item.type === "boolean" || item.type === "status") ({ value: input, control } = passFailInput(item.name, item.type === "status"));
+      if (item.type === "boolean" || item.type === "status") ({ value: input, control } = passFailInput(item.name, item.type === "status", item.unit === "Yes/No"));
       else if (item.type === "numeric") control = input = el("input", { type: "number", step: "any", class: "result-input", "aria-label": item.name });
       else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
       const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
@@ -1042,7 +1047,8 @@ async function renderPerform(assignmentId) {
       // As in the myQA template: the numbered title, then its directions block, then the result.
       const directions = helpText(item.description);
       rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
-        el("div", { class: "check-name" }, el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
+        el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, item.category) : null,
+          el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
           item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
         el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
         statusCell,
@@ -1251,7 +1257,7 @@ async function renderQueueEditor(id) {
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = (item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       const n = sectionNumber(t);
-      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n)))) : null;
+      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
       const directions = helpText(t.description);
       const dirRow = directions ? el("tr", { class: "directions-row" }, el("td", { colspan: 7 }, directions)) : null;
       lastSection = n;

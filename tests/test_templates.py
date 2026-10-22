@@ -70,7 +70,7 @@ class MigrationTests(unittest.TestCase):
         db = Database(":memory:")
         users = make_users(db)
         result = service.seed_defaults(db, users["admin"])
-        self.assertEqual(result["machines"], ["GTR1", "GTR2", "GTR5", "TrueBeam", "Linac 1 Synergy", "Ethos", "Big Bore CT (7064)", "MRI Sim"])
+        self.assertEqual(result["machines"], ["GTR1", "GTR2", "GTR5", "TrueBeam", "Linac 1", "Ethos", "Big Bore CT (7064)", "MRI Sim"])
         lists = {q["name"]: q for q in service.list_queues(db, users["admin"])}
         self.assertIn("Daily QA – TrueBeam", lists)
         self.assertIn("SRS QA – TrueBeam", lists)

@@ -451,3 +451,7 @@ td.right .row.nowrap.end { flex-wrap: nowrap; }
 .fixed-table tbody tr.machine-row:hover td { background: color-mix(in srgb, var(--uf-navy) 9%, var(--surface)); }
 .fixed-table tbody tr:not(.machine-row):hover td { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
 :root[data-theme="dark"] .fixed-table tbody tr.machine-row td, :root[data-theme="dark"] .fixed-table tbody tr.machine-row:hover td { background: color-mix(in srgb, #ffffff 7%, var(--surface)); }
+/* Buttons start at the same x in every row and table, so the columns line up top to bottom. */
+.fixed-table td.right { text-align: left; }
+.fixed-table td.right .row.nowrap.end { justify-content: flex-start; }
+.category-tag { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }

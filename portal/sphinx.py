@@ -186,3 +186,26 @@ def parse_file(data, filename=""):
     parsed["filename"] = filename
     parsed["sha256"] = hashlib.sha256(data).hexdigest()
     return parsed
+
+
+def canonical_key(name):
+    """What a Sphinx value measures, independent of wording, so one export fills tests named either
+    'Spot 1 [100 MeV] – Position X' or 'GTR5_Energy [100.00 MeV]: Spot1 Pos X [mm]' (RadMachine).
+    Returns None for anything that is not a Sphinx measurement."""
+    n = re.sub(r"\s+", " ", (name or "").lower())
+    metric = None
+    for pattern, key in ((r"distal fall ?off|\bdfo\b", "dfo"), (r"distal depth", "distal"), (r"proximal depth", "proximal"),
+                         (r"\bpos(ition)? x\b", "pos_x"), (r"\bpos(ition)? y\b", "pos_y"), (r"sigma x", "sigma_x"), (r"sigma y", "sigma_y"),
+                         (r"skewness x", "skew_x"), (r"skewness y", "skew_y"), (r"intensity", "intensity"),
+                         (r"homogeneity|flatness", "flatness"), (r"absolute dose", "output"),
+                         (r"coincidence.*(x offset|distance x)", "coin_x"), (r"coincidence.*(y offset|distance y)", "coin_y"),
+                         (r"\bwidth\b", "width")):
+        if re.search(pattern, n):
+            metric = key
+            break
+    if metric is None:
+        return None
+    spot = re.search(r"spot ?(\d+)", n)
+    energy = nominal_energy(name) if metric in ("dfo", "distal", "proximal", "width") or spot else None
+    return f"{metric}|{energy or ''}|{spot[1] if spot else ''}"
+
