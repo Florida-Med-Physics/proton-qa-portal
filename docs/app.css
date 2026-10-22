@@ -835,3 +835,7 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .more-item { text-align: left; background: none; border: 0; padding: 7px 10px; border-radius: 5px; cursor: pointer; color: var(--text); font: inherit; font-size: 14px; }
 .more-item:hover { background: var(--surface-2); }
 .icon-actions { flex-wrap: nowrap !important; }
+
+/* Dashboard: pass ring beside the last result. */
+td.last-result { display: flex; align-items: center; gap: 10px; }
+td.last-result .ring.mini .ring-svg { width: 46px; height: 46px; }

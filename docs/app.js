@@ -344,6 +344,18 @@ function homeIcon() {
 async function renderHome() {
   const data = await api("GET", "/api/dashboard");
   page("Dashboard", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
+  // Pass / warning / action counts of each machine's most recent run, for the ring beside its last result.
+  const lastCounts = {};
+  await Promise.all(data.machines.map(async (m) => {
+    const lasts = m.queues.filter((q) => q.last_run).sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""));
+    if (!lasts.length) return;
+    try {
+      const run = await api("GET", `/api/runs/${lasts[0].last_run.id}`);
+      const c = { pass: 0, warn: 0, fail: 0 };
+      for (const r of run.results || []) if (r.status in c) c[r.status]++;
+      lastCounts[m.id] = c;
+    } catch (err) { console.error(err); }
+  }));
   const queues = data.machines.flatMap((m) => m.queues);
   const todo = queues.filter((q) => q.state === "due" || q.state === "overdue");
   const overdue = queues.filter((q) => q.state === "overdue").length;
@@ -366,7 +378,7 @@ async function renderHome() {
         el("td", {}, el("strong", {}, m.name)),
         el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small" }, q.queue_name)) : el("span", { class: "muted small" }, "None")),
         el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? (([q]) => dueIn(q.next_due, q.frequency))(m.queues.filter((q) => q.state === "due").sort((x, y) => x.next_due.localeCompare(y.next_due))) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
-        el("td", {}, lastRun ? [chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`)] : el("span", { class: "muted small" }, "No runs yet")),
+        el("td", { class: "last-result" }, lastRun ? [lastCounts[m.id] ? miniRing(lastCounts[m.id]) : null, el("span", {}, chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`))] : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));
     });
