@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Trend charts: the absolute view of an X / Y / Z set is drawn as stacked subplots (one per axis, each on its own scale around its own reference) instead of one squashed axis.
 - Trend charts have a true calendar x-axis with a vertical line at each month (labelled every few months), the within-warning band is green again, and clicking a dot lights it up with its date, value and Δ (click again to clear).
 - Trend charts: "Δ" is never spelled out; the statistics read "Mean ± SD · 95% CI · n · range · biggest outlier (date)", the biggest outlier is ringed on the chart, and the within-warning band is baby blue.
 - Trend charts: the two views are "Absolute <unit>" and "Delta from Reference", the axis keeps the unit in both, the band inside the warning limits is green and the band between warning and action is orange, named "Within Warning" and "Warning to Action" in the key.

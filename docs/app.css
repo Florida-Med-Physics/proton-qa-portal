@@ -818,3 +818,8 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .chart .dot.selected, .spark .dot.selected { stroke: var(--uf-orange); stroke-width: 3; r: 6; }
 .dot-label rect { fill: var(--surface); stroke: var(--uf-orange); stroke-width: 1.5; }
 .dot-label text { fill: var(--text); font-size: 13px; font-weight: 600; }
+
+/* Stacked subplots for the absolute view of X / Y / Z. */
+.subplot { margin-top: 6px; }
+.subplot-title { font-weight: 700; font-size: 15px; margin: 4px 0 2px; }
+.chart-box.small .subplot-title { font-size: 13px; }

@@ -2255,6 +2255,19 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);
+    // Absolute view of several series (X and Y sit around different references): one subplot per series, stacked,
+    // each on its own scale with its own reference line and bands.
+    if (multi && !delta) {
+      box.replaceChildren(buttons, ...series.map((x) => el("div", { class: "subplot" },
+        el("div", { class: "subplot-title" }, x.label),
+        drawSeries([x], unit, { small, delta: false }),
+        el("div", { class: "chart-key" },
+          el("span", { class: "key-item" }, el("span", { class: "key-swatch line single" }), x.label),
+          x.points.some((pt) => pt.expected !== null && pt.expected !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), "Reference") : null,
+          x.points.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
+          x.points.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null))));
+      return;
+    }
     const drawRef = hasRef && !(multi && !delta);
     const key = el("div", { class: "chart-key" },
       series.map((x, k) => el("span", { class: "key-item" }, el("span", { class: `key-swatch line ${multi ? `axis-${k}` : "single"}` }), `${x.label}${delta ? " (Δ)" : ""}`)),
