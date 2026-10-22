@@ -378,7 +378,7 @@ async function renderDashboard() {
         const due = startable(q.state);
         const last = q.last_run;
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
-          el("td", {}, i === 0 ? el("strong", {}, machine.name) : ""),
+          el("td", {}, el("strong", {}, machine.name)),
           el("td", {}, q.queue_name, el("div", { class: "muted small" }, q.schedule)),
           el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
@@ -821,7 +821,7 @@ function helpText(description) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
   const m = TEMPLATE_NUMBER.exec(description);
   const text = description.replace(TEMPLATE_NUMBER, "");
-  return text ? el("div", { class: "directions pre" }, m ? el("span", { class: "muted" }, `${m[1]}.${m[2]} · `) : null, text) : null;
+  return text ? el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text) : null;
 }
 
 // Which numbered section a test belongs to: the template number in its directions ("Template 2.03.") when
@@ -839,8 +839,8 @@ function sectionNumber(item) {
 // Heading for a section: its number plus the categories in it (or a generic name when there are many).
 function sectionTitle(number, categories) {
   const names = [...new Set(categories.map((c) => c || "General"))];
-  const generic = { 1: "Safety", 2: "Mechanical and imaging", 3: "Dosimetry", 4: "Other" };
-  const label = names.length <= 2 ? names.join(" and ") : (generic[number] || "Other");
+  const generic = { 0: "Setup", 1: "Safety", 2: "Mechanical and imaging", 3: "Dosimetry", 4: "Other" };
+  const label = number === 0 ? generic[0] : names.length <= 2 ? names.join(" and ") : (generic[number] || "Other");
   return `${number}.0 ${label}`;
 }
 
@@ -859,7 +859,7 @@ async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
   page(t.queue.name, t.assignment.schedule);
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "0.0 Setup")), el("div", { class: "pre" }, t.queue.description)));
+    app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
   }
   const inputs = [];
   const sections = [];
@@ -922,9 +922,12 @@ async function renderPerform(assignmentId) {
       input.addEventListener("change", update);
       inputs.push(entry);
       entries.push(entry);
-      rows.push(el("div", { class: "check-row" },
-        el("div", { class: "check-name" }, el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)} ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
-          item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note, helpText(item.description)),
+      // As in the myQA template: the numbered title, then its directions block, then the result.
+      const directions = helpText(item.description);
+      rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
+        el("div", { class: "check-name" }, el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
+          item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
+        directions,
         el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
         statusCell,
         el("div", { class: "check-note" }, noteToggle, comment)));

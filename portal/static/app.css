@@ -393,3 +393,10 @@ td .muted.small, td.small { overflow-wrap: break-word; }
 td.trend-cell, td.folder-cell { max-width: none; }
 .folder-cell button { white-space: nowrap; flex: none; }
 .folder-cell input { width: 360px; }
+
+/* Perform: title, then the directions block across the row, then the result (as in the myQA template). */
+.check-row.with-directions .check-name { grid-column: 1 / -1; }
+.check-row.with-directions .directions { grid-column: 1 / -1; }
+.check-row.with-directions .check-input { grid-column: 2; }
+.directions { margin: 0; padding: 10px 12px; border-left: 3px solid var(--uf-orange); background: var(--surface-2); border-radius: 6px; color: var(--text); font-size: 13px; }
+.directions-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 4px; }

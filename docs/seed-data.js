@@ -8,8 +8,14 @@ window.PORTAL_SEED = {
    "kind": "Proton gantry",
    "list": "Daily QA",
    "frequency": "daily",
-   "setup": "Daily QA protocol, in accordance with TG-224\n\nLast updated August, 2026.\n\nPatient Name:  QA G2 PBS\n\nIs loading bar shifted to Gantry 270. \nIs RS taken off?\nIs Snout Retracted?\nIs Electrometer setup, turn on voltage, set to -300V. \nCompensate and Run Background.\n\nBegin Imaging protocol: \nIndex to Sphinx to H3. \nValidate PPC05 is correct number.\nSet DCEU to at least 800.",
+   "setup": "Daily QA protocol, in accordance with TG-224\n\nLast updated August, 2026.",
    "checks": [
+    {
+     "category": "Other",
+     "name": "Other – Daily QA Setup",
+     "type": "boolean",
+     "description": "Template 0.01. Patient Name:  QA G2 PBS\n\nIs loading bar shifted to Gantry 270. \nIs RS taken off?\nIs Snout Retracted?\nIs Electrometer setup, turn on voltage, set to -300V. \nCompensate and Run Background.\n\nBegin Imaging protocol: \nIndex to Sphinx to H3. \nValidate PPC05 is correct number.\nSet DCEU to at least 800."
+    },
     {
      "category": "Safety",
      "name": "Safety – Door interlock",
@@ -211,7 +217,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Patient Name:  QA G2 PBS\n\nDocument MUs\nDocument Charge\nRun Sphinx Analysis\n\nCompleting TG-224: \n\nImaging: \n- X-ray and proton beam isocenter coincidence < 1mm (Spot)\n\nDosimetry: \n- Output < 3% for different energies on different days with one consistent field.  (Output)\n- Distal Depth: 1mm at distal 90% depth dose. (Energy)\n- Spot position: 2mm/1mm absolute/relative. (Spot) Measured by Sphinx; template label: Energy [100.81 MeV] – Distal Depth."
+     "description": "Template 3.01. Patient Name:  QA G2 PBS\n\nDocument MUs\nDocument Charge\nRun Sphinx Analysis\n\nCompleting TG-224: \n\nImaging: \n- X-ray and proton beam isocenter coincidence < 1mm (Spot)\n\nDosimetry: \n- Output < 3% for different energies on different days with one consistent field.  (Output)\n- Distal Depth: 1mm at distal 90% depth dose. (Energy)\n- Spot position: 2mm/1mm absolute/relative. (Spot)"
     },
     {
      "category": "Energy",
@@ -222,7 +228,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.2,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [100.81 MeV] – DFO."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -233,7 +239,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [100.81 MeV] – Proximal Depth."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -244,7 +250,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.2,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [100.81 MeV] – Width."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -255,7 +261,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [150.09 MeV] – Distal Depth."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -266,7 +272,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.2,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [150.09 MeV] – DFO."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -277,7 +283,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [150.09 MeV] – Proximal Depth."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -288,7 +294,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.2,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [150.09 MeV] – Width."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -299,7 +305,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [200.26 MeV] – Distal Depth."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -310,7 +316,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.2,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [200.26 MeV] – DFO."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -321,7 +327,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [200.26 MeV] – Proximal Depth."
+     "description": "Template 3.01."
     },
     {
      "category": "Energy",
@@ -332,7 +338,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.2,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Energy [200.26 MeV] – Width."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -343,7 +349,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Position X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -354,7 +360,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Position Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -365,7 +371,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.6,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Sigma X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -376,7 +382,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.6,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Sigma Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -387,7 +393,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Skewness X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -398,7 +404,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Skewness Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -409,7 +415,7 @@ window.PORTAL_SEED = {
      "warn": 12.0,
      "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 1 [226.4 MeV] – Intensity."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -420,7 +426,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Position X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -431,7 +437,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Position Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -442,7 +448,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Sigma X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -453,7 +459,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Sigma Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -464,7 +470,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Skewness X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -475,7 +481,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Skewness Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -486,7 +492,7 @@ window.PORTAL_SEED = {
      "warn": 12.0,
      "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 2 [201.0 MeV ] – Intensity."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -497,7 +503,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Position X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -508,7 +514,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Position Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -519,7 +525,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Sigma X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -530,7 +536,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Sigma Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -541,7 +547,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Skewness X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -552,7 +558,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Skewness Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -563,7 +569,7 @@ window.PORTAL_SEED = {
      "warn": 12.0,
      "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 3 [180.10 MeV] – Intensity."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -574,7 +580,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Position X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -585,7 +591,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Position Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -596,7 +602,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Sigma X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -607,7 +613,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Sigma Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -618,7 +624,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Skewness X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -629,7 +635,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Skewness Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -640,7 +646,7 @@ window.PORTAL_SEED = {
      "warn": 2.5,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 4 [160.7 MeV] – Intensity."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -651,7 +657,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Position X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -662,7 +668,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Position Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -673,7 +679,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Sigma X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -684,7 +690,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Sigma Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -695,7 +701,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Skewness X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -706,7 +712,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Skewness Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -717,7 +723,7 @@ window.PORTAL_SEED = {
      "warn": 2.5,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 5 [140.6 MeV] – Intensity."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -728,7 +734,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Position X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -739,7 +745,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Position Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -750,7 +756,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Sigma X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -761,7 +767,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Sigma Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -772,7 +778,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Skewness X."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -783,7 +789,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Skewness Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Spot",
@@ -794,7 +800,7 @@ window.PORTAL_SEED = {
      "warn": 2.5,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Spot 6 [120.6 MeV] – Intensity."
+     "description": "Template 3.01."
     },
     {
      "category": "Coincidence",
@@ -805,7 +811,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Iso Coincidence – Distance X."
+     "description": "Template 3.01."
     },
     {
      "category": "Coincidence",
@@ -816,7 +822,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Iso Coincidence – Distance Y."
+     "description": "Template 3.01."
     },
     {
      "category": "Homogeneity",
@@ -827,7 +833,7 @@ window.PORTAL_SEED = {
      "warn": 2.0,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.01. Measured by Sphinx; template label: Flatness."
+     "description": "Template 3.01."
     },
     {
      "category": "Output",
@@ -838,7 +844,7 @@ window.PORTAL_SEED = {
      "warn": 2.0,
      "fail": 3.0,
      "tol_mode": "percent",
-     "description": "Template 3.01. Measured by Sphinx; template label: PPC-05-862 – Absolute Dose."
+     "description": "Template 3.01."
     }
    ]
   },

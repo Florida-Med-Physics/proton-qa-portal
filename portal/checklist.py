@@ -36,19 +36,12 @@ def parse_rows(rows):
             current = {"number": f"{title[1]}.{title[2]}", "section": section, "title": label, "category": None,
                        "instructions": "", "rows": []}
             header = None
-            if section == 0:
-                current["setup"] = True
-            else:
-                checks.append(current)
+            checks.append(current)
             continue
         if current is not None and current["section"] >= 3:
             _sphinx_row(current, sph, cells, by_col, first)
             continue
         if current is None or not first:
-            continue
-        if current.get("setup"):
-            if first not in ("Other", "Acceptance Criteria", "Functional") and len(first) > 40:
-                setup = first.strip()
             continue
         if current["category"] is None:
             current["category"] = first.strip()
@@ -63,6 +56,8 @@ def parse_rows(rows):
                 "warn": _number(by_col.get(header.get("warn"))),
                 "fail": _number(by_col.get(header.get("fail"))),
             })
+        elif first in ("Functional",):
+            continue                                     # the result type: pass/fail
         elif not current["instructions"]:
             current["instructions"] = first.strip()
     if not checks:
@@ -110,11 +105,12 @@ def to_tests(parsed):
                 if row["category"] == "Spot" and row["item"] not in spots:
                     spots[row["item"]] = spot_number(row["item"]) or len(spots) + 1
                 label = f"{row['item']} – {row['name']}" if row["item"] != row["category"] else row["name"]
+                # The section's directions sit on its first test; the rest carry only the template number.
                 note = description if i == 0 else f"Template {check['number']}."
                 tests.append({"category": row["category"], "type": "numeric", "unit": row["unit"],
                               "name": standard_name(row["category"], row["item"], row["name"], spots.get(row["item"])),
                               "expected": row["expected"], "warn": row["warn"], "fail": row["fail"], "tol_mode": row["tol_mode"],
-                              "description": f"{note} Measured by Sphinx; template label: {label}."})
+                              "description": note})
             continue
         if not check["rows"]:
             tests.append({"category": category, "name": f"{category} – {check['title']}", "type": "boolean", "description": description})
