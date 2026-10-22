@@ -1217,6 +1217,13 @@ function wireCalculations(entries) {
     const m = MARKER.exec(e.item.description || "");
     if (!m) return;
     const kind = m[2].trim();
+    if (m[1] === "auto" && kind === "sphinx-finished") {
+      e.input.readOnly = true;
+      e.input.placeholder = "from file";
+      e.input.classList.add("from-file");
+      e.input.title = "Acquisition date and time from the Sphinx export";
+      return;
+    }
     if (m[1] === "auto" && kind === "user") {
       e.input.value = state.user.full_name || state.user.username;
       e.input.readOnly = true;
@@ -1406,7 +1413,7 @@ async function renderPerform(assignmentId) {
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader !== "Test" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "22%", "5%", "7%", "15%", "8%", "8%", "5%", "23%", "4%"];
+      const widths = firstHeader !== "Test" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "30%", "5%", "7%", "13%", "8%", "8%", "5%", "17%", "4%"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
@@ -1497,8 +1504,8 @@ async function renderPerform(assignmentId) {
         const left = req.filter((e) => !e.status()).length;
         const bad = s.filter((x) => x === "fail").length;
         const warn = s.filter((x) => x === "warn").length;
-        summary.replaceChildren(left ? `${left} to do` : "All done",
-          bad ? [" · ", chip("fail", `${bad} action`)] : "", warn ? [" · ", chip("warn", `${warn} warning`)] : "");
+        summary.replaceChildren(...present([left ? `${left} to do` : "All done",
+          bad ? [" · ", chip("fail", `${bad} action`)] : null, warn ? [" · ", chip("warn", `${warn} warning`)] : null]));
       },
       settled() {
         return entries.every((e) => !e.required || e.status() === "pass" || e.status() === "recorded");
@@ -1515,6 +1522,11 @@ async function renderPerform(assignmentId) {
     const p = await api("POST", `/api/assignments/${assignmentId}/sphinx/preview`, { file: state.sphinxFile });
     sourceRef = p.source_ref;
     qaDate.value = p.qa_date;
+    // Fields marked [auto: sphinx-finished] take the export's acquisition date and time.
+    for (const e of inputs) {
+      const mk = MARKER.exec(e.item.description || "");
+      if (mk && mk[1] === "auto" && mk[2].trim() === "sphinx-finished") { e.input.value = String(p.finished || p.qa_date).replace("T", " "); e.input.dispatchEvent(new Event("input")); }
+    }
     const byTest = Object.fromEntries(inputs.map((i) => [i.item.test_id, i]));
     for (const m of p.matched) {
       const entry = byTest[m.test_id];

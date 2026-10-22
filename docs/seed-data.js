@@ -1543,16 +1543,10 @@ window.PORTAL_SEED = {
      "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] Calculated here: dose [cGy] = charge [nC] × 10⁻⁹ × overall calibration factor [Gy/C] × kTP × 100 (physicist to confirm the formula matches RadMachine)."
     },
     {
-     "category": "Dosimetry",
-     "name": "File_GTR5_Sphinx_DQA_Results",
-     "type": "text",
-     "description": "Template 3.10. [Section: Sphinx Measurements] Load the Sphinx export in the Measurement file step above; it fills in every Sphinx value."
-    },
-    {
      "category": "Data",
-     "name": "DailyQA_Sphinx_GTR5: Acquisition Date and Time",
+     "name": "Sphinx acquisition date and time",
      "type": "text",
-     "description": "Template 3.11. [Section: Sphinx Measurements] From the Sphinx export."
+     "description": "Template 3.10. [Section: Sphinx Measurements] [auto: sphinx-finished] Filled in from the Sphinx export file."
     },
     {
      "category": "Dosimetry",
@@ -1561,7 +1555,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 77.7,
      "tol_mode": "absolute",
-     "description": "Template 3.12. [Section: Sphinx Measurements]",
+     "description": "Template 3.11. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -1572,7 +1566,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 2.3,
      "tol_mode": "absolute",
-     "description": "Template 3.13. [Section: Sphinx Measurements]",
+     "description": "Template 3.12. [Section: Sphinx Measurements]",
      "warn": 0.1,
      "fail": 0.2
     },
@@ -1583,7 +1577,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 72.1,
      "tol_mode": "absolute",
-     "description": "Template 3.14. [Section: Sphinx Measurements]",
+     "description": "Template 3.13. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -1594,7 +1588,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5.6,
      "tol_mode": "absolute",
-     "description": "Template 3.15. [Section: Sphinx Measurements]",
+     "description": "Template 3.14. [Section: Sphinx Measurements]",
      "warn": 0.1,
      "fail": 0.2
     },
@@ -1605,7 +1599,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 158.5,
      "tol_mode": "absolute",
-     "description": "Template 3.16. [Section: Sphinx Measurements]",
+     "description": "Template 3.15. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -1616,7 +1610,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 3.9,
      "tol_mode": "absolute",
-     "description": "Template 3.17. [Section: Sphinx Measurements]",
+     "description": "Template 3.16. [Section: Sphinx Measurements]",
      "warn": 0.1,
      "fail": 0.2
     },
@@ -1627,7 +1621,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 149.3,
      "tol_mode": "absolute",
-     "description": "Template 3.18. [Section: Sphinx Measurements]",
+     "description": "Template 3.17. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -1638,7 +1632,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 9.2,
      "tol_mode": "absolute",
-     "description": "Template 3.19. [Section: Sphinx Measurements]",
+     "description": "Template 3.18. [Section: Sphinx Measurements]",
      "warn": 0.1,
      "fail": 0.2
     },
@@ -1649,7 +1643,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 260.7,
      "tol_mode": "absolute",
-     "description": "Template 3.20. [Section: Sphinx Measurements]",
+     "description": "Template 3.19. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -1660,7 +1654,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5.2,
      "tol_mode": "absolute",
-     "description": "Template 3.21. [Section: Sphinx Measurements]",
+     "description": "Template 3.20. [Section: Sphinx Measurements]",
      "warn": 0.1,
      "fail": 0.2
     },
@@ -1671,7 +1665,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 250.8,
      "tol_mode": "absolute",
-     "description": "Template 3.22. [Section: Sphinx Measurements]",
+     "description": "Template 3.21. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -1682,7 +1676,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 9.9,
      "tol_mode": "absolute",
-     "description": "Template 3.23. [Section: Sphinx Measurements]",
+     "description": "Template 3.22. [Section: Sphinx Measurements]",
      "warn": 0.1,
      "fail": 0.2
     },
@@ -1695,7 +1689,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.24. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.23. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1706,7 +1700,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.25. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.24. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1717,7 +1711,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.6,
      "tol_mode": "absolute",
-     "description": "Template 3.26. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.25. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1728,7 +1722,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.6,
      "tol_mode": "absolute",
-     "description": "Template 3.27. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.26. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1739,7 +1733,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.28. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.27. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1750,7 +1744,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.29. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.28. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1761,7 +1755,7 @@ window.PORTAL_SEED = {
      "warn": 12.0,
      "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 3.30. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.29. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1772,7 +1766,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.31. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.30. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1783,7 +1777,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.32. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.31. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1794,7 +1788,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.33. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.32. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1805,7 +1799,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.34. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.33. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1816,7 +1810,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.35. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.34. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1827,7 +1821,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.36. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.35. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1838,7 +1832,7 @@ window.PORTAL_SEED = {
      "warn": 12.0,
      "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 3.37. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.36. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1849,7 +1843,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.38. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.37. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1860,7 +1854,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.39. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.38. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1871,7 +1865,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.40. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.39. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1882,7 +1876,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 3.41. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.40. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1893,7 +1887,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.42. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.41. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1904,7 +1898,7 @@ window.PORTAL_SEED = {
      "warn": 0.8,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.43. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.42. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1915,7 +1909,7 @@ window.PORTAL_SEED = {
      "warn": 12.0,
      "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 3.44. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.43. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1926,7 +1920,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.45. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.44. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1937,7 +1931,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.46. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.45. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1948,7 +1942,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.47. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.46. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1959,7 +1953,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.48. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.47. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1970,7 +1964,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.49. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.48. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1981,7 +1975,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.50. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.49. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -1992,7 +1986,7 @@ window.PORTAL_SEED = {
      "warn": 2.5,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.51. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.50. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2003,7 +1997,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.52. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.51. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2014,7 +2008,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.53. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.52. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2025,7 +2019,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.54. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.53. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2036,7 +2030,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.55. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.54. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2047,7 +2041,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.56. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.55. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2058,7 +2052,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.57. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.56. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2069,7 +2063,7 @@ window.PORTAL_SEED = {
      "warn": 2.5,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.58. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.57. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2080,7 +2074,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.59. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.58. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2091,7 +2085,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.60. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.59. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2102,7 +2096,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.61. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.60. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2113,7 +2107,7 @@ window.PORTAL_SEED = {
      "warn": 0.4,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 3.62. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.61. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2124,7 +2118,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.63. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.62. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2135,7 +2129,7 @@ window.PORTAL_SEED = {
      "warn": 0.25,
      "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 3.64. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.63. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Spot",
@@ -2146,7 +2140,7 @@ window.PORTAL_SEED = {
      "warn": 2.5,
      "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 3.65. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+     "description": "Template 3.64. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Dosimetry",
@@ -2155,7 +2149,7 @@ window.PORTAL_SEED = {
      "unit": "%",
      "expected": 1.7,
      "tol_mode": "absolute",
-     "description": "Template 3.66. [Section: Sphinx Measurements]",
+     "description": "Template 3.65. [Section: Sphinx Measurements]",
      "warn": 2.0,
      "fail": 3.0
     },
@@ -2166,7 +2160,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.67. [Section: Sphinx Measurements]",
+     "description": "Template 3.66. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -2177,7 +2171,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.68. [Section: Sphinx Measurements]",
+     "description": "Template 3.67. [Section: Sphinx Measurements]",
      "warn": 0.5,
      "fail": 1.0
     },

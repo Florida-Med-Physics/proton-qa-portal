@@ -1033,6 +1033,30 @@
   ];
   function spellOutNames() {
     let n = 0;
+    // Sphinx list: the file-name item is gone (the file is chosen in the Measurement file step) and the acquisition
+    // date/time is filled from the export; numbering in section 3 closes up.
+    for (const q of S.queues) {
+      const items = S.queue_items.filter((i) => i.queue_id === q.id).sort((a, b) => a.position - b.position);
+      let touched = false;
+      for (const i of items) {
+        const t = byId("tests", i.test_id);
+        if (!t) continue;
+        if (t.name === "File_GTR5_Sphinx_DQA_Results" && !S.results.some((r) => r.test_id === t.id)) {
+          S.queue_items = S.queue_items.filter((x) => x !== i); S.tests = S.tests.filter((x) => x.id !== t.id); touched = true; n++;
+        } else if (t.name === "DailyQA_Sphinx_GTR5: Acquisition Date and Time") {
+          t.name = "Sphinx acquisition date and time"; t.description = (t.description || "").replace("From the Sphinx export.", "[auto: sphinx-finished] Filled in from the Sphinx export file."); touched = true; n++;
+        }
+      }
+      if (touched) {
+        const count = {};
+        for (const i of S.queue_items.filter((x) => x.queue_id === q.id).sort((a, b) => a.position - b.position)) {
+          const t = byId("tests", i.test_id); const m = /^Template (\d+)\.(\d+)\./.exec(t && t.description || "");
+          if (!m) continue;
+          count[m[1]] = (count[m[1]] || 0) + 1;
+          t.description = `Template ${m[1]}.${String(count[m[1]]).padStart(2, "0")}.` + t.description.slice(m[0].length);
+        }
+      }
+    }
     const old = S.queues.find((q) => q.is_template && q.name === "PBS DailyQA GTR5 - Sphinx");
     if (old) { old.name = "PBS DailyQA Template - Sphinx"; n++; }
     for (const t of S.tests) {
