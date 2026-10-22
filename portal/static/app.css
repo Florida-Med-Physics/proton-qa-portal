@@ -375,3 +375,9 @@ td.indent { padding-left: 28px; }
 .dot.st-fail { stroke: var(--fail); stroke-width: 2.5; }
 .dot.single.st-warn { fill: var(--warn); } .dot.single.st-fail { fill: var(--fail); }
 .legend .dot-key { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+
+/* Admin tab. */
+td.center { text-align: center; }
+.tick { color: var(--pass); font-weight: 700; }
+.folder-cell { min-width: 320px; }
+.folder-cell input { min-width: 260px; }

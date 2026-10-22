@@ -220,9 +220,10 @@ function evaluate(type, value, limits) {
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
   ["#/", "Perform QA", null, ["#/", "#", "#/perform", "#/runs"]],
-  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/users", "#/audit"]],
+  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit"]],
   ["#/machines", "Machines", "configure", ["#/machines", "#/assignments"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
+  ["#/admin", "Admin", "configure", ["#/admin", "#/users"]],
 ];
 
 // Dark mode on/off, remembered on this computer (same control as the TrueBeam Service Log).
@@ -294,6 +295,7 @@ async function logout() {
 const ROUTES = [
   [/^#?\/?$/, renderDashboard],
   [/^#\/setup$/, renderSetup],
+  [/^#\/admin$/, renderAdmin],
   [/^#\/machines$/, renderMachines],
   [/^#\/machines\/(\d+)$/, renderMachine],
   [/^#\/assignments\/(\d+)\/limits$/, renderLimits],
@@ -682,6 +684,12 @@ function importFolderCard(assignmentId, onPick) {
         return;
       }
       const newest = r.files.find((f) => !f.run_id);
+      if (newest && !card.dataset.autoRead) {
+        card.dataset.autoRead = "1";
+        api("GET", `/api/assignments/${assignmentId}/file?path=${encodeURIComponent(newest.path)}`)
+          .then((file) => { onPick(file); toast(`Read in ${newest.name} automatically`); })
+          .catch((err) => toast(err.message, true));
+      }
       body.replaceChildren(
         el("div", { class: "muted small" }, `${r.folder} · newest first`),
         el("table", { class: "compact" }, el("tbody", {}, r.files.map((f) => el("tr", {},
@@ -1677,6 +1685,93 @@ function userForm(user) {
     field(user ? "New password (leave blank to keep)" : "Temporary password", el("input", { name: "password", type: "password", autocomplete: "new-password", minlength: 10, required: !user })),
     user ? el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!u.active }), "Active") : null,
     el("p", { class: "muted small wide" }, "Admins manage users. Physicists configure machines, queues and limits, and review runs. Therapists perform QA."));
+}
+
+// Admin: who can sign in and what they may do, and the folders each QA list reads its export files from.
+const RIGHTS = [
+  ["perform", "Perform QA"],
+  ["review", "Review and approve"],
+  ["configure", "Set up QA lists, machines, limits and folders"],
+  ["manage_users", "Manage users"],
+];
+const ROLE_RIGHTS = { admin: ["perform", "review", "configure", "manage_users"], physicist: ["perform", "review", "configure"], therapist: ["perform"] };
+
+async function renderAdmin() {
+  page("Admin", "Users and their rights, and the folders export files are read from.");
+  const [users, machines] = await Promise.all([can("manage_users") ? api("GET", "/api/users") : null, api("GET", "/api/machines")]);
+
+  // 1. Users and rights (admins only; others see what each role may do).
+  app.append(el("h2", { class: "section-head" }, "Users and rights"));
+  if (!users) {
+    app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"),
+      table(["Role", ...RIGHTS.map(([, label]) => label)], Object.entries(ROLE_RIGHTS).map(([role, rights]) => el("tr", {},
+        el("td", {}, el("strong", {}, ROLE_LABEL[role])), RIGHTS.map(([key]) => el("td", { class: "center" }, rights.includes(key) ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—")))))));
+  }
+  if (users) app.append(
+    el("p", { class: "row" }, el("span", { class: "muted" }, "Rights come from each person's role."), el("span", { class: "spacer" }),
+      el("button", { class: "primary", onclick: () => modal("Add user", userForm(), async (data) => {
+        await api("POST", "/api/users", data);
+        toast("User added");
+        route();
+      }) }, "Add user")));
+  const tick = (on) => el("td", { class: "center" }, on ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—"));
+  if (users) app.append(table(["Username", "Name", "Role", ...RIGHTS.map(([, label]) => label), "Status", ""], users.map((u) => el("tr", {},
+    el("td", {}, el("strong", {}, u.username)),
+    el("td", {}, u.full_name),
+    el("td", {}, ROLE_LABEL[u.role]),
+    RIGHTS.map(([key]) => tick(ROLE_RIGHTS[u.role].includes(key))),
+    el("td", {}, u.active ? chip("pass", "Active") : chip("", "Disabled")),
+    el("td", { class: "right" }, el("button", { class: "small", onclick: () => modal(`Edit ${u.username}`, userForm(u), async (data) => {
+      await api("PUT", `/api/users/${u.id}`, data);
+      toast("User saved");
+      route();
+    }) }, "Edit"))))));
+
+  // 2. Import folders: one per scheduled QA list. When a list has a folder, its newest unrecorded export
+  // is read automatically when someone starts that list's QA (no file dialog).
+  app.append(el("h2", { class: "section-head" }, "Import folders (auto-read)"),
+    el("p", { class: "muted" }, window.localApi
+      ? "Choose the folder each list's export files (Sphinx .xls) are saved to. When QA is started, the newest file not yet recorded is read in automatically. Folders are remembered in this browser on this computer (Chrome or Edge)."
+      : "The folder (on this PC or a network share it can read) each list's export files (Sphinx .xls) are saved to. When QA is started, the newest file not yet recorded is read in automatically."));
+  const rows = [];
+  for (const m of machines.filter((x) => x.active)) {
+    for (const a of await api("GET", `/api/machines/${m.id}/assignments`)) {
+      const status = el("span", { class: "muted small" }, a.import_folder ? "Checking…" : "No folder");
+      const check = async () => {
+        if (!a.import_folder && !window.localApi) { status.textContent = "No folder"; return; }
+        try {
+          const r = await api("GET", `/api/assignments/${a.id}/files`);
+          if (r.permission === "none" && window.localApi) { status.textContent = "No folder chosen on this computer"; return; }
+          if (r.permission && r.permission !== "granted" && r.permission !== "none") { status.textContent = "Needs permission again (open the list's Perform page)"; return; }
+          const waiting = r.files.filter((f) => !f.run_id).length;
+          status.replaceChildren(chip(waiting ? "due" : "pass", `${r.files.length} files · ${waiting} not yet recorded`));
+        } catch (err) {
+          status.replaceChildren(el("span", { class: "error small" }, err.message));
+        }
+      };
+      let pathCell;
+      if (window.localApi) {
+        pathCell = importFolderField(a);
+      } else {
+        const input = el("input", { value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\…\\ProtonDaily\\G1 Sphinx" });
+        const save = el("button", { class: "small primary", onclick: async () => {
+          try {
+            await api("PUT", `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(",").map(Number),
+              start_date: a.start_date, active: !!a.active, import_folder: input.value.trim() });
+            a.import_folder = input.value.trim();
+            toast("Folder saved");
+            check();
+          } catch (err) {
+            toast(err.message, true);
+          }
+        } }, "Save");
+        pathCell = el("div", { class: "row nowrap" }, input, save);
+      }
+      rows.push(el("tr", {}, el("td", {}, el("strong", {}, m.name)), el("td", {}, a.queue_name), el("td", { class: "folder-cell" }, pathCell), el("td", {}, status)));
+      check();
+    }
+  }
+  app.append(table(["Machine", "QA list", "Folder", "Status"], rows, "No QA lists are scheduled yet."));
 }
 
 async function renderUsers() {

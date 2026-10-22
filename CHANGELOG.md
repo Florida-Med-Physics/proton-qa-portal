@@ -35,6 +35,7 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Setup QA has two tables: QA List Templates on top, and Machine-Specific QA Lists (each machine's own copy of a template; edits there do not affect the template) below.
 - Machine Trends: couch Pitch, Roll and Rotation share one chart, like X/Y/Z.
 - Machine Trends: the overview is a table (one row per chart) instead of card panels; charts plot dots instead of lines (one colour per axis, warning/fail ringed); all dates show the year.
+- New Admin tab (5th tab): users and what each role may do (admins add users and change roles), and an import folder for each scheduled QA list. When QA is started, the newest export file in that folder not yet recorded is read in automatically.
 - **[Physics review]** Sphinx test names follow the myQA template and keep the spot number: "Spot 1 [225 MeV] – Sigma X", "Energy [100 MeV] – Distal Depth". GTR5 exports have no spot numbers, so its spots are numbered in file order (Spot 1 = 100 MeV … Spot 9 = 80 MeV). Existing tests are renamed in place.
 - **[Physics review]** Couch translation is no longer imported from Sphinx exports (it is documented in RadMachine). Couch tests already imported from Sphinx are taken off their lists; their stored values are kept.
 - Every trend chart now shows its statistics (n, mean, SD, range, with units), a y axis titled with the unit and auto-scaled to the data (limit bands are clipped to fit), and a dated x axis titled "Date".
