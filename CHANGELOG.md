@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Every font size steps up two sizes across the portal; the pass rings are thicker and read green (passed) or red (warning or action).
 - Machine Trends: a "30 days" column right of History holds an open-circle ring per test with the share of its results that passed in the last 30 days (warning and action arcs in their colours).
 - New "Review QA" tab to the right of Perform QA: submitted runs awaiting a physicist's sign-off (with a Review button), then recent decisions, and a link to all past results.
 - "QA Performed By" starts as the signed-in user on every list (still editable if someone else performed the QA). Table titles, their directions and limits are much larger; the "Reference and limits from the Sphinx reference sheet" notes are gone; "Spot 1 · 226.4 MeV" always sits on one line.

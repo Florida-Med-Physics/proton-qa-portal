@@ -2119,11 +2119,12 @@ function miniRing(counts) {
 function passRing(counts, title, sub) {
   const total = (counts.pass || 0) + (counts.warn || 0) + (counts.fail || 0);
   const pct = total ? Math.round((100 * (counts.pass || 0)) / total) : null;
-  const r = 34, c = 2 * Math.PI * r;
+  const r = 33, c = 2 * Math.PI * r;
   const kids = [svg("circle", { class: "ring-track", cx: 44, cy: 44, r })];
   let offset = 0;
-  for (const [key, cls] of [["pass", "ring-pass"], ["warn", "ring-warn"], ["fail", "ring-fail"]]) {
-    const share = total ? (counts[key] || 0) / total : 0;
+  const shares = { pass: total ? (counts.pass || 0) / total : 0, fail: total ? ((counts.warn || 0) + (counts.fail || 0)) / total : 0 };
+  for (const [key, cls] of [["pass", "ring-pass"], ["fail", "ring-fail"]]) {
+    const share = shares[key];
     if (share > 0) kids.push(svg("circle", { class: `ring-seg ${cls}`, cx: 44, cy: 44, r, "stroke-dasharray": `${share * c} ${c}`, "stroke-dashoffset": -offset * c, transform: "rotate(-90 44 44)" }));
     offset += share;
   }
@@ -2186,7 +2187,7 @@ function fitHistoryRows(tableEl, nDates) {
   const fit = () => {
     const th = tableEl.querySelector("th.history-cell");
     if (!th || !th.clientWidth) return;
-    const n = Math.max(1, Math.min(nDates, Math.floor((th.clientWidth - 10) / 58)));
+    const n = Math.max(1, Math.min(nDates, Math.floor((th.clientWidth - 10) / 66)));
     tableEl.querySelectorAll(".hist-row").forEach((row) => [...row.children].forEach((c, i) => { c.hidden = i >= n; }));
   };
   requestAnimationFrame(fit);

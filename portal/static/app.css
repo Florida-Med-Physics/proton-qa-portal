@@ -57,20 +57,20 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+  font: 16px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 a { color: var(--accent); }
-h1 { font-size: 22px; margin: 0 0 4px; }
-h2 { font-size: 16px; margin: 24px 0 8px; }
-h3 { font-size: 14px; margin: 0 0 6px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 20px; margin: 24px 0 8px; }
+h3 { font-size: 18px; margin: 0 0 6px; }
 .muted { color: var(--muted); }
-.small { font-size: 12px; }
+.small { font-size: 14px; }
 
 .draft-banner {
   background: var(--warn-bg);
   color: var(--warn);
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   padding: 4px 16px;
 }
 .topbar {
@@ -104,7 +104,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
   box-shadow: var(--shadow);
 }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-.machine-card h3 { font-size: 17px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.machine-card h3 { font-size: 19px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .queue-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -117,10 +117,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
 
 table { width: 100%; border-collapse: collapse; background: var(--surface); }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-th { font-size: 14px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+th { font-size: 16px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); font-weight: 600; background: var(--surface-2); }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--surface-2); }
-tr.group td { background: var(--surface-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+tr.group td { background: var(--surface-2); font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
 .table-wrap { overflow-x: visible; border: 1px solid var(--border); border-radius: 10px; }   /* tables fit the page; no sideways scrolling */
 .table-wrap table { border: 0; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -129,7 +129,7 @@ tr.group td { background: var(--surface-2); font-weight: 600; font-size: 12px; t
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   background: var(--info-bg);
@@ -156,7 +156,7 @@ button.link { border: 0; background: none; color: var(--accent); padding: 0; }
 button:disabled { opacity: 0.5; cursor: default; }
 .icon-btn { padding: 2px 8px; }
 
-label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+label { display: block; font-size: 14px; color: var(--muted); font-weight: 600; }
 input, select, textarea {
   font: inherit;
   color: var(--text);
@@ -171,7 +171,7 @@ textarea { min-height: 60px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .form-grid .wide { grid-column: 1 / -1; }
 .field label { margin-bottom: 4px; }
-.check { display: flex; gap: 6px; align-items: center; font-weight: 400; color: var(--text); font-size: 14px; }
+.check { display: flex; gap: 6px; align-items: center; font-weight: 400; color: var(--text); font-size: 16px; }
 .weekdays { display: flex; gap: 10px; flex-wrap: wrap; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row.nowrap { flex-wrap: nowrap; }
@@ -215,7 +215,7 @@ dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top
 .toast.bad { background: var(--fail); color: #fff; }
 
 .chart { width: 100%; height: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-.chart text { fill: var(--muted); font-size: 11px; }
+.chart text { fill: var(--muted); font-size: 13px; }
 .chart .axis { stroke: var(--border); }
 .chart .expected { stroke: var(--muted); stroke-dasharray: 4 4; fill: none; }
 .chart .series { stroke: var(--accent); fill: none; stroke-width: 1.5; }
@@ -225,13 +225,13 @@ dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top
 .chart circle.warn { fill: var(--warn); }
 .chart circle.fail { fill: var(--fail); }
 .chart circle.recorded { fill: var(--accent); }
-.legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0; font-size: 12px; color: var(--muted); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0; font-size: 14px; color: var(--muted); }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 .swatch.warn { background: var(--band-warn); border: 1px solid var(--warn); }
 .swatch.fail { background: var(--band-fail); border: 1px solid var(--fail); }
 
 /* Simplified layouts: one action per row, details folded away until needed. */
-.lead { font-size: 16px; margin: 0 0 16px; }
+.lead { font-size: 18px; margin: 0 0 16px; }
 .setup-card { display: block; text-decoration: none; color: inherit; }
 .setup-card:hover { border-color: var(--accent); }
 .setup-card p { margin: 0; }
@@ -253,13 +253,13 @@ details.more .menu a:hover, details.more .menu button:hover { background: var(--
 .seg.pass.on { background: var(--pass-bg); color: var(--pass); }
 .seg.warn.on { background: var(--warn-bg); color: var(--warn); }
 .seg.fail.on { background: var(--fail-bg); color: var(--fail); }
-details.help, details.instructions { font-size: 13px; }
+details.help, details.instructions { font-size: 15px; }
 details.help summary, details.instructions summary { cursor: pointer; color: var(--accent); }
 .pre { white-space: pre-wrap; margin-top: 6px; color: var(--muted); }
 .step { margin-bottom: 12px; }
 .section { padding: 0; margin-bottom: 12px; }
 .section > summary { padding: 12px 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.section-summary { font-size: 12px; color: var(--muted); }
+.section-summary { font-size: 14px; color: var(--muted); }
 .check-row { display: grid; grid-template-columns: 1fr auto 90px 1fr; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border); }
 .check-input { display: flex; gap: 6px; align-items: center; }
 .text-input { min-width: 0; width: 100%; max-width: 320px; }
@@ -268,28 +268,28 @@ details.help summary, details.instructions summary { cursor: pointer; color: var
   position: sticky; bottom: 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
   padding: 12px 16px; margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
 }
-label.inline { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; color: var(--text); font-size: 14px; }
+label.inline { display: inline-flex; gap: 6px; align-items: center; font-weight: 400; color: var(--text); font-size: 16px; }
 label.inline input { width: auto; }
 .review-box { display: grid; gap: 8px; margin-top: 12px; }
-.section-head { font-size: 18px; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
-.directions { font-size: 13px; margin-top: 4px; }
+.section-head { font-size: 20px; margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 2px solid var(--accent); }
+.directions { font-size: 15px; margin-top: 4px; }
 .spark-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 8px; }
 .spark-card { display: block; text-decoration: none; color: inherit; padding: 12px; border-left: 4px solid var(--border); }
 .spark-card.pass { border-left-color: var(--pass); }
 .spark-card.warn { border-left-color: var(--warn); }
 .spark-card.fail { border-left-color: var(--fail); }
 .spark-card:hover { border-color: var(--accent); }
-.spark-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+.spark-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 15px; }
 .spark { width: 100%; height: 56px; display: block; }
 .spark .series { stroke: var(--accent); fill: none; stroke-width: 1.25; }
 .spark .band-warn { fill: var(--band-warn); }
 .spark circle.pass { fill: var(--pass); } .spark circle.warn { fill: var(--warn); } .spark circle.fail { fill: var(--fail); }
 .spark-foot { display: flex; justify-content: space-between; margin-top: 4px; }
 .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 12px; }
-.stat-value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .search { max-width: 360px; }
 .result-card { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: baseline; }
-.result-card dt { color: var(--muted); font-size: 12px; }
+.result-card dt { color: var(--muted); font-size: 14px; }
 .result-card dd { margin: 0; }
 
 @media (max-width: 640px) {
@@ -300,12 +300,12 @@ label.inline input { width: auto; }
 }
 
 .warn-card { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); gap: 12px; }
-button.small { padding: 4px 10px; font-size: 12px; }
+button.small { padding: 4px 10px; font-size: 14px; }
 .toolbar { flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .toolbar .search { flex: 1; min-width: 200px; }
 label.inline select { width: auto; }
 td.right { text-align: right; }
-a.button.small { padding: 4px 12px; font-size: 13px; }
+a.button.small { padding: 4px 12px; font-size: 15px; }
 tr.row-overdue td:first-child { border-left: 3px solid var(--fail); }
 .row.end { justify-content: flex-end; }
 
@@ -314,7 +314,7 @@ tr.row-overdue td:first-child { border-left: 3px solid var(--fail); }
 .chart .series.axis-1, .spark .series.axis-1 { stroke: #d9822b; }
 .chart .series.axis-2, .spark .series.axis-2 { stroke: #8e6bd1; }
 .axis-legend { display: inline-flex; gap: 6px; margin-left: 8px; }
-.axis-key { font-size: 12px; font-weight: 700; padding: 0; color: var(--axis); }   /* a coloured letter, no box */
+.axis-key { font-size: 14px; font-weight: 700; padding: 0; color: var(--axis); }   /* a coloured letter, no box */
 .axis-key.axis-0, .axis-val.axis-0 { --axis: var(--accent); }
 .axis-key.axis-1, .axis-val.axis-1 { --axis: #d9822b; }
 .axis-key.axis-2, .axis-val.axis-2 { --axis: #8e6bd1; }
@@ -331,7 +331,7 @@ td.indent { padding-left: 28px; }
 .tol-cell { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .tol-cell label.inline { white-space: nowrap; gap: 4px; }
 .tol-cell label.inline input { width: 64px; min-width: 0; padding: 3px 6px; }
-.tol-cell select { width: auto; padding: 3px 6px; font-size: 12px; }
+.tol-cell select { width: auto; padding: 3px 6px; font-size: 14px; }
 
 /* UF Health Proton Therapy Institute branding (matches the TrueBeam Service Log): navy header, orange rule, logo. */
 :root { --uf-navy: #0d1d3e; --uf-orange: #f37021; }  /* sampled from the UF Health logo */
@@ -339,7 +339,7 @@ td.indent { padding-left: 28px; }
 .topbar { background: var(--uf-navy); border-bottom: 4px solid var(--uf-orange); color: #fff; padding: 6px 24px; }
 .brand { display: flex; align-items: center; gap: 12px; color: #fff; }
 .brand-logo { width: 200px; height: 40px; object-fit: cover; object-position: center; display: block; }
-.brand span { font-size: 15px; font-weight: 600; padding-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.35); }
+.brand span { font-size: 17px; font-weight: 600; padding-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.35); }
 #nav a { color: rgba(255, 255, 255, 0.8); }
 #nav a.active, #nav a:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
 #nav a.active { box-shadow: inset 0 -3px 0 var(--uf-orange); }
@@ -353,11 +353,11 @@ td.indent { padding-left: 28px; }
 .chart .unit-label { font-weight: 600; }
 
 /* Chart axes and statistics. */
-.chart .axis-title, .spark .axis-title { font-size: 11px; fill: var(--muted); font-weight: 600; }
+.chart .axis-title, .spark .axis-title { font-size: 13px; fill: var(--muted); font-weight: 600; }
 .chart .axis-base, .spark .axis-base { stroke: var(--muted); }
-.chart .stats-line { font-size: 12px; fill: var(--text); }
-.spark .stats-line { font-size: 11px; fill: var(--text); }
-.spark text { fill: var(--muted); font-size: 11px; }
+.chart .stats-line { font-size: 14px; fill: var(--text); }
+.spark .stats-line { font-size: 13px; fill: var(--text); }
+.spark text { fill: var(--muted); font-size: 13px; }
 .spark .axis { stroke: var(--border); }
 .spark .expected { stroke: var(--muted); stroke-dasharray: 3 3; fill: none; }
 .spark .band-fail { fill: var(--band-fail); }
@@ -396,25 +396,25 @@ td.trend-cell, td.folder-cell { max-width: none; }
 
 /* Perform: title, then the directions block across the row, then the result (as in the myQA template). */
 .check-row.with-directions .directions { grid-column: 1 / -1; }
-.directions { margin: 0; padding: 10px 12px; border-left: 3px solid var(--uf-orange); background: var(--surface-2); border-radius: 6px; color: var(--text); font-size: 13px; }
-.directions-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 4px; }
+.directions { margin: 0; padding: 10px 12px; border-left: 3px solid var(--uf-orange); background: var(--surface-2); border-radius: 6px; color: var(--text); font-size: 15px; }
+.directions-label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 4px; }
 .item-cell { min-width: 260px; max-width: 420px; }
-.item-cell .directions { margin-top: 6px; font-size: 12px; }
+.item-cell .directions { margin-top: 6px; font-size: 14px; }
 th { white-space: normal; }
 
 /* QA list editor: section headings stand out above their items; directions run the full width above each test. */
 tr.section-row td {
-  font-size: 16px; font-weight: 700; color: var(--text); background: var(--surface-2);
+  font-size: 18px; font-weight: 700; color: var(--text); background: var(--surface-2);
   border-top: 2px solid var(--uf-orange); padding: 12px 12px; letter-spacing: 0.01em;
 }
 tr.directions-row td { padding: 0 12px 10px; max-width: none; }
 tr.directions-row .directions { margin: 0; }
 tr.before-directions td { border-bottom: 0; }
-.item-cell strong { font-size: 13px; }
+.item-cell strong { font-size: 15px; }
 
 /* Perform: section headings stand out more than the items in them. */
-.section > summary strong { font-size: 16px; }
-h2.section-head { font-size: 20px; }
+.section > summary strong { font-size: 18px; }
+h2.section-head { font-size: 22px; }
 
 /* Perform QA and Machines: Proton and Photon tables share one width and column layout. */
 .fixed-wrap { display: block; width: 100%; max-width: 1080px; }
@@ -426,7 +426,7 @@ h2.section-head { font-size: 20px; }
 .fixed-table td { padding: 10px 12px; }
 .fixed-table .row.nowrap.end { flex-wrap: wrap; justify-content: flex-end; }
 .modality-head { display: flex; align-items: baseline; gap: 10px; max-width: 1080px; }
-.modality-head .modality-count { font-size: 13px; font-weight: 500; color: var(--muted); }
+.modality-head .modality-count { font-size: 15px; font-weight: 500; color: var(--muted); }
 .modality-head.proton { border-bottom-color: var(--uf-orange); }
 .modality-head.photon { border-bottom-color: #3a7bd5; }
 .lead { max-width: 1080px; }
@@ -439,7 +439,7 @@ h2.section-head { font-size: 20px; }
 .home-stat:hover { background: var(--surface-2); }
 .home-stat.pass { border-left-color: var(--pass); } .home-stat.due { border-left-color: var(--warn); } .home-stat.fail { border-left-color: var(--fail); }
 .home-stat-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.home-stat-label { font-size: 12px; color: var(--muted); }
+.home-stat-label { font-size: 14px; color: var(--muted); }
 .table-wrap.fixed-wrap table.fixed-table { width: 100%; }
 /* Action buttons never squash into the column. */
 td.right { max-width: none; white-space: nowrap; }
@@ -454,10 +454,10 @@ td.right .row.nowrap.end { flex-wrap: nowrap; }
 /* Buttons start at the same x in every row and table, so the columns line up top to bottom. */
 .fixed-table td.right { text-align: left; }
 .fixed-table td.right .row.nowrap.end { justify-content: flex-start; }
-.category-tag { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
+.category-tag { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
 
 /* Drag and drop in the QA list editor. */
-.drag-handle { cursor: grab; color: var(--muted); margin-right: 8px; font-size: 15px; user-select: none; }
+.drag-handle { cursor: grab; color: var(--muted); margin-right: 8px; font-size: 17px; user-select: none; }
 tr[draggable="true"]:hover .drag-handle { color: var(--accent); }
 tr.dragging td { opacity: 0.45; }
 tr.drop-before td { box-shadow: inset 0 3px 0 var(--uf-orange); }
@@ -465,14 +465,14 @@ tr.drop-after td { box-shadow: inset 0 -3px 0 var(--uf-orange); }
 
 /* Perform: measurements repeated per energy / spot, as one table (energy, measurement, reference, tolerance, action, status, comment, history, trend). */
 .measure-block { padding: 10px 16px 14px; border-top: 1px solid var(--border); }
-.measure-title { margin-bottom: 8px; font-size: 14px; }
+.measure-title { margin-bottom: 8px; font-size: 16px; }
 .measure-wrap { display: block; width: 100%; }
 .measure-table { width: 100%; }
 .measure-table td, .measure-table th { padding: 6px 10px; max-width: none; }
 .measure-table .result-input { max-width: 110px; }
 .measure-table .note-input { max-width: 180px; min-width: 120px; }
 .history-cell { white-space: nowrap; }
-.hist { display: inline-block; min-width: 44px; text-align: center; padding: 1px 6px; margin-right: 4px; border-radius: 4px; font-size: 12px; font-variant-numeric: tabular-nums; background: var(--pass-bg); color: var(--pass); }
+.hist { display: inline-block; min-width: 44px; text-align: center; padding: 1px 6px; margin-right: 4px; border-radius: 4px; font-size: 14px; font-variant-numeric: tabular-nums; background: var(--pass-bg); color: var(--pass); }
 .hist.warn { background: var(--warn-bg); color: var(--warn); }
 .hist.fail { background: var(--fail-bg); color: var(--fail); }
 .hist.recorded { background: var(--info-bg); color: var(--info); }
@@ -488,14 +488,14 @@ tr.quick-trend .spark { max-width: 700px; }
 .brand-title {
   order: -1; margin-right: 4px; padding-right: 16px; border-right: 1px solid rgba(255, 255, 255, 0.35);
   text-decoration: none; color: var(--uf-orange); white-space: nowrap;   /* whole title in UF Health orange */
-  font-family: Georgia, "Times New Roman", Times, serif; font-size: 19px; font-weight: 400; letter-spacing: 0.01em;
+  font-family: Georgia, "Times New Roman", Times, serif; font-size: 21px; font-weight: 400; letter-spacing: 0.01em;
 }
 .brand-title:hover { color: var(--uf-orange); }   /* no colour change on hover */
 
 .who { margin-left: auto; }
 #nav { flex: 0 1 auto; }
 .topbar { gap: 16px; }
-@media (max-width: 900px) { .brand-title { font-size: 15px; } }
+@media (max-width: 900px) { .brand-title { font-size: 17px; } }
 
 /* The UF Health logo sits at the right end of the header, on the same row as the signed-in person. */
 .brand { order: 10; margin-left: 12px; }
@@ -524,12 +524,12 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 
 /* One compact bar, as in RadMachine: brand at the left, home icon and tabs, then the person at the right. */
 .topbar { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; padding: 0 20px; min-height: 52px; border-bottom-width: 3px; }
-.brand-title { font-family: "Segoe UI", system-ui, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.02em; margin-right: 10px; padding: 0; order: 0; }
+.brand-title { font-family: "Segoe UI", system-ui, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.02em; margin-right: 10px; padding: 0; order: 0; }
 #nav { flex: 1 1 auto; flex-wrap: nowrap; gap: 2px; }
-#nav a { padding: 15px 11px; border-radius: 0; font-weight: 600; font-size: 13.5px; }
+#nav a { padding: 15px 9px; border-radius: 0; font-weight: 600; font-size: 15px; }
 #nav a.active { background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 -3px 0 var(--uf-orange); }
 #nav a.home-link { padding: 12px 12px; }
-.who { margin-left: auto; gap: 12px; font-size: 13.5px; white-space: nowrap; }
+.who { margin-left: auto; gap: 12px; font-size: 15px; white-space: nowrap; }
 .brand { order: 0; margin: 0 0 0 14px; justify-self: auto; }
 .brand-logo { width: 120px; height: 24px; }
 @media (max-width: 1000px) { .brand { display: none; } .topbar { flex-wrap: wrap; } }
@@ -540,15 +540,15 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 .topbar { flex-wrap: nowrap; overflow: hidden; }
 #nav { overflow-x: auto; scrollbar-width: none; min-width: 0; }
 #nav::-webkit-scrollbar { display: none; }
-.brand-title { flex: none; font-size: 16px; }
-.who { flex: none; gap: 10px; font-size: 13px; }
-.theme-toggle { padding: 4px 8px; font-size: 12px; }
-@media (max-width: 1000px) { .topbar { flex-wrap: nowrap; } .brand-title { font-size: 14px; } #nav a { padding: 15px 8px; font-size: 13px; } }
+.brand-title { flex: none; font-size: 18px; }
+.who { flex: none; gap: 10px; font-size: 15px; }
+.theme-toggle { padding: 4px 8px; font-size: 14px; }
+@media (max-width: 1000px) { .topbar { flex-wrap: nowrap; } .brand-title { font-size: 16px; } #nav a { padding: 15px 8px; font-size: 15px; } }
 
 .who .person { display: inline-flex; align-items: center; gap: 5px; }
 .person-icon { display: block; }
 
-.active-tag { color: var(--pass); font-weight: 600; font-size: 12px; }
+.active-tag { color: var(--pass); font-weight: 600; font-size: 14px; }
 
 .fixed-table tbody td { padding-left: 24px; }
 .fixed-table tbody td.indent { padding-left: 40px; }
@@ -560,12 +560,12 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 /* GatorQA mark: the UF Proton dot grid in white on the navy bar, centre spot orange. */
 .brand-title { display: inline-flex; align-items: baseline; gap: 8px; }
 .brand-mark { width: 26px; height: 26px; align-self: center; color: #fff; flex: none; }
-.brand-name { font-family: "Segoe UI", system-ui, sans-serif; font-weight: 700; font-size: 20px; letter-spacing: 0.01em; }
-.brand-sub { font-family: "Segoe UI", system-ui, sans-serif; font-weight: 400; font-size: 12px; color: rgba(255, 255, 255, 0.75); letter-spacing: 0.04em; text-transform: uppercase; }
+.brand-name { font-family: "Segoe UI", system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.01em; }
+.brand-sub { font-family: "Segoe UI", system-ui, sans-serif; font-weight: 400; font-size: 14px; color: rgba(255, 255, 255, 0.75); letter-spacing: 0.04em; text-transform: uppercase; }
 @media (max-width: 1100px) { .brand-sub { display: none; } }
 .login-title { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 2px; }
 .login-mark { width: 40px; height: 40px; }
-.login-sub { margin-top: 0; letter-spacing: 0.06em; text-transform: uppercase; font-size: 12px; }
+.login-sub { margin-top: 0; letter-spacing: 0.06em; text-transform: uppercase; font-size: 14px; }
 
 .trend-icon { vertical-align: -3px; }
 #nav a .trend-icon { margin-right: 2px; }
@@ -578,11 +578,11 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 
 .result-input.from-file { background: var(--surface-2); color: var(--text); cursor: default; }
 .result-input.from-file::placeholder { font-style: italic; }
-.inactive-tag { color: var(--muted); font-weight: 600; font-size: 12px; }
+.inactive-tag { color: var(--muted); font-weight: 600; font-size: 14px; }
 .icon-link { display: inline-flex; padding: 4px 8px; border-radius: 6px; } .icon-link:hover { background: var(--surface-2); }
 
 /* Header search box, left of the account icon. */
-.topbar-search { width: 200px; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 13px; }
+.topbar-search { width: 170px; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 15px; }
 .topbar-search::placeholder { color: rgba(255, 255, 255, 0.7); }
 .topbar-search:focus { outline: 2px solid var(--uf-orange); background: rgba(255, 255, 255, 0.18); }
 @media (max-width: 1000px) { .topbar-search { width: 120px; } }
@@ -590,10 +590,10 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 /* Sortable column headers and table filter boxes. */
 th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--text); }
-.sort-arrow { margin-left: 4px; font-size: 11px; opacity: 0.45; }
+.sort-arrow { margin-left: 4px; font-size: 13px; opacity: 0.45; }
 th[data-sort] .sort-arrow { opacity: 1; color: var(--uf-orange); }
 .filter-row { margin: 0 0 8px; }
-.filter-box { width: 320px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 13px; }
+.filter-box { width: 320px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 15px; }
 
 /* Nothing scrolls sideways: tables and their inputs shrink to the page instead. */
 .table-wrap, .measure-wrap { max-width: 100%; }
@@ -601,17 +601,17 @@ th[data-sort] .sort-arrow { opacity: 1; color: var(--uf-orange); }
 .measure-table td, .measure-table th { padding: 6px 6px; }
 .measure-table .result-input, .measure-table .note-input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
 .history-cell { white-space: normal; }
-.hist { width: 54px; min-width: 54px; margin: 1px 2px 1px 0; padding: 1px 3px; font-size: 11px; }
+.hist { width: 64px; min-width: 64px; margin: 1px 2px 1px 0; padding: 1px 3px; font-size: 13px; }
 .hist.date { line-height: 1.1; }
-.hist.date .yr { font-weight: 400; font-size: 10px; }
+.hist.date .yr { font-weight: 400; font-size: 12px; }
 td.trend-cell svg { max-width: 100%; height: auto; }
 td.history-cell, th.history-cell { padding-left: 6px; }
 
 /* Trend charts: lines between results, a key, and the Absolute / Δ toggle. */
 .chart .series, .spark .series { fill: none; stroke-width: 1.4; opacity: 0.75; }
 .chart .series.single, .spark .series.single { stroke: var(--accent); }
-.key-text { font-size: 13px; fill: var(--text); font-weight: 600; }
-.spark .key-text { font-size: 17px; }   /* small charts are scaled down, so the key is drawn larger */
+.key-text { font-size: 15px; fill: var(--text); font-weight: 600; }
+.spark .key-text { font-size: 19px; }   /* small charts are scaled down, so the key is drawn larger */
 .chart-box .chart-mode { display: flex; gap: 10px; justify-content: flex-end; margin: 0 0 2px; }
 .chart-box.small .chart-mode { gap: 6px; }
 .chart-mode .link { color: var(--text); text-decoration: none; }
@@ -619,15 +619,15 @@ td.history-cell, th.history-cell { padding-left: 6px; }
 .chart-box svg { display: block; width: 100%; height: auto; }
 /* Headers wrap at spaces only, never mid-word. */
 th { overflow-wrap: normal; word-break: normal; }
-.measure-table th { font-size: 12px; letter-spacing: 0.02em; }
+.measure-table th { font-size: 14px; letter-spacing: 0.02em; }
 
 /* Directions inside a measurement row read as a small note under the test name. */
-.measure-table .directions.in-cell { margin: 4px 0 0; padding: 4px 8px; font-size: 11px; border-left-width: 2px; }
-.measure-table .directions.in-cell .directions-label { font-size: 9px; }
+.measure-table .directions.in-cell { margin: 4px 0 0; padding: 4px 8px; font-size: 13px; border-left-width: 2px; }
+.measure-table .directions.in-cell .directions-label { font-size: 11px; }
 .measure-table td:first-child .category-tag { margin: 2px 0 0; }
 
 /* Δ from reference: green within tolerance, yellow at tolerance, red at action. */
-.delta { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.delta { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .delta.st-pass { background: var(--pass-bg); color: var(--pass); }
 .delta.st-warn { background: var(--warn-bg); color: var(--warn); }
 .delta.st-fail { background: var(--fail-bg); color: var(--fail); }
@@ -638,7 +638,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .axis-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .axis-field { display: inline-flex; align-items: center; gap: 3px; }
 .axis-field .result-input { width: 62px; min-width: 0; }
-.axis-key { font-weight: 700; font-size: 11px; color: var(--axis, var(--muted)); }
+.axis-key { font-weight: 700; font-size: 13px; color: var(--axis, var(--muted)); }
 .axis-field.axis-0, .hist-axis .axis-key.axis-0 { --axis: var(--accent); }
 .axis-field.axis-1, .hist-axis .axis-key.axis-1 { --axis: #d9822b; }
 .axis-field.axis-2, .hist-axis .axis-key.axis-2 { --axis: #8e6bd1; }
@@ -652,8 +652,8 @@ th { overflow-wrap: normal; word-break: normal; }
 .axis-inputs { gap: 4px; }
 
 /* Chart key as ordinary text under the drawing. */
-.chart-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 2px; font-size: 13px; color: var(--text); }
-.chart-box.small .chart-key { font-size: 12px; gap: 2px 10px; }
+.chart-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 2px; font-size: 15px; color: var(--text); }
+.chart-box.small .chart-key { font-size: 14px; gap: 2px 10px; }
 .key-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .key-swatch { display: inline-block; width: 18px; height: 10px; border-radius: 2px; }
 .key-swatch.line { height: 0; border-top: 2px solid var(--accent); position: relative; }
@@ -671,11 +671,11 @@ th { overflow-wrap: normal; word-break: normal; }
 .axis-inputs { flex-direction: column; align-items: stretch; gap: 3px; }
 .axis-field { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 4px; }
 .axis-field .result-input, .axis-field.axis-calc .result-input { width: 100%; min-width: 0; max-width: 90px; }
-.axis-field.axis-calc .axis-key { color: var(--muted); font-size: 10px; }
+.axis-field.axis-calc .axis-key { color: var(--muted); font-size: 12px; }
 
 /* History: one line of equal slots separated by lines; the header dates line up above the values. */
 .hist-row { display: inline-flex; white-space: nowrap; }
-.hist-row .hist { width: 56px; min-width: 56px; margin: 0; border-radius: 0; padding: 2px 3px; }
+.hist-row .hist { width: 64px; min-width: 64px; margin: 0; border-radius: 0; padding: 2px 3px; }
 .hist-row .hist + .hist { border-left: 1px solid var(--border); }
 .hist-row .hist:first-child { border-radius: 4px 0 0 4px; }
 .hist-row .hist:last-child { border-radius: 0 4px 4px 0; }
@@ -685,42 +685,42 @@ th { overflow-wrap: normal; word-break: normal; }
 
 /* Perform QA: the list's title row is frozen at the top of the page while scrolling. */
 .sticky-head { position: sticky; top: 0; z-index: 6; background: var(--bg, var(--surface)); padding: 10px 0 8px; margin: -8px 0 12px; border-bottom: 2px solid var(--uf-orange); }
-.sticky-head h1 { font-size: 20px; margin: 0; }
+.sticky-head h1 { font-size: 22px; margin: 0; }
 
 /* Machine Trends table: history column beside the chart. */
 .trend-table { width: 100%; table-layout: fixed; }
 .trend-table tr.hist-dates th { padding-top: 0; border-top: 0; }
 
 /* Perform QA rows in the Monthly QA layout. */
-.measure-table td.qa-n { color: var(--text); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.measure-table td.qa-n { color: var(--text); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; white-space: nowrap; }
 .measure-table td.qa-label strong { display: block; }
-.qa-limits { display: block; font-size: 11px; color: var(--uf-navy); margin-top: 2px; }
-.measure-table td.qa-unit { color: var(--muted); font-size: 12px; }
+.qa-limits { display: block; font-size: 13px; color: var(--uf-navy); margin-top: 2px; }
+.measure-table td.qa-unit { color: var(--muted); font-size: 14px; }
 .measure-table td.qa-measured .pass-fail { flex-wrap: wrap; }
 .measure-table td.qa-dev { font-variant-numeric: tabular-nums; }
 .chip { text-transform: none; }
-.chip.pass, .chip.warn, .chip.fail { font-size: 11px; letter-spacing: 0.03em; font-weight: 700; }
+.chip.pass, .chip.warn, .chip.fail { font-size: 13px; letter-spacing: 0.03em; font-weight: 700; }
 
 /* Calmer tables: no vertical rules, lighter zebra, quiet notes, comments on demand. */
 .measure-table th + th, .measure-table td + td { border-left: 0; }
 .measure-table tbody tr:nth-child(even) td { background: transparent; }
 .measure-table tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
-.measure-table th { background: transparent; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 11px; letter-spacing: 0.06em; }
+.measure-table th { background: transparent; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 13px; letter-spacing: 0.06em; }
 .measure-table td { padding: 8px 6px; }
-.qa-sub { display: block; font-size: 11px; color: var(--muted); line-height: 1.35; margin-top: 2px; font-weight: 400; }
+.qa-sub { display: block; font-size: 13px; color: var(--muted); line-height: 1.35; margin-top: 2px; font-weight: 400; }
 .measure-title .qa-sub { margin-top: 1px; }
 .measure-table .note-btn { opacity: 0.45; padding: 2px 6px; }
 .measure-table .note-btn:hover { opacity: 1; }
 .measure-table td.qa-comment .note-input { margin-top: 2px; }
 .measure-table .result-input { border-color: var(--border); }
-.card.section > summary strong { font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.card.section > summary strong { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .measure-block { margin-top: 6px; }
-.measure-title strong { font-size: 13px; }
+.measure-title strong { font-size: 15px; }
 .machine-link { color: inherit; text-decoration: none; } .machine-link:hover strong { text-decoration: underline; }
 
 .measure-table td.qa-measured { white-space: nowrap; }
 .measure-table .pass-fail { display: inline-flex; flex-wrap: nowrap; }
-.measure-table .pass-fail button { white-space: nowrap; padding: 4px 9px; font-size: 12px; }
+.measure-table .pass-fail button { white-space: nowrap; padding: 4px 9px; font-size: 14px; }
 .measure-table td.qa-unit { white-space: nowrap; }
 .measure-table th { white-space: nowrap; letter-spacing: 0.04em; }
 .measure-table td.qa-comment { text-align: center; }
@@ -736,31 +736,31 @@ th { overflow-wrap: normal; word-break: normal; }
 
 /* Machine Trends tables share the Perform QA look; the chart sits in the last column. */
 .trend-table td.trend-cell { padding: 4px 6px; vertical-align: middle; }
-.trend-table td.trend-cell .chart-box .chart-mode { font-size: 11px; }
+.trend-table td.trend-cell .chart-box .chart-mode { font-size: 13px; }
 .trend-table tr.trend-row td { cursor: pointer; }
 
 /* Green start dot in front of a due QA list. */
 td.list-cell { display: flex; align-items: center; gap: 8px; }
-.start-dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--pass); color: #fff; font-size: 9px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding-left: 2px; }
+.start-dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--pass); color: #fff; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; padding-left: 2px; }
 .start-dot:hover { filter: brightness(1.1); }
 
 /* Trend tables: the chart fits its column; a one-series chart needs no key (the row is the name). */
 .trend-table .chart-key .key-item { white-space: normal; }
 .trend-table .chart-box:not(.multi) .chart-key { display: none; }
-.trend-table .chart-box .chart-mode { font-size: 11px; gap: 6px; }
+.trend-table .chart-box .chart-mode { font-size: 13px; gap: 6px; }
 .trend-table td.num { white-space: nowrap; }
 .trend-table td.trend-cell .chart-box svg { min-width: 0; }
 
 /* Status chips on Machine Trends filter the tables. */
-button.chip-filter { cursor: pointer; border: 1px solid transparent; font: inherit; font-size: 11px; font-weight: 700; }
+button.chip-filter { cursor: pointer; border: 1px solid transparent; font: inherit; font-size: 13px; font-weight: 700; }
 button.chip-filter.on { outline: 2px solid currentColor; outline-offset: 1px; }
 button.chip-filter:hover { filter: brightness(0.95); }
 
 /* Table titles (the measurement name, its directions and its limits) read large. */
 .measure-title { margin: 10px 0 6px; }
-.measure-title strong { font-size: 20px; font-weight: 700; display: block; }
-.measure-title .qa-sub { font-size: 14px; color: var(--text); margin-top: 2px; }
-.measure-title .qa-limits { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.measure-title strong { font-size: 22px; font-weight: 700; display: block; }
+.measure-title .qa-sub { font-size: 16px; color: var(--text); margin-top: 2px; }
+.measure-title .qa-limits { font-size: 16px; font-weight: 600; margin-top: 2px; }
 
 /* "Spot 1 · 226.4 MeV" stays on one line in energy and axis tables. */
 .energy-table td.qa-label strong { white-space: nowrap; }
@@ -772,12 +772,22 @@ button.chip-filter:hover { filter: brightness(0.95); }
 .ring-track { fill: none; stroke: var(--border); stroke-width: 9; }
 .ring-seg { fill: none; stroke-width: 9; stroke-linecap: butt; }
 .ring-pass { stroke: var(--pass); } .ring-warn { stroke: var(--warn); } .ring-fail { stroke: var(--fail); }
-.ring-pct { font-size: 18px; font-weight: 700; fill: var(--text); }
-.ring-title { font-size: 12px; font-weight: 600; margin-top: 4px; }
-.ring-sub { font-size: 11px; color: var(--muted); }
+.ring-pct { font-size: 20px; font-weight: 700; fill: var(--text); }
+.ring-title { font-size: 14px; font-weight: 600; margin-top: 4px; }
+.ring-sub { font-size: 13px; color: var(--muted); }
 
 /* Per-test pass ring in the "30 days" column. */
 .ring.mini { width: auto; }
 .ring.mini .ring-svg { width: 44px; height: 44px; }
-.ring.mini .ring-pct { font-size: 22px; }
+.ring.mini .ring-pct { font-size: 24px; }
 td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
+
+/* Rings: thick, green for passed and red for the rest. */
+.ring-track { stroke-width: 14; }
+.ring-seg { stroke-width: 14; }
+.ring-warn { stroke: var(--fail); }
+.ring.mini .ring-svg { width: 52px; height: 52px; }
+
+/* Top bar: keep every tab visible on a 1250 px window now the fonts are larger. */
+.topbar { gap: 10px; }
+@media (max-width: 1400px) { #nav a { padding: 15px 7px; font-size: 14px; } .brand-sub { display: none; } .topbar-search { width: 140px; } }
