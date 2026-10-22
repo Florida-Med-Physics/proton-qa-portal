@@ -755,3 +755,9 @@ td.list-cell { display: flex; align-items: center; gap: 8px; }
 button.chip-filter { cursor: pointer; border: 1px solid transparent; font: inherit; font-size: 11px; font-weight: 700; }
 button.chip-filter.on { outline: 2px solid currentColor; outline-offset: 1px; }
 button.chip-filter:hover { filter: brightness(0.95); }
+
+/* Table titles (the measurement name, its directions and its limits) read large. */
+.measure-title { margin: 10px 0 6px; }
+.measure-title strong { font-size: 20px; font-weight: 700; display: block; }
+.measure-title .qa-sub { font-size: 14px; color: var(--text); margin-top: 2px; }
+.measure-title .qa-limits { font-size: 14px; font-weight: 600; margin-top: 2px; }
