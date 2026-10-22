@@ -356,10 +356,22 @@ td.indent { padding-left: 28px; }
 .chart .axis-title, .spark .axis-title { font-size: 11px; fill: var(--muted); font-weight: 600; }
 .chart .axis-base, .spark .axis-base { stroke: var(--muted); }
 .chart .stats-line { font-size: 12px; fill: var(--text); }
-.spark .stats-line { font-size: 10px; fill: var(--text); }
-.spark text { fill: var(--muted); font-size: 9px; }
+.spark .stats-line { font-size: 11px; fill: var(--text); }
+.spark text { fill: var(--muted); font-size: 11px; }
 .spark .axis { stroke: var(--border); }
 .spark .expected { stroke: var(--muted); stroke-dasharray: 3 3; fill: none; }
 .spark .band-fail { fill: var(--band-fail); }
 .stats-line.axis-0 { fill: var(--accent); } .stats-line.axis-1 { fill: #d9822b; } .stats-line.axis-2 { fill: #8e6bd1; }
 .spark { height: auto; }
+
+/* Trends as a table, not panels; charts are dots (one colour per axis, status ring on warn/fail). */
+.trend-row td { vertical-align: top; }
+.trend-cell { width: 55%; min-width: 300px; }
+.trend-cell .spark { width: 100%; max-width: 620px; height: auto; }
+.chart .dot, .spark .dot { stroke-width: 0; }
+.dot.single { fill: var(--accent); }
+.dot.axis-0 { fill: var(--accent); } .dot.axis-1 { fill: #d9822b; } .dot.axis-2 { fill: #8e6bd1; }
+.dot.st-warn { stroke: var(--warn); stroke-width: 2; }
+.dot.st-fail { stroke: var(--fail); stroke-width: 2.5; }
+.dot.single.st-warn { fill: var(--warn); } .dot.single.st-fail { fill: var(--fail); }
+.legend .dot-key { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }

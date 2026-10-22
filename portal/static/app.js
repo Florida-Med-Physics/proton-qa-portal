@@ -253,7 +253,7 @@ function renderShell() {
 }
 
 function shortDate(iso) {
-  return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
 function renderLogin() {
@@ -1448,10 +1448,10 @@ function seriesStats(values) {
 // Each chart carries its own statistics: n, mean ± SD and range per series.
 function seriesChart(series, unit, { small = false } = {}) {
   const multi = series.length > 1;
-  const W = small ? 300 : 900, H = small ? 150 : 360;
-  const L = small ? 46 : 70, R = small ? 8 : 16, T = small ? 10 : 20, B = small ? 30 : 52;
+  const W = small ? 560 : 900, H = small ? 120 : 360;
+  const L = small ? 56 : 70, R = small ? 40 : 40, T = small ? 8 : 20, B = small ? 34 : 52;
   const lineH = small ? 13 : 16;
-  const statH = lineH * series.length * (small ? 2 : 1) + 6;   // statistics block under the plot (two lines per series on small charts)
+  const statH = lineH * series.length + 6;   // statistics block under the plot (two lines per series on small charts)
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
   const xi = Object.fromEntries(dates.map((d, i) => [d, i]));
@@ -1497,29 +1497,26 @@ function seriesChart(series, unit, { small = false } = {}) {
 
   // X axis: dates, and the axis title.
   kids.push(svg("line", { class: "axis-base", x1: L, x2: W - R, y1: plotBottom, y2: plotBottom }));
-  const labels = small ? 3 : 8;
+  const labels = small ? 4 : 7;
   const every = Math.max(1, Math.ceil(dates.length / labels));
   const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
-  const fmtDate = (d) => (multiYear ? d.slice(0, 7) : d.slice(5));
+  const fmtDate = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   dates.forEach((d, i) => {
     if (i % every === 0 || i === dates.length - 1) {
-      if (i === dates.length - 1 && i % every !== 0 && dates.length > 1 && x(d) - x(dates[i - (i % every)]) < (small ? 60 : 70)) return;
+      if (i === dates.length - 1 && i % every !== 0 && dates.length > 1 && x(d) - x(dates[i - (i % every)]) < 95) return;
       const anchor = i === 0 ? "start" : i === dates.length - 1 ? "end" : "middle";
       kids.push(svg("text", { x: x(d), y: plotBottom + 14, "text-anchor": anchor }, fmtDate(d)));
     }
   });
-  kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, `Date (QA performed${multiYear ? ", year-month" : ", month-day"})`));
+  kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, "Date QA performed"));
 
   series.forEach((s, k) => {
     const cls = multi ? `axis-${k}` : "";
-    plot.push(svg("polyline", { class: `series ${cls}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
+    const r = small ? (dates.length > 120 ? 1.8 : 2.4) : (dates.length > 150 ? 2.6 : 3.6);
     for (const p of s.points) {
-      const show = !small || p.status === "fail" || p.status === "warn";
-      if (show) plot.push(svg("circle", { class: p.status, cx: x(p.qa_date), cy: y(val(p)), r: small ? 2.5 : (dates.length > 150 ? 2.5 : 3.5) },
+      plot.push(svg("circle", { class: `dot ${multi ? cls : "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
         svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${p.status})`)));
     }
-    const last = latest(s.points);
-    if (small && last) plot.push(svg("circle", { class: `${last.status} last ${cls}`, cx: x(last.qa_date), cy: y(val(last)), r: 3.5 }));
   });
   kids.push(svg("g", { "clip-path": `url(#${clipId})` }, plot));
 
@@ -1531,8 +1528,7 @@ function seriesChart(series, unit, { small = false } = {}) {
     const cls = `stats-line ${multi ? `axis-${k}` : ""}`;
     const a = `${name}n ${st.n} · mean ${fmt(st.mean, 2)}${u} · SD ${fmt(st.sd, 2)}${u}`;
     const b = `range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u}`;
-    if (!small) return [svg("text", { class: cls, x: L, y: H + (k + 1) * lineH }, `${a} · ${b}`)];
-    return [svg("text", { class: cls, x: 4, y: H + (2 * k + 1) * lineH }, a), svg("text", { class: cls, x: 4, y: H + (2 * k + 2) * lineH }, `${multi ? "   " : ""}${b}`)];
+    return [svg("text", { class: cls, x: L, y: H + (k + 1) * lineH }, `${a} · ${b}`)];
   });
   kids.push(...statLines);
   return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H + statH}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
@@ -1579,18 +1575,24 @@ async function renderTrendOverview(machines, machineId, range) {
     lastSection = section;
     app.append(el("h3", { class: "muted" }, category));
     list.sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]);
-    app.append(el("div", { class: "spark-grid" }, list.map((g) => {
+    // One table per category, one row per chart (no card panels): name, latest values, status, then the chart.
+    app.append(table(["Test", "Latest", "Status", "Trend"], list.map((g) => {
       const status = worstOf(g);
       const unit = g.members[0].unit;
       const short = g.base.startsWith(category + " – ") ? g.base.slice(category.length + 3) : g.base.replace(category + " ", "");
       const ids = g.members.map((m) => m.test_id).join(",");
-      const foot = g.members.length > 1
-        ? g.members.map((m, k) => { const d = asDeviation(latest(m.points)); return el("span", { class: `axis-val axis-${k}` }, `${m.axis} ${signed(d.dev)}`); })
-        : (() => { const p = latest(g.members[0].points), d = asDeviation(p); return [el("span", {}, `Last ${fmt(p.value)} ${unit}`.trim()), p.expected !== null ? el("span", {}, `(${signed(d.dev)} ${unit})`.replace(" )", ")")) : null]; })();
-      return el("a", { class: `card spark-card ${status}`, href: `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}` },
-        el("div", { class: "spark-head" }, el("strong", {}, short), axisLegend(g), chip(status)),
-        seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true }),
-        el("div", { class: "spark-foot muted small" }, foot, g.members.length > 1 ? el("span", {}, unit ? `${unit} from expected` : "from expected") : null));
+      const href = `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}`;
+      const latestCell = g.members.map((m, k) => {
+        const p = latest(m.points), d = asDeviation(p);
+        return el("div", { class: g.members.length > 1 ? `axis-val axis-${k}` : "" },
+          `${g.members.length > 1 ? m.axis + " " : ""}${fmt(p.value)} ${unit}`.trim(),
+          p.expected !== null ? el("span", { class: "muted small" }, ` (${signed(d.dev)} ${unit})`.replace(" )", ")")) : null);
+      });
+      return el("tr", { class: "clickable trend-row", onclick: () => (location.hash = href) },
+        el("td", {}, el("a", { href }, el("strong", {}, short)), axisLegend(g), el("div", { class: "muted small" }, `${latest(g.members[0].points).qa_date}`)),
+        el("td", { class: "small" }, latestCell),
+        el("td", {}, chip(status)),
+        el("td", { class: "trend-cell" }, seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true })));
     })));
   }
 }
