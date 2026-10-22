@@ -1117,8 +1117,8 @@ function passFailInput(name, withWarning, yesNo) {
     for (const b of buttons) b.classList.toggle("on", value.value === b.dataset.value);
     value.dispatchEvent(new Event("input"));
   };
-  // Checks copied from RadMachine read No / Yes (Yes = pass); their unit is set to "Yes/No".
-  const choices = withWarning ? [["pass", "Pass"], ["warn", "Warning"], ["fail", "Fail"]] : yesNo ? [["fail", "No"], ["pass", "Yes"]] : [["pass", "Pass"], ["fail", "Fail"]];
+  // Checks copied from RadMachine read Yes / No (Yes = pass); their unit is set to "Yes/No".
+  const choices = withWarning ? [["pass", "Pass"], ["warn", "Warning"], ["fail", "Fail"]] : yesNo ? [["pass", "Yes"], ["fail", "No"]] : [["pass", "Pass"], ["fail", "Fail"]];
   for (const [v, label] of choices) {
     buttons.push(el("button", { type: "button", class: `seg ${v}`, "data-value": v, "aria-label": `${name}: ${label.toLowerCase()}`, onclick: pick(v) }, label));
   }
