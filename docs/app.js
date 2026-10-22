@@ -220,7 +220,7 @@ function evaluate(type, value, limits) {
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
   ["#/", "Perform QA", null, ["#/", "#", "#/perform", "#/runs"]],
-  ["#/setup", "Test Setup", "configure", ["#/setup", "#/machines", "#/queues", "#/tests", "#/users", "#/audit", "#/assignments"]],
+  ["#/setup", "Setup QA", "configure", ["#/setup", "#/machines", "#/queues", "#/tests", "#/users", "#/audit", "#/assignments"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
 ];
 
@@ -376,16 +376,69 @@ async function renderDashboard() {
   }
 }
 
+// Setup QA reads like Perform QA: one table per machine type, one row per QA list, actions on the right.
 async function renderSetup() {
-  page("Test Setup", "Machines, what gets tested, and who can sign in.");
-  const card = (href, title, text) => el("a", { class: "card setup-card", href }, el("h3", {}, title), el("p", { class: "muted" }, text));
-  app.append(el("div", { class: "grid" },
-    card("#/machines", "Machines", "Gantries and the QA lists scheduled on each."),
-    card("#/queues", "QA lists", "Which tests make up each daily, monthly or annual list."),
-    card("#/tests", "Tests", "Every test, its expected value and its limits."),
-    can("manage_users") ? card("#/users", "People", "Accounts and roles.") : null,
-    card("#/audit", "Audit log", "Who changed what, and when.")));
-  if (window.localApi && can("configure")) {
+  page("Setup QA", "What each machine is checked against, and how often.");
+  const [data, queues] = await Promise.all([api("GET", "/api/dashboard"), api("GET", "/api/queues")]);
+  const byId = Object.fromEntries(queues.map((q) => [q.id, q]));
+  const templates = queues.filter((q) => q.is_template);
+  const scheduled = data.machines.reduce((n, m) => n + m.queues.length, 0);
+  const editable = can("configure");
+  app.append(el("p", { class: "lead" },
+    `${data.machines.length} machines · ${scheduled} scheduled QA ${scheduled === 1 ? "list" : "lists"} · ${templates.length} ${templates.length === 1 ? "template" : "templates"}.`,
+    editable ? [" ", el("a", { class: "small", href: "#/machines" }, "Add a machine")] : ""));
+
+  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
+  const groups = new Map();
+  for (const machine of data.machines) {
+    const kind = machine.kind || "Other";
+    if (!groups.has(kind)) groups.set(kind, []);
+    groups.get(kind).push(machine);
+  }
+  const rank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
+  for (const [kind, machines] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
+    const rows = machines.flatMap((machine) => {
+      if (!machine.queues.length) {
+        return [el("tr", {}, el("td", {}, el("strong", {}, machine.name)), el("td", { class: "muted", colspan: 3 }, "Nothing scheduled."),
+          el("td", { class: "right" }, editable ? el("a", { class: "button small", href: `#/machines/${machine.id}` }, "Add a QA list") : null))];
+      }
+      return machine.queues.map((a, i) => {
+        const q = byId[a.queue_id] || {};
+        return el("tr", {},
+          el("td", {}, i === 0 ? el("a", { href: `#/machines/${machine.id}` }, el("strong", {}, machine.name)) : ""),
+          el("td", {}, queueLabel(a.queue_name, machine.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+          el("td", {}, a.schedule),
+          el("td", { class: "num" }, q.item_count ?? ""),
+          el("td", { class: "right" }, el("div", { class: "row nowrap end" },
+            el("a", { class: "button small", href: `#/queues/${a.queue_id}` }, "Tests"),
+            editable ? el("a", { class: "button small", href: `#/assignments/${a.id}/limits` }, "Limits") : null,
+            editable ? el("button", { class: "small", onclick: () => modal(`${a.queue_name}: schedule`, scheduleForm(a), async (d, form) => {
+              await api("PUT", `/api/assignments/${a.id}`, scheduleData(d, form));
+              toast("Schedule saved");
+              route();
+            }) }, "Schedule") : null)));
+      });
+    });
+    app.append(el("h2", { class: "section-head" }, kind), table(["Machine", "QA list", "Schedule", "#Tests", ""], rows));
+  }
+
+  app.append(el("h2", { class: "section-head" }, "Templates"));
+  app.append(templates.length ? table(["Template", "#Tests", "Copies on", ""], templates.map((t) => el("tr", {},
+    el("td", {}, el("strong", {}, t.name)),
+    el("td", { class: "num" }, t.item_count),
+    el("td", { class: "muted" }, queues.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
+    el("td", { class: "right" }, el("div", { class: "row nowrap end" },
+      el("a", { class: "button small", href: `#/queues/${t.id}` }, "Tests"),
+      editable ? el("button", { class: "small", onclick: () => duplicateDialog(t, data.machines) }, "Copy to a machine") : null)))))
+    : el("div", { class: "card empty" }, "No templates yet."));
+
+  app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
+    el("a", { class: "button small", href: "#/tests" }, "All tests"),
+    el("a", { class: "button small", href: "#/queues" }, "All QA lists"),
+    can("manage_users") ? el("a", { class: "button small", href: "#/users" }, "People") : null,
+    el("a", { class: "button small", href: "#/audit" }, "Audit log")));
+
+  if (window.localApi && editable) {
     const restore = el("input", { type: "file", accept: ".json", hidden: true });
     restore.addEventListener("change", async () => {
       const file = restore.files[0];
@@ -400,15 +453,14 @@ async function renderSetup() {
         toast(err.message, true);
       }
     });
-    app.append(el("h2", {}, "Database location"), databaseLocationCard());
-    app.append(el("h2", {}, "Backup"),
-      el("div", { class: "card" }, el("p", { class: "muted" }, "This build keeps all data in this browser on this computer unless a database file is chosen above. Save a backup file regularly, and restore it on another computer to move the data."),
+    app.append(el("h2", { class: "section-head" }, "Data"), databaseLocationCard(),
+      el("div", { class: "card" }, el("p", { class: "muted" }, "Save a backup file regularly, and restore it on another computer to move the data."),
         el("div", { class: "row" },
           el("button", { onclick: async () => {
-            const data = await api("GET", "/api/backup");
-            const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-            const a = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
-            document.body.append(a); a.click(); a.remove();
+            const backup = await api("GET", "/api/backup");
+            const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+            const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
+            document.body.append(link); link.click(); link.remove();
           } }, "Save backup"),
           el("button", { onclick: () => restore.click() }, "Restore from backup"), restore)));
   }
@@ -738,6 +790,12 @@ function sectionTitle(number, categories) {
   const generic = { 1: "Safety", 2: "Mechanical and imaging", 3: "Dosimetry", 4: "Other" };
   const label = names.length <= 2 ? names.join(" and ") : (generic[number] || "Other");
   return `${number}.0 ${label}`;
+}
+
+// Section label for a test on its own (Trends), e.g. "3.0 Dosimetry".
+function sectionOf(item) {
+  const n = sectionNumber(item);
+  return sectionTitle(n, n === 3 || n === 4 ? [] : [item.category]).replace(/^(\d)\.0 $/, (_, d) => `${d}.0 ${{ 3: "Dosimetry", 4: "Other" }[d]}`);
 }
 
 function checkNumber(description) {
@@ -1320,14 +1378,19 @@ function sparkline(points, unit) {
 
 async function renderTrendOverview(machines, machineId, range) {
   const machine = machines.find((m) => String(m.id) === String(machineId));
+  const loading = el("div", { class: "card empty" }, `Loading ${machine.name} trends…`);
+  app.append(loading);
   const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
   const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
   const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric").map((i) => ({ ...i, queue: t.queue.name })));
   if (!numeric.length) {
+    loading.remove();
     app.append(el("div", { class: "card empty" }, `${machine.name} has no measured tests scheduled.`));
     return;
   }
-  const trends = await Promise.all(numeric.map((i) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${i.test_id}`)));
+  const all = await api("GET", `/api/machines/${machineId}/trends`);
+  const trends = numeric.map((i) => ({ points: all[i.test_id] || [] }));
+  loading.remove();
   const cards = numeric.map((item, k) => ({ item, points: filterRange(trends[k].points, range) })).filter((c) => c.points.length);
   if (!cards.length) {
     app.append(el("div", { class: "card empty" }, "No results in this period."));
@@ -1340,7 +1403,7 @@ async function renderTrendOverview(machines, machineId, range) {
     !worst && !warn ? el("span", { class: "chip pass" }, "All passing") : ""));
   const bySection = new Map();
   for (const c of cards) {
-    const key = `${sectionOf(c.item.category)}|${c.item.category}`;
+    const key = `${sectionOf(c.item)}|${c.item.category}`;
     if (!bySection.has(key)) bySection.set(key, []);
     bySection.get(key).push(c);
   }
@@ -1393,7 +1456,8 @@ function stat(label, value, note) {
 async function renderTrends() {
   const params = queryParams();
   const machines = (await api("GET", "/api/machines")).filter((m) => m.active);
-  const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (machines[0] && machines[0].id);
+  const fallback = machines.find((m) => m.kind === "Proton gantry") || machines[0];
+  const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (fallback && fallback.id);
   const range = params.get("range") || "90";
   const testId = params.get("test_id");
   page("Machine Trends", testId ? "One test over time, against the limits in force when each value was recorded." : "Every measured test on this machine. Click one for detail.");
@@ -1407,7 +1471,7 @@ async function renderTrends() {
   if (!testId) return renderTrendOverview(machines, machineId, range);
   const data = await api("GET", `/api/trend?machine_id=${machineId}&test_id=${testId}`);
   const points = filterRange(data.points, range);
-  app.append(el("h2", {}, data.test.name), el("p", { class: "muted small" }, [sectionOf(data.test.category), data.test.category].join(" · ")));
+  app.append(el("h2", {}, data.test.name), el("p", { class: "muted small" }, [sectionOf(data.test), data.test.category].join(" · ")));
   if (!points.length) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
   renderTrendDetail(data, points, data.test.unit, range, machineId);
 }

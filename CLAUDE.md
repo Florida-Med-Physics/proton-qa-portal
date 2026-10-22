@@ -44,7 +44,7 @@ Share with `--host 0.0.0.0`.
 
 ## Interface decisions
 
-- Tabs: Perform QA / Test Setup / Machine Trends (myQA-style). No History tab; past results via a link.
+- Tabs: Perform QA / Setup QA / Machine Trends (myQA-style). No History tab; past results via a link.
 - Perform QA shows one table per machine type, with pending reviews for physicists.
 - "Tests", not "checks". Test types: numeric, pass/fail, pass/warning/fail (`status`), text.
 - Frequencies include `asneeded` (never overdue, always startable).

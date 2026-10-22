@@ -24,7 +24,7 @@ python -m venv .venv
 .venv\Scripts\python run_portal.py serve --open
 ```
 
-`create-admin` prompts for a password; no passwords are stored in code or config. `seed-defaults` loads `portal/seed.json` (the six machines, one daily template per machine type, the TrueBeam SRS list, and a scheduled copy of each on its machines) into an empty database; it refuses to run twice. After that, add people under *Test Setup → People*, and set each list's default import folder (a path on the host PC, or a network share the host can read) under *Change schedule*. The database is `data/portal.db` (change it with `--db` or the `PROTON_QA_DB` environment variable).
+`create-admin` prompts for a password; no passwords are stored in code or config. `seed-defaults` loads `portal/seed.json` (the six machines, one daily template per machine type, the TrueBeam SRS list, and a scheduled copy of each on its machines) into an empty database; it refuses to run twice. After that, add people under *Setup QA → People*, and set each list's default import folder (a path on the host PC, or a network share the host can read) under *Change schedule*. The database is `data/portal.db` (change it with `--db` or the `PROTON_QA_DB` environment variable).
 
 By default the portal listens only on this computer at http://127.0.0.1:8790. To share it with other workstations, run it on one host PC with `--host 0.0.0.0` and have others browse to `http://<host-name>:8790`. On a shared network, put it behind HTTPS (for example IIS or a reverse proxy) and add `--secure-cookies`.
 

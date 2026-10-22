@@ -728,6 +728,18 @@
     return { test, points };
   }
 
+  function machineTrends(machineId) {
+    const runs = Object.fromEntries(S.runs.filter((r) => r.machine_id === Number(machineId)).map((r) => [r.id, r]));
+    const out = {};
+    for (const x of S.results) {
+      if (!runs[x.run_id] || x.value_num === null) continue;
+      (out[x.test_id] = out[x.test_id] || []).push({ run_id: x.run_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected,
+        warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status });
+    }
+    for (const k in out) out[k].sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);
+    return out;
+  }
+
   // ---- Sphinx into lists --------------------------------------------------------
 
   function sphinxTestIds(user, t, measurements, create) {
@@ -918,6 +930,7 @@
   route("GET", "/api/runs", (u, m, body, q) => listRuns(q));
   route("GET", "/api/runs/(\\d+)", (u, m) => getRun(Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
+  route("GET", "/api/machines/(\\d+)/trends", (u, m) => machineTrends(Number(m[1])));
   route("GET", "/api/trend", (u, m, body, q) => {
     if (!q.machine_id || !q.test_id) throw new Error("Choose a machine and a test.");
     return trend(q.machine_id, q.test_id);

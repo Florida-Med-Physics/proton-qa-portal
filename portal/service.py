@@ -740,6 +740,18 @@ def trend(db, user, machine_id, test_id):
     return {"test": test, "points": points}
 
 
+def machine_trends(db, user, machine_id):
+    """Every numeric result on one machine, grouped by test, in one query (the Trends overview)."""
+    rows = db.all(
+        "SELECT res.test_id, r.id AS run_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
+        "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.value_num IS NOT NULL "
+        "ORDER BY r.qa_date, r.id", (machine_id,))
+    out = {}
+    for row in rows:
+        out.setdefault(str(row.pop("test_id")), []).append(row)
+    return out
+
+
 def list_audit(db, user, limit=300):
     require(user, "review")
     return db.all("SELECT a.*, u.username FROM audit a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT ?", (min(int(limit), 2000),))

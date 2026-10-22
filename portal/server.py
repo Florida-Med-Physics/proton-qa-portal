@@ -180,6 +180,11 @@ def review(db, user, m, body, q):
     return service.review_run(db, user, int(m[1]), body)
 
 
+@route("GET", r"/api/machines/(\d+)/trends")
+def machine_trends(db, user, m, body, q):
+    return service.machine_trends(db, user, int(m[1]))
+
+
 @route("GET", r"/api/trend")
 def trend(db, user, m, body, q):
     try:
