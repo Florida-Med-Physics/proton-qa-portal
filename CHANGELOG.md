@@ -29,6 +29,8 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - **[Physics review]** In Machine Trends, the X, Y, and Z values of a test share one chart (shown as deviation from expected), with statistics and values for each axis.
 - Lighter screens; template sections include directions; added a trend overview.
 - The README describes running the portal on a host PC as the intended setup.
+- Four tabs: Perform QA, Setup QA (the editable QA lists and templates), Machines (add machines and assign QA lists to each), and Machine Trends.
+- QA lists are shown by their full name everywhere, for example "Daily QA – GTR1".
 
 ### Fixed
 - Machine Trends no longer fails because of a missing section helper, and a machine's trends now load in one request.
