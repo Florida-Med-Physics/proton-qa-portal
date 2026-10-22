@@ -376,9 +376,11 @@ async function renderHome() {
       const lastRun = lasts.sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""))[0];
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
         el("td", {}, el("strong", {}, m.name)),
-        el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small" }, q.queue_name)) : el("span", { class: "muted small" }, "None")),
+        el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small list-line" },
+          can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}`, onclick: (e) => e.stopPropagation() }, "▶") : null,
+          q.queue_name)) : el("span", { class: "muted small" }, "None")),
         el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? (([q]) => dueIn(q.next_due, q.frequency))(m.queues.filter((q) => q.state === "due").sort((x, y) => x.next_due.localeCompare(y.next_due))) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
-        el("td", { class: "last-result" }, lastRun ? [lastCounts[m.id] ? miniRing(lastCounts[m.id]) : null, el("span", {}, chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`))] : el("span", { class: "muted small" }, "No runs yet")),
+        el("td", {}, lastRun ? el("div", { class: "last-result-row" }, lastCounts[m.id] ? miniRing(lastCounts[m.id]) : null, el("span", { class: "last-result-text" }, chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`))) : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));
     });

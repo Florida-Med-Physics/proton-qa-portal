@@ -837,5 +837,8 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .icon-actions { flex-wrap: nowrap !important; }
 
 /* Dashboard: pass ring beside the last result. */
-td.last-result { display: flex; align-items: center; gap: 10px; }
-td.last-result .ring.mini .ring-svg { width: 46px; height: 46px; }
+.last-result-row { display: flex; align-items: center; gap: 10px; }
+.last-result-row .ring.mini .ring-svg { width: 44px; height: 44px; }
+.last-result-text { flex: 1; min-width: 0; }
+.list-line { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.list-line .start-dot { width: 20px; height: 20px; font-size: 8px; }
