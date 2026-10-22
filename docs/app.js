@@ -305,7 +305,7 @@ function renderLogin() {
   const error = el("p", { class: "error" });
   const form = el("form", {},
     el("img", { class: "brand-logo", src: "uf-proton-logo.png", alt: "UF Health Proton Therapy Institute" }),
-    el("h1", {}, "Physics QA Portal"),
+    el("h1", {}, "UF Proton Machine QA Portal"),
     window.localApi
       ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
         field("Your name", el("input", { name: "username", autocomplete: "name", required: true, autofocus: true })),
@@ -381,10 +381,10 @@ function queryParams() {
 // Dashboard
 // ---------------------------------------------------------------------------
 
-// Proton gantries first, then every other machine (TrueBeam, CT and MRI simulators) under Photon.
-const MODALITIES = ["Proton", "Photon"];
-const modalityOf = (kind) => (/proton/i.test(kind || "") ? "Proton" : "Photon");
-const KIND_RANK = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
+// Proton gantries, then Photon (TrueBeam, Synergy, Ethos), then Simulation (CT and MRI simulators).
+const MODALITIES = ["Proton", "Photon", "Simulation"];
+const modalityOf = (kind) => (/proton/i.test(kind || "") ? "Proton" : /simulat/i.test(kind || "") ? "Simulation" : "Photon");
+const KIND_RANK = ["Proton gantry", "Linac", "Elekta Synergy", "Varian Ethos", "CT simulator", "MRI simulator"];
 const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RANK.length : i; };
 
 // A table with fixed column widths, so the Proton and Photon tables line up at the same width.
@@ -492,10 +492,11 @@ async function renderSetup() {
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  app.append(templates.length ? table(["QA List Template", "#Tests", "Copies on", ""], templates.map((t) => el("tr", {},
+  const SETUP_COLS = (first, second) => [[first, "36%"], [second, "20%"], ["#Tests", "8%"], ["", "36%"]];
+  app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, el("strong", {}, t.name)),
-    el("td", { class: "num" }, t.item_count),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
+    el("td", { class: "num" }, t.item_count),
     actions(t))))
     : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
 
@@ -506,10 +507,9 @@ async function renderSetup() {
   const ordered = lists.slice().sort((x, y) => rank(x) - rank(y) || (x.machines || "").localeCompare(y.machines || "") || x.name.localeCompare(y.name));
   app.append(el("h2", { class: "section-head" }, "Machine-Specific QA Lists"),
     el("p", { class: "muted" }, "Each list here is that machine's own copy. Edits made here change only that machine's list; they do not affect the template it came from."));
-  app.append(table(["QA List", "Machine", "From template", "#Tests", ""], ordered.map((q) => el("tr", { class: q.active ? "" : "muted" },
-    el("td", {}, el("strong", {}, q.name)),
+  app.append(fixedTable(SETUP_COLS("QA List", "Machine"), ordered.map((q) => el("tr", { class: q.active ? "" : "muted" },
+    el("td", {}, el("strong", {}, q.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
     el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
-    el("td", { class: "muted small" }, q.template_name || "—"),
     el("td", { class: "num" }, q.item_count),
     actions(q))), "No QA lists on machines yet. Copy a template to a machine."));
 

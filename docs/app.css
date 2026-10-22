@@ -334,7 +334,7 @@ td.indent { padding-left: 28px; }
 .tol-cell select { width: auto; padding: 3px 6px; font-size: 12px; }
 
 /* UF Health Proton Therapy Institute branding (matches the TrueBeam Service Log): navy header, orange rule, logo. */
-:root { --uf-navy: #122d59; --uf-orange: #fa7021; }
+:root { --uf-navy: #0d1d3e; --uf-orange: #f37021; }  /* sampled from the UF Health logo */
 :root[data-theme="light"] { --accent: #183f74; }
 .topbar { background: var(--uf-navy); border-bottom: 4px solid var(--uf-orange); color: #fff; padding: 6px 24px; }
 .brand { display: flex; align-items: center; gap: 12px; color: #fff; }
@@ -347,7 +347,7 @@ td.indent { padding-left: 28px; }
 .theme-toggle { background: transparent; border: 1px solid #7893a7; color: #fff; white-space: nowrap; padding: 4px 10px; }
 .theme-toggle:hover { background: #2b526d; }
 .section-head { border-bottom-color: var(--uf-orange); }
-:root[data-theme="dark"] .topbar { background: #0d2142; }
+:root[data-theme="dark"] .topbar { background: var(--uf-navy); }
 .login .brand-logo { width: 100%; height: 90px; margin: 0 0 8px; border-radius: 8px; }
 @media (max-width: 640px) { .brand span { display: none; } .brand-logo { width: 180px; height: 36px; } }
 .chart .unit-label { font-weight: 600; }
@@ -444,3 +444,10 @@ h2.section-head { font-size: 20px; }
 /* Action buttons never squash into the column. */
 td.right { max-width: none; white-space: nowrap; }
 td.right .row.nowrap.end { flex-wrap: nowrap; }
+.modality-head.simulation { border-bottom-color: #2e9d8f; }
+
+/* Machines tab: machine header rows keep their own tint; hovering a QA-list row uses a lighter, distinct shade. */
+.fixed-table tbody tr.machine-row td { background: color-mix(in srgb, var(--uf-navy) 9%, var(--surface)); border-top: 1px solid var(--border); }
+.fixed-table tbody tr.machine-row:hover td { background: color-mix(in srgb, var(--uf-navy) 9%, var(--surface)); }
+.fixed-table tbody tr:not(.machine-row):hover td { background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+:root[data-theme="dark"] .fixed-table tbody tr.machine-row td, :root[data-theme="dark"] .fixed-table tbody tr.machine-row:hover td { background: color-mix(in srgb, #ffffff 7%, var(--surface)); }

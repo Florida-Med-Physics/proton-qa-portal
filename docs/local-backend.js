@@ -920,7 +920,20 @@
     dropSphinxCouch();
     renameSphinxTests();
     refreshTemplates();
+    addSeedMachines();
   })();
+
+  // Machines added to the starting data later (e.g. Linac 1 Synergy, Ethos) appear in browsers seeded before them.
+  function addSeedMachines() {
+    let added = 0;
+    for (const m of (window.PORTAL_SEED || {}).machines || []) {
+      if (S.machines.some((x) => x.name === m.name)) continue;
+      if (m.name === "Big Bore CT (7064)" && S.machines.some((x) => x.name === "CT Sim")) continue;
+      insert("machines", { name: m.name, kind: m.kind || "", location: m.location || "", notes: m.notes || "", active: 1, created_at: now() });
+      added++;
+    }
+    if (added) { audit(null, "upgrade", "machines", null, { added }); save(); }
+  }
 
   // Templates follow the starting data (e.g. the proton template now matches the myQA TG-224 outline exactly).
   // Only templates are refreshed; machine-specific lists are separate copies and are left alone.

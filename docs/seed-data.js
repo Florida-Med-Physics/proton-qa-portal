@@ -1246,6 +1246,14 @@ window.PORTAL_SEED = {
    "kind": "Linac"
   },
   {
+   "name": "Linac 1 Synergy",
+   "kind": "Elekta Synergy"
+  },
+  {
+   "name": "Ethos",
+   "kind": "Varian Ethos"
+  },
+  {
    "name": "Big Bore CT (7064)",
    "kind": "CT simulator"
   },

@@ -37,6 +37,9 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Machine Trends: the overview is a table (one row per chart) instead of card panels; charts plot dots instead of lines (one colour per axis, warning/fail ringed); all dates show the year.
 - **[Physics review]** Built like the myQA sheet: every numbered item is its title, then a Directions block, then the result. "0.01 Daily QA Setup" is now a pass/fail test with its directions (it was loose setup text); the protocol note stays at the top.
 - **[Physics review]** Units on the proton template's 2.02–2.06 measurements (laser/kV alignment offsets, CBCT and kV/kV correction vectors, kV/kV-to-CBCT deltas): mm. The myQA table has no unit column; the values are millimetres (a −5 cm shift is entered as 50). The editor now flags any measured test without a unit.
+- Renamed "UF Proton Machine QA Portal"; the header uses the UF Health deep navy (#0d1d3e) and orange (#f37021) sampled from the logo.
+- Machines are grouped Proton, Photon and Simulation (Big Bore CT, MRI Sim). Added Linac 1 Synergy and Ethos to Photon (no QA lists yet).
+- Setup QA's two tables share one width and column layout; on Machines, hovering a QA list row no longer matches the machine row colour.
 - QA lists can be archived (hidden from Perform QA, Machines and Trends; tests and results kept; restore from "Archived QA lists" in Setup QA) or deleted permanently. Delete is refused for any list with recorded results, so QA history cannot be deleted.
 - Data Administration (server build): an admin can switch the portal to another database file. A new file is created empty with the admin's account copied in; the choice is remembered across restarts (data/portal-settings.json) unless --db or PROTON_QA_DB is given.
 - Home: an Active QA lists column, and no machine-type label under each machine (also removed on Perform QA).
