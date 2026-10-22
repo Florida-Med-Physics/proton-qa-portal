@@ -977,8 +977,28 @@
     addSeedMachines();
     spellOutNames();
     reassignSphinx();
+    retireSplitEyelineLists();
     instantiateSeedTemplates();
   })();
+
+  // The three separate Eyeline lists became one "Eyeline Daily QA"; drop the split ones where nothing was recorded on them.
+  function retireSplitEyelineLists() {
+    const names = ["Eyeline Daily QA – Dosimetry: PDD template", "Eyeline Daily QA – Dosimetry: Output template", "Eyeline Daily QA – Imaging template"];
+    let gone = 0;
+    for (const tpl of S.queues.filter((q) => q.is_template && names.includes(q.name))) {
+      for (const q of [...S.queues.filter((x) => x.template_id === tpl.id), tpl]) {
+        const own = S.tests.filter((t) => t.owner_queue_id === q.id).map((t) => t.id);
+        if (S.results.some((r) => own.includes(r.test_id))) continue;
+        S.assignments = S.assignments.filter((a) => a.queue_id !== q.id);
+        S.drafts = (S.drafts || []).filter((d) => S.assignments.some((a) => a.id === d.assignment_id));
+        S.queue_items = S.queue_items.filter((i) => i.queue_id !== q.id);
+        S.tests = S.tests.filter((t) => t.owner_queue_id !== q.id);
+        S.queues = S.queues.filter((x) => x.id !== q.id);
+        gone++;
+      }
+    }
+    if (gone) { audit(null, "upgrade", "queues", null, { retired: gone }); save(); }
+  }
 
   // Templates added to the starting data later (e.g. the Eyeline lists) get their machine instance once, as a fresh seed would.
   function instantiateSeedTemplates() {

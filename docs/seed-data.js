@@ -2226,23 +2226,23 @@ window.PORTAL_SEED = {
    ]
   },
   {
-   "name": "Eyeline Daily QA – Dosimetry: PDD template",
+   "name": "Eyeline Daily QA template",
    "kind": "Proton eyeline",
-   "list": "Eyeline Daily QA – Dosimetry: PDD",
+   "list": "Eyeline Daily QA",
    "frequency": "daily",
-   "setup": "Transcribed from the RadMachine list 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Dosimetry: PDD' (October 2026). References are RadMachine's; no warn / fail limits were shown, so values are recorded, not judged, until limits are entered.",
+   "setup": "Transcribed from the RadMachine lists 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Dosimetry: PDD', '- Dosimetry: Output' and '- Imaging' (October 2026), combined into one daily list. References are RadMachine's; no warn / fail limits were shown, so values are recorded, not judged, until limits are entered. The Output section is PARTIAL: its screenshot was too small to read past the first items — add the rest from a readable copy.",
    "checks": [
     {
      "category": "Administrative",
      "name": "Last Edited By:",
      "type": "text",
-     "description": "Template 1.01. [Section: Eyeline Daily QA – Dosimetry: PDD] [auto: user]"
+     "description": "Template 1.01. [Section: Administrative] [auto: user]"
     },
     {
      "category": "Administrative",
      "name": "QA Performed By:",
      "type": "text",
-     "description": "Template 1.02. [Section: Eyeline Daily QA – Dosimetry: PDD]"
+     "description": "Template 1.02. [Section: Administrative]"
     },
     {
      "category": "Beam_Parameters",
@@ -2251,7 +2251,7 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.01. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.01. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Beam_Parameters",
@@ -2260,13 +2260,13 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.02. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.02. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Beam_Parameters",
      "name": "Aperture (diameter in cm)",
      "type": "text",
-     "description": "Template 2.03. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.03. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Beam_Parameters",
@@ -2275,7 +2275,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.04. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.04. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Beam_Parameters",
@@ -2284,7 +2284,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.05. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.05. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Beam_Parameters",
@@ -2293,7 +2293,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.06. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.06. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Beam_Parameters",
@@ -2302,19 +2302,19 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.07. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.07. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Device Selection",
      "name": "Chamber",
      "type": "text",
-     "description": "Template 2.08. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.08. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Device Selection",
      "name": "Eyeline Phantom",
      "type": "text",
-     "description": "Template 2.09. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.09. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Device Selection",
@@ -2323,7 +2323,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.10. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.10. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Device Selection",
@@ -2332,7 +2332,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.11. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.11. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Device Selection",
@@ -2341,7 +2341,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.12. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.12. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Device Selection",
@@ -2350,7 +2350,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.13. [Section: Eyeline_DailyQA_Ref1_PDD_module] [calc: sum:3] Calculated here: chamber offset + phantom offset + user offset."
+     "description": "Template 2.13. [Section: Dosimetry: PDD] [calc: sum:3] Calculated here: chamber offset + phantom offset + user offset."
     },
     {
      "category": "Dosimetry",
@@ -2359,7 +2359,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.14. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.14. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2368,7 +2368,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 2.5,
      "tol_mode": "absolute",
-     "description": "Template 2.15. [Section: Eyeline_DailyQA_Ref1_PDD_module] [calc: sum:2] Calculated here: measured range without offset + total offset."
+     "description": "Template 2.15. [Section: Dosimetry: PDD] [calc: sum:2] Calculated here: measured range without offset + total offset."
     },
     {
      "category": "Dosimetry",
@@ -2377,7 +2377,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 2.5,
      "tol_mode": "absolute",
-     "description": "Template 2.16. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.16. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2386,7 +2386,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.17. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.17. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2395,7 +2395,7 @@ window.PORTAL_SEED = {
      "unit": "%",
      "expected": 90,
      "tol_mode": "absolute",
-     "description": "Template 2.18. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.18. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2404,7 +2404,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.19. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.19. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2413,7 +2413,7 @@ window.PORTAL_SEED = {
      "unit": "%",
      "expected": 100,
      "tol_mode": "absolute",
-     "description": "Template 2.20. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.20. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2422,7 +2422,7 @@ window.PORTAL_SEED = {
      "unit": "%",
      "expected": 100,
      "tol_mode": "absolute",
-     "description": "Template 2.21. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
+     "description": "Template 2.21. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Dosimetry",
@@ -2431,67 +2431,7 @@ window.PORTAL_SEED = {
      "unit": "%",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.22. [Section: Eyeline_DailyQA_Ref1_PDD_module]"
-    }
-   ]
-  },
-  {
-   "name": "Eyeline Daily QA – Dosimetry: Output template",
-   "kind": "Proton eyeline",
-   "list": "Eyeline Daily QA – Dosimetry: Output",
-   "frequency": "daily",
-   "setup": "PARTIAL. The RadMachine screenshot of 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Dosimetry: Output' was too small to read in full; only the items that could be read with confidence are here. Add the rest from a readable screenshot or export.",
-   "checks": [
-    {
-     "category": "Administrative",
-     "name": "Last Edited By:",
-     "type": "text",
-     "description": "Template 1.01. [Section: Eyeline Daily QA – Dosimetry: Output] [auto: user]"
-    },
-    {
-     "category": "Administrative",
-     "name": "QA Performed By:",
-     "type": "text",
-     "description": "Template 1.02. [Section: Eyeline Daily QA – Dosimetry: Output]"
-    },
-    {
-     "category": "Beam_Parameters",
-     "name": "Field1_RM Wheel ID",
-     "type": "numeric",
-     "unit": "",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.01. [Section: Eyeline_DailyQA_Ref1_Output_module]"
-    },
-    {
-     "category": "Beam_Parameters",
-     "name": "Field1_RM Block ID",
-     "type": "numeric",
-     "unit": "",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.02. [Section: Eyeline_DailyQA_Ref1_Output_module]"
-    },
-    {
-     "category": "Beam_Parameters",
-     "name": "Aperture (diameter in cm)",
-     "type": "text",
-     "description": "Template 2.03. [Section: Eyeline_DailyQA_Ref1_Output_module]"
-    },
-    {
-     "category": "Beam_Parameters",
-     "name": "Field1_Exp_IsoDepth [cm]",
-     "type": "numeric",
-     "unit": "cm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.04. [Section: Eyeline_DailyQA_Ref1_Output_module]"
-    },
-    {
-     "category": "Device Selection",
-     "name": "Eyeline Phantom",
-     "type": "text",
-     "description": "Template 2.05. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 2.22. [Section: Dosimetry: PDD]"
     },
     {
      "category": "Temp & Pressure",
@@ -2500,7 +2440,7 @@ window.PORTAL_SEED = {
      "unit": "°C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.06. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 3.01. [Section: Dosimetry: Output]"
     },
     {
      "category": "Temp & Pressure",
@@ -2509,7 +2449,7 @@ window.PORTAL_SEED = {
      "unit": "kPa",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.07. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 3.02. [Section: Dosimetry: Output]"
     },
     {
      "category": "Temp & Pressure",
@@ -2518,13 +2458,7 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.08. [Section: Eyeline_DailyQA_Ref1_Output_module] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
-    },
-    {
-     "category": "Device Selection",
-     "name": "Chamber",
-     "type": "text",
-     "description": "Template 2.09. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 3.03. [Section: Dosimetry: Output] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
     },
     {
      "category": "Device Selection",
@@ -2533,13 +2467,13 @@ window.PORTAL_SEED = {
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.10. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 3.04. [Section: Dosimetry: Output]"
     },
     {
      "category": "Device Selection",
      "name": "Electrometer",
      "type": "text",
-     "description": "Template 2.11. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 3.05. [Section: Dosimetry: Output]"
     },
     {
      "category": "Device Selection",
@@ -2548,34 +2482,13 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.12. [Section: Eyeline_DailyQA_Ref1_Output_module]"
+     "description": "Template 3.06. [Section: Dosimetry: Output]"
     },
     {
      "category": "Dosimetry",
      "name": "Remaining output items",
      "type": "text",
-     "description": "Template 2.13. [Section: Eyeline_DailyQA_Ref1_Output_module] Placeholder: the output measurements (background, MU, charge, irradiation time, dose and dose rate per run, averaging) still need to be added from a readable copy of the RadMachine list."
-    }
-   ]
-  },
-  {
-   "name": "Eyeline Daily QA – Imaging template",
-   "kind": "Proton eyeline",
-   "list": "Eyeline Daily QA – Imaging",
-   "frequency": "daily",
-   "setup": "Transcribed from the RadMachine list 'Eyeline (PAT006-FSTR4) :: Eyeline Daily QA - Imaging' (October 2026). References are RadMachine's; no warn / fail limits were shown, so values are recorded, not judged, until limits are entered.",
-   "checks": [
-    {
-     "category": "Administrative",
-     "name": "Last Edited By:",
-     "type": "text",
-     "description": "Template 1.01. [Section: Eyeline Daily QA – Imaging] [auto: user]"
-    },
-    {
-     "category": "Administrative",
-     "name": "QA Performed By:",
-     "type": "text",
-     "description": "Template 1.02. [Section: Eyeline Daily QA – Imaging]"
+     "description": "Template 3.07. [Section: Dosimetry: Output] Placeholder: the output measurements (background, MU, charge, irradiation time, dose and dose rate per run, averaging) still need to be added from a readable copy of the RadMachine list."
     },
     {
      "category": "Alignment",
@@ -2584,7 +2497,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5,
      "tol_mode": "absolute",
-     "description": "Template 2.01. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.01. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2593,7 +2506,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5,
      "tol_mode": "absolute",
-     "description": "Template 2.02. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.02. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2602,7 +2515,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5,
      "tol_mode": "absolute",
-     "description": "Template 2.03. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.03. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2611,7 +2524,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.04. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.04. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2620,7 +2533,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.05. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.05. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2629,7 +2542,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.06. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.06. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2638,7 +2551,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 25,
      "tol_mode": "absolute",
-     "description": "Template 2.07. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.07. [Section: Imaging]"
     },
     {
      "category": "Alignment",
@@ -2647,56 +2560,56 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 25,
      "tol_mode": "absolute",
-     "description": "Template 2.08. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.08. [Section: Imaging]"
     },
     {
      "category": "Alignment",
      "name": "After correcting a chair position with imaging, check laser alignment (< 1 mm)",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 2.09. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.09. [Section: Imaging]"
     },
     {
      "category": "Alignment",
      "name": "After installing a pin-hole aperture, check light field projection (< 1 mm)",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 2.10. [Section: Eyeline Daily alignment]"
+     "description": "Template 4.10. [Section: Imaging]"
     },
     {
      "category": "Safety",
      "name": "Light-pen system functional?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.01. [Section: Safety]"
+     "description": "Template 5.01. [Section: Safety]"
     },
     {
      "category": "Safety",
      "name": "Eye cameras and monitors functional?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.02. [Section: Safety]"
+     "description": "Template 5.02. [Section: Safety]"
     },
     {
      "category": "Safety",
      "name": "Gazing light functional?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.03. [Section: Safety]"
+     "description": "Template 5.03. [Section: Safety]"
     },
     {
      "category": "Safety",
      "name": "Panic button functional?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.04. [Section: Safety]"
+     "description": "Template 5.04. [Section: Safety]"
     },
     {
      "category": "Safety",
      "name": "QA reviewed by therapist?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.05. [Section: Safety]"
+     "description": "Template 5.05. [Section: Safety]"
     }
    ]
   }

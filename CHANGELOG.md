@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Eyeline GTR4 has one daily list, "Eyeline Daily QA" (sections Administrative / Dosimetry: PDD / Dosimetry: Output (partial) / Imaging / Safety), replacing the three separate lists.
 - Machine Trends: the table is Test · Reference · Warn · Fail · History (values under their QA dates, as in Perform QA) · Trends, and a search box narrows it to matching tests. Axis labels (X / Y / Z) are plain coloured letters, not boxes.
 - Perform QA: a Save button keeps what has been entered (per user and list) without submitting, and it is restored when the list is opened again; the list's title row stays frozen at the top while scrolling. Chart toggle reads "<unit> | Δ from reference" in one colour, the chosen one underlined.
 - **[Physics review]** New machine "Eyeline GTR4" (proton eye line) with three daily lists transcribed from RadMachine: Dosimetry: PDD (22 items; Total Offset and Measured Range Eyeline are calculated), Imaging (17 items) and a PARTIAL Dosimetry: Output list (the screenshot was unreadable past the first items — to be completed). Setup QA: "Generated from" says "No changes" or "Changed (n tests)" comparing each machine list with its template. Perform QA: X, Y, Z and 3D stack in one column; history dates sit in one line of separated slots, only as many as fit the column.
