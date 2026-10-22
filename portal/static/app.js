@@ -302,7 +302,7 @@ function renderShell() {
   const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
   document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns, title]) =>
     el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
-      title ? [homeIcon(), " ", label] : label)));
+      title ? homeIcon() : label)));   // the Dashboard tab is the house icon alone
   document.getElementById("who").replaceChildren(
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
