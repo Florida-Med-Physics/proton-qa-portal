@@ -1425,61 +1425,117 @@ function asDeviation(p) {
 
 const latest = (points) => points[points.length - 1];
 
-// One chart for one or more series. Single series: actual values with expected line and bands.
-// Several series: deviation from expected, so X, Y and Z share one scale and one band.
+/// Nice tick step for a span, and how many decimals its labels need.
+function niceTicks(lo, hi, count) {
+  const raw = (hi - lo) / count, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9) + (step / mag === 2.5 ? 1 : 0));
+  const ticks = [];
+  for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(v);
+  return { ticks, decimals };
+}
+
+function seriesStats(values) {
+  const n = values.length;
+  const mean = values.reduce((a, b) => a + b, 0) / n;
+  const sd = n > 1 ? Math.sqrt(values.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)) : 0;
+  return { n, mean, sd, min: Math.min(...values), max: Math.max(...values) };
+}
+
+// One chart for one or more series. Single series: actual values, with the expected line and limit bands.
+// Several series (X/Y/Z, pitch/roll/rotation): deviation from each one's expected value, on one scale.
+// The y axis is scaled to the data (limit bands are clipped to the plot), carries the unit, and the x axis is dated.
+// Each chart carries its own statistics: n, mean ± SD and range per series.
 function seriesChart(series, unit, { small = false } = {}) {
   const multi = series.length > 1;
-  const W = small ? 260 : 900, H = small ? 70 : 320, L = small ? 4 : 60, R = small ? 4 : 16, T = small ? 4 : 16, B = small ? 4 : 40;
+  const W = small ? 300 : 900, H = small ? 150 : 360;
+  const L = small ? 46 : 70, R = small ? 8 : 16, T = small ? 10 : 20, B = small ? 30 : 52;
+  const lineH = small ? 13 : 16;
+  const statH = lineH * series.length * (small ? 2 : 1) + 6;   // statistics block under the plot (two lines per series on small charts)
+  const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
   const xi = Object.fromEntries(dates.map((d, i) => [d, i]));
   const x = (d) => L + (dates.length === 1 ? (W - L - R) / 2 : (xi[d] * (W - L - R)) / (dates.length - 1));
   const val = (p) => (multi ? asDeviation(p).dev : p.value);
-  // Band per date from the first series (axes of one test share tolerances).
   const ref = series[0].points.map((p) => {
     if (multi) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
     return { d: p.qa_date, w: p.warn === null ? null : bandValue(p, "warn", 1) - p.expected, f: p.fail === null ? null : bandValue(p, "fail", 1) - p.expected, c: p.expected };
   }).filter((b) => b.c !== null && b.c !== undefined);
+
+  // Auto-scale to the data only, with a little headroom.
   const values = series.flatMap((s) => s.points.map(val));
-  for (const b of ref) for (const t of small ? [b.w] : [b.w, b.f]) if (t !== null && t !== undefined) values.push(b.c + t, b.c - t);
   let lo = Math.min(...values), hi = Math.max(...values);
-  if (lo === hi) { lo -= 1; hi += 1; }
-  const pad = (hi - lo) * 0.08;
-  lo -= pad; hi += pad;
-  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
+  if (lo === hi) {
+    const pad = Math.abs(lo) * 0.05 || (ref[0] && ref[0].w) || 1;
+    lo -= pad; hi += pad;
+  } else {
+    const pad = (hi - lo) * 0.1;
+    lo -= pad; hi += pad;
+  }
+  const y = (v) => T + ((hi - v) * (plotBottom - T)) / (hi - lo);
+  const clipId = `clip-${Math.random().toString(36).slice(2)}`;
+  const kids = [svg("defs", {}, svg("clipPath", { id: clipId }, svg("rect", { x: L, y: T, width: W - L - R, height: plotBottom - T })))];
   const band = (key) => {
     const up = [], dn = [];
     for (const b of ref) if (b[key] !== null && b[key] !== undefined) { up.push(`${x(b.d)},${y(b.c + b[key])}`); dn.unshift(`${x(b.d)},${y(b.c - b[key])}`); }
     return up.length ? up.concat(dn).join(" ") : null;
   };
-  const kids = [];
-  const fail = small ? null : band("f"), warn = band("w");
-  if (fail) kids.push(svg("polygon", { class: "band-fail", points: fail }));
-  if (warn) kids.push(svg("polygon", { class: "band-warn", points: warn }));
-  if (!small) {
-    const raw = (hi - lo) / 4, mag = 10 ** Math.floor(Math.log10(raw));
-    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
-    const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9) + (step / mag === 2.5 ? 1 : 0));
-    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
-      kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }), svg("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, (multi && v > 0 ? "+" : "") + fmt(v, decimals)));
-    }
-    if (unit) kids.push(svg("text", { x: L - 6, y: T - 4, "text-anchor": "end", class: "unit-label" }, multi ? `Δ ${unit}` : unit));
-    const every = Math.max(1, Math.ceil(dates.length / 8));
-    const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
-    dates.forEach((d, i) => { if (i % every === 0) kids.push(svg("text", { x: x(d), y: H - B + 18, "text-anchor": "middle" }, multiYear ? d.slice(0, 7) : d.slice(5))); });
+  const plot = [];
+  const fail = band("f"), warn = band("w");
+  if (fail) plot.push(svg("polygon", { class: "band-fail", points: fail }));
+  if (warn) plot.push(svg("polygon", { class: "band-warn", points: warn }));
+  if (ref.length) plot.push(svg("polyline", { class: "expected", points: ref.map((b) => `${x(b.d)},${y(b.c)}`).join(" ") }));
+
+  // Y axis: gridlines, labels, and the unit as the axis title.
+  const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
+  for (const v of ticks) {
+    kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
+      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (multi && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  if (ref.length) kids.push(svg("polyline", { class: "expected", points: ref.map((b) => `${x(b.d)},${y(b.c)}`).join(" ") }));
+  const yTitle = multi ? `Δ from expected (${unit || "unitless"})` : `${unit || "unitless"}`;
+  kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
+
+  // X axis: dates, and the axis title.
+  kids.push(svg("line", { class: "axis-base", x1: L, x2: W - R, y1: plotBottom, y2: plotBottom }));
+  const labels = small ? 3 : 8;
+  const every = Math.max(1, Math.ceil(dates.length / labels));
+  const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
+  const fmtDate = (d) => (multiYear ? d.slice(0, 7) : d.slice(5));
+  dates.forEach((d, i) => {
+    if (i % every === 0 || i === dates.length - 1) {
+      if (i === dates.length - 1 && i % every !== 0 && dates.length > 1 && x(d) - x(dates[i - (i % every)]) < (small ? 60 : 70)) return;
+      const anchor = i === 0 ? "start" : i === dates.length - 1 ? "end" : "middle";
+      kids.push(svg("text", { x: x(d), y: plotBottom + 14, "text-anchor": anchor }, fmtDate(d)));
+    }
+  });
+  kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, `Date (QA performed${multiYear ? ", year-month" : ", month-day"})`));
+
   series.forEach((s, k) => {
     const cls = multi ? `axis-${k}` : "";
-    kids.push(svg("polyline", { class: `series ${cls}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
+    plot.push(svg("polyline", { class: `series ${cls}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
       const show = !small || p.status === "fail" || p.status === "warn";
-      if (show) kids.push(svg("circle", { class: p.status, cx: x(p.qa_date), cy: y(val(p)), r: small ? 2.5 : (dates.length > 150 ? 2.5 : 3.5) },
+      if (show) plot.push(svg("circle", { class: p.status, cx: x(p.qa_date), cy: y(val(p)), r: small ? 2.5 : (dates.length > 150 ? 2.5 : 3.5) },
         svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${p.status})`)));
     }
     const last = latest(s.points);
-    if (small && last) kids.push(svg("circle", { class: `${last.status} last ${cls}`, cx: x(last.qa_date), cy: y(val(last)), r: 3.5 }));
+    if (small && last) plot.push(svg("circle", { class: `${last.status} last ${cls}`, cx: x(last.qa_date), cy: y(val(last)), r: 3.5 }));
   });
-  return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
+  kids.push(svg("g", { "clip-path": `url(#${clipId})` }, plot));
+
+  // Statistics block under the plot, one line per series.
+  const u = unit && unit !== "unitless" ? ` ${unit}` : "";
+  const statLines = series.flatMap((s, k) => {
+    const st = seriesStats(s.points.map(val));
+    const name = multi ? `${s.label} (Δ): ` : "";
+    const cls = `stats-line ${multi ? `axis-${k}` : ""}`;
+    const a = `${name}n ${st.n} · mean ${fmt(st.mean, 2)}${u} · SD ${fmt(st.sd, 2)}${u}`;
+    const b = `range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u}`;
+    if (!small) return [svg("text", { class: cls, x: L, y: H + (k + 1) * lineH }, `${a} · ${b}`)];
+    return [svg("text", { class: cls, x: 4, y: H + (2 * k + 1) * lineH }, a), svg("text", { class: cls, x: 4, y: H + (2 * k + 2) * lineH }, `${multi ? "   " : ""}${b}`)];
+  });
+  kids.push(...statLines);
+  return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H + statH}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
 }
 
 function axisLegend(group) {
