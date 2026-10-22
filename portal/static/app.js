@@ -2256,8 +2256,8 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
     const key = el("div", { class: "chart-key" },
       series.map((x, k) => el("span", { class: "key-item" }, el("span", { class: `key-swatch line ${multi ? `axis-${k}` : "single"}` }), `${x.label}${delta ? " (Δ)" : ""}`)),
       drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
-      drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Warning ±") : null,
-      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Action ±") : null);
+      drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
+      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null);
     box.replaceChildren(buttons, drawSeries(series, unit, { small, delta }), key);
   };
   draw();
@@ -2284,6 +2284,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
 
   // Auto-scale to the data only, with a little headroom.
   const values = series.flatMap((s) => s.points.map(val));
+  for (const b of ref) if (b.w !== null && b.w !== undefined) values.push(b.c + b.w, b.c - b.w);
   let lo = Math.min(...values), hi = Math.max(...values);
   if (lo === hi) {
     const pad = Math.abs(lo) * 0.05 || (ref[0] && ref[0].w) || 1;
@@ -2300,9 +2301,16 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     for (const b of ref) if (b[key] !== null && b[key] !== undefined) { up.push(`${x(b.d)},${y(b.c + b[key])}`); dn.unshift(`${x(b.d)},${y(b.c - b[key])}`); }
     return up.length ? up.concat(dn).join(" ") : null;
   };
+  // A strip from the warning limit out to the action limit, on one side of the reference.
+  const strip = (sign) => {
+    const outer = [], inner = [];
+    for (const b of ref) if (b.f !== null && b.f !== undefined && b.w !== null && b.w !== undefined) { outer.push(`${x(b.d)},${y(b.c + sign * b.f)}`); inner.unshift(`${x(b.d)},${y(b.c + sign * b.w)}`); }
+    return outer.length ? outer.concat(inner).join(" ") : null;
+  };
   const plot = [];
   const fail = band("f"), warn = band("w");
-  if (fail) plot.push(svg("polygon", { class: "band-fail", points: fail }));
+  if (fail && warn) { for (const sign of [1, -1]) { const pts = strip(sign); if (pts) plot.push(svg("polygon", { class: "band-fail", points: pts })); } }
+  else if (fail) plot.push(svg("polygon", { class: "band-fail", points: fail }));
   if (warn) plot.push(svg("polygon", { class: "band-warn", points: warn }));
   if (ref.length) plot.push(svg("polyline", { class: "expected", points: ref.map((b) => `${x(b.d)},${y(b.c)}`).join(" ") }));
 
@@ -2312,7 +2320,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
       svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  const yTitle = delta ? (unit ? `Delta from reference (${unit})` : "Delta from reference") : unit ? `Absolute (${unit})` : "Value";   // the unit never changes between the two views
+  const yTitle = delta ? (unit ? `Delta from Reference (${unit})` : "Delta from Reference") : unit ? `Absolute (${unit})` : "Value";   // the unit never changes between the two views
   kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
 
   // X axis: dates, and the axis title.
