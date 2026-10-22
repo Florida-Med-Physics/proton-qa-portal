@@ -527,13 +527,13 @@ async function renderSetup() {
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "28%"], [second, "24%"], ["Tests", "7%"], ["Last Modified", "11%"], ["Actions", "30%"]];
+  const SETUP_COLS = (first, second) => [[first, "28%"], [second, "24%"], ["Tests", "7%"], ["Actions", "30%"], ["Last Modified", "11%"]];
   const modified = (q) => el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—");
   app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
-    el("td", { class: "center" }, t.item_count), modified(t),
-    actions(t))))
+    el("td", { class: "center" }, t.item_count),
+    actions(t), modified(t))))
     : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
 
   // Bottom table: every QA list instantiated on a machine (a copy of a template), one row each.
@@ -555,8 +555,8 @@ async function renderSetup() {
       ...qs.map((q) => el("tr", { class: q.active ? "" : "muted" },
         el("td", { class: "indent" }, editableName(q, editable)),
         el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
-        el("td", { class: "center" }, q.item_count), modified(q),
-        actions(q)))];
+        el("td", { class: "center" }, q.item_count),
+        actions(q), modified(q)))];
   });
   app.append(fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));
 
