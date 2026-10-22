@@ -50,10 +50,10 @@ def grid(offset=0, finished="10/21/2026 5:35:11 AM", intensity="71.75 %", intens
 
 
 EXPECTED_NAMES = [
-    ("Energy", "Energy 100 MeV – Distal Depth"),
-    ("Energy", "Energy 100 MeV – DFO"),
-    ("Spot", "Spot 120 MeV – Intensity"),
-    ("Spot", "Spot 120 MeV – Skewness X"),
+    ("Energy", "Energy [100 MeV] – Distal Depth"),
+    ("Energy", "Energy [100 MeV] – DFO"),
+    ("Spot", "Spot 1 [120 MeV] – Intensity"),
+    ("Spot", "Spot 1 [120 MeV] – Skewness X"),
     ("Output", "Output – Absolute Dose"),
 ]
 
@@ -69,18 +69,18 @@ class ParserTests(unittest.TestCase):
             self.assertEqual([(m["category"], m["name"]) for m in parsed["measurements"]], EXPECTED_NAMES)
             self.assertEqual((parsed["qa_date"], parsed["sphinx_user"]), ("2026-10-21", "synthetic-user"))
         m = {x["name"]: x for x in parsed["measurements"]}
-        self.assertEqual(m["Energy 100 MeV – Distal Depth"],
-                         {**m["Energy 100 MeV – Distal Depth"], "expected": 77.8, "result": 77.7, "warn": 0.9, "fail": 1.0,
+        self.assertEqual(m["Energy [100 MeV] – Distal Depth"],
+                         {**m["Energy [100 MeV] – Distal Depth"], "expected": 77.8, "result": 77.7, "warn": 0.9, "fail": 1.0,
                           "unit": "mm", "tol_mode": "absolute", "sphinx_status": "Passed"})
-        self.assertEqual((m["Spot 120 MeV – Intensity"]["unit"], m["Spot 120 MeV – Intensity"]["tol_mode"]), ("%", "absolute"))
-        self.assertEqual(m["Spot 120 MeV – Skewness X"]["unit"], "unitless")
+        self.assertEqual((m["Spot 1 [120 MeV] – Intensity"]["unit"], m["Spot 1 [120 MeV] – Intensity"]["tol_mode"]), ("%", "absolute"))
+        self.assertEqual(m["Spot 1 [120 MeV] – Skewness X"]["unit"], "unitless")
         self.assertEqual((m["Output – Absolute Dose"]["unit"], m["Output – Absolute Dose"]["tol_mode"]), ("cGy", "percent"))
 
     def test_standard_names(self):
-        self.assertEqual(sphinx.standard_name("Energy", "Energy [100.81 MeV]", "Distal Depth"), "Energy 100 MeV – Distal Depth")
-        self.assertEqual(sphinx.standard_name("Energy", "100 MeV", "Distal Depth"), "Energy 100 MeV – Distal Depth")
-        self.assertEqual(sphinx.standard_name("Spot", "Spot 1 [226.18 MeV]", "Sigma X"), "Spot 225 MeV – Sigma X")
-        self.assertEqual(sphinx.standard_name("Spot", "Spot 6 [121.83 MeV]", "Sigma  X"), "Spot 120 MeV – Sigma X")
+        self.assertEqual(sphinx.standard_name("Energy", "Energy [100.81 MeV]", "Distal Depth"), "Energy [100 MeV] – Distal Depth")
+        self.assertEqual(sphinx.standard_name("Energy", "100 MeV", "Distal Depth"), "Energy [100 MeV] – Distal Depth")
+        self.assertEqual(sphinx.standard_name("Spot", "Spot 1 [226.18 MeV]", "Sigma X", 1), "Spot 1 [225 MeV] – Sigma X")
+        self.assertEqual(sphinx.standard_name("Spot", "Spot 6 [121.83 MeV]", "Sigma  X", 6), "Spot 6 [120 MeV] – Sigma X")
         self.assertEqual(sphinx.standard_name("Coincidence", "IsoCentricity", "Distance X"), "Coincidence – Distance X")
         self.assertEqual(sphinx.standard_name("Homogeneity", "Homogenity", "Flatness"), "Homogeneity – Flatness")
         self.assertEqual(sphinx.standard_name("Couch Translation", "Couch Translation Vector", "Pitch"), "Couch Translation – Pitch")
@@ -94,9 +94,10 @@ class ParserTests(unittest.TestCase):
         rows[at + 1:at + 1] = [[(4, "Spot 9 [119 MeV]")], [(9, "Intensity"), (16, "± 2.50 %"), (18, "± 3.00 %"), (22, "60.0 %"),
                                                           (24, "60.1 %"), (28, "Passed")]]
         names = [m["name"] for m in sphinx.parse_rows(rows)["measurements"]]
-        self.assertIn("Spot – Spot 9 [119 MeV] – Intensity", names)
-        self.assertIn("Spot – Spot 1 [120 MeV] – Intensity", names)
-        self.assertIn("Spot 120 MeV – Skewness X", names)
+        # Spot numbers keep spots at the same nominal energy apart.
+        self.assertIn("Spot 9 [120 MeV] – Intensity", names)
+        self.assertIn("Spot 1 [120 MeV] – Intensity", names)
+        self.assertIn("Spot 1 [120 MeV] – Skewness X", names)
 
     def test_couch_translation_is_not_imported(self):
         rows = drop_empty(grid())
@@ -201,11 +202,11 @@ class ImportTests(unittest.TestCase):
         service.import_sphinx(self.db, admin, self.assignment, [("a.xls", fake_file("shared-a", energy_label="Energy [100.81 MeV]"))])
         service.import_sphinx(self.db, admin, other, [("b.xls", fake_file("shared-b", offset=1, energy_label="100 MeV", depth_warn="± 0.8 mm"))])
         self.assertEqual(self.db.one("SELECT COUNT(*) AS n FROM tests")["n"], 10)  # each list owns its own copies
-        depths = {d["owner_queue_id"]: d for d in self.db.all("SELECT * FROM tests WHERE name = 'Energy 100 MeV – Distal Depth'")}
+        depths = {d["owner_queue_id"]: d for d in self.db.all("SELECT * FROM tests WHERE name = 'Energy [100 MeV] – Distal Depth'")}
         self.assertEqual((depths[self.queue]["warn"], depths[queue]["warn"]), (0.9, 0.8))
         self.assertIn("Energy [100.81 MeV]", depths[self.queue]["description"])
         limits = {i["name"]: i["limits"]["warn"] for i in service.run_template(self.db, admin, other)["items"]}
-        self.assertEqual(limits["Energy 100 MeV – Distal Depth"], 0.8)
+        self.assertEqual(limits["Energy [100 MeV] – Distal Depth"], 0.8)
 
     def test_upload_endpoint_validation(self, _):
         with self.assertRaisesRegex(PortalError, "Choose"):

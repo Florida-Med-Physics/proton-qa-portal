@@ -43,10 +43,20 @@ def nominal_energy(item):
     return int(ENERGY_STEP * round(float(match[1]) / ENERGY_STEP))
 
 
-def standard_name(category, item, metric):
+def spot_number(item):
+    match = re.match(r"Spot\s+(\d+)", item or "")
+    return int(match[1]) if match else None
+
+
+def standard_name(category, item, metric, spot=None):
+    """Names follow the myQA template: 'Spot 1 [225 MeV] – Sigma X', 'Energy [100 MeV] – Distal Depth'."""
     metric = re.sub(r"\s+", " ", metric).strip()
     energy = nominal_energy(item)
-    return f"{category} {energy} MeV – {metric}" if energy is not None else f"{category} – {metric}"
+    if energy is None:
+        return f"{category} – {metric}"
+    if category == "Spot" and spot is not None:
+        return f"Spot {spot} [{energy} MeV] – {metric}"
+    return f"{category} [{energy} MeV] – {metric}"
 
 
 def quantity(text):
@@ -136,10 +146,16 @@ def parse_rows(rows, filename=""):
                 category, item = setup_text, None
             elif category and setup_text not in SETUP_LABELS and not _SETUP_VALUE.match(setup_text):
                 item = _clean_item(setup_text)
+    # Spot numbers as in the template: from the label ("Spot 1 [226.18 MeV]") or, when the export has none
+    # (G5: "100 MeV"), the spot's order in the file.
+    spot_order = {}
+    for m in measurements:
+        if m["category"] == "Spot" and m["item"] not in spot_order:
+            spot_order[m["item"]] = spot_number(m["item"]) or len(spot_order) + 1
     seen = {}
     for m in measurements:
         m["sphinx_label"] = m["metric"] if m["item"] == m["category"] else f"{m['item']} – {m['metric']}"
-        m["name"] = standard_name(m["category"], m["item"], m["metric"])
+        m["name"] = standard_name(m["category"], m["item"], m["metric"], spot_order.get(m["item"]) if m["category"] == "Spot" else None)
         seen.setdefault((m["category"], m["name"]), []).append(m)
     for group in seen.values():
         if len(group) > 1:  # two items would share a name (e.g. energies within one step): keep them apart

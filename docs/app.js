@@ -1579,7 +1579,7 @@ async function renderTrendOverview(machines, machineId, range) {
     app.append(table(["Test", "Latest", "Status", "Trend"], list.map((g) => {
       const status = worstOf(g);
       const unit = g.members[0].unit;
-      const short = g.base.startsWith(category + " – ") ? g.base.slice(category.length + 3) : g.base.replace(category + " ", "");
+      const short = g.base.startsWith(category + " – ") ? g.base.slice(category.length + 3) : g.base;
       const ids = g.members.map((m) => m.test_id).join(",");
       const href = `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}`;
       const latestCell = g.members.map((m, k) => {

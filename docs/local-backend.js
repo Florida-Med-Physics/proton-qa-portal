@@ -330,10 +330,13 @@
     const m = ENERGY.exec(item || "");
     return m ? Math.round(ENERGY_STEP * Math.round(Number(m[1]) / ENERGY_STEP)) : null;
   }
-  function standardName(category, item, metric) {
+  // Names follow the myQA template: "Spot 1 [225 MeV] – Sigma X", "Energy [100 MeV] – Distal Depth" (mirrors sphinx.py).
+  function standardName(category, item, metric, spot) {
     metric = metric.replace(/\s+/g, " ").trim();
     const e = nominalEnergy(item);
-    return e !== null ? `${category} ${e} MeV – ${metric}` : `${category} – ${metric}`;
+    if (e === null) return `${category} – ${metric}`;
+    if (category === "Spot" && spot) return `Spot ${spot} [${e} MeV] – ${metric}`;
+    return `${category} [${e} MeV] – ${metric}`;
   }
   function cellText(v) {
     if (v === null || v === undefined) return "";
@@ -395,10 +398,17 @@
         else if (category && !SETUP_LABELS.has(setupText) && !SETUP_VALUE.test(setupText)) item = cleanItem(setupText);
       }
     });
+    const spotOrder = new Map();
+    for (const m of measurements) {
+      if (m.category === "Spot" && !spotOrder.has(m.item)) {
+        const n = /^Spot\s+(\d+)/.exec(m.item);
+        spotOrder.set(m.item, n ? Number(n[1]) : spotOrder.size + 1);
+      }
+    }
     const seen = new Map();
     for (const m of measurements) {
       m.sphinx_label = m.item === m.category ? m.metric : `${m.item} – ${m.metric}`;
-      m.name = standardName(m.category, m.item, m.metric);
+      m.name = standardName(m.category, m.item, m.metric, m.category === "Spot" ? spotOrder.get(m.item) : null);
       const k = `${m.category}|${m.name}`;
       if (!seen.has(k)) seen.set(k, []);
       seen.get(k).push(m);
@@ -881,7 +891,36 @@
     upgradeCtList();
     upgradeBbUnits();
     dropSphinxCouch();
+    renameSphinxTests();
   })();
+
+  // Sphinx tests take the template naming ("Spot 1 [225 MeV] – Sigma X"); rebuild names from each test's export label.
+  function renameSphinxTests() {
+    let renamed = 0;
+    for (const q of S.queues) {
+      const rows = S.queue_items.filter((i) => i.queue_id === q.id).sort((a, b) => a.position - b.position)
+        .map((i) => byId("tests", i.test_id)).filter((t) => t && /^Measured by Sphinx/.test(t.description || ""));
+      const spotOrder = new Map();
+      const parsed = [];
+      for (const t of rows) {
+        const m = /Export label: (.*)\.$/.exec(t.description);
+        if (!m) continue;
+        const cut = m[1].lastIndexOf(" – ");
+        const item = cut >= 0 ? m[1].slice(0, cut) : t.category;
+        const metric = cut >= 0 ? m[1].slice(cut + 3) : m[1];
+        if (t.category === "Spot" && !spotOrder.has(item)) {
+          const n = /^Spot\s+(\d+)/.exec(item);
+          spotOrder.set(item, n ? Number(n[1]) : spotOrder.size + 1);
+        }
+        parsed.push([t, item, metric]);
+      }
+      for (const [t, item, metric] of parsed) {
+        const name = standardName(t.category, item, metric, t.category === "Spot" ? spotOrder.get(item) : null);
+        if (name !== t.name) { t.name = name; renamed++; }
+      }
+    }
+    if (renamed) { audit(null, "rename", "tests", null, { reason: "Template naming", tests: renamed }); save(); }
+  }
 
   // Couch translation is documented in RadMachine, not imported from Sphinx: take any Sphinx-imported couch
   // tests off their lists (their stored values are kept).
