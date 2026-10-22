@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- **[Physics review]** The limits are called Warn ± and Fail ± everywhere (was Tolerance / Action). The Sphinx template and its GTR1/GTR2/GTR5 instances carry the warn / fail limits from the myQA TG-224 template export (60 tests matched by what they measure). Perform QA: the Start button is the third column.
 - Perform QA: an X / Y / Z offset (and its calculated 3D offset) is one row with the three fields side by side, one status, one comment, history per axis, and a trend that plots X, Y and Z together. Machine Trends groups such tests the same way even when the name ends with a unit.
 - Every numeric result shows its Δ from the reference as a green / yellow / red badge (Perform QA as you type, run pages, Machine Trends; history chips carry it in their tooltip). Chart keys are plain text under each chart, readable at any chart size; the "Last Edited By" direction is gone (the field still fills itself).
 - Dimensionless values (skewness, correction factors) show no unit at all instead of the word "unitless"; a chart with no unit titles its axis "Value". Yes/No checks read Yes then No.

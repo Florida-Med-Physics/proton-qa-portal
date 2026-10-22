@@ -1561,7 +1561,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 77.7,
      "tol_mode": "absolute",
-     "description": "Template 3.12. [Section: Sphinx Measurements]"
+     "description": "Template 3.12. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Dosimetry",
@@ -1570,7 +1572,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 2.3,
      "tol_mode": "absolute",
-     "description": "Template 3.13. [Section: Sphinx Measurements]"
+     "description": "Template 3.13. [Section: Sphinx Measurements]",
+     "warn": 0.1,
+     "fail": 0.2
     },
     {
      "category": "Dosimetry",
@@ -1579,7 +1583,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 72.1,
      "tol_mode": "absolute",
-     "description": "Template 3.14. [Section: Sphinx Measurements]"
+     "description": "Template 3.14. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Dosimetry",
@@ -1588,7 +1594,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5.6,
      "tol_mode": "absolute",
-     "description": "Template 3.15. [Section: Sphinx Measurements]"
+     "description": "Template 3.15. [Section: Sphinx Measurements]",
+     "warn": 0.1,
+     "fail": 0.2
     },
     {
      "category": "Dosimetry",
@@ -1597,7 +1605,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 158.5,
      "tol_mode": "absolute",
-     "description": "Template 3.16. [Section: Sphinx Measurements]"
+     "description": "Template 3.16. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Dosimetry",
@@ -1606,7 +1616,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 3.9,
      "tol_mode": "absolute",
-     "description": "Template 3.17. [Section: Sphinx Measurements]"
+     "description": "Template 3.17. [Section: Sphinx Measurements]",
+     "warn": 0.1,
+     "fail": 0.2
     },
     {
      "category": "Dosimetry",
@@ -1615,7 +1627,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 149.3,
      "tol_mode": "absolute",
-     "description": "Template 3.18. [Section: Sphinx Measurements]"
+     "description": "Template 3.18. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Dosimetry",
@@ -1624,7 +1638,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 9.2,
      "tol_mode": "absolute",
-     "description": "Template 3.19. [Section: Sphinx Measurements]"
+     "description": "Template 3.19. [Section: Sphinx Measurements]",
+     "warn": 0.1,
+     "fail": 0.2
     },
     {
      "category": "Dosimetry",
@@ -1633,7 +1649,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 260.7,
      "tol_mode": "absolute",
-     "description": "Template 3.20. [Section: Sphinx Measurements]"
+     "description": "Template 3.20. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Dosimetry",
@@ -1642,7 +1660,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 5.2,
      "tol_mode": "absolute",
-     "description": "Template 3.21. [Section: Sphinx Measurements]"
+     "description": "Template 3.21. [Section: Sphinx Measurements]",
+     "warn": 0.1,
+     "fail": 0.2
     },
     {
      "category": "Dosimetry",
@@ -1651,7 +1671,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 250.8,
      "tol_mode": "absolute",
-     "description": "Template 3.22. [Section: Sphinx Measurements]"
+     "description": "Template 3.22. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Dosimetry",
@@ -1660,7 +1682,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 9.9,
      "tol_mode": "absolute",
-     "description": "Template 3.23. [Section: Sphinx Measurements]"
+     "description": "Template 3.23. [Section: Sphinx Measurements]",
+     "warn": 0.1,
+     "fail": 0.2
     },
     {
      "category": "Spot",
@@ -2131,7 +2155,9 @@ window.PORTAL_SEED = {
      "unit": "%",
      "expected": 1.7,
      "tol_mode": "absolute",
-     "description": "Template 3.66. [Section: Sphinx Measurements]"
+     "description": "Template 3.66. [Section: Sphinx Measurements]",
+     "warn": 2.0,
+     "fail": 3.0
     },
     {
      "category": "Alignment",
@@ -2140,7 +2166,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.67. [Section: Sphinx Measurements]"
+     "description": "Template 3.67. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Alignment",
@@ -2149,7 +2177,9 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.68. [Section: Sphinx Measurements]"
+     "description": "Template 3.68. [Section: Sphinx Measurements]",
+     "warn": 0.5,
+     "fail": 1.0
     },
     {
      "category": "Safety",
