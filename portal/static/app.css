@@ -580,3 +580,17 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 .result-input.from-file::placeholder { font-style: italic; }
 .inactive-tag { color: var(--muted); font-weight: 600; font-size: 12px; }
 .icon-link { display: inline-flex; padding: 4px 8px; border-radius: 6px; } .icon-link:hover { background: var(--surface-2); }
+
+/* Header search box, left of the account icon. */
+.topbar-search { width: 200px; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 6px; background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 13px; }
+.topbar-search::placeholder { color: rgba(255, 255, 255, 0.7); }
+.topbar-search:focus { outline: 2px solid var(--uf-orange); background: rgba(255, 255, 255, 0.18); }
+@media (max-width: 1000px) { .topbar-search { width: 120px; } }
+
+/* Sortable column headers and table filter boxes. */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+.sort-arrow { margin-left: 4px; font-size: 11px; opacity: 0.45; }
+th[data-sort] .sort-arrow { opacity: 1; color: var(--uf-orange); }
+.filter-row { margin: 0 0 8px; }
+.filter-box { width: 320px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 13px; }

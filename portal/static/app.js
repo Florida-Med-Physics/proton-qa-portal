@@ -14,15 +14,19 @@ const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quart
 // A list can be started when it is due, overdue, or "as needed".
 const startable = (state) => state === "due" || state === "overdue" || state === "ready";
 // Hours left until the end of the due day (QA is due by the end of that day).
-function dueIn(iso) {
-  const end = new Date(iso + "T23:59:59");
-  const hours = Math.max(0, Math.round((end - Date.now()) / 3600000));
-  return `Due in ${hours} ${hours === 1 ? "hour" : "hours"} (${shortDate(iso)})`;
+const DAILY_DUE_TIME = "06:00";                 // daily lists are due at 6:00 am on each weekday
+function dueIn(iso, frequency) {
+  const daily = frequency === "daily";
+  const end = new Date(iso + (daily ? `T${DAILY_DUE_TIME}:00` : "T23:59:59"));
+  const when = daily ? `${shortDate(iso)} 6:00 AM` : shortDate(iso);
+  if (end <= Date.now()) return `Due now (${when})`;
+  const hours = Math.max(1, Math.round((end - Date.now()) / 3600000));
+  return `Due in ${hours} ${hours === 1 ? "hour" : "hours"} (${when})`;
 }
 function scheduleStatus(a) {
   if (!a.active) return "Paused";
   if (a.state === "overdue") return `Overdue since ${shortDate(a.next_due)}`;
-  if (a.state === "due") return dueIn(a.next_due);
+  if (a.state === "due") return dueIn(a.next_due, a.frequency);
   if (a.state === "done") return "Done today";
   if (a.state === "ready") return a.last_done ? `As needed · last run ${shortDate(a.last_done)}` : "As needed";
   return `Next due ${shortDate(a.next_due)}`;
@@ -182,9 +186,62 @@ function page(title, subtitle, actions) {
 
 function table(headers, rows, emptyText) {
   if (!rows.length) return el("div", { class: "card empty" }, emptyText || "Nothing here yet.");
-  return el("div", { class: "table-wrap" }, el("table", {},
+  return el("div", { class: "table-wrap" }, sortable(el("table", {},
     el("thead", {}, el("tr", {}, headers.map((h) => el("th", { class: h.startsWith("#") ? "num" : "" }, h.replace(/^#/, ""))))),
-    el("tbody", {}, rows)));
+    el("tbody", {}, rows))));
+}
+
+// Click a column header to sort its table by that column (numbers as numbers, text as text); click again to reverse.
+// Rows under a group header (e.g. a machine) stay in their group; rows with hidden children (quick trends) move together.
+function sortable(tableEl) {
+  const heads = [...tableEl.querySelectorAll("thead > tr:first-child > th")];
+  heads.forEach((th, index) => {
+    if (!th.textContent.trim()) return;
+    th.classList.add("sortable");
+    th.append(el("span", { class: "sort-arrow", "aria-hidden": "true" }, "⇅"));
+    th.addEventListener("click", () => {
+      const dir = th.dataset.sort === "asc" ? "desc" : "asc";
+      heads.forEach((h) => { delete h.dataset.sort; const a = h.querySelector(".sort-arrow"); if (a) a.textContent = "⇅"; });
+      th.dataset.sort = dir;
+      th.querySelector(".sort-arrow").textContent = dir === "asc" ? "↑" : "↓";
+      const body = tableEl.tBodies[0];
+      const groups = [];
+      for (const row of [...body.rows]) {
+        if (row.classList.contains("machine-row") || row.querySelector("td[colspan]") && row.cells.length === 1) groups.push({ head: row, rows: [] });
+        else if (row.classList.contains("quick-trend") && groups.length && groups[groups.length - 1].rows.length) groups[groups.length - 1].rows[groups[groups.length - 1].rows.length - 1].push(row);
+        else { if (!groups.length) groups.push({ head: null, rows: [] }); groups[groups.length - 1].rows.push([row]); }
+      }
+      const key = (row) => { const cell = row.cells[index]; return cell ? (cell.dataset.sortValue ?? cell.textContent).trim() : ""; };
+      const cmp = (a, b) => {
+        const ka = key(a[0]), kb = key(b[0]);
+        const na = parseFloat(ka.replace(/[^\d.+-]/g, "")), nb = parseFloat(kb.replace(/[^\d.+-]/g, ""));
+        const bothNum = ka !== "" && kb !== "" && !isNaN(na) && !isNaN(nb) && /^[-+±]?\d/.test(ka) && /^[-+±]?\d/.test(kb);
+        const r = bothNum ? na - nb : ka.localeCompare(kb, undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? r : -r;
+      };
+      body.replaceChildren(...groups.flatMap((g) => [g.head, ...g.rows.sort(cmp).flat()]).filter(Boolean));
+    });
+  });
+  return tableEl;
+}
+
+// A box that narrows a table to the rows containing what is typed; a group header stays while any of its rows show.
+function filterBox(wrap, placeholder) {
+  const input = el("input", { type: "search", class: "filter-box", placeholder: placeholder || "Filter…", "aria-label": placeholder || "Filter" });
+  input.addEventListener("input", () => {
+    const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+    const body = wrap.querySelector("tbody");
+    if (!body) return;
+    let group = null;
+    for (const row of body.rows) {
+      if (row.classList.contains("machine-row")) { group = row; row.hidden = true; continue; }
+      if (row.classList.contains("quick-trend")) continue;
+      const text = row.textContent.toLowerCase();
+      row.hidden = !words.every((w) => text.includes(w));
+      if (!row.hidden && group) group.hidden = false;
+    }
+  });
+  return el("div", { class: "filter-row" }, input);
 }
 
 function limitsText(limits, unit) {
@@ -281,7 +338,7 @@ async function renderHome() {
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
         el("td", {}, el("strong", {}, m.name)),
         el("td", {}, m.queues.length ? m.queues.map((q) => el("div", { class: "small" }, q.queue_name)) : el("span", { class: "muted small" }, "None")),
-        el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? dueIn(m.queues.filter((q) => q.state === "due").map((q) => q.next_due).sort()[0]) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
+        el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? (([q]) => dueIn(q.next_due, q.frequency))(m.queues.filter((q) => q.state === "due").sort((x, y) => x.next_due.localeCompare(y.next_due))) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
         el("td", {}, lastRun ? [chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`)] : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));
@@ -305,6 +362,10 @@ function themeToggle() {
   return button;
 }
 
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "f") { const box = document.querySelector(".topbar-search"); if (box) { e.preventDefault(); box.focus(); box.select(); } }
+});
+
 function renderShell() {
   const bar = document.getElementById("topbar");
   bar.hidden = !state.user;
@@ -312,8 +373,12 @@ function renderShell() {
   const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
   document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns, title]) =>
     el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
-      title ? homeIcon() : href === "#/trends" ? [trendIcon(), " ", label] : label)));   // the Dashboard tab is the house icon alone
+      title ? homeIcon() : label)));   // the Dashboard tab is the house icon alone
+  const search = el("input", { type: "search", class: "topbar-search", placeholder: "Search | Ctrl+Shift+F", "aria-label": "Search machines, QA lists and tests",
+    value: location.hash.startsWith("#/search") ? queryParams().get("q") || "" : "" });
+  search.addEventListener("keydown", (e) => { if (e.key === "Enter" && search.value.trim()) location.hash = `#/search?q=${encodeURIComponent(search.value.trim())}`; });
   document.getElementById("who").replaceChildren(
+    search,
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
     themeToggle());
@@ -374,6 +439,7 @@ const ROUTES = [
   [/^#\/runs$/, renderRuns],
   [/^#\/runs\/(\d+)$/, renderRun],
   [/^#\/trends$/, renderTrends],
+  [/^#\/search$/, renderSearch],
   [/^#\/users$/, renderUsers],
   [/^#\/audit$/, renderAudit],
   [/^#\/account$/, renderAccount],
@@ -414,10 +480,10 @@ const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RA
 // A table with fixed column widths, so the Proton and Photon tables line up at the same width.
 function fixedTable(columns, rows, emptyText) {
   if (!rows.length) return el("div", { class: "card empty" }, emptyText || "Nothing here yet.");
-  return el("div", { class: "table-wrap fixed-wrap" }, el("table", { class: "fixed-table" },
+  return el("div", { class: "table-wrap fixed-wrap" }, sortable(el("table", { class: "fixed-table" },
     el("colgroup", {}, columns.map(([, width]) => { const col = el("col"); if (width) col.style.width = width; return col; })),
     el("thead", {}, el("tr", {}, columns.map(([h]) => el("th", { class: h.startsWith("#") ? "num" : "" }, h.replace(/^#/, ""))))),
-    el("tbody", {}, rows)));
+    el("tbody", {}, rows))));
 }
 
 function modalityHead(name, count) {
@@ -551,7 +617,7 @@ async function renderSetup() {
 
   const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end" },
     el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
-    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Instantiate" : "Duplicate") : null,
+    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Instantiate on a Machine" : "Duplicate") : null,
     editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
     editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null));
 
@@ -559,12 +625,13 @@ async function renderSetup() {
   const SETUP_COLS = (first, second) => [[first, "26%"], [second, "21%"], ["Tests", "7%"], ["Actions", "27%"], ["Last Modified", "10%"], ["Modified By", "9%"]];
   const modified = (q) => [el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—"),
     el("td", { class: "small muted" }, q.modified_by || "—")];
-  app.append(templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
+  const templateTable = templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
     el("td", { class: "center" }, t.item_count),
     actions(t), modified(t))))
-    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
+    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one.");
+  app.append(filterBox(templateTable, "Search QA list templates"), templateTable);
 
   // Bottom table: every QA list instantiated on a machine (a copy of a template), one row each.
   const kindOf = Object.fromEntries(machines.map((m) => [m.name, m.kind || "Other"]));
@@ -596,12 +663,14 @@ async function renderSetup() {
             editable && a ? el("button", { class: `small${live ? "" : " primary"}`, title: live ? "Stop scheduling this list on the machine (nothing is deleted)" : "Schedule this list on the machine",
               onclick: () => setActive(a, !live) }, live ? "Set Inactive" : "Set Active") : null,
             editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, "Duplicate") : null,
+            editable ? el("button", { class: "small", title: "Save a copy of this list as a new template", onclick: () => templateDialog(q) }, "Make Template") : null,
             editable ? el("button", { class: "small", title: "Hide this list (nothing is deleted)", onclick: () => archiveList(q, true) }, "Archive") : null,
             editable ? el("button", { class: "small danger", title: "Delete permanently (only if it has no results)", onclick: () => deleteList(q) }, "Delete") : null)),
           modified(q));
       })];
   });
-  app.append(fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Copy a template to a machine."));
+  const instanceTable = fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Instantiate a template on a machine.");
+  app.append(filterBox(instanceTable, "Search machine-assigned QA lists"), instanceTable);
 
   if (archivedLists.length) {
     app.append(el("details", { class: "archived" }, el("summary", {}, `Archived QA lists (${archivedLists.length})`),
@@ -1257,11 +1326,11 @@ async function renderPerform(assignmentId) {
       rows.push(el("div", { class: "measure-block" },
         el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
         directions,
-        el("div", { class: "table-wrap measure-wrap" }, el("table", { class: "measure-table" },
+        el("div", { class: "table-wrap measure-wrap" }, sortable(el("table", { class: "measure-table" },
           el("thead", {}, el("tr", {}, ["Energy", "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
               el("th", { class: "history-cell" }, dates.map((d) => el("span", { class: "hist date" }, dateLabel(d)))), el("th", {})) : null),
-          el("tbody", {}, trRows.flat())))));
+          el("tbody", {}, trRows.flat()))))));
     }
     const summary = el("span", { class: "section-summary" });
     const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, categoryLabel(category)), summary), rows);
@@ -1397,9 +1466,21 @@ function importSphinxDialog(a) {
 // Queues and test library
 // ---------------------------------------------------------------------------
 
+// Save a machine's list back as a template: a new master copy; the machine keeps its own list untouched.
+function templateDialog(source) {
+  const body = el("div", {},
+    el("p", { class: "muted" }, `Every test in "${source.name}" is copied into a new template. ${source.name} stays on its machine as it is.`),
+    el("div", { class: "form-grid" }, field("Template name", el("input", { name: "name", required: true, value: `${source.name.replace(/\s*–\s*[^–]+$/, "")} template` }), "wide")));
+  modal(`Make a template from ${source.name}`, body, async (data) => {
+    const r = await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name, as_template: true });
+    toast("Template created");
+    location.hash = `#/queues/${r.id}`;
+  }, "Make Template");
+}
+
 function duplicateDialog(source, machines) {
   // Name the copy, and optionally put it straight onto a machine. A template is "instantiated"; a machine's list is "duplicated".
-  const verb = source.is_template ? "Instantiate" : "Duplicate";
+  const verb = source.is_template ? "Instantiate on a Machine" : "Duplicate";
   const body = el("div", {},
     el("p", { class: "muted" }, `Every test in "${source.name}" is copied, so the new list's limits can be adjusted on its own.`),
     el("div", { class: "form-grid" },
@@ -1995,6 +2076,36 @@ function renderTrendDetail(group, range) {
 
 function stat(label, value, note) {
   return el("div", { class: "stat" }, el("div", { class: "muted small" }, label), el("div", { class: "stat-value" }, value), el("div", { class: "small muted" }, note));
+}
+
+// Search: machines, QA lists and tests whose names contain the words typed; each result links to where it lives.
+async function renderSearch() {
+  const q = (queryParams().get("q") || "").trim();
+  page("Search", q ? `Results for "${q}"` : "Type in the box at the top right and press Enter.");
+  if (!q) return;
+  const words = q.toLowerCase().split(/\s+/);
+  const hit = (text) => words.every((w) => String(text || "").toLowerCase().includes(w));
+  const [machines, queues, tests] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), can("configure") ? api("GET", "/api/tests") : []]);
+  const section = (title, rows, cols) => {
+    if (!rows.length) return;
+    app.append(el("h2", { class: "section-head" }, `${title} (${rows.length})`), fixedTable(cols, rows));
+  };
+  section("Machines", machines.filter((m) => hit(`${m.name} ${m.kind}`)).map((m) => el("tr", {},
+    el("td", {}, el("a", { href: `#/machines/${m.id}` }, el("strong", {}, m.name))), el("td", { class: "muted" }, m.kind || "—"),
+    el("td", {}, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}` }, "Trends")))),
+    [["Machine", "40%"], ["Kind", "40%"], ["", "20%"]]);
+  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.template_name || ""} ${x.machines || ""}`)).map((x) => el("tr", {},
+    el("td", {}, el("a", { href: `#/queues/${x.id}` }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.is_template ? "Template" : x.machines || "Not on a machine"),
+    el("td", { class: "center" }, x.item_count))),
+    [["QA list", "50%"], ["Where", "40%"], ["Tests", "10%"]]);
+  const byQueue = new Map(queues.map((x) => [x.id, x]));
+  section("Tests", tests.filter((t) => hit(`${t.name} ${t.category || ""} ${t.owner_name || ""}`)).slice(0, 200).map((t) => {
+    const owner = byQueue.get(t.owner_queue_id);
+    return el("tr", {},
+      el("td", {}, owner ? el("a", { href: `#/queues/${owner.id}` }, t.name) : t.name), el("td", { class: "muted" }, categoryLabel(t.category) || "—"),
+      el("td", { class: "muted" }, t.owner_name || "Shared"), el("td", { class: "muted" }, t.unit || ""));
+  }), [["Test", "45%"], ["Category", "20%"], ["QA list", "25%"], ["Unit", "10%"]]);
+  if (!app.querySelector("h2")) app.append(el("p", { class: "muted" }, "Nothing matches."));
 }
 
 async function renderTrends() {

@@ -316,8 +316,9 @@ def duplicate_queue(db, user, source_id, data):
     if db.one("SELECT id FROM queues WHERE name = ?", (name,)):
         raise PortalError(f"A QA list named '{name}' already exists.")
     with db.transaction():
-        queue_id = db.run("INSERT INTO queues (name, description, active, is_template, template_id) VALUES (?, ?, 1, 0, ?)",
-                          (name, source["description"], source_id))
+        as_template = _flag(data, "as_template", default=False)
+        queue_id = db.run("INSERT INTO queues (name, description, active, is_template, template_id) VALUES (?, ?, 1, ?, ?)",
+                          (name, source["description"], 1 if as_template else 0, None if as_template else source_id))
         for item in source["items"]:
             test = _get(db, "tests", item["test_id"])
             limits = qa.resolve_limits(test, item)

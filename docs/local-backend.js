@@ -616,7 +616,8 @@
     const source = getQueue(sourceId);
     const name = required(data, "name");
     if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase())) throw new Error(`A QA list named '${name}' already exists.`);
-    const id = insert("queues", { name, description: source.description, active: 1, is_template: 0, template_id: source.id });
+    const asTemplate = !!flag(data, "as_template", false);
+    const id = insert("queues", { name, description: source.description, active: 1, is_template: asTemplate ? 1 : 0, template_id: asTemplate ? null : source.id });
     for (const item of source.items) {
       const test = byId("tests", item.test_id);
       const limits = resolveLimits(test, item);
