@@ -400,3 +400,6 @@ td.trend-cell, td.folder-cell { max-width: none; }
 .check-row.with-directions .check-input { grid-column: 2; }
 .directions { margin: 0; padding: 10px 12px; border-left: 3px solid var(--uf-orange); background: var(--surface-2); border-radius: 6px; color: var(--text); font-size: 13px; }
 .directions-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 4px; }
+.item-cell { min-width: 260px; max-width: 420px; }
+.item-cell .directions { margin-top: 6px; font-size: 12px; }
+th { white-space: nowrap; }

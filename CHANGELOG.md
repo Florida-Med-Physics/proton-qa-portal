@@ -36,6 +36,7 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Machine Trends: couch Pitch, Roll and Rotation share one chart, like X/Y/Z.
 - Machine Trends: the overview is a table (one row per chart) instead of card panels; charts plot dots instead of lines (one colour per axis, warning/fail ringed); all dates show the year.
 - **[Physics review]** Built like the myQA sheet: every numbered item is its title, then a Directions block, then the result. "0.01 Daily QA Setup" is now a pass/fail test with its directions (it was loose setup text); the protocol note stays at the top.
+- The QA list editor in Setup QA follows the same layout: section headings (0.0 Setup, 1.0 Safety, …), each item numbered ("0.01: Daily QA Setup") with its Directions block, then its result type and limits.
 - Perform QA shows the machine name on every row (e.g. both TrueBeam lists).
 - New Admin tab (5th tab): users and what each role may do (admins add users and change roles), and an import folder for each scheduled QA list. When QA is started, the newest export file in that folder not yet recorded is read in automatically.
 - Admin also holds the database settings: the database file location (shown on the host PC for the server version; choosable plus backup/restore in the browser version), moved from Setup QA.

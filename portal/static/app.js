@@ -1121,7 +1121,11 @@ async function renderQueueEditor(id) {
   const body = el("tbody");
   const holder = el("div");
   const draw = () => {
-    body.replaceChildren(...items.map((item, index) => {
+    // Laid out like the myQA sheet: a heading per section, then each numbered item with its directions.
+    const sectionCats = new Map();
+    for (const it of items) { const t = byId[it.test_id]; const n = sectionNumber(t); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(t.category); }
+    let lastSection = null;
+    body.replaceChildren(...items.flatMap((item, index) => {
       const t = byId[item.test_id];
       const numeric = t.type === "numeric";
       const input = (name, props) => el("input", { type: "number", step: "any", value: item[name] ?? "", placeholder: fmt(t[name]), disabled: !editable || !numeric,
@@ -1129,8 +1133,12 @@ async function renderQueueEditor(id) {
       const m = changed[item.test_id] || {};
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = (item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
-      return el("tr", { class: "compact" },
-        el("td", {}, el("strong", {}, shortName)),
+      const n = sectionNumber(t);
+      const head = n !== lastSection ? el("tr", { class: "group" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n)))) : null;
+      lastSection = n;
+      const number = checkNumber(t.description);
+      return [head, el("tr", { class: "compact" },
+        el("td", { class: "item-cell" }, el("strong", {}, number ? `${number}: ` : "", shortName), helpText(t.description)),
         el("td", {}, t.category || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
@@ -1149,8 +1157,8 @@ async function renderQueueEditor(id) {
             toast("Test saved");
             route();
           }) }, "✎"),
-          el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null));
-    }));
+          el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null))];
+    }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
       el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Tolerance", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
