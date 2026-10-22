@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Machine Trends opens with pass-rate rings: the share of results that passed over the selected period for the whole machine and for each section (warning and action shown in their colours).
 - New "Review QA" tab to the right of Perform QA: submitted runs awaiting a physicist's sign-off (with a Review button), then recent decisions, and a link to all past results.
 - "QA Performed By" starts as the signed-in user on every list (still editable if someone else performed the QA). Table titles, their directions and limits are much larger; the "Reference and limits from the Sphinx reference sheet" notes are gone; "Spot 1 · 226.4 MeV" always sits on one line.
 - Baseline, latest and history values in a table share one number of decimals (the most any of them needs), so 3.0 mm sits beside 2.7 mm rather than "3 mm".

@@ -764,3 +764,14 @@ button.chip-filter:hover { filter: brightness(0.95); }
 
 /* "Spot 1 · 226.4 MeV" stays on one line in energy and axis tables. */
 .energy-table td.qa-label strong, .trend-table:not(.test-table) td.qa-label strong { white-space: nowrap; }
+
+/* Pass-rate rings. */
+.ring-row { display: flex; flex-wrap: wrap; gap: 18px 28px; margin: 4px 0 16px; }
+.ring { display: flex; flex-direction: column; align-items: center; width: 150px; text-align: center; }
+.ring-svg { width: 88px; height: 88px; }
+.ring-track { fill: none; stroke: var(--border); stroke-width: 9; }
+.ring-seg { fill: none; stroke-width: 9; stroke-linecap: butt; }
+.ring-pass { stroke: var(--pass); } .ring-warn { stroke: var(--warn); } .ring-fail { stroke: var(--fail); }
+.ring-pct { font-size: 18px; font-weight: 700; fill: var(--text); }
+.ring-title { font-size: 12px; font-weight: 600; margin-top: 4px; }
+.ring-sub { font-size: 11px; color: var(--muted); }

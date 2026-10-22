@@ -2110,6 +2110,23 @@ function bandValue(point, key, sign) {
   return point.expected + sign * tol;
 }
 
+function passRing(counts, title, sub) {
+  const total = (counts.pass || 0) + (counts.warn || 0) + (counts.fail || 0);
+  const pct = total ? Math.round((100 * (counts.pass || 0)) / total) : null;
+  const r = 34, c = 2 * Math.PI * r;
+  const kids = [svg("circle", { class: "ring-track", cx: 44, cy: 44, r })];
+  let offset = 0;
+  for (const [key, cls] of [["pass", "ring-pass"], ["warn", "ring-warn"], ["fail", "ring-fail"]]) {
+    const share = total ? (counts[key] || 0) / total : 0;
+    if (share > 0) kids.push(svg("circle", { class: `ring-seg ${cls}`, cx: 44, cy: 44, r, "stroke-dasharray": `${share * c} ${c}`, "stroke-dashoffset": -offset * c, transform: "rotate(-90 44 44)" }));
+    offset += share;
+  }
+  kids.push(svg("text", { class: "ring-pct", x: 44, y: 44, "text-anchor": "middle", "dominant-baseline": "central" }, pct === null ? "—" : `${pct}%`));
+  return el("div", { class: "ring", title: total ? `${counts.pass || 0} pass · ${counts.warn || 0} warning · ${counts.fail || 0} action of ${total} results` : "No results in this period" },
+    svg("svg", { viewBox: "0 0 88 88", class: "ring-svg", role: "img", "aria-label": `${title}: ${pct === null ? "no results" : pct + "% passed"}` }, kids),
+    el("div", { class: "ring-title" }, title), sub ? el("div", { class: "ring-sub" }, sub) : null);
+}
+
 function filterRange(points, range) {
   if (range === "all" || !points.length) return points;
   const cutoff = new Date();
@@ -2354,6 +2371,11 @@ async function renderTrendOverview(machines, machineId, range) {
     app.append(el("div", { class: "card empty" }, numeric.length ? "No results in this period." : `${machine.name} has no measured tests scheduled.`));
     return;
   }
+  const tally = (items) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const it of items) for (const pt of it.points) if (pt.status in c) c[pt.status]++; return c; };
+  const rangeLabel = { "30": "last 30 days", "90": "last 3 months", "365": "last year", all: "all history" }[range] || `last ${range} days`;
+  const sections = [...new Set(withData.map((i) => sectionOf(i)))].sort();
+  app.append(el("div", { class: "ring-row" }, passRing(tally(withData), `${machine.name} · all tests`, `passed, ${rangeLabel}`),
+    ...sections.map((sec) => passRing(tally(withData.filter((i) => sectionOf(i) === sec)), sec, `passed, ${rangeLabel}`))));
   const groups = axisGroups(withData);
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
