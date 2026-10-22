@@ -121,7 +121,7 @@ th { font-size: 14px; text-transform: uppercase; letter-spacing: 0.03em; color: 
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: var(--surface-2); }
 tr.group td { background: var(--surface-2); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.table-wrap { overflow-x: visible; border: 1px solid var(--border); border-radius: 10px; }   /* tables fit the page; no sideways scrolling */
 .table-wrap table { border: 0; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -262,7 +262,7 @@ details.help summary, details.instructions summary { cursor: pointer; color: var
 .section-summary { font-size: 12px; color: var(--muted); }
 .check-row { display: grid; grid-template-columns: 1fr auto 90px 1fr; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--border); }
 .check-input { display: flex; gap: 6px; align-items: center; }
-.text-input { min-width: 220px; }
+.text-input { min-width: 0; width: 100%; max-width: 320px; }
 .note-input { max-width: 320px; }
 .submit-bar {
   position: sticky; bottom: 0; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
@@ -384,7 +384,7 @@ td.center { text-align: center; }
 
 /* Tables size to their content instead of stretching across the page; long text wraps at a maximum column width. */
 .table-wrap { display: inline-block; max-width: 100%; vertical-align: top; }
-.table-wrap table { width: auto; }
+.table-wrap table { width: auto; max-width: 100%; }
 th, td { max-width: 340px; overflow-wrap: anywhere; }
 td .muted.small, td.small { overflow-wrap: break-word; }
 /* Tables whose last column holds a chart or editing controls still get the room they need. */
@@ -400,7 +400,7 @@ td.trend-cell, td.folder-cell { max-width: none; }
 .directions-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 4px; }
 .item-cell { min-width: 260px; max-width: 420px; }
 .item-cell .directions { margin-top: 6px; font-size: 12px; }
-th { white-space: nowrap; }
+th { white-space: normal; }
 
 /* QA list editor: section headings stand out above their items; directions run the full width above each test. */
 tr.section-row td {
@@ -594,3 +594,28 @@ th.sortable:hover { color: var(--text); }
 th[data-sort] .sort-arrow { opacity: 1; color: var(--uf-orange); }
 .filter-row { margin: 0 0 8px; }
 .filter-box { width: 320px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 13px; }
+
+/* Nothing scrolls sideways: tables and their inputs shrink to the page instead. */
+.table-wrap, .measure-wrap { max-width: 100%; }
+.measure-table { table-layout: fixed; width: 100%; }
+.measure-table td, .measure-table th { padding: 6px 6px; }
+.measure-table .result-input, .measure-table .note-input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.history-cell { white-space: normal; }
+.hist { width: 54px; min-width: 54px; margin: 1px 2px 1px 0; padding: 1px 3px; font-size: 11px; }
+.hist.date { line-height: 1.1; }
+.hist.date .yr { font-weight: 400; font-size: 10px; }
+td.trend-cell { width: 34%; }
+td.trend-cell svg { max-width: 100%; height: auto; }
+td.history-cell, th.history-cell { padding-left: 6px; }
+
+/* Trend charts: lines between results, a key, and the Absolute / Δ toggle. */
+.chart .series, .spark .series { fill: none; stroke-width: 1.4; opacity: 0.75; }
+.chart .series.single, .spark .series.single { stroke: var(--accent); }
+.key-text { font-size: 11px; fill: var(--muted); }
+.chart-box .chart-mode { display: flex; gap: 10px; justify-content: flex-end; margin: 0 0 2px; }
+.chart-box.small .chart-mode { gap: 6px; }
+.chart-mode .link.on { font-weight: 700; color: var(--uf-orange); text-decoration: none; }
+.chart-box svg { display: block; width: 100%; height: auto; }
+/* Headers wrap at spaces only, never mid-word. */
+th { overflow-wrap: normal; word-break: normal; }
+.measure-table th { font-size: 12px; letter-spacing: 0.02em; }

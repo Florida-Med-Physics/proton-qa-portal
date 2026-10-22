@@ -1294,6 +1294,8 @@ async function renderPerform(assignmentId) {
       // The five most recent QA dates across the family; each row shows its value under the matching date.
       const dates = [...new Set(family.flatMap(({ item: it }) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
       const dateLabel = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+      const dateSlot = (d) => { const dt = new Date(d + "T00:00"); return el("span", { class: "hist date", title: dateLabel(d) },
+        el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear()))); };
       const trRows = family.map(({ item: it, mp }) => {
         drawn.add(it.test_id);
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
@@ -1327,9 +1329,10 @@ async function renderPerform(assignmentId) {
         el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
         directions,
         el("div", { class: "table-wrap measure-wrap" }, sortable(el("table", { class: "measure-table" },
+          el("colgroup", {}, ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"].map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["Energy", "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
-              el("th", { class: "history-cell" }, dates.map((d) => el("span", { class: "hist date" }, dateLabel(d)))), el("th", {})) : null),
+              el("th", { class: "history-cell" }, dates.map(dateSlot)), el("th", {})) : null),
           el("tbody", {}, trRows.flat()))))));
     }
     const summary = el("span", { class: "section-summary" });
@@ -1886,19 +1889,36 @@ function seriesStats(values) {
 // Several series (X/Y/Z, pitch/roll/rotation): deviation from each one's expected value, on one scale.
 // The y axis is scaled to the data (limit bands are clipped to the plot), carries the unit, and the x axis is dated.
 // Each chart carries its own statistics: n, mean ± SD and range per series.
-function seriesChart(series, unit, { small = false } = {}) {
+function seriesChart(series, unit, { small = false, delta = null } = {}) {
+  // Absolute values by default for one series; several series (X/Y/Z) start on Δ from reference so they share one scale.
+  let mode = delta === null ? (series.length > 1 ? "delta" : "absolute") : (delta ? "delta" : "absolute");
+  const hasRef = series.some((x) => x.points.some((pt) => pt.expected !== null && pt.expected !== undefined));
+  const box = el("div", { class: `chart-box${small ? " small" : ""}` });
+  const draw = () => {
+    const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
+      el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
+        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? "Absolute" : "Δ from reference"))) : null;
+    box.replaceChildren(buttons, drawSeries(series, unit, { small, delta: mode === "delta" }));
+  };
+  draw();
+  return box;
+}
+
+function drawSeries(series, unit, { small = false, delta = false } = {}) {
   const multi = series.length > 1;
   const W = small ? 560 : 900, H = small ? 120 : 360;
   const L = small ? 56 : 70, R = small ? 40 : 40, T = small ? 8 : 20, B = small ? 34 : 52;
   const lineH = small ? 13 : 16;
-  const statH = lineH * series.length + 6;   // statistics block under the plot (two lines per series on small charts)
+  const keyH = lineH + 4;                     // the key (what each colour and band means) sits between the plot and the statistics
+  const statH = keyH + lineH * series.length + 6;
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
   const xi = Object.fromEntries(dates.map((d, i) => [d, i]));
   const x = (d) => L + (dates.length === 1 ? (W - L - R) / 2 : (xi[d] * (W - L - R)) / (dates.length - 1));
-  const val = (p) => (multi ? asDeviation(p).dev : p.value);
-  const ref = series[0].points.map((p) => {
-    if (multi) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
+  const val = (p) => (delta ? asDeviation(p).dev : p.value);
+  // Reference line and bands: around 0 on a Δ chart, around the reference on an absolute chart (one series only).
+  const ref = (multi && !delta ? [] : series[0].points).map((p) => {
+    if (delta) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
     return { d: p.qa_date, w: p.warn === null ? null : bandValue(p, "warn", 1) - p.expected, f: p.fail === null ? null : bandValue(p, "fail", 1) - p.expected, c: p.expected };
   }).filter((b) => b.c !== null && b.c !== undefined);
 
@@ -1930,9 +1950,9 @@ function seriesChart(series, unit, { small = false } = {}) {
   const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
   for (const v of ticks) {
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
-      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (multi && v > 0 ? "+" : "") + fmt(v, decimals)));
+      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  const yTitle = multi ? `Δ from expected (${unit || "unitless"})` : `${unit || "unitless"}`;
+  const yTitle = delta ? `Δ from reference (${unit || "unitless"})` : `${unit || "unitless"}`;
   kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
 
   // X axis: dates, and the axis title.
@@ -1953,6 +1973,8 @@ function seriesChart(series, unit, { small = false } = {}) {
   series.forEach((s, k) => {
     const cls = multi ? `axis-${k}` : "";
     const r = small ? (dates.length > 120 ? 1.8 : 2.4) : (dates.length > 150 ? 2.6 : 3.6);
+    // A line from each result to the next, then the dots on top.
+    if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${multi ? cls : "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
       plot.push(svg("circle", { class: `dot ${multi ? cls : "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
         svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`)));
@@ -1960,15 +1982,28 @@ function seriesChart(series, unit, { small = false } = {}) {
   });
   kids.push(svg("g", { "clip-path": `url(#${clipId})` }, plot));
 
-  // Statistics block under the plot, one line per series.
+  // Key: one entry per series (dot and line), then the reference line and the Tolerance / Action bands when drawn.
+  const keyY = H + lineH - 2;
+  let kx = L;
+  const keyItem = (swatch, label, width) => { kids.push(svg("g", { transform: `translate(${kx} ${keyY})` }, ...swatch, svg("text", { class: "key-text", x: 22, y: 4 }, label))); kx += width; };
+  series.forEach((s, k) => {
+    const cls = multi ? `axis-${k}` : "single";
+    keyItem([svg("line", { class: `series ${cls}`, x1: 0, x2: 18, y1: 0, y2: 0 }), svg("circle", { class: `dot ${cls} st-pass`, cx: 9, cy: 0, r: 3 })],
+      `${s.label}${delta ? " (Δ)" : ""}`, 28 + (s.label.length + (delta ? 4 : 0)) * (small ? 6 : 7));
+  });
+  if (ref.length) keyItem([svg("line", { class: "expected", x1: 0, x2: 18, y1: 0, y2: 0 })], delta ? "Reference (0)" : "Reference", small ? 92 : 100);
+  if (warn) keyItem([svg("rect", { class: "band-warn", x: 0, y: -5, width: 18, height: 10 })], "Tolerance ±", small ? 90 : 100);
+  if (fail) keyItem([svg("rect", { class: "band-fail", x: 0, y: -5, width: 18, height: 10 })], "Action ±", small ? 76 : 86);
+
+  // Statistics block under the key, one line per series.
   const u = unit && unit !== "unitless" ? ` ${unit}` : "";
   const statLines = series.flatMap((s, k) => {
     const st = seriesStats(s.points.map(val));
-    const name = multi ? `${s.label} (Δ): ` : "";
+    const name = multi ? `${s.label}${delta ? " (Δ)" : ""}: ` : delta ? "Δ: " : "";
     const cls = `stats-line ${multi ? `axis-${k}` : ""}`;
     const a = `${name}n ${st.n} · mean ${fmt(st.mean, 2)}${u} · SD ${fmt(st.sd, 2)}${u}`;
     const b = `range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u}`;
-    return [svg("text", { class: cls, x: L, y: H + (k + 1) * lineH }, `${a} · ${b}`)];
+    return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, `${a} · ${b}`)];
   });
   kids.push(...statLines);
   return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H + statH}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
@@ -2016,21 +2051,21 @@ async function renderTrendOverview(machines, machineId, range) {
     app.append(el("h3", { class: "muted" }, categoryLabel(category)));
     list.sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]);
     // One table per category, one row per chart (no card panels): name, latest values, status, then the chart.
-    app.append(table(["Test", "Latest", "Status", "Trend"], list.map((g) => {
+    app.append(table(["Test", "Measurement", "Reference", "Tolerance", "Action", "Status", "Trends"], list.map((g) => {
       const status = worstOf(g);
       const unit = g.members[0].unit;
+      const lim = (v, m) => (v === null || v === undefined ? el("span", { class: "muted" }, "—") : `±${fmt(v)} ${(m.limits || {}).tol_mode === "percent" ? "%" : unit}`.trim());
+      const perAxis = (f) => g.members.map((m, k) => el("div", { class: g.members.length > 1 ? `axis-val axis-${k}` : "" }, f(m, latest(m.points))));
+      const prefix = (m) => (g.members.length > 1 ? `${m.axis} ` : "");
       const short = g.base.startsWith(category + " – ") ? g.base.slice(category.length + 3) : g.base;
       const ids = g.members.map((m) => m.test_id).join(",");
       const href = `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}`;
-      const latestCell = g.members.map((m, k) => {
-        const p = latest(m.points), d = asDeviation(p);
-        return el("div", { class: g.members.length > 1 ? `axis-val axis-${k}` : "" },
-          `${g.members.length > 1 ? m.axis + " " : ""}${fmt(p.value)} ${unit}`.trim(),
-          p.expected !== null ? el("span", { class: "muted small" }, ` (${signed(d.dev)} ${unit})`.replace(" )", ")")) : null);
-      });
       return el("tr", { class: "clickable trend-row", onclick: () => (location.hash = href) },
         el("td", {}, el("a", { href }, el("strong", {}, short)), axisLegend(g), el("div", { class: "muted small" }, `${latest(g.members[0].points).qa_date}`)),
-        el("td", { class: "small" }, latestCell),
+        el("td", { class: "small num" }, perAxis((m, p) => `${prefix(m)}${fmt(p.value)} ${unit}`.trim())),
+        el("td", { class: "small num" }, perAxis((m, p) => { const e = p.expected ?? (m.limits || {}).expected; return e === null || e === undefined ? el("span", { class: "muted" }, "—") : `${prefix(m)}${fmt(e)} ${unit}`.trim(); })),
+        el("td", { class: "small num" }, perAxis((m, p) => lim(p.warn ?? (m.limits || {}).warn, m))),
+        el("td", { class: "small num" }, perAxis((m, p) => lim(p.fail ?? (m.limits || {}).fail, m))),
         el("td", {}, chip(status)),
         el("td", { class: "trend-cell" }, seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true })));
     })));
