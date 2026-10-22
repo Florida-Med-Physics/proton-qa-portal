@@ -960,6 +960,17 @@
   })();
 
   // "Distal Fall Off" spelled out and the GTR5_ prefix dropped from measurement names (mirrors the starting data).
+  // RadMachine transcription notes -> the action itself (markers drive the Perform page) or nothing.
+  const NOTE_REWRITES = [
+      ["A choice list in RadMachine.", ""],
+      ["Filled automatically in RadMachine.", "[auto: user] Filled in with the signed-in user."],
+      ["Calculated in RadMachine (3D offset from X, Y, Z).", "[calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."],
+      ["Calculated in RadMachine (3D offset).", "[calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."],
+      ["Calculated in RadMachine from temperature and pressure.", "[calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P, with T in °C and P in kPa (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."],
+      ["Calculated in RadMachine (chamber x electrometer factor).", "[calc: product] Calculated here: chamber calibration factor × electrometer calibration factor."],
+      ["Calculated in RadMachine from charge, calibration and temperature-pressure correction.", "[calc: dose] Calculated here: dose [cGy] = charge [nC] × 10⁻⁹ × overall calibration factor [Gy/C] × kTP × 100 (physicist to confirm the formula matches RadMachine)."],
+      ["Load the Sphinx export with 'Sphinx file' at the top of this page; it fills the values below.", "Load the Sphinx export in the Measurement file step above; it fills in every Sphinx value."],
+  ];
   function spellOutNames() {
     let n = 0;
     const old = S.queues.find((q) => q.is_template && q.name === "PBS DailyQA GTR5 - Sphinx");
@@ -967,7 +978,8 @@
     for (const t of S.tests) {
       const name = t.name.replace(/^GTR5_(Energy|Field|Isocenter|Daily output|Beam)/, "$1").replace("Distal FallOff", "Distal Fall Off").replace("– DFO", "– Distal Fall Off");
       if (name !== t.name) { t.name = name; n++; }
-      const d = (t.description || "").replace(/\s*Reference: Yes\.?/g, "").trimEnd();   // "Reference: Yes" is not a direction
+      let d = (t.description || "").replace(/\s*Reference: Yes\.?/g, "").trimEnd();   // "Reference: Yes" is not a direction
+      for (const [o, nw] of NOTE_REWRITES) d = d.split(o).join(nw).trimEnd();            // transcription notes become actions
       if (d !== (t.description || "")) { t.description = d; n++; }
     }
     if (n) { audit(null, "upgrade", "tests", null, { renamed: n }); save(); }

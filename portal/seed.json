@@ -1235,25 +1235,25 @@
      "category": "Administrative",
      "name": "Last Edited By:",
      "type": "text",
-     "description": "Template 1.01. [Section: Setup and Safety] Filled automatically in RadMachine."
+     "description": "Template 1.01. [Section: Setup and Safety] [auto: user] Filled in with the signed-in user."
     },
     {
      "category": "Administrative",
      "name": "QA Performed By:",
      "type": "text",
-     "description": "Template 1.02. [Section: Setup and Safety] A choice list in RadMachine."
+     "description": "Template 1.02. [Section: Setup and Safety]"
     },
     {
      "category": "Safety",
      "name": "PTS Version",
      "type": "text",
-     "description": "Template 1.03. [Section: Setup and Safety] A choice list in RadMachine."
+     "description": "Template 1.03. [Section: Setup and Safety]"
     },
     {
      "category": "Safety",
      "name": "PTS Config Version",
      "type": "text",
-     "description": "Template 1.04. [Section: Setup and Safety] A choice list in RadMachine."
+     "description": "Template 1.04. [Section: Setup and Safety]"
     },
     {
      "category": "Dosimetry",
@@ -1280,7 +1280,7 @@
      "unit": "unitless",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.07. [Section: Setup and Safety] Calculated in RadMachine from temperature and pressure."
+     "description": "Template 1.07. [Section: Setup and Safety] [calc: ktp] Calculated here: kTP = (273.15 + T) / (273.15 + 22) × 101.325 / P, with T in °C and P in kPa (TG-51 reference conditions 22 °C, 101.325 kPa — physicist to confirm)."
     },
     {
      "category": "Safety",
@@ -1358,7 +1358,7 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.05. [Section: Mechanical and Imaging] Calculated in RadMachine (3D offset from X, Y, Z)."
+     "description": "Template 2.05. [Section: Mechanical and Imaging] [calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."
     },
     {
      "category": "Mechanical and Safety",
@@ -1401,7 +1401,7 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.10. [Section: Mechanical and Imaging] Calculated in RadMachine (3D offset)."
+     "description": "Template 2.10. [Section: Mechanical and Imaging] [calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."
     },
     {
      "category": "Mechanical and Safety",
@@ -1451,7 +1451,7 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.16. [Section: Mechanical and Imaging] Calculated in RadMachine (3D offset)."
+     "description": "Template 2.16. [Section: Mechanical and Imaging] [calc: 3d-offset] Calculated here: √(X² + Y² + Z²) from the three offsets above."
     },
     {
      "category": "Mechanical and Safety",
@@ -1486,7 +1486,7 @@
      "category": "Device Selection",
      "name": "Chamber",
      "type": "text",
-     "description": "Template 3.03. [Section: Sphinx Measurements] A choice list in RadMachine."
+     "description": "Template 3.03. [Section: Sphinx Measurements]"
     },
     {
      "category": "Device Selection",
@@ -1501,7 +1501,7 @@
      "category": "Device Selection",
      "name": "Electrometer",
      "type": "text",
-     "description": "Template 3.05. [Section: Sphinx Measurements] A choice list in RadMachine."
+     "description": "Template 3.05. [Section: Sphinx Measurements]"
     },
     {
      "category": "Device Selection",
@@ -1519,7 +1519,7 @@
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.07. [Section: Sphinx Measurements] Calculated in RadMachine (chamber x electrometer factor)."
+     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product] Calculated here: chamber calibration factor × electrometer calibration factor."
     },
     {
      "category": "Daily_PBS_Dosimetry",
@@ -1537,13 +1537,13 @@
      "unit": "cGy",
      "expected": 150,
      "tol_mode": "absolute",
-     "description": "Template 3.09. [Section: Sphinx Measurements] Calculated in RadMachine from charge, calibration and temperature-pressure correction."
+     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] Calculated here: dose [cGy] = charge [nC] × 10⁻⁹ × overall calibration factor [Gy/C] × kTP × 100 (physicist to confirm the formula matches RadMachine)."
     },
     {
      "category": "Dosimetry",
      "name": "File_GTR5_Sphinx_DQA_Results",
      "type": "text",
-     "description": "Template 3.10. [Section: Sphinx Measurements] Load the Sphinx export with 'Sphinx file' at the top of this page; it fills the values below."
+     "description": "Template 3.10. [Section: Sphinx Measurements] Load the Sphinx export in the Measurement file step above; it fills in every Sphinx value."
     },
     {
      "category": "Data",

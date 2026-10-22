@@ -1122,10 +1122,11 @@ function passFailInput(name, withWarning, yesNo) {
 const TEMPLATE_NUMBER = /^Template (\d+)\.(\d+)\.\s*/;
 // Lists copied from RadMachine keep its own section names: "Template 1.04. [Section: PBS DailyQA GTR5 - Sphinx] ...".
 const SECTION_NAME = /\[Section: ([^\]]+)\]\s*/;
+const MARKER = /\[(auto|calc): ([^\]]+)\]\s*/;         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function helpText(description) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").trim();
   return text ? el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text) : null;
 }
 
@@ -1182,6 +1183,46 @@ function measureParts(name) {
 function checkNumber(description) {
   const m = /^Template (\d+\.\d+)\./.exec(description || "");
   return m ? m[1] : "";
+}
+
+// Fields marked [auto: …] or [calc: …] in their directions are filled here instead of typed:
+// the signed-in user, a 3D offset from the X, Y, Z fields above it, kTP, a product, or the daily output dose.
+function wireCalculations(entries) {
+  const byName = (re) => entries.find((e) => re.test(e.item.name));
+  const num = (e) => (e && e.input.value.trim() !== "" ? Number(e.input.value) : NaN);
+  const lock = (e, title) => { e.input.readOnly = true; e.input.classList.add("from-file"); e.input.placeholder = "calculated"; e.input.title = title; };
+  const set = (e, v, decimals) => { e.input.value = Number.isFinite(v) ? v.toFixed(decimals) : ""; e.input.dispatchEvent(new Event("input")); };
+  entries.forEach((e, i) => {
+    const m = MARKER.exec(e.item.description || "");
+    if (!m) return;
+    const kind = m[2].trim();
+    if (m[1] === "auto" && kind === "user") {
+      e.input.value = state.user.full_name || state.user.username;
+      e.input.readOnly = true;
+      e.input.title = "Filled in with the signed-in user";
+      return;
+    }
+    let sources = [], compute = null, decimals = 2;
+    if (kind === "3d-offset") {
+      sources = entries.slice(Math.max(0, i - 3), i).filter((x) => x.item.type === "numeric");
+      compute = (v) => Math.sqrt(v.reduce((a, b) => a + b * b, 0));
+    } else if (kind === "ktp") {
+      sources = [byName(/chamber temperature/i), byName(/air pressure/i)].filter(Boolean);
+      compute = ([t, pr]) => ((273.15 + t) / (273.15 + 22)) * (101.325 / pr);
+      decimals = 4;
+    } else if (kind === "product") {
+      sources = [byName(/chamber cal\.? factor/i), byName(/electrometer calibration factor/i)].filter(Boolean);
+      compute = ([a, b]) => a * b;
+      decimals = 4;
+    } else if (kind === "dose") {
+      sources = [byName(/charge \[nC\]/i), byName(/overall calibration factor/i), byName(/temp\.? & press\.? correction/i)].filter(Boolean);
+      compute = ([q, f, k]) => q * 1e-9 * f * k * 100;
+    }
+    if (!compute || !sources.length) return;
+    lock(e, "Calculated from the fields it depends on");
+    const update = () => { const v = sources.map(num); set(e, v.some((x) => !Number.isFinite(x)) ? NaN : compute(v), decimals); };
+    sources.forEach((src) => src.input.addEventListener("input", update));
+  });
 }
 
 async function renderPerform(assignmentId) {
@@ -1272,32 +1313,16 @@ async function renderPerform(assignmentId) {
     const grouped = new Set([...families.values()].filter((f) => f.length > 1).flatMap((f) => f.map((x) => x.item.test_id)));
     const drawn = new Set();
     const limitText = (v, limits, unit) => (v === null || v === undefined ? el("span", { class: "muted" }, "—") : `±${fmt(v)} ${limits.tol_mode === "percent" ? "%" : unit || ""}`.trim());
-    for (const item of items) {
-      if (drawn.has(item.test_id)) continue;
-      if (!grouped.has(item.test_id)) {
-        const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(item);
-        // As in the myQA template: the numbered title, then its directions block, then the result.
-        const directions = helpText(item.description);
-        rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
-          el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, categoryLabel(item.category)) : null,
-            el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
-            item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
-          el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
-          statusCell,
-          el("div", { class: "check-note" }, noteToggle, comment),
-          directions));
-        continue;
-      }
-      const mp0 = measureParts(item.name);
-      const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
-      const unit = item.unit && item.unit !== "unitless" ? item.unit : "";
-      // The five most recent QA dates across the family; each row shows its value under the matching date.
-      const dates = [...new Set(family.flatMap(({ item: it }) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
-      const dateLabel = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-      const dateSlot = (d) => { const dt = new Date(d + "T00:00"); return el("span", { class: "hist date", title: dateLabel(d) },
-        el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear()))); };
-      const trRows = family.map(({ item: it, mp }) => {
+    const dateLabel = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    const dateSlot = (d) => { const dt = new Date(d + "T00:00"); return el("span", { class: "hist date", title: dateLabel(d) },
+      el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear()))); };
+    // Every measured (numeric) test is a row in a table: Measurement, Reference, Tolerance, Action, Status, Comment,
+    // History (under its QA dates) and Trends. Repeated measurements (per energy or spot) share a titled table.
+    const measureTable = (members, { firstHeader, title, directions, firstCell, label }) => {
+      const dates = [...new Set(members.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
+      const trRows = members.map((it) => {
         drawn.add(it.test_id);
+        const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
         comment.hidden = false; noteToggle.hidden = true;          // the table has its own comment column
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
@@ -1307,13 +1332,13 @@ async function renderPerform(assignmentId) {
           const pts = (history[it.test_id] || []).slice(-60);
           if (!pts.length) return toast("No results yet for this test.", true);
           if (chart.hidden) chart.firstChild.replaceChildren(
-            el("div", { class: "row" }, el("strong", {}, `${mp.rowLabel} · ${mp.metricLabel}`), el("span", { class: "spacer" }),
+            el("div", { class: "row" }, el("strong", {}, label(it)), el("span", { class: "spacer" }),
               el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
             seriesChart([{ label: it.name, points: pts }], unit, { small: true }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
         const row = el("tr", {},
-          el("td", {}, el("strong", {}, mp.rowLabel), note),
+          el("td", {}, firstCell(it), note),
           el("td", {}, el("div", { class: "row nowrap" }, control, unit ? el("span", { class: "muted small" }, unit) : null)),
           el("td", { class: "num" }, it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—")),
           el("td", { class: "num" }, limitText(it.limits.warn, it.limits, unit)),
@@ -1324,17 +1349,55 @@ async function renderPerform(assignmentId) {
           el("td", {}, trend));
         return [row, chart];
       });
-      const directions = helpText(item.description);
-      rows.push(el("div", { class: "measure-block" },
-        el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
-        directions,
+      const widths = firstHeader === "Energy" ? ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"] : ["24%", "11%", "9%", "8%", "8%", "7%", "11%", "18%", "4%"];
+      return el("div", { class: "measure-block" }, title, directions,
         el("div", { class: "table-wrap measure-wrap" }, sortable(el("table", { class: "measure-table" },
-          el("colgroup", {}, ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"].map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["Energy", "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
+          el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
+          el("thead", {}, el("tr", {}, [firstHeader, "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
               el("th", { class: "history-cell" }, dates.map(dateSlot)), el("th", {})) : null),
-          el("tbody", {}, trRows.flat()))))));
+          el("tbody", {}, trRows.flat())))));
+    };
+    const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : it.name;
+    // Single measurements that follow one another share one table; the row carries the number, name and directions.
+    let pending = [];
+    const flush = () => {
+      if (!pending.length) return;
+      rows.push(measureTable(pending, { firstHeader: "Test", title: null, directions: null, label: shortName,
+        firstCell: (it) => [el("strong", {}, checkNumber(it.description) ? `${checkNumber(it.description)}: ` : "", shortName(it)),
+          named && it.category ? el("div", { class: "category-tag" }, categoryLabel(it.category)) : null,
+          (() => { const d = helpText(it.description); if (d) d.classList.add("in-cell"); return d; })()] }));
+      pending = [];
+    };
+    for (const item of items) {
+      if (drawn.has(item.test_id)) continue;
+      if (!grouped.has(item.test_id)) {
+        if (item.type === "numeric") { pending.push(item); continue; }
+        flush();
+        const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(item);
+        // As in the myQA template: the numbered title, then its directions block, then the result.
+        const directions = helpText(item.description);
+        rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
+          el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, categoryLabel(item.category)) : null,
+            el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", shortName(item)), note),
+          el("div", { class: "check-input" }, control),
+          statusCell,
+          el("div", { class: "check-note" }, noteToggle, comment),
+          directions));
+        continue;
+      }
+      flush();
+      const mp0 = measureParts(item.name);
+      const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
+      rows.push(measureTable(family.map((f) => f.item), {
+        firstHeader: "Energy",
+        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
+        directions: helpText(item.description),
+        firstCell: (it) => el("strong", {}, measureParts(it.name).rowLabel),
+        label: (it) => { const mp = measureParts(it.name); return `${mp.rowLabel} · ${mp.metricLabel}`; },
+      }));
     }
+    flush();
     const summary = el("span", { class: "section-summary" });
     const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, categoryLabel(category)), summary), rows);
     sections.push({
@@ -1354,6 +1417,7 @@ async function renderPerform(assignmentId) {
     });
   }
 
+  wireCalculations(inputs);
   const qaDate = el("input", { type: "date", value: today(), max: today(), "aria-label": "QA date" });
   const runComment = el("textarea", { placeholder: "Anything the reviewer should know" });
   let sourceRef = null;
@@ -1411,7 +1475,7 @@ async function renderPerform(assignmentId) {
   // The file goes first in the Sphinx Measurements section (or at the top of a list that has no such section).
   const sphinxSection = sections.find((x) => /sphinx measurements/i.test(x.section)) || null;
   if (!sphinxSection) app.append(fileCard);
-  app.append(...sections.flatMap((x) => [x.heading, x === sphinxSection && x.heading ? fileCard : null, x.box]));
+  app.append(...sections.flatMap((x) => [x.heading, x === sphinxSection && x.heading ? fileCard : null, x.box]).filter(Boolean));   // a null would append as the text "null"
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";

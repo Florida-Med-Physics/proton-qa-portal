@@ -619,3 +619,8 @@ td.history-cell, th.history-cell { padding-left: 6px; }
 /* Headers wrap at spaces only, never mid-word. */
 th { overflow-wrap: normal; word-break: normal; }
 .measure-table th { font-size: 12px; letter-spacing: 0.02em; }
+
+/* Directions inside a measurement row read as a small note under the test name. */
+.measure-table .directions.in-cell { margin: 4px 0 0; padding: 4px 8px; font-size: 11px; border-left-width: 2px; }
+.measure-table .directions.in-cell .directions-label { font-size: 9px; }
+.measure-table td:first-child .category-tag { margin: 2px 0 0; }
