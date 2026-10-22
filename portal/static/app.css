@@ -624,3 +624,11 @@ th { overflow-wrap: normal; word-break: normal; }
 .measure-table .directions.in-cell { margin: 4px 0 0; padding: 4px 8px; font-size: 11px; border-left-width: 2px; }
 .measure-table .directions.in-cell .directions-label { font-size: 9px; }
 .measure-table td:first-child .category-tag { margin: 2px 0 0; }
+
+/* Δ from reference: green within tolerance, yellow at tolerance, red at action. */
+.delta { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.delta.st-pass { background: var(--pass-bg); color: var(--pass); }
+.delta.st-warn { background: var(--warn-bg); color: var(--warn); }
+.delta.st-fail { background: var(--fail-bg); color: var(--fail); }
+.delta.st-recorded { background: var(--surface-2); color: var(--muted); }
+.delta-slot { margin-top: 3px; min-height: 0; }

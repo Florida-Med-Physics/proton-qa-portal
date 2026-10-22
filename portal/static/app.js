@@ -266,6 +266,15 @@ const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass 
 const STATUS_WORDS = { pass: "Pass", warn: "Warning", fail: "Fail" };
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
+// "Δ +0.30 mm" badge beside a numeric result, green / yellow / red by its status against the limits.
+function deltaBadge(value, limits, unit, status) {
+  if (!Number.isFinite(value) || !limits || limits.expected === null || limits.expected === undefined) return null;
+  const d = value - limits.expected;
+  const st = status || evaluate("numeric", value, limits);
+  const pct = limits.tol_mode === "percent" && limits.expected ? ` (${signed((100 * d) / limits.expected, 2)} %)` : "";
+  return el("span", { class: `delta st-${st}`, title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, `Δ ${signed(d)} ${unit || ""}`.trim() + pct);
+}
+
 function evaluate(type, value, limits) {
   if (type === "boolean") return value === "pass" ? "pass" : "fail";
   if (type === "status") return ["pass", "warn", "fail"].includes(value) ? value : "fail";
@@ -1344,15 +1353,18 @@ async function renderPerform(assignmentId) {
             seriesChart([{ label: it.name, points: pts }], unit, { small: true }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
+        const dlt = el("div", { class: "delta-slot" });
+        const showDelta = () => { const v = Number(control.value); dlt.replaceChildren(control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : ""); };
+        control.addEventListener("input", showDelta);
         const row = el("tr", {},
           el("td", {}, firstCell(it), note),
-          el("td", {}, el("div", { class: "row nowrap" }, control, unit ? el("span", { class: "muted small" }, unit) : null)),
+          el("td", {}, el("div", { class: "row nowrap" }, control, unit ? el("span", { class: "muted small" }, unit) : null), dlt),
           el("td", { class: "num" }, it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—")),
           el("td", { class: "num" }, limitText(it.limits.warn, it.limits, unit)),
           el("td", { class: "num" }, limitText(it.limits.fail, it.limits, unit)),
           el("td", {}, statusCell),
           el("td", {}, comment),
-          el("td", { class: "history-cell" }, dates.length ? past.map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")) : el("span", { class: "muted small" }, "—")),
+          el("td", { class: "history-cell" }, dates.length ? past.map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")) : el("span", { class: "muted small" }, "—")),
           el("td", {}, trend));
         return [row, chart];
       });
@@ -1867,9 +1879,10 @@ async function renderRun(id) {
   const rows = (list) => list.map((r) => el("tr", {},
     el("td", {}, el("strong", {}, r.name), r.comment ? el("div", { class: "muted small" }, r.comment) : null),
     el("td", { class: "num" }, valueText(r)),
+    el("td", { class: "num" }, r.type === "numeric" ? deltaBadge(r.value_num, r, r.unit, r.status) : ""),
     el("td", { class: "small muted" }, r.type === "numeric" ? limitsText(r, r.unit) : ""),
     el("td", {}, chip(r.status))));
-  const headers = ["Test", "#Result", "Expected / limits", "Status"];
+  const headers = ["Test", "#Result", "#Δ", "Expected / limits", "Status"];
   if (problems.length) {
     app.append(el("h2", {}, `${problems.length} to look at`), table(headers, rows(problems)));
   } else {
@@ -2133,7 +2146,7 @@ async function renderTrendOverview(machines, machineId, range) {
       const href = `#/trends?machine_id=${machineId}&test_id=${ids}&range=${range}`;
       return el("tr", { class: "clickable trend-row", onclick: () => (location.hash = href) },
         el("td", {}, el("a", { href }, el("strong", {}, short)), axisLegend(g), el("div", { class: "muted small" }, `${latest(g.members[0].points).qa_date}`)),
-        el("td", { class: "small num" }, perAxis((m, p) => `${prefix(m)}${fmt(p.value)} ${unit}`.trim())),
+        el("td", { class: "small num" }, perAxis((m, p) => [`${prefix(m)}${fmt(p.value)} ${unit}`.trim(), " ", deltaBadge(p.value, p, unit, p.status)])),
         el("td", { class: "small num" }, perAxis((m, p) => { const e = p.expected ?? (m.limits || {}).expected; return e === null || e === undefined ? el("span", { class: "muted" }, "—") : `${prefix(m)}${fmt(e)} ${unit}`.trim(); })),
         el("td", { class: "small num" }, perAxis((m, p) => lim(p.warn ?? (m.limits || {}).warn, m))),
         el("td", { class: "small num" }, perAxis((m, p) => lim(p.fail ?? (m.limits || {}).fail, m))),
