@@ -241,11 +241,6 @@ function shortDate(iso) {
   return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
-// "Daily QA – GTR1" reads as "Daily QA" on GTR1's own card.
-function queueLabel(queueName, machineName) {
-  return queueName.endsWith(` – ${machineName}`) ? queueName.slice(0, -(machineName.length + 3)) : queueName;
-}
-
 function renderLogin() {
   renderShell();
   const error = el("p", { class: "error" });
@@ -345,7 +340,7 @@ async function renderDashboard() {
     const pending = await api("GET", "/api/runs?review_status=pending&limit=50");
     app.append(el("h2", { class: "section-head" }, "Waiting for review"), table(["Date", "Machine", "QA list", "Result", "Performed by", ""], pending.map((r) =>
       el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
-        el("td", {}, shortDate(r.qa_date)), el("td", {}, r.machine_name), el("td", {}, queueLabel(r.queue_name, r.machine_name)),
+        el("td", {}, shortDate(r.qa_date)), el("td", {}, r.machine_name), el("td", {}, r.queue_name),
         el("td", {}, chip(r.overall)), el("td", { class: "muted" }, personName(r.performer_name, r.performer)),
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/runs/${r.id}` }, "Review"))))));
   }
@@ -366,7 +361,7 @@ async function renderDashboard() {
         const last = q.last_run;
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
           el("td", {}, i === 0 ? el("strong", {}, machine.name) : ""),
-          el("td", {}, queueLabel(q.queue_name, machine.name), el("div", { class: "muted small" }, q.schedule)),
+          el("td", {}, q.queue_name, el("div", { class: "muted small" }, q.schedule)),
           el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
           el("td", { class: "right" }, due && can("perform") ? el("a", { class: q.state === "ready" ? "button small" : "button primary small", href: `#/perform/${q.id}` }, "Start")
@@ -587,7 +582,7 @@ async function renderMachines() {
       const lines = mine.length ? mine.map((a) => {
         const q = queues[a.queue_id] || {};
         return el("tr", { class: a.active ? "" : "muted" },
-          el("td", { class: "indent" }, queueLabel(a.queue_name, machine.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+          el("td", { class: "indent" }, a.queue_name, q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
           el("td", {}, a.schedule),
           el("td", {}, chip(a.active ? a.state : "", scheduleStatus(a))),
           el("td", { class: "num" }, q.item_count ?? ""),
@@ -756,7 +751,7 @@ async function renderMachine(id) {
         el("a", { href: `#/queues/${a.queue_id}` }, "Edit the tests in this list"),
         el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
     return el("div", { class: "card list-row" },
-      el("div", {}, el("strong", {}, queueLabel(a.queue_name, machine.name)), el("div", { class: "muted small" }, a.schedule)),
+      el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule)),
       chip(a.active ? a.state : "", status),
       el("div", { class: "row" },
         due && can("perform") ? el("a", { class: a.state === "ready" ? "button" : "button primary", href: `#/perform/${a.id}` }, "Start") : null,
@@ -767,7 +762,7 @@ async function renderMachine(id) {
 
 async function renderLimits(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
-  page(`Limits for ${t.machine.name}: ${queueLabel(t.queue.name, t.machine.name)}`,
+  page(`Limits: ${t.queue.name}`,
     "Only fill in what is different on this machine. Blank fields use the list's value, shown in grey.");
   const numeric = t.items.filter((i) => i.type === "numeric");
   if (!numeric.length) {
@@ -868,7 +863,7 @@ function checkNumber(description) {
 
 async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
-  page(`${queueLabel(t.queue.name, t.machine.name)} · ${t.machine.name}`, t.assignment.schedule);
+  page(t.queue.name, t.assignment.schedule);
   if (t.queue.description) {
     app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "0.0 Setup")), el("div", { class: "pre" }, t.queue.description)));
   }
@@ -1290,14 +1285,14 @@ async function renderRuns() {
   app.append(table(["Date", "Machine", "QA list", "Result", "Review"], runs.map((r) =>
     el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
       el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
-      el("td", {}, r.machine_name), el("td", {}, queueLabel(r.queue_name, r.machine_name)),
+      el("td", {}, r.machine_name), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)),
       el("td", {}, r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)))), "No runs match."));
 }
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(`${queueLabel(run.queue_name, run.machine_name)} · ${run.machine_name}`, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`);
+  page(run.queue_name, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
     el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),
