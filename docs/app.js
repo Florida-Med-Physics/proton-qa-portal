@@ -277,7 +277,7 @@ async function renderHome() {
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}`, onclick: (e) => e.stopPropagation() }, "Trends")));
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "13%"], ["Active QA lists", "22%"], ["Today", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["", "9%"]], rows));
+      fixedTable([["Machine", "13%"], ["Active QA lists", "22%"], ["Due Date", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["", "9%"]], rows));
   }
 }
 
