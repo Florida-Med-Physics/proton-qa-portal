@@ -733,3 +733,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .axis-table tbody tr:not(:last-child) td { border-bottom: 0; }
 .axis-table tbody td { padding-top: 4px; padding-bottom: 4px; }
 .measure-table td.qa-n-span { vertical-align: middle; text-align: center; }
+
+/* Axis labels (X, Y, Z, Pitch, Roll, Rotation) are never coloured as text; only the chart lines carry colour. */
+.axis-key, .axis-val, .axis-legend .axis-key, .hist-axis .axis-key, .axis-field .axis-key, .stats-line.axis-0, .stats-line.axis-1, .stats-line.axis-2 { color: inherit; fill: currentColor; font-weight: 600; }
+.axis-val { font-weight: 500; }
