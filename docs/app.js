@@ -1271,7 +1271,7 @@ function wireCalculations(entries) {
   const lock = (e, title) => { e.input.readOnly = true; e.input.classList.add("from-file"); e.input.placeholder = "calculated"; e.input.title = title; };
   const set = (e, v, decimals) => { e.input.value = Number.isFinite(v) ? v.toFixed(decimals) : ""; e.input.dispatchEvent(new Event("input")); };
   entries.forEach((e, i) => {
-    if (e.item.type === "text" && !e.input.value) {
+    if (e.item.type === "text" && !e.input.value && !/\[auto: performer\]/.test(e.item.description || "")) {
       const d = DEFAULT_MARK.exec(e.item.description || "");
       const start = e.item.last_text || (d && d[1].trim());
       if (start) { e.input.value = start; e.input.title = e.item.last_text ? "As recorded last time; change it if different" : "Usual value; change it if different"; }
@@ -1284,6 +1284,11 @@ function wireCalculations(entries) {
       e.input.placeholder = "from file";
       e.input.classList.add("from-file");
       e.input.title = "Acquisition date and time from the Sphinx export";
+      return;
+    }
+    if (m[1] === "auto" && kind === "performer") {
+      if (!e.input.value) e.input.value = state.user.full_name || state.user.username;   // the signed-in user, unless someone else did the QA
+      e.input.title = "Starts as the signed-in user; change it if someone else performed the QA";
       return;
     }
     if (m[1] === "auto" && kind === "user") {

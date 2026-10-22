@@ -1067,6 +1067,7 @@
   ];
   function spellOutNames() {
     let n = 0;
+    for (const t of S.tests) if (t.name === "QA Performed By:" && !/\[auto: performer\]/.test(t.description || "")) { t.description = `${t.description || ""} [auto: performer]`.trim(); n++; }
     // Sphinx list: the file-name item is gone (the file is chosen in the Measurement file step) and the acquisition
     // date/time is filled from the export; numbering in section 3 closes up.
     for (const q of S.queues) {

@@ -1244,7 +1244,7 @@ window.PORTAL_SEED = {
      "category": "Administrative",
      "name": "QA Performed By:",
      "type": "text",
-     "description": "Template 1.02. [Section: Setup and Safety]"
+     "description": "Template 1.02. [Section: Setup and Safety] [auto: performer]"
     },
     {
      "category": "Safety",
@@ -2236,7 +2236,7 @@ window.PORTAL_SEED = {
      "category": "Administrative",
      "name": "QA Performed By:",
      "type": "text",
-     "description": "Template 1.02. [Section: Administrative]"
+     "description": "Template 1.02. [Section: Administrative] [auto: performer]"
     },
     {
      "category": "Beam_Parameters",
