@@ -954,7 +954,47 @@
     renameSphinxTests();
     refreshTemplates();
     addSeedMachines();
+    spellOutNames();
+    reassignSphinx();
   })();
+
+  // "Distal Fall Off" spelled out and the GTR5_ prefix dropped from measurement names (mirrors the starting data).
+  function spellOutNames() {
+    let n = 0;
+    const old = S.queues.find((q) => q.is_template && q.name === "PBS DailyQA GTR5 - Sphinx");
+    if (old) { old.name = "PBS DailyQA Template - Sphinx"; n++; }
+    for (const t of S.tests) {
+      const name = t.name.replace(/^GTR5_(Energy|Field|Isocenter|Daily output|Beam)/, "$1").replace("Distal FallOff", "Distal Fall Off").replace("– DFO", "– Distal Fall Off");
+      if (name !== t.name) { t.name = name; n++; }
+      const d = (t.description || "").replace(/\s*Reference: Yes\.?/g, "").trimEnd();   // "Reference: Yes" is not a direction
+      if (d !== (t.description || "")) { t.description = d; n++; }
+    }
+    if (n) { audit(null, "upgrade", "tests", null, { renamed: n }); save(); }
+  }
+
+  // The Sphinx list is the proton daily list: one instance per proton gantry, and the TG-224 instances come off the schedule.
+  function reassignSphinx() {
+    if (S.sphinxAssigned) return;
+    const tpl = S.queues.find((q) => q.is_template && q.name === "PBS DailyQA Template - Sphinx");
+    if (!tpl) return;
+    const admin = S.users.find((u) => u.role === "admin") || S.users[0];
+    for (const m of S.machines.filter((x) => x.kind === "Proton gantry")) {
+      let folder = "";
+      for (const a of S.assignments.filter((x) => x.machine_id === m.id && x.active)) {
+        const q = byId("queues", a.queue_id);
+        if (!q || q.template_id === tpl.id) continue;
+        folder = folder || a.import_folder || "";
+        a.active = 0;
+        a.import_folder = "";
+      }
+      const name = `PBS Daily QA (Sphinx) – ${m.name}`;
+      if (S.queues.some((q) => q.name === name)) continue;
+      duplicateQueue(admin, tpl.id, { name, machine_id: m.id, frequency: "daily", weekdays: [0, 1, 2, 3, 4], import_folder: folder });
+    }
+    S.sphinxAssigned = true;
+    audit(null, "upgrade", "assignments", null, { sphinx: "assigned to proton gantries" });
+    save();
+  }
 
   // Machines added to the starting data later (e.g. Linac 1 Synergy, Ethos) appear in browsers seeded before them.
   function addSeedMachines() {
@@ -978,7 +1018,7 @@
     for (const t of seedTemplates) {
       let q = S.queues.find((x) => x.is_template && x.name === t.name);
       if (!q) {
-        // A template added to the starting data later (e.g. PBS DailyQA GTR5 - Sphinx): create it once.
+        // A template added to the starting data later (e.g. PBS DailyQA Template - Sphinx): create it once.
         S.seededTemplates = S.seededTemplates || S.queues.filter((x) => x.is_template).map((x) => x.name);
         if (S.seededTemplates.includes(t.name)) continue;   // it was here before and someone deleted it: leave it gone
         const id = insert("queues", { name: t.name, description: t.setup || "", active: 1, is_template: 1, template_id: null });

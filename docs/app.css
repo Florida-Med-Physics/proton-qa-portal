@@ -569,3 +569,14 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 
 .trend-icon { vertical-align: -3px; }
 #nav a .trend-icon { margin-right: 2px; }
+
+/* History values sit in fixed-width slots so they line up under the dates in the header row. */
+.hist { width: 78px; min-width: 78px; box-sizing: border-box; }
+.hist.empty { background: transparent; color: var(--muted); }
+.hist.date { background: transparent; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; padding: 0 2px; white-space: nowrap; }
+.measure-table tr.hist-dates th { padding-top: 0; border-top: 0; }
+
+.result-input.from-file { background: var(--surface-2); color: var(--text); cursor: default; }
+.result-input.from-file::placeholder { font-style: italic; }
+.inactive-tag { color: var(--muted); font-weight: 600; font-size: 12px; }
+.icon-link { display: inline-flex; padding: 4px 8px; border-radius: 6px; } .icon-link:hover { background: var(--surface-2); }

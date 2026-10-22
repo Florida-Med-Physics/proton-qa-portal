@@ -284,10 +284,10 @@ async function renderHome() {
         el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? dueIn(m.queues.filter((q) => q.state === "due").map((q) => q.next_due).sort()[0]) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
         el("td", {}, lastRun ? [chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`)] : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
-        el("td", { class: "right" }, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}`, onclick: (e) => e.stopPropagation() }, "Trends")));
+        el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "13%"], ["Active QA lists", "22%"], ["Due Date", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["", "9%"]], rows));
+      fixedTable([["Machine", "13%"], ["Active QA lists", "22%"], ["Due Date", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["Trends", "9%"]], rows));
   }
 }
 
@@ -588,7 +588,7 @@ async function renderSetup() {
         const a = instanceOf(q);
         const live = !!(a && a.active);
         return el("tr", { class: live ? "" : "muted" },
-          el("td", { class: "indent" }, editableName(q, editable), live ? el("span", { class: "active-tag" }, " (Active)") : null),
+          el("td", { class: "indent" }, editableName(q, editable), live ? el("span", { class: "active-tag" }, " (Active)") : a ? el("span", { class: "inactive-tag" }, " (Inactive)") : null),
           el("td", {}, q.template_name || el("span", { class: "muted" }, "—")),
           el("td", { class: "center" }, q.item_count),
           el("td", { class: "right" }, el("div", { class: "row nowrap end" },
@@ -1076,15 +1076,19 @@ function sectionNumber(item) {
 function sectionTitle(number, categories, named) {
   if (named) return `${number}.0 ${named}`;
   const names = [...new Set(categories.map((c) => c || "General"))];
-  const generic = { 0: "Setup", 1: "Safety", 2: "Mechanical and imaging", 3: "Dosimetry", 4: "Other" };
+  const generic = { 0: "Setup", 1: "Safety", 2: "Mechanical and imaging", 3: "Sphinx Measurements", 4: "Other" };
   const label = number === 0 ? generic[0] : names.length <= 2 ? names.join(" and ") : (generic[number] || "Other");
   return `${number}.0 ${label}`;
 }
 
-// Section label for a test on its own (Trends), e.g. "3.0 Dosimetry".
+// How a category reads on screen; the data keeps the Sphinx sheet names ("Spot").
+const CATEGORY_LABEL = { Spot: "Spot Characteristics" };
+const categoryLabel = (c) => CATEGORY_LABEL[c] || c;
+
+// Section label for a test on its own (Trends), e.g. "3.0 Sphinx Measurements".
 function sectionOf(item) {
   const n = sectionNumber(item);
-  return sectionTitle(n, n === 3 || n === 4 ? [] : [item.category]).replace(/^(\d)\.0 $/, (_, d) => `${d}.0 ${{ 3: "Dosimetry", 4: "Other" }[d]}`);
+  return sectionTitle(n, n === 3 || n === 4 ? [] : [item.category]).replace(/^(\d)\.0 $/, (_, d) => `${d}.0 ${{ 3: "Sphinx Measurements", 4: "Other" }[d]}`);
 }
 
 // What a Sphinx-style test measures, independent of wording (mirrors sphinx.canonical_key / local-backend canonicalKey).
@@ -1155,7 +1159,12 @@ async function renderPerform(assignmentId) {
     const buildEntry = (item) => {
       let input, control;
       if (item.type === "boolean" || item.type === "status") ({ value: input, control } = passFailInput(item.name, item.type === "status", item.unit === "Yes/No"));
-      else if (item.type === "numeric") control = input = el("input", { type: "number", step: "any", class: "result-input", "aria-label": item.name });
+      else if (item.type === "numeric") {
+        // Sphinx measurements are read from the export file, never typed in.
+        const fromFile = !!measureParts(item.name) || /^Measured by Sphinx/.test(item.description || "");
+        control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
+          readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
+      }
       else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
       const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
       const noteToggle = el("button", { type: "button", class: "link small", onclick: () => { comment.hidden = false; noteToggle.hidden = true; comment.focus(); } }, "+ note");
@@ -1201,7 +1210,7 @@ async function renderPerform(assignmentId) {
         // As in the myQA template: the numbered title, then its directions block, then the result.
         const directions = helpText(item.description);
         rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
-          el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, item.category) : null,
+          el("div", { class: "check-name" }, named && item.category ? el("div", { class: "category-tag" }, categoryLabel(item.category)) : null,
             el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
             item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
           el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
@@ -1213,11 +1222,15 @@ async function renderPerform(assignmentId) {
       const mp0 = measureParts(item.name);
       const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
       const unit = item.unit && item.unit !== "unitless" ? item.unit : "";
+      // The five most recent QA dates across the family; each row shows its value under the matching date.
+      const dates = [...new Set(family.flatMap(({ item: it }) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
+      const dateLabel = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
       const trRows = family.map(({ item: it, mp }) => {
         drawn.add(it.test_id);
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
         comment.hidden = false; noteToggle.hidden = true;          // the table has its own comment column
-        const past = (history[it.test_id] || []).slice(-5).reverse();
+        const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
+        const past = dates.map((d) => byDate.get(d) || null);
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
           const pts = (history[it.test_id] || []).slice(-60);
@@ -1236,7 +1249,7 @@ async function renderPerform(assignmentId) {
           el("td", { class: "num" }, limitText(it.limits.fail, it.limits, unit)),
           el("td", {}, statusCell),
           el("td", {}, comment),
-          el("td", { class: "history-cell" }, past.length ? past.map((h) => el("span", { class: `hist ${h.status}`, title: `${h.qa_date}: ${fmt(h.value)} ${unit}`.trim() }, fmt(h.value))) : el("span", { class: "muted small" }, "—")),
+          el("td", { class: "history-cell" }, dates.length ? past.map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")) : el("span", { class: "muted small" }, "—")),
           el("td", {}, trend));
         return [row, chart];
       });
@@ -1245,13 +1258,15 @@ async function renderPerform(assignmentId) {
         el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), el("span", { class: "muted small" }, ` · ${family.length} values`)),
         directions,
         el("div", { class: "table-wrap measure-wrap" }, el("table", { class: "measure-table" },
-          el("thead", {}, el("tr", {}, ["Energy", "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History (newest first)", ""].map((h) => el("th", {}, h)))),
+          el("thead", {}, el("tr", {}, ["Energy", "Measurement", "Reference", "Tolerance", "Action", "Status", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
+            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
+              el("th", { class: "history-cell" }, dates.map((d) => el("span", { class: "hist date" }, dateLabel(d)))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())))));
     }
     const summary = el("span", { class: "section-summary" });
-    const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, category), summary), rows);
+    const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, categoryLabel(category)), summary), rows);
     sections.push({
-      box, heading, entries,
+      box, heading, entries, section,
       refresh() {
         const s = entries.map((e) => e.status());
         const req = entries.filter((e) => e.required);
@@ -1313,15 +1328,18 @@ async function renderPerform(assignmentId) {
     }
   };
   const autoLine = t.assignment.import_folder ? autoReadLine(assignmentId, useUpload) : null;
-  app.append(el("div", { class: "card step" }, el("strong", {}, "Measurement file"),
+  const fileCard = el("div", { class: "card step" }, el("strong", {}, "Measurement file"),
     el("span", { class: "muted small" }, " A Sphinx export fills in every measured value. (DQA3 and MPC exports for the TrueBeam: importer not built yet.)"),
-    autoLine, el("div", {}, sphinxFile), sphinxInfo));
+    autoLine, el("div", {}, sphinxFile), sphinxInfo);
   if (!t.items.length) {
-    app.append(el("div", { class: "card empty" }, "This list has no tests yet. ",
+    app.append(fileCard, el("div", { class: "card empty" }, "This list has no tests yet. ",
       can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add tests"), ", or load a Sphinx file above."] : ""));
     return;
   }
-  app.append(...sections.flatMap((s) => [s.heading, s.box]));
+  // The file goes first in the Sphinx Measurements section (or at the top of a list that has no such section).
+  const sphinxSection = sections.find((x) => /sphinx measurements/i.test(x.section)) || null;
+  if (!sphinxSection) app.append(fileCard);
+  app.append(...sections.flatMap((x) => [x.heading, x === sphinxSection && x.heading ? fileCard : null, x.box]));
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
@@ -1459,7 +1477,7 @@ async function renderQueueEditor(id) {
       return [head, el("tr", { class: `compact${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable ? "true" : null },
         el("td", { class: "item-cell" }, editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
           el("strong", {}, number ? `${number}: ` : "", shortName)),
-        el("td", {}, t.category || el("span", { class: "muted" }, "—")),
+        el("td", {}, categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -1615,7 +1633,7 @@ async function renderTests() {
       el("tr", { class: editable ? "clickable" : "", onclick: edit(t) },
         el("td", {}, el("strong", {}, shortName(t))),
         el("td", { class: "muted" }, t.owner_name || "Shared"),
-        el("td", { class: "muted" }, t.category || "General"),
+        el("td", { class: "muted" }, categoryLabel(t.category) || "General"),
         ...limitCells(t)))));
   };
   for (const control of [search, listPick, sortPick]) {
@@ -1914,7 +1932,7 @@ async function renderTrendOverview(machines, machineId, range) {
     const [section, category] = key.split("|");
     if (section !== lastSection) app.append(el("h2", { class: "section-head" }, section));
     lastSection = section;
-    app.append(el("h3", { class: "muted" }, category));
+    app.append(el("h3", { class: "muted" }, categoryLabel(category)));
     list.sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]);
     // One table per category, one row per chart (no card panels): name, latest values, status, then the chart.
     app.append(table(["Test", "Latest", "Status", "Trend"], list.map((g) => {
@@ -2000,7 +2018,7 @@ async function renderTrends() {
   const head = data[0].test;
   const group = axisGroups(items)[0];
   app.append(el("h2", {}, group ? group.base : head.name, group ? axisLegend(group) : null),
-    el("p", { class: "muted small" }, [sectionOf(head), head.category].join(" · ")));
+    el("p", { class: "muted small" }, [sectionOf(head), categoryLabel(head.category)].join(" · ")));
   if (!group) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
   renderTrendDetail(group, range);
 }

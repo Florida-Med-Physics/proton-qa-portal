@@ -2,7 +2,7 @@
  "templates": [
   {
    "name": "Daily QA template – Proton gantry (TG-224)",
-   "kind": "Proton gantry",
+   "kind": "",
    "list": "Daily QA",
    "frequency": "daily",
    "setup": "Daily QA protocol, in accordance with TG-224\n\nLast updated August, 2026.",
@@ -232,7 +232,7 @@
      "category": "Energy",
      "type": "numeric",
      "unit": "mm",
-     "name": "Energy [100 MeV] – DFO",
+     "name": "Energy [100 MeV] – Distal Fall Off",
      "expected": 2.1,
      "warn": 0.1,
      "fail": 0.2,
@@ -276,7 +276,7 @@
      "category": "Energy",
      "type": "numeric",
      "unit": "mm",
-     "name": "Energy [150 MeV] – DFO",
+     "name": "Energy [150 MeV] – Distal Fall Off",
      "expected": 3.9,
      "warn": 0.1,
      "fail": 0.2,
@@ -320,7 +320,7 @@
      "category": "Energy",
      "type": "numeric",
      "unit": "mm",
-     "name": "Energy [200 MeV] – DFO",
+     "name": "Energy [200 MeV] – Distal Fall Off",
      "expected": 5.5,
      "warn": 0.1,
      "fail": 0.2,
@@ -1225,9 +1225,9 @@
    ]
   },
   {
-   "name": "PBS DailyQA GTR5 - Sphinx",
-   "kind": "",
-   "list": "PBS DailyQA GTR5 - Sphinx",
+   "name": "PBS DailyQA Template - Sphinx",
+   "kind": "Proton gantry",
+   "list": "PBS Daily QA (Sphinx)",
    "frequency": "daily",
    "setup": "Transcribed from the RadMachine list 'GTR5 (SBF-113) :: PBS DailyQA GTR5 - Sphinx' (October 2026). References are RadMachine's reference values; warning and fail tolerances were not shown, so values are recorded, not judged, until limits are entered.",
    "checks": [
@@ -1235,25 +1235,25 @@
      "category": "Administrative",
      "name": "Last Edited By:",
      "type": "text",
-     "description": "Template 1.01. [Section: PBS DailyQA GTR5 - Sphinx] Filled automatically in RadMachine."
+     "description": "Template 1.01. [Section: Setup and Safety] Filled automatically in RadMachine."
     },
     {
      "category": "Administrative",
      "name": "QA Performed By:",
      "type": "text",
-     "description": "Template 1.02. [Section: PBS DailyQA GTR5 - Sphinx] A choice list in RadMachine."
+     "description": "Template 1.02. [Section: Setup and Safety] A choice list in RadMachine."
     },
     {
      "category": "Safety",
      "name": "PTS Version",
      "type": "text",
-     "description": "Template 1.03. [Section: PBS DailyQA GTR5 - Sphinx] A choice list in RadMachine."
+     "description": "Template 1.03. [Section: Setup and Safety] A choice list in RadMachine."
     },
     {
      "category": "Safety",
      "name": "PTS Config Version",
      "type": "text",
-     "description": "Template 1.04. [Section: PBS DailyQA GTR5 - Sphinx] A choice list in RadMachine."
+     "description": "Template 1.04. [Section: Setup and Safety] A choice list in RadMachine."
     },
     {
      "category": "Dosimetry",
@@ -1262,7 +1262,7 @@
      "unit": "°C",
      "expected": 22,
      "tol_mode": "absolute",
-     "description": "Template 1.05. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.05. [Section: Setup and Safety]"
     },
     {
      "category": "Dosimetry",
@@ -1271,7 +1271,7 @@
      "unit": "kPa",
      "expected": 101.3,
      "tol_mode": "absolute",
-     "description": "Template 1.06. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.06. [Section: Setup and Safety]"
     },
     {
      "category": "Dosimetry",
@@ -1280,49 +1280,49 @@
      "unit": "unitless",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.07. [Section: PBS DailyQA GTR5 - Sphinx] Calculated in RadMachine from temperature and pressure."
+     "description": "Template 1.07. [Section: Setup and Safety] Calculated in RadMachine from temperature and pressure."
     },
     {
      "category": "Safety",
      "name": "Please connect the power cord and the chamber cable to the GTR5 electrometer (DOSE-X) in the control room, then turn on the electrometer.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.08. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.08. [Section: Setup and Safety]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please log in to the 'MOSAIQ2' computer and launch the myQA software.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.09. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.09. [Section: Setup and Safety]"
     },
     {
      "category": "Safety",
      "name": "Please setup the Sphinx (index: H3) and move the couch BARS to the patient's right side to prevent potential collision during CBCT.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.10. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.10. [Section: Setup and Safety]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please remove the range shifter to prevent collisions and beam delivery.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.11. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.11. [Section: Setup and Safety]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please connect the chamber cable in the treatment room.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.12. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 1.12. [Section: Setup and Safety]"
     },
     {
      "category": "Mechanical and Safety",
      "name": "Is a room laser's offset less than ± 2 mm?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.13. [Section: PBS DailyQA GTR5 - Sphinx] Reference: Yes."
+     "description": "Template 2.01. [Section: Mechanical and Imaging]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1331,7 +1331,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.14. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.02. [Section: Mechanical and Imaging]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1340,7 +1340,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.15. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.03. [Section: Mechanical and Imaging]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1349,7 +1349,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.16. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.04. [Section: Mechanical and Imaging]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1358,14 +1358,14 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 1.17. [Section: PBS DailyQA GTR5 - Sphinx] Calculated in RadMachine (3D offset from X, Y, Z)."
+     "description": "Template 2.05. [Section: Mechanical and Imaging] Calculated in RadMachine (3D offset from X, Y, Z)."
     },
     {
      "category": "Mechanical and Safety",
      "name": "Please move PPS in X (-4.0 cm), Y (+1.0 cm), Z (+1.0 cm) using the correction vector to run CBCT.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.18. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.06. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1374,7 +1374,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.19. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.07. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1383,7 +1383,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.20. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.08. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1392,7 +1392,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.21. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.09. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1401,21 +1401,21 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 1.22. [Section: PBS DailyQA GTR5 - Sphinx] Calculated in RadMachine (3D offset)."
+     "description": "Template 2.10. [Section: Mechanical and Imaging] Calculated in RadMachine (3D offset)."
     },
     {
      "category": "Mechanical and Safety",
      "name": "Please set all angles (Rotation, Pitch, Roll) in the correction vector to 0 degrees, and apply the 3D correction vector (x, y, z) based on the CBCT to return to the isocenter position.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.23. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.11. [Section: Mechanical and Imaging]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please retract the CBCT imaging panel.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.24. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.12. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1424,7 +1424,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.25. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.13. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1433,7 +1433,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.26. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.14. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1442,7 +1442,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.27. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.15. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -1451,21 +1451,21 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 1.28. [Section: PBS DailyQA GTR5 - Sphinx] Calculated in RadMachine (3D offset)."
+     "description": "Template 2.16. [Section: Mechanical and Imaging] Calculated in RadMachine (3D offset)."
     },
     {
      "category": "Mechanical and Safety",
      "name": "Please review the isocenter position by selecting OB's DR image and apply a correction vector if necessary (if any axis exceeds 0.05 cm: x, y, or z).",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.29. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.17. [Section: Mechanical and Imaging]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Go to MyQA, open your machine QA, connect Sphinx, and measure the background.",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 1.30. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 2.18. [Section: Mechanical and Imaging]"
     },
     {
      "category": "Beam_Parameters",
@@ -1474,19 +1474,19 @@
      "unit": "MU",
      "expected": 587.2,
      "tol_mode": "absolute",
-     "description": "Template 1.31. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 3.01. [Section: Sphinx Measurements]"
     },
     {
      "category": "Beam_Parameters",
-     "name": "GTR5_Beam Irradiation Time [min:s]",
+     "name": "Beam Irradiation Time [min:s]",
      "type": "text",
-     "description": "Template 1.32. [Section: PBS DailyQA GTR5 - Sphinx] Entered as min:s."
+     "description": "Template 3.02. [Section: Sphinx Measurements] Entered as min:s."
     },
     {
      "category": "Device Selection",
      "name": "Chamber",
      "type": "text",
-     "description": "Template 1.33. [Section: PBS DailyQA GTR5 - Sphinx] A choice list in RadMachine."
+     "description": "Template 3.03. [Section: Sphinx Measurements] A choice list in RadMachine."
     },
     {
      "category": "Device Selection",
@@ -1495,13 +1495,13 @@
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.34. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 3.04. [Section: Sphinx Measurements]"
     },
     {
      "category": "Device Selection",
      "name": "Electrometer",
      "type": "text",
-     "description": "Template 1.35. [Section: PBS DailyQA GTR5 - Sphinx] A choice list in RadMachine."
+     "description": "Template 3.05. [Section: Sphinx Measurements] A choice list in RadMachine."
     },
     {
      "category": "Device Selection",
@@ -1510,7 +1510,7 @@
      "unit": "unitless",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.36. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 3.06. [Section: Sphinx Measurements]"
     },
     {
      "category": "Device Selection",
@@ -1519,781 +1519,676 @@
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.37. [Section: PBS DailyQA GTR5 - Sphinx] Calculated in RadMachine (chamber x electrometer factor)."
+     "description": "Template 3.07. [Section: Sphinx Measurements] Calculated in RadMachine (chamber x electrometer factor)."
     },
     {
      "category": "Daily_PBS_Dosimetry",
-     "name": "GTR5_Daily output: Charge [nC]",
+     "name": "Daily output: Charge [nC]",
      "type": "numeric",
      "unit": "nC",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.38. [Section: PBS DailyQA GTR5 - Sphinx]"
+     "description": "Template 3.08. [Section: Sphinx Measurements]"
     },
     {
      "category": "Daily_PBS_Dosimetry",
-     "name": "GTR5_Daily output: Dose [cGy]",
+     "name": "Daily output: Dose [cGy]",
      "type": "numeric",
      "unit": "cGy",
      "expected": 150,
      "tol_mode": "absolute",
-     "description": "Template 1.39. [Section: PBS DailyQA GTR5 - Sphinx] Calculated in RadMachine from charge, calibration and temperature-pressure correction."
+     "description": "Template 3.09. [Section: Sphinx Measurements] Calculated in RadMachine from charge, calibration and temperature-pressure correction."
     },
     {
      "category": "Dosimetry",
      "name": "File_GTR5_Sphinx_DQA_Results",
      "type": "text",
-     "description": "Template 2.01. [Section: Sphinx_DQA_Read_GTR5] Load the Sphinx export with 'Sphinx file' at the top of this page; it fills the values below."
+     "description": "Template 3.10. [Section: Sphinx Measurements] Load the Sphinx export with 'Sphinx file' at the top of this page; it fills the values below."
     },
     {
      "category": "Data",
      "name": "DailyQA_Sphinx_GTR5: Acquisition Date and Time",
      "type": "text",
-     "description": "Template 2.02. [Section: Sphinx_DQA_Read_GTR5] From the Sphinx export."
+     "description": "Template 3.11. [Section: Sphinx Measurements] From the Sphinx export."
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Distal Depth [mm]",
+     "name": "Energy [100.00 MeV]: Distal Depth [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 77.7,
      "tol_mode": "absolute",
-     "description": "Template 2.03. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.12. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Distal FallOff [mm]",
+     "name": "Energy [100.00 MeV]: Distal Fall Off [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 2.3,
      "tol_mode": "absolute",
-     "description": "Template 2.04. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.13. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Proximal Depth [mm]",
+     "name": "Energy [100.00 MeV]: Proximal Depth [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 72.1,
      "tol_mode": "absolute",
-     "description": "Template 2.05. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.14. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Width [mm]",
+     "name": "Energy [100.00 MeV]: Width [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 5.6,
      "tol_mode": "absolute",
-     "description": "Template 2.06. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.15. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [150.00 MeV]: Distal Depth [mm]",
+     "name": "Energy [150.00 MeV]: Distal Depth [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 158.5,
      "tol_mode": "absolute",
-     "description": "Template 2.07. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.16. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [150.00 MeV]: Distal FallOff [mm]",
+     "name": "Energy [150.00 MeV]: Distal Fall Off [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 3.9,
      "tol_mode": "absolute",
-     "description": "Template 2.08. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.17. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [150.00 MeV]: Proximal Depth [mm]",
+     "name": "Energy [150.00 MeV]: Proximal Depth [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 149.3,
      "tol_mode": "absolute",
-     "description": "Template 2.09. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.18. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [150.00 MeV]: Width [mm]",
+     "name": "Energy [150.00 MeV]: Width [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 9.2,
      "tol_mode": "absolute",
-     "description": "Template 2.10. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.19. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Distal Depth [mm]",
+     "name": "Energy [200.00 MeV]: Distal Depth [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 260.7,
      "tol_mode": "absolute",
-     "description": "Template 2.11. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.20. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Distal FallOff [mm]",
+     "name": "Energy [200.00 MeV]: Distal Fall Off [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 5.2,
      "tol_mode": "absolute",
-     "description": "Template 2.12. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.21. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Proximal Depth [mm]",
+     "name": "Energy [200.00 MeV]: Proximal Depth [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 250.8,
      "tol_mode": "absolute",
-     "description": "Template 2.13. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.22. [Section: Sphinx Measurements]"
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Width [mm]",
+     "name": "Energy [200.00 MeV]: Width [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 9.9,
      "tol_mode": "absolute",
-     "description": "Template 2.14. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.23. [Section: Sphinx Measurements]"
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Pos X [mm]",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Position X",
      "type": "numeric",
      "unit": "mm",
-     "expected": 10.5,
+     "expected": -49.4,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.15. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.24. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Pos Y [mm]",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Position Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 40.8,
+     "expected": 81.2,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.16. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.25. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Sigma X [mm]",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Sigma X",
      "type": "numeric",
      "unit": "mm",
-     "expected": 6,
+     "expected": 2.9,
+     "warn": 0.5,
+     "fail": 1.6,
      "tol_mode": "absolute",
-     "description": "Template 2.17. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.26. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Sigma Y [mm]",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Sigma Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 6,
+     "expected": 2.8,
+     "warn": 0.5,
+     "fail": 1.6,
      "tol_mode": "absolute",
-     "description": "Template 2.18. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.27. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Skewness X",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Skewness X",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.8,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.19. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.28. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Skewness Y",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Skewness Y",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.8,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.20. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.29. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [100.00 MeV]: Spot1 Intensity [%]",
+     "category": "Spot",
+     "name": "Spot 1 [226.4 MeV] – Intensity",
      "type": "numeric",
      "unit": "%",
-     "expected": 57,
+     "expected": 75.5,
+     "warn": 12.0,
+     "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 2.21. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.30. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Pos X [mm]",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Position X",
      "type": "numeric",
      "unit": "mm",
-     "expected": -23.8,
+     "expected": -49.0,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.22. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.31. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Pos Y [mm]",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Position Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 41.1,
+     "expected": 51.3,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.23. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.32. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Sigma X [mm]",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Sigma X",
      "type": "numeric",
      "unit": "mm",
-     "expected": 5,
+     "expected": 3.1,
+     "warn": 0.5,
+     "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 2.24. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.33. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Sigma Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": 5.1,
-     "tol_mode": "absolute",
-     "description": "Template 2.25. [Section: Sphinx_DQA_Read_GTR5]"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Skewness X",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
-     "tol_mode": "absolute",
-     "description": "Template 2.26. [Section: Sphinx_DQA_Read_GTR5]"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Skewness Y",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
-     "tol_mode": "absolute",
-     "description": "Template 2.27. [Section: Sphinx_DQA_Read_GTR5]"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [120.00 MeV]: Spot2 Intensity [%]",
-     "type": "numeric",
-     "unit": "%",
-     "expected": 63.26,
-     "tol_mode": "absolute",
-     "description": "Template 2.28. [Section: Sphinx_DQA_Read_GTR5]"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Pos X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": -54,
-     "tol_mode": "absolute",
-     "description": "Template 2.29. [Section: Sphinx_DQA_Read_GTR5]"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Pos Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.30. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Sigma X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.31. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Sigma Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.32. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Skewness X",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.33. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Skewness Y",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.34. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [140.00 MeV]: Spot3 Intensity [%]",
-     "type": "numeric",
-     "unit": "%",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.35. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Pos X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.36. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Pos Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.37. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Sigma X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.38. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Sigma Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.39. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Skewness X",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.40. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Skewness Y",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.41. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [160.00 MeV]: Spot4 Intensity [%]",
-     "type": "numeric",
-     "unit": "%",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.42. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Pos X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.43. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Pos Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.44. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Sigma X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.45. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Sigma Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.46. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Skewness X",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.47. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Skewness Y",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.48. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [180.00 MeV]: Spot5 Intensity [%]",
-     "type": "numeric",
-     "unit": "%",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.49. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Pos X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.50. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Pos Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.51. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Sigma X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.52. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Sigma Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.53. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Skewness X",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.54. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Skewness Y",
-     "type": "numeric",
-     "unit": "unitless",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.55. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [200.00 MeV]: Spot6 Intensity [%]",
-     "type": "numeric",
-     "unit": "%",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.56. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Pos X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.57. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Pos Y [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.58. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Sigma X [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": null,
-     "tol_mode": "absolute",
-     "description": "Template 2.59. [Section: Sphinx_DQA_Read_GTR5] Reference not visible in the screenshots provided; enter it from RadMachine."
-    },
-    {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Sigma Y [mm]",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Sigma Y",
      "type": "numeric",
      "unit": "mm",
      "expected": 3.2,
+     "warn": 0.5,
+     "fail": 0.8,
      "tol_mode": "absolute",
-     "description": "Template 2.60. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.34. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Skewness X",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Skewness X",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.8,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.61. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.35. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Skewness Y",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Skewness Y",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.8,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.62. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.36. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [220.00 MeV]: Spot7 Intensity [%]",
+     "category": "Spot",
+     "name": "Spot 2 [201 MeV] – Intensity",
      "type": "numeric",
      "unit": "%",
-     "expected": 77.67,
+     "expected": 72.42,
+     "warn": 12.0,
+     "fail": 15.0,
      "tol_mode": "absolute",
-     "description": "Template 2.63. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.37. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Pos X [mm]",
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Position X",
      "type": "numeric",
      "unit": "mm",
-     "expected": 81,
+     "expected": -49.3,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.64. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.38. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Pos Y [mm]",
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Position Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 41.1,
+     "expected": 11.0,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.65. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.39. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Sigma X [mm]",
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Sigma X",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 3.2,
+     "warn": 0.5,
+     "fail": 0.8,
+     "tol_mode": "absolute",
+     "description": "Template 3.40. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Sigma Y",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 3.2,
+     "warn": 0.5,
+     "fail": 0.8,
+     "tol_mode": "absolute",
+     "description": "Template 3.41. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Skewness X",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.8,
+     "fail": 1.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.42. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Skewness Y",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.8,
+     "fail": 1.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.43. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 3 [180.1 MeV] – Intensity",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 68.07,
+     "warn": 12.0,
+     "fail": 15.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.44. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Position X",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": -9.5,
+     "warn": 0.5,
+     "fail": 1.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.45. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Position Y",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 30.2,
+     "warn": 0.5,
+     "fail": 1.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.46. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Sigma X",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 7.0,
+     "warn": 0.4,
+     "fail": 0.5,
+     "tol_mode": "absolute",
+     "description": "Template 3.47. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Sigma Y",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 7.3,
+     "warn": 0.4,
+     "fail": 0.5,
+     "tol_mode": "absolute",
+     "description": "Template 3.48. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Skewness X",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0.235,
+     "warn": 0.25,
+     "fail": 0.3,
+     "tol_mode": "absolute",
+     "description": "Template 3.49. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Skewness Y",
+     "type": "numeric",
+     "unit": "",
+     "expected": 0.0,
+     "warn": 0.25,
+     "fail": 0.3,
+     "tol_mode": "absolute",
+     "description": "Template 3.50. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 4 [160.7 MeV] – Intensity",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 54.42,
+     "warn": 2.5,
+     "fail": 3.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.51. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Position X",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 30.5,
+     "warn": 0.5,
+     "fail": 1.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.52. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Position Y",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 30.5,
+     "warn": 0.5,
+     "fail": 1.0,
+     "tol_mode": "absolute",
+     "description": "Template 3.53. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
+    },
+    {
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Sigma X",
      "type": "numeric",
      "unit": "mm",
      "expected": 7.9,
+     "warn": 0.4,
+     "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.66. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.54. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Sigma Y [mm]",
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Sigma Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 8,
+     "expected": 8.0,
+     "warn": 0.4,
+     "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.67. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.55. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Skewness X",
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Skewness X",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.184,
+     "warn": 0.25,
+     "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 2.68. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.56. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Skewness Y",
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Skewness Y",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.421,
+     "warn": 0.25,
+     "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 2.69. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.57. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [070.00 MeV]: Spot8 Intensity [%]",
+     "category": "Spot",
+     "name": "Spot 5 [140.6 MeV] – Intensity",
      "type": "numeric",
      "unit": "%",
-     "expected": 32.1,
+     "expected": 41.96,
+     "warn": 2.5,
+     "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 2.70. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.58. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Pos X [mm]",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Position X",
      "type": "numeric",
      "unit": "mm",
-     "expected": 40.5,
+     "expected": 70.7,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.71. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.59. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Pos Y [mm]",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Position Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 41.2,
+     "expected": 30.8,
+     "warn": 0.5,
+     "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 2.72. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.60. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Sigma X [mm]",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Sigma X",
      "type": "numeric",
      "unit": "mm",
-     "expected": 7.3,
+     "expected": 9.0,
+     "warn": 0.4,
+     "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.73. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.61. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Sigma Y [mm]",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Sigma Y",
      "type": "numeric",
      "unit": "mm",
-     "expected": 7.3,
+     "expected": 9.3,
+     "warn": 0.4,
+     "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.74. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.62. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Skewness X",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Skewness X",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.535,
+     "warn": 0.25,
+     "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 2.75. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.63. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Skewness Y",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Skewness Y",
      "type": "numeric",
-     "unit": "unitless",
-     "expected": 0,
+     "unit": "",
+     "expected": 0.535,
+     "warn": 0.25,
+     "fail": 0.3,
      "tol_mode": "absolute",
-     "description": "Template 2.76. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.64. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
-     "category": "Dosimetry",
-     "name": "GTR5_Energy [080.00 MeV]: Spot9 Intensity [%]",
+     "category": "Spot",
+     "name": "Spot 6 [120.6 MeV] – Intensity",
      "type": "numeric",
      "unit": "%",
-     "expected": 39.09,
+     "expected": 31.42,
+     "warn": 2.5,
+     "fail": 3.0,
      "tol_mode": "absolute",
-     "description": "Template 2.77. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.65. [Section: Sphinx Measurements] Reference and limits from the Sphinx reference sheet (2026-10-22)."
     },
     {
      "category": "Dosimetry",
-     "name": "GTR5_Field Homogeneity [%]",
+     "name": "Field Homogeneity [%]",
      "type": "numeric",
      "unit": "%",
      "expected": 1.7,
      "tol_mode": "absolute",
-     "description": "Template 2.78. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.66. [Section: Sphinx Measurements]"
     },
     {
      "category": "Alignment",
-     "name": "GTR5_Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]",
+     "name": "Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.79. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.67. [Section: Sphinx Measurements]"
     },
     {
      "category": "Alignment",
-     "name": "GTR5_Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]",
+     "name": "Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]",
      "type": "numeric",
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.80. [Section: Sphinx_DQA_Read_GTR5]"
+     "description": "Template 3.68. [Section: Sphinx Measurements]"
     },
     {
      "category": "Safety",
      "name": "Does search button & its chime work?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.01. [Section: Final safety checks]"
+     "description": "Template 4.01. [Section: Final safety checks]"
     },
     {
      "category": "Safety",
      "name": "Does \"Beam ON\" indicator function correctly?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.02. [Section: Final safety checks]"
+     "description": "Template 4.02. [Section: Final safety checks]"
     },
     {
      "category": "Safety",
      "name": "Did you hear beeping sound from the neutron detector?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.03. [Section: Final safety checks]"
+     "description": "Template 4.03. [Section: Final safety checks]"
     },
     {
      "category": "Safety",
      "name": "Does beam pause work and resume right after pause?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.04. [Section: Final safety checks] Reference: Yes."
+     "description": "Template 4.04. [Section: Final safety checks]"
     },
     {
      "category": "Safety",
      "name": "Does A/V intercom work?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.05. [Section: Final safety checks] Reference: Yes."
+     "description": "Template 4.05. [Section: Final safety checks]"
     },
     {
      "category": "Safety",
      "name": "QA reviewed by therapist?",
      "type": "boolean",
      "unit": "Yes/No",
-     "description": "Template 3.06. [Section: Final safety checks] Reference: Yes."
+     "description": "Template 4.06. [Section: Final safety checks]"
     }
    ]
   }
