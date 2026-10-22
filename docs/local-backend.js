@@ -892,7 +892,33 @@
     upgradeBbUnits();
     dropSphinxCouch();
     renameSphinxTests();
+    refreshTemplates();
   })();
+
+  // Templates follow the starting data (e.g. the proton template now matches the myQA TG-224 outline exactly).
+  // Only templates are refreshed; machine-specific lists are separate copies and are left alone.
+  function refreshTemplates() {
+    const seedTemplates = (window.PORTAL_SEED || {}).templates || [];
+    let changed = 0;
+    for (const t of seedTemplates) {
+      const q = S.queues.find((x) => x.is_template && x.name === t.name);
+      if (!q) continue;
+      const items = S.queue_items.filter((i) => i.queue_id === q.id).sort((a, b) => a.position - b.position).map((i) => byId("tests", i.test_id));
+      const same = items.length === t.checks.length && items.every((x, k) => x && x.name === t.checks[k].name && (x.description || "") === (t.checks[k].description || ""));
+      if (same) continue;
+      const old = new Set(items.map((x) => x && x.id));
+      S.queue_items = S.queue_items.filter((i) => i.queue_id !== q.id);
+      S.tests = S.tests.filter((x) => !(old.has(x.id) && x.owner_queue_id === q.id && !S.results.some((r) => r.test_id === x.id)));
+      t.checks.forEach((c, position) => {
+        const id = insert("tests", { name: c.name, category: c.category, type: c.type, unit: c.unit || "", description: c.description || "",
+          expected: c.expected ?? null, warn: c.warn ?? null, fail: c.fail ?? null, tol_mode: c.tol_mode || "absolute", active: 1, owner_queue_id: q.id });
+        insert("queue_items", { queue_id: q.id, test_id: id, position, expected: null, warn: null, fail: null, tol_mode: null });
+      });
+      q.description = t.setup || q.description;
+      changed++;
+    }
+    if (changed) { audit(null, "update", "templates", null, { refreshed: changed }); save(); }
+  }
 
   // Sphinx tests take the template naming ("Spot 1 [225 MeV] – Sigma X"); rebuild names from each test's export label.
   function renameSphinxTests() {

@@ -15,6 +15,7 @@ from datetime import datetime
 CATEGORIES = ("Energy", "Spot", "Coincidence", "Homogeneity", "Output", "Couch Translation")
 # Read (so the sections parse) but not imported: couch translation is documented in RadMachine, not from Sphinx.
 NOT_IMPORTED = {"Couch Translation"}
+SPHINX_CATEGORIES = tuple(c for c in CATEGORIES if c not in NOT_IMPORTED)
 SETUP_LABELS = {"X Start", "X Stop", "Y Start", "Y Stop", "Wedge Thickness", "Additional Thickness"}
 SPHINX_STATUSES = ("Passed", "Failed", "Warning")
 _QUANTITY = re.compile(r"^±?\s*([-+]?\d+(?:\.\d+)?)\s*(.*?)\s*$")
