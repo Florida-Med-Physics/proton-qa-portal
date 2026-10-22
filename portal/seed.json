@@ -373,98 +373,125 @@
    ]
   },
   {
-   "name": "Daily QA template – CT simulator (TG-66)",
+   "name": "Bigbore CT Daily template – Big Bore CT",
    "kind": "CT simulator",
-   "list": "Daily QA",
+   "list": "Bigbore CT Daily",
    "frequency": "daily",
-   "setup": "Daily items follow the structure of AAPM TG-66 (CT simulator QA): laser alignment, then image quality on the daily phantom. The TG-66 daily tolerances are NOT entered in this draft (the report table was not provided), so measured values are Recorded, not judged. Enter each tolerance from TG-66 on this list once confirmed, and replace the directions with the department's procedure.",
+   "setup": "Bigbore CT Daily, as performed in RadMachine. References are the RadMachine reference values. Warning and fail tolerances are NOT entered yet, so measured values are Recorded, not judged, until a physicist enters them.",
    "checks": [
     {
-     "category": "Safety",
-     "name": "Safety – Warm-up and tube conditioning complete",
-     "type": "status",
-     "description": "Template 1.01."
+     "category": "Mechanical and Safety",
+     "name": "Mechanical and Safety – \"X-Ray ON\" indicator",
+     "type": "boolean",
+     "description": "Template 1.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Door interlock and X-ray on indicator",
-     "type": "status",
-     "description": "Template 1.02."
-    },
-    {
-     "category": "Safety",
-     "name": "Safety – Intercom and video monitor",
-     "type": "status",
-     "description": "Template 1.03."
-    },
-    {
-     "category": "Lasers",
-     "name": "Lasers – Alignment of gantry lasers with the centre of the imaging plane",
+     "category": "CT HU constancy",
+     "name": "CT HU constancy – Head CT Number (HU)",
      "type": "numeric",
-     "unit": "mm",
-     "expected": 0,
-     "description": "Template 2.01. TG-66 daily (electromechanical: lasers). Tolerance per TG-66; to be entered."
-    },
-    {
-     "category": "Lasers",
-     "name": "Lasers – Orientation of gantry lasers with respect to the imaging plane",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": 0,
-     "description": "Template 2.02. TG-66 daily. Deviation over the length of the laser projection. Tolerance per TG-66; to be entered."
-    },
-    {
-     "category": "Lasers",
-     "name": "Lasers – Spacing of lateral wall lasers with respect to lateral gantry lasers",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": 0,
-     "description": "Template 2.03. TG-66 daily. Tolerance per TG-66; to be entered."
-    },
-    {
-     "category": "Lasers",
-     "name": "Lasers – Orientation of wall lasers with respect to the imaging plane",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": 0,
-     "description": "Template 2.04. TG-66 daily. Tolerance per TG-66; to be entered."
-    },
-    {
-     "category": "Lasers",
-     "name": "Lasers – Orientation of the vertical wall (sagittal) laser with respect to the imaging plane",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": 0,
-     "description": "Template 2.05. TG-66 daily. Tolerance per TG-66; to be entered."
-    },
-    {
-     "category": "Image quality",
-     "name": "Image quality – CT number of water",
-     "type": "numeric",
+     "description": "Template 2.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
      "unit": "HU",
      "expected": 0,
-     "description": "Template 3.01. TG-66 daily. Mean HU in a water-equivalent ROI of the daily phantom. Tolerance per TG-66; to be entered."
+     "tol_mode": "absolute"
     },
     {
-     "category": "Image quality",
-     "name": "Image quality – Image noise (standard deviation in water)",
+     "category": "CT HU constancy",
+     "name": "CT HU constancy – Head Uniformity (HU)",
      "type": "numeric",
+     "description": "Template 2.02. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
      "unit": "HU",
-     "description": "Template 3.02. TG-66 daily. Recorded; expected value and tolerance from the manufacturer's specification / baseline."
-    },
-    {
-     "category": "Image quality",
-     "name": "Image quality – In-plane spatial integrity",
-     "type": "numeric",
-     "unit": "mm",
      "expected": 0,
-     "description": "Template 3.03. Measured minus known distance between phantom markers. Frequency and tolerance per TG-66; to be confirmed."
+     "tol_mode": "absolute"
     },
     {
-     "category": "Physics review",
-     "name": "Physics review – Daily results reviewed",
-     "type": "status",
-     "description": "Template 4.00."
+     "category": "CT HU constancy",
+     "name": "CT HU constancy – Head Noise (HU)",
+     "type": "numeric",
+     "description": "Template 2.03. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "HU",
+     "expected": 2.7,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "Quality",
+     "name": "Quality – Head Low Contrast (mm)",
+     "type": "numeric",
+     "description": "Template 3.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "mm",
+     "expected": 4,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT HU constancy",
+     "name": "CT HU constancy – Body CT Number (HU)",
+     "type": "numeric",
+     "description": "Template 2.04. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "HU",
+     "expected": 0,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT HU constancy",
+     "name": "CT HU constancy – Body Uniformity (HU)",
+     "type": "numeric",
+     "description": "Template 2.05. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "HU",
+     "expected": 0,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT HU constancy",
+     "name": "CT HU constancy – Body Noise (HU)",
+     "type": "numeric",
+     "description": "Template 2.06. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "HU",
+     "expected": 7.65,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT Geometry",
+     "name": "CT Geometry – CT BB position x (BB)",
+     "type": "numeric",
+     "description": "Template 4.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "",
+     "expected": 0,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT Geometry",
+     "name": "CT Geometry – CT BB position y (BB)",
+     "type": "numeric",
+     "description": "Template 4.02. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "",
+     "expected": 101.5,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT Geometry",
+     "name": "CT Geometry – CT BB distance Left-Right (BB)",
+     "type": "numeric",
+     "description": "Template 4.03. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "",
+     "expected": 203.5,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT Geometry",
+     "name": "CT Geometry – CT BB distance Left-Top (BB)",
+     "type": "numeric",
+     "description": "Template 4.04. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "",
+     "expected": 144.5,
+     "tol_mode": "absolute"
+    },
+    {
+     "category": "CT Geometry",
+     "name": "CT Geometry – CT BB distance Top-Right (BB)",
+     "type": "numeric",
+     "description": "Template 4.05. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "unit": "",
+     "expected": 144.5,
+     "tol_mode": "absolute"
     }
    ]
   },
@@ -572,7 +599,7 @@
    "kind": "Linac"
   },
   {
-   "name": "CT Sim",
+   "name": "Big Bore CT (7064)",
    "kind": "CT simulator"
   },
   {

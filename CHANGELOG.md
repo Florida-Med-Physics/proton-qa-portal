@@ -32,6 +32,7 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Four tabs: Perform QA, Setup QA (the editable QA lists and templates), Machines (add machines and assign QA lists to each), and Machine Trends.
 - QA lists are shown by their full name everywhere, for example "Daily QA – GTR1".
 - The Templates section is now called "QA List Templates".
+- **[Physics review]** CT Sim is now "Big Bore CT (7064)", running "Bigbore CT Daily": the 13 tests, names, categories and reference values from the RadMachine list. Warning and fail tolerances are not entered yet, so CT values are recorded, not judged. Browsers that already had the old CT Sim list are upgraded automatically if no CT results were recorded.
 
 ### Fixed
 - Machine Trends no longer fails because of a missing section helper, and a machine's trends now load in one request.

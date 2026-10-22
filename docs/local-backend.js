@@ -860,7 +860,33 @@
     if (fromFile) S = fromFile;
     else if (stored) S = stored;
     else { seed(); save(); }
+    upgradeCtList();
   })();
+
+  // 2026-10-22: the CT simulator became "Big Bore CT (7064)" running "Bigbore CT Daily" (the RadMachine list).
+  // Browsers seeded earlier still hold the old placeholder; swap it in place, but only if no CT results exist.
+  function upgradeCtList() {
+    const machine = S.machines.find((m) => m.name === "CT Sim");
+    const seedTpl = ((window.PORTAL_SEED || {}).templates || []).find((t) => t.kind === "CT simulator");
+    if (!machine || !seedTpl || S.runs.some((r) => r.machine_id === machine.id)) return;
+    const replaceTests = (queueId) => {
+      const old = new Set(S.queue_items.filter((i) => i.queue_id === queueId).map((i) => i.test_id));
+      S.queue_items = S.queue_items.filter((i) => i.queue_id !== queueId);
+      S.tests = S.tests.filter((t) => !(old.has(t.id) && t.owner_queue_id === queueId));
+      seedTpl.checks.forEach((c, position) => {
+        const id = insert("tests", { name: c.name, category: c.category, type: c.type, unit: c.unit || "", description: c.description || "",
+          expected: c.expected ?? null, warn: c.warn ?? null, fail: c.fail ?? null, tol_mode: c.tol_mode || "absolute", active: 1, owner_queue_id: queueId });
+        insert("queue_items", { queue_id: queueId, test_id: id, position, expected: null, warn: null, fail: null, tol_mode: null });
+      });
+    };
+    const lists = S.assignments.filter((a) => a.machine_id === machine.id).map((a) => byId("queues", a.queue_id)).filter(Boolean);
+    const templates = S.queues.filter((q) => q.is_template && /CT simulator/.test(q.name));
+    machine.name = "Big Bore CT (7064)";
+    for (const q of templates) { q.name = seedTpl.name; q.description = seedTpl.setup || ""; replaceTests(q.id); }
+    for (const q of lists) { q.name = `${seedTpl.list} – ${machine.name}`; q.description = seedTpl.setup || ""; replaceTests(q.id); }
+    audit(null, "upgrade", "machine", machine.id, { renamed: "CT Sim → Big Bore CT (7064)", list: seedTpl.list });
+    save();
+  }
 
   const routes = [];
   const route = (method, pattern, handler, pub) => routes.push({ method, pattern: new RegExp(`^${pattern}$`), handler, pub });
