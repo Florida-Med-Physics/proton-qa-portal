@@ -904,7 +904,7 @@
       const q = S.queues.find((x) => x.is_template && x.name === t.name);
       if (!q) continue;
       const items = S.queue_items.filter((i) => i.queue_id === q.id).sort((a, b) => a.position - b.position).map((i) => byId("tests", i.test_id));
-      const same = items.length === t.checks.length && items.every((x, k) => x && x.name === t.checks[k].name && (x.description || "") === (t.checks[k].description || ""));
+      const same = items.length === t.checks.length && items.every((x, k) => x && x.name === t.checks[k].name && (x.description || "") === (t.checks[k].description || "") && (x.unit || "") === (t.checks[k].unit || ""));
       if (same) continue;
       const old = new Set(items.map((x) => x && x.id));
       S.queue_items = S.queue_items.filter((i) => i.queue_id !== q.id);
@@ -962,6 +962,7 @@
     let changed = 0;
     for (const t of S.tests) if (/\(BB\)$/.test(t.name) && !t.unit) { t.unit = "mm"; changed++; }
     for (const t of S.tests) if (/Skewness [XY]$/.test(t.name) && !t.unit) { t.unit = "unitless"; changed++; }
+    for (const t of S.tests) if (t.type === "numeric" && !t.unit && /^(Mechanical|CBCT kv\/MV) – /.test(t.name)) { t.unit = "mm"; changed++; }
     if (changed) { audit(null, "upgrade", "tests", null, { unit: "mm", tests: changed }); save(); }
   }
 

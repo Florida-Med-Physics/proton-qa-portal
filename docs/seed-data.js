@@ -90,7 +90,8 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2.0,
      "tol_mode": "absolute",
-     "description": "Template 2.02. Align phantom to lasers. \nCapture kV/kV\n\nDocument offset applied after kV/kV to go to iso.\nApply correction vector.\n\n*TG-224: Mechanical Laser Position accuracy: 2mm"
+     "description": "Template 2.02. Align phantom to lasers. \nCapture kV/kV\n\nDocument offset applied after kV/kV to go to iso.\nApply correction vector.\n\n*TG-224: Mechanical Laser Position accuracy: 2mm",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -100,7 +101,8 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2.0,
      "tol_mode": "absolute",
-     "description": "Template 2.02. Align phantom to lasers. \nCapture kV/kV\n\nDocument offset applied after kV/kV to go to iso.\nApply correction vector.\n\n*TG-224: Mechanical Laser Position accuracy: 2mm"
+     "description": "Template 2.02. Align phantom to lasers. \nCapture kV/kV\n\nDocument offset applied after kV/kV to go to iso.\nApply correction vector.\n\n*TG-224: Mechanical Laser Position accuracy: 2mm",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -110,7 +112,8 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2.0,
      "tol_mode": "absolute",
-     "description": "Template 2.02. Align phantom to lasers. \nCapture kV/kV\n\nDocument offset applied after kV/kV to go to iso.\nApply correction vector.\n\n*TG-224: Mechanical Laser Position accuracy: 2mm"
+     "description": "Template 2.02. Align phantom to lasers. \nCapture kV/kV\n\nDocument offset applied after kV/kV to go to iso.\nApply correction vector.\n\n*TG-224: Mechanical Laser Position accuracy: 2mm",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -126,7 +129,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.04. APPLY KNOWN SHIFT: -5cm, -1cm, 4.5cm \n\nRetract panel A\nCBCT with preset: Head ND, Gantry 0, CW, half arc. \nUse Auto function to automatch. \n\nRecord recommended shift, BUT DO NOT APPLY OFFSET. \nClose imaging field on sequencer."
+     "description": "Template 2.04. APPLY KNOWN SHIFT: -5cm, -1cm, 4.5cm \n\nRetract panel A\nCBCT with preset: Head ND, Gantry 0, CW, half arc. \nUse Auto function to automatch. \n\nRecord recommended shift, BUT DO NOT APPLY OFFSET. \nClose imaging field on sequencer.",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -136,7 +140,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.04. APPLY KNOWN SHIFT: -5cm, -1cm, 4.5cm \n\nRetract panel A\nCBCT with preset: Head ND, Gantry 0, CW, half arc. \nUse Auto function to automatch. \n\nRecord recommended shift, BUT DO NOT APPLY OFFSET. \nClose imaging field on sequencer."
+     "description": "Template 2.04. APPLY KNOWN SHIFT: -5cm, -1cm, 4.5cm \n\nRetract panel A\nCBCT with preset: Head ND, Gantry 0, CW, half arc. \nUse Auto function to automatch. \n\nRecord recommended shift, BUT DO NOT APPLY OFFSET. \nClose imaging field on sequencer.",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -146,7 +151,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.04. APPLY KNOWN SHIFT: -5cm, -1cm, 4.5cm \n\nRetract panel A\nCBCT with preset: Head ND, Gantry 0, CW, half arc. \nUse Auto function to automatch. \n\nRecord recommended shift, BUT DO NOT APPLY OFFSET. \nClose imaging field on sequencer."
+     "description": "Template 2.04. APPLY KNOWN SHIFT: -5cm, -1cm, 4.5cm \n\nRetract panel A\nCBCT with preset: Head ND, Gantry 0, CW, half arc. \nUse Auto function to automatch. \n\nRecord recommended shift, BUT DO NOT APPLY OFFSET. \nClose imaging field on sequencer.",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -156,7 +162,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.05. Close imaging field on sequencer. \nOpen Daily QA field on Mosaic. \nMove Gantry to 90  (Go to Treatment Setup, Gantry, Move Enable). \n\nMove both Panel A out, acquire kV/kV, manually align to center of BB. (Automatch doesn't work well).\nRecord recommended shift, and APPLY SHIFT.\n\n** Expected Shift: 5cm, 1cm, -4.5cm \n\n**TG-224: Mechanical: Couch translational motion should be < 1mm"
+     "description": "Template 2.05. Close imaging field on sequencer. \nOpen Daily QA field on Mosaic. \nMove Gantry to 90  (Go to Treatment Setup, Gantry, Move Enable). \n\nMove both Panel A out, acquire kV/kV, manually align to center of BB. (Automatch doesn't work well).\nRecord recommended shift, and APPLY SHIFT.\n\n** Expected Shift: 5cm, 1cm, -4.5cm \n\n**TG-224: Mechanical: Couch translational motion should be < 1mm",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -166,7 +173,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.05. Close imaging field on sequencer. \nOpen Daily QA field on Mosaic. \nMove Gantry to 90  (Go to Treatment Setup, Gantry, Move Enable). \n\nMove both Panel A out, acquire kV/kV, manually align to center of BB. (Automatch doesn't work well).\nRecord recommended shift, and APPLY SHIFT.\n\n** Expected Shift: 5cm, 1cm, -4.5cm \n\n**TG-224: Mechanical: Couch translational motion should be < 1mm"
+     "description": "Template 2.05. Close imaging field on sequencer. \nOpen Daily QA field on Mosaic. \nMove Gantry to 90  (Go to Treatment Setup, Gantry, Move Enable). \n\nMove both Panel A out, acquire kV/kV, manually align to center of BB. (Automatch doesn't work well).\nRecord recommended shift, and APPLY SHIFT.\n\n** Expected Shift: 5cm, 1cm, -4.5cm \n\n**TG-224: Mechanical: Couch translational motion should be < 1mm",
+     "unit": "mm"
     },
     {
      "category": "Mechanical",
@@ -176,7 +184,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.05. Close imaging field on sequencer. \nOpen Daily QA field on Mosaic. \nMove Gantry to 90  (Go to Treatment Setup, Gantry, Move Enable). \n\nMove both Panel A out, acquire kV/kV, manually align to center of BB. (Automatch doesn't work well).\nRecord recommended shift, and APPLY SHIFT.\n\n** Expected Shift: 5cm, 1cm, -4.5cm \n\n**TG-224: Mechanical: Couch translational motion should be < 1mm"
+     "description": "Template 2.05. Close imaging field on sequencer. \nOpen Daily QA field on Mosaic. \nMove Gantry to 90  (Go to Treatment Setup, Gantry, Move Enable). \n\nMove both Panel A out, acquire kV/kV, manually align to center of BB. (Automatch doesn't work well).\nRecord recommended shift, and APPLY SHIFT.\n\n** Expected Shift: 5cm, 1cm, -4.5cm \n\n**TG-224: Mechanical: Couch translational motion should be < 1mm",
+     "unit": "mm"
     },
     {
      "category": "CBCT kv/MV",
@@ -186,7 +195,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.06. Report the absolute difference between kV/kV and CBCT recommended shifts.\n\n**TG-142: CBCT iso to treatment iso < 1mm. We assume the kV iso is within the 0.5mm tolerance, so 0.5+ 0.5 = 1mm max."
+     "description": "Template 2.06. Report the absolute difference between kV/kV and CBCT recommended shifts.\n\n**TG-142: CBCT iso to treatment iso < 1mm. We assume the kV iso is within the 0.5mm tolerance, so 0.5+ 0.5 = 1mm max.",
+     "unit": "mm"
     },
     {
      "category": "CBCT kv/MV",
@@ -196,7 +206,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.06. Report the absolute difference between kV/kV and CBCT recommended shifts.\n\n**TG-142: CBCT iso to treatment iso < 1mm. We assume the kV iso is within the 0.5mm tolerance, so 0.5+ 0.5 = 1mm max."
+     "description": "Template 2.06. Report the absolute difference between kV/kV and CBCT recommended shifts.\n\n**TG-142: CBCT iso to treatment iso < 1mm. We assume the kV iso is within the 0.5mm tolerance, so 0.5+ 0.5 = 1mm max.",
+     "unit": "mm"
     },
     {
      "category": "CBCT kv/MV",
@@ -206,7 +217,8 @@ window.PORTAL_SEED = {
      "warn": 0.3,
      "fail": 0.5,
      "tol_mode": "absolute",
-     "description": "Template 2.06. Report the absolute difference between kV/kV and CBCT recommended shifts.\n\n**TG-142: CBCT iso to treatment iso < 1mm. We assume the kV iso is within the 0.5mm tolerance, so 0.5+ 0.5 = 1mm max."
+     "description": "Template 2.06. Report the absolute difference between kV/kV and CBCT recommended shifts.\n\n**TG-142: CBCT iso to treatment iso < 1mm. We assume the kV iso is within the 0.5mm tolerance, so 0.5+ 0.5 = 1mm max.",
+     "unit": "mm"
     },
     {
      "category": "Energy",

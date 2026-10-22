@@ -115,7 +115,9 @@ def to_tests(parsed):
         if not check["rows"]:
             tests.append({"category": category, "name": f"{category} – {check['title']}", "type": "boolean", "description": description})
         for row in check["rows"]:
-            tests.append({"category": category, "name": f"{category} – {check['title']} – {row['name']}", "type": "numeric",
+            # The template's acceptance tables (2.02-2.06: laser/kV/CBCT offsets and correction vectors) carry no unit
+            # column; they are positions in millimetres (e.g. a -5 cm shift is entered as 50).
+            tests.append({"category": category, "name": f"{category} – {check['title']} – {row['name']}", "type": "numeric", "unit": "mm",
                           "expected": row["expected"], "warn": row["warn"], "fail": row["fail"], "tol_mode": "absolute",
                           "description": description})
     return tests

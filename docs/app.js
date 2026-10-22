@@ -1140,7 +1140,7 @@ async function renderQueueEditor(id) {
       return [head, el("tr", { class: "compact" },
         el("td", { class: "item-cell" }, el("strong", {}, number ? `${number}: ` : "", shortName), helpText(t.description)),
         el("td", {}, t.category || el("span", { class: "muted" }, "—")),
-        el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : null)
+        el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, "warn ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
