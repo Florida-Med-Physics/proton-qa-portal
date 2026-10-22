@@ -2272,11 +2272,15 @@ async function renderTrendOverview(machines, machineId, range) {
   const groups = axisGroups(withData);
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
+  let onlyStatus = null;                                     // "fail" / "warn" when a chip is active
+  const statusChip = (status, label) => el("button", { type: "button", class: `chip ${status} chip-filter`, title: `Show only the tests ${status === "fail" ? "at action level" : "outside tolerance"}`,
+    onclick: () => { onlyStatus = onlyStatus === status ? null : status; app.querySelectorAll(".chip-filter").forEach((c) => c.classList.toggle("on", c.dataset.status === onlyStatus)); applyFilters(); },
+    "data-status": status }, label);
   app.append(el("p", { class: "lead" }, `${withData.length} tests on ${groups.length} charts. `,
-    failing ? el("span", { class: "chip fail" }, `${failing} at action level`) : "", " ", warning ? el("span", { class: "chip warn" }, `${warning} outside tolerance`) : "",
+    failing ? statusChip("fail", `${failing} at action level`) : "", " ", warning ? statusChip("warn", `${warning} outside tolerance`) : "",
     !failing && !warning ? el("span", { class: "chip pass" }, "All passing") : ""));
   const search = el("input", { type: "search", class: "filter-box", placeholder: "Search tests (e.g. spot 3 sigma)", "aria-label": "Search tests" });
-  search.addEventListener("input", () => {
+  const applyFilters = () => {
     const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
     for (const block of app.querySelectorAll(".trend-group")) {
       let shown = 0;
@@ -2285,7 +2289,8 @@ async function renderTrendOverview(machines, machineId, range) {
         const title = (table.querySelector(".measure-title") || {}).textContent || "";
         for (const row of table.querySelectorAll("tr.trend-row")) {
           const text = `${title} ${row.querySelector(".qa-label").textContent}`.toLowerCase();
-          row.hidden = !words.every((w) => text.includes(w));
+          row.hidden = !words.every((w) => text.includes(w)) || (onlyStatus !== null && row.dataset.status !== onlyStatus);
+          if (row.hidden && row.nextElementSibling && row.nextElementSibling.classList.contains("quick-trend")) row.nextElementSibling.hidden = true;
           if (!row.hidden) inTable++;
         }
         table.hidden = !inTable;
@@ -2298,7 +2303,8 @@ async function renderTrendOverview(machines, machineId, range) {
       while (sib && !sib.classList.contains("section-head")) { if (sib.classList.contains("trend-group") && !sib.hidden) any = true; sib = sib.nextElementSibling; }
       head.hidden = !any;
     }
-  });
+  };
+  search.addEventListener("input", applyFilters);
   app.append(el("div", { class: "filter-row" }, search));
 
   // The same shape as Perform QA: a heading per section, a box per category, and inside it the single tests as one
@@ -2348,7 +2354,7 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit) : el("span", { class: "muted small" }, "—")),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length }, trend) : null) : el("td", {}, trend),
       ];
-      return [el("tr", { class: "clickable trend-row", onclick: () => (location.hash = href) }, ...present(cells)), chart];
+      return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
     });
     const widths = firstHeader === "Test" ? ["3%", "27%", "4%", "8%", "9%", "9%", "8%", "27%", "5%"] : ["3%", "13%", "4%", "8%", "9%", "9%", "8%", "41%", "5%"];
     const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}` },
