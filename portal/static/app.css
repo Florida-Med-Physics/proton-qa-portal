@@ -251,6 +251,7 @@ details.more .menu a:hover, details.more .menu button:hover { background: var(--
 .seg { border: 0; border-radius: 0; padding: 8px 18px; background: var(--surface); font-weight: 600; color: var(--muted); }
 .seg + .seg { border-left: 1px solid var(--border); }
 .seg.pass.on { background: var(--pass-bg); color: var(--pass); }
+.seg.warn.on { background: var(--warn-bg); color: var(--warn); }
 .seg.fail.on { background: var(--fail-bg); color: var(--fail); }
 details.help, details.instructions { font-size: 13px; }
 details.help summary, details.instructions summary { cursor: pointer; color: var(--accent); }
@@ -297,3 +298,12 @@ label.inline input { width: auto; }
   main { padding: 16px 16px 48px; }
   .grid { grid-template-columns: 1fr; }
 }
+
+.warn-card { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); gap: 12px; }
+button.small { padding: 4px 10px; font-size: 12px; }
+.toolbar { flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.toolbar .search { flex: 1; min-width: 200px; }
+label.inline select { width: auto; }
+td.right { text-align: right; }
+a.button.small { padding: 4px 12px; font-size: 13px; }
+tr.row-overdue td:first-child { border-left: 3px solid var(--fail); }

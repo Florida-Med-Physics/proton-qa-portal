@@ -140,6 +140,16 @@ def submit(db, user, m, body, q):
     return service.submit_run(db, user, int(m[1]), body)
 
 
+@route("GET", r"/api/assignments/(\d+)/files")
+def import_files(db, user, m, body, q):
+    return service.list_import_files(db, user, int(m[1]))
+
+
+@route("GET", r"/api/assignments/(\d+)/file")
+def import_file(db, user, m, body, q):
+    return service.read_import_file(db, user, int(m[1]), q.get("path", ""))
+
+
 @route("POST", r"/api/assignments/(\d+)/sphinx/preview")
 def sphinx_preview(db, user, m, body, q):
     return service.sphinx_preview(db, user, int(m[1]), body.get("file") or {})

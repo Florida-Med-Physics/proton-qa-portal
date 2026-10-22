@@ -1,12 +1,12 @@
-# Proton QA Portal
+# Physics QA Portal
 
-A RadMachine-style QA portal for the proton gantries: user accounts, machines, a test library, QA queues that are scheduled per machine, result entry with pass/warn/fail, physicist review and sign-off, trends, and an audit log.
+A RadMachine-style machine QA portal for every treatment and imaging machine (proton gantries GTR1/GTR2/GTR5, TrueBeam, CT simulator, MRI simulator): user accounts, machines, a test library, QA queues that are scheduled per machine, result entry with pass/warn/fail, physicist review and sign-off, trends, and an audit log.
 
 > **Draft software for review by a qualified medical physicist.** It is not validated or commissioned for clinical use. Every limit, schedule, and the pass/warn/fail logic must be checked before anyone relies on it.
 
 ## Two ways to run it
 
-**In the browser, no server (GitHub Pages).** Open the published page. Everything you record is stored in that browser on that computer (IndexedDB); nothing is sent anywhere. Use *Setup → Backup* to save a backup file and to move the data to another computer. The page starts with the TG-224 daily template and three gantries (GTR1, GTR2, GTR5), each with its own copy of the template scheduled on weekdays. Sign in by name and role; this build has no passwords, so it suits a single QA workstation. The files live in `docs/`; `python build_pages.py` refreshes them from the shared interface.
+**In the browser, no server (GitHub Pages).** Open the published page. Everything you record is stored in that browser on that computer (IndexedDB); nothing is sent anywhere. Use *Setup → Backup* to save a backup file and to move the data to another computer. The page starts with one daily template per machine type (proton gantry per TG-224, TrueBeam per TG-142 / TG-198, CT simulator along TG-66, MRI placeholder) plus an SRS QA template for the TrueBeam, and six machines (GTR1, GTR2, GTR5, TrueBeam, CT Sim, MRI Sim), each with its own copy of its templates. Daily lists are scheduled on weekdays; the SRS list is "as needed". Under *Setup → Database location* you can pick a file (on a shared drive, say) that holds the whole database: every change is written there and the page loads from it. The seed lists are in `docs/seed-data.js`. Sign in by name and role; this build has no passwords, so it suits a single QA workstation. The files live in `docs/`; `python build_pages.py` refreshes them from the shared interface.
 
 **On one host PC for the department (server).** The sections below. Accounts have passwords, several people can use it at once, and the data is one SQLite file you can back up. `python export_backup.py --db data/portal.db out.json` makes a file the browser build can restore.
 
@@ -67,9 +67,9 @@ The entry form follows the template's sections: **0.0 Setup** instructions, **1.
 | Concept | What it is |
 | --- | --- |
 | **Machine** | A gantry or device. Can be retired without losing history. |
-| **Test** | One check in the library: numeric (with unit, expected value, warning and fail tolerances), pass/fail, or free text. |
+| **Test** | One check in the library: numeric (with unit, expected value, warning and fail tolerances), pass/fail, pass/warning/fail (chosen directly, as on a checklist), or free text. |
 | **QA queue** | An ordered list of tests, such as "Daily QA – TG-224". A queue can tighten or change limits for its tests. |
-| **Schedule** | A queue assigned to a machine: daily on chosen weekdays, weekly, monthly, quarterly, semiannual, annual, or every N days. |
+| **Schedule** | A queue assigned to a machine: daily on chosen weekdays, weekly, monthly, quarterly, semiannual, annual, every N days, or as needed (SRS QA on SRS days: never overdue, always startable). A schedule can name a **default import folder**; the Perform page then lists that folder's export files, newest first, with the ones already recorded marked. In the server build it is a path on the host PC; in the browser build it is chosen with the browser's folder picker and remembered on that computer. |
 | **Machine limits** | Per-machine adjustments to a scheduled queue's expected values and tolerances. |
 | **Run** | One completed queue. Limits are copied onto each result, so later changes never rewrite history. |
 
@@ -102,7 +102,9 @@ Code layout: `portal/db.py` (schema), `portal/auth.py` (passwords, sessions, rol
 
 ## Not built yet
 
-- Watching the Sphinx export folders and importing new files automatically.
+- Importers for the TrueBeam: Sun Nuclear DQA3 export and Varian MPC results (sample exports needed first), and the Dose Pro SRS export.
+- TG-66 daily tolerances for the CT simulator and the MRI daily items (sources to follow).
+- Watching the export folders and importing new files automatically.
 - Monthly and annual templates (the model supports them; only the daily template is seeded).
 - Email or in-app notifications for overdue QA or failures.
 - Attachments (images, PDFs) on runs.

@@ -13,10 +13,11 @@
   const PERMISSIONS = {
     perform: ["admin", "physicist", "therapist"], review: ["admin", "physicist"], configure: ["admin", "physicist"], manage_users: ["admin"],
   };
-  const FREQUENCIES = ["daily", "weekly", "monthly", "quarterly", "semiannual", "annual", "custom"];
+  const FREQUENCIES = ["daily", "weekly", "monthly", "quarterly", "semiannual", "annual", "custom", "asneeded"];
   const MONTH_STEPS = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12 };
   const STATUS_RANK = { pass: 0, recorded: 0, warn: 1, fail: 2 };
   const SPHINX_STATUS = { Passed: "pass", Warning: "warn", Failed: "fail" };
+  const STATUS_WORDS = { pass: "pass", passed: "pass", warn: "warn", warning: "warn", fail: "fail", failed: "fail" };
   const EPS = 1e-9;
 
   // ---- storage ---------------------------------------------------------------
@@ -41,6 +42,63 @@
       return null;
     }
   }
+  async function kvGet(key) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE).objectStore(STORE).get(key);
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function kvPut(key, value) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, "readwrite").objectStore(STORE).put(value, key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function kvDelete(key) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(STORE, "readwrite").objectStore(STORE).delete(key);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // ---- database file: where the whole database is saved (optional) --------------------------
+  // Chosen once under Setup. Every save also writes the state there, and the page loads from it on start, so
+  // the file (on a shared drive, say) is the database and this browser's storage is only a cache.
+  const DB_FILE_KEY = "dbfile";
+  async function dbFileHandle() { return kvGet(DB_FILE_KEY); }
+  async function dbFilePermission(handle) {
+    try { return await handle.queryPermission({ mode: "readwrite" }); } catch { return "denied"; }
+  }
+  async function dbFileInfo() {
+    const h = await dbFileHandle();
+    if (!h) return { name: null, permission: "none", supported: "showSaveFilePicker" in window };
+    return { name: h.name, permission: await dbFilePermission(h), supported: true };
+  }
+  async function writeDbFile() {
+    const h = await dbFileHandle();
+    if (!h || (await dbFilePermission(h)) !== "granted") return false;
+    const w = await h.createWritable();
+    await w.write(JSON.stringify({ exported_at: now(), state: S }));
+    await w.close();
+    return true;
+  }
+  async function readDbFile() {
+    const h = await dbFileHandle();
+    if (!h || (await dbFilePermission(h)) !== "granted") return null;
+    const text = await (await h.getFile()).text();
+    if (!text.trim()) return null;
+    const backup = JSON.parse(text);
+    if (!validState(backup.state)) throw new Error(`${h.name} is not a portal database file.`);
+    return backup.state;
+  }
+  const validState = (s) => !!s && TABLES.every((t) => Array.isArray(s[t])) && !!s.seq;
+
   let saveTimer = null;
   function save() {
     clearTimeout(saveTimer);
@@ -51,7 +109,67 @@
       } catch (err) {
         console.error("Could not save", err);
       }
+      try {
+        await writeDbFile();
+      } catch (err) {
+        console.error("Could not write the database file", err);
+      }
     }, 150);
+  }
+
+  // ---- default import folders (one per scheduled list) -----------------------------------
+  // The folder handle lives in this browser's storage; the list keeps only the folder's name.
+  const FOLDER_PREFIX = "folder:";
+  const IMPORT_EXTENSIONS = [".xls"];
+  async function folderHandle(assignmentId) { return kvGet(FOLDER_PREFIX + assignmentId); }
+  async function folderPermission(handle) {
+    try { return await handle.queryPermission({ mode: "read" }); } catch { return "denied"; }
+  }
+  async function walkFolder(handle, prefix, depth, out) {
+    for await (const [name, entry] of handle.entries()) {
+      if (entry.kind === "file") {
+        if (IMPORT_EXTENSIONS.some((x) => name.toLowerCase().endsWith(x)) && !name.startsWith("~$")) {
+          out.push({ path: prefix + name, entry });
+        }
+      } else if (depth > 0) {
+        await walkFolder(entry, `${prefix}${name}/`, depth - 1, out);
+      }
+    }
+  }
+  async function listImportFiles(assignmentId, limit = 40) {
+    const a = get("assignments", assignmentId, "Schedule");
+    const handle = await folderHandle(a.id);
+    if (!handle) return { folder: a.import_folder || "", files: [], permission: "none" };
+    const permission = await folderPermission(handle);
+    if (permission !== "granted") return { folder: handle.name, files: [], permission };
+    const found = [];
+    await walkFolder(handle, "", 3, found);
+    const withFiles = await Promise.all(found.map(async (f) => ({ ...f, file: await f.entry.getFile() })));
+    withFiles.sort((x, y) => y.file.lastModified - x.file.lastModified);
+    const files = [];
+    for (const f of withFiles.slice(0, limit)) {
+      const digest = await sha256(new Uint8Array(await f.file.arrayBuffer()));
+      const run = S.runs.find((r) => r.source_ref === digest);
+      files.push({ name: f.file.name, path: f.path, size: f.file.size, modified: new Date(f.file.lastModified).toISOString().slice(0, 16),
+        run_id: run ? run.id : null, qa_date: run ? run.qa_date : null });
+    }
+    return { folder: handle.name, files, permission };
+  }
+  async function readImportFile(assignmentId, path) {
+    const a = get("assignments", assignmentId, "Schedule");
+    const handle = await folderHandle(a.id);
+    if (!handle) throw new Error("This list has no default import folder. Set one under Change schedule.");
+    const parts = String(path || "").split("/").filter((p) => p && p !== "." && p !== "..");
+    if (!parts.length || !IMPORT_EXTENSIONS.some((x) => parts[parts.length - 1].toLowerCase().endsWith(x))) throw new Error("That file is not in this list's import folder.");
+    let dir = handle;
+    for (const part of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(part);
+    const file = await (await dir.getFileHandle(parts[parts.length - 1])).getFile();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ name: file.name, data: String(reader.result).split(",")[1] || "" });
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+      reader.readAsDataURL(file);
+    });
   }
 
   function emptyState() {
@@ -125,6 +243,7 @@
   }
   function evaluate(type, value, limits) {
     if (type === "boolean") return value ? "pass" : "fail";
+    if (type === "status") return ["pass", "warn", "fail"].includes(value) ? value : "fail";
     if (type === "text") return "recorded";
     if (limits.expected === null || limits.expected === undefined) return "recorded";
     let dev = value - limits.expected;
@@ -158,6 +277,7 @@
   const maxDate = (a, b) => (a > b ? a : b);
   function nextDue(a, lastDone) {
     const start = fromIso(a.start_date);
+    if (a.frequency === "asneeded") return null;
     if (a.frequency === "daily") {
       const days = parseWeekdays(a.weekdays);
       let c = lastDone ? maxDate(start, addDays(lastDone, 1)) : start;
@@ -171,7 +291,9 @@
   }
   function dueState(a, lastDone, today) {
     const due = nextDue(a, lastDone);
-    const d = localIso(due), t = localIso(today), l = lastDone ? localIso(lastDone) : null;
+    const t = localIso(today), l = lastDone ? localIso(lastDone) : null;
+    if (due === null) return { next_due: null, state: l === t ? "done" : "ready", last_done: l };
+    const d = localIso(due);
     const state = d < t ? "overdue" : d === t ? "due" : l === t ? "done" : "upcoming";
     return { next_due: d, state, last_done: l };
   }
@@ -184,6 +306,7 @@
       return "Daily (" + days.map((d) => WEEKDAY_NAMES[d]).join(", ") + ")";
     }
     if (a.frequency === "custom") return `Every ${a.interval_days || 1} days`;
+    if (a.frequency === "asneeded") return "As needed (run on the days it applies)";
     return a.frequency[0].toUpperCase() + a.frequency.slice(1);
   }
 
@@ -335,7 +458,7 @@
   function saveTest(user, data, testId) {
     require(user, "configure");
     const type = data.type || "numeric";
-    if (!["numeric", "boolean", "text"].includes(type)) throw new Error("Test type must be numeric, boolean, or text.");
+    if (!["numeric", "boolean", "status", "text"].includes(type)) throw new Error("Test type must be numeric, boolean, status, or text.");
     const limits = type === "numeric" ? limitsOf(data, false) : { expected: null, warn: null, fail: null, tol_mode: "absolute" };
     const name = required(data, "name"), category = text(data, "category");
     const existing = testId ? get("tests", testId, "Check") : null;
@@ -467,14 +590,16 @@
       const machine = get("machines", data.machine_id), queue = get("queues", data.queue_id, "QA list");
       if (queue.is_template) throw new Error(`'${queue.name}' is a template. Duplicate it, then schedule the copy.`);
       if (S.assignments.some((a) => a.machine_id === machine.id && a.queue_id === queue.id)) throw new Error(`'${queue.name}' is already scheduled on ${machine.name}.`);
-      const id = insert("assignments", { machine_id: machine.id, queue_id: queue.id, frequency, interval_days: interval, weekdays, start_date: start, active });
+      const id = insert("assignments", { machine_id: machine.id, queue_id: queue.id, frequency, interval_days: interval, weekdays, start_date: start, active,
+        import_folder: text(data, "import_folder") });
       audit(user.id, "create", "assignment", id, { machine: machine.name, queue: queue.name, frequency });
       return { id };
     }
     const a = get("assignments", assignmentId, "Schedule");
     Object.assign(a, { frequency, interval_days: interval, weekdays, start_date: start, active });
+    if (data.import_folder !== undefined) a.import_folder = text(data, "import_folder");
     save();
-    audit(user.id, "update", "assignment", a.id, { frequency, weekdays, start, active });
+    audit(user.id, "update", "assignment", a.id, { frequency, weekdays, start, active, import_folder: a.import_folder || "" });
     return { id: a.id };
   }
   function runTemplate(assignmentId) {
@@ -508,7 +633,7 @@
     const machines = S.machines.filter((m) => m.active).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
       const queues = listAssignments(m.id, today).filter((a) => a.active).map((a) => {
         const runs = S.runs.filter((r) => r.assignment_id === a.id).sort((x, y) => (y.qa_date.localeCompare(x.qa_date)) || (y.id - x.id));
-        return { ...a, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status } : null };
+        return { ...a, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status, qa_date: runs[0].qa_date } : null };
       });
       return { ...m, queues, pending_review: S.runs.filter((r) => r.machine_id === m.id && r.review_status === "pending").length };
     });
@@ -546,10 +671,15 @@
       if (value === null || value === undefined || String(value).trim() === "") { if (item.type !== "text") missing.push(item.name); continue; }
       if (item.type === "numeric") { value = Number(value); if (!Number.isFinite(value)) throw new Error(`${item.name}: enter a number.`); }
       else if (item.type === "boolean") value = [true, 1, "1", "true", "pass", "yes"].includes(value);
+      else if (item.type === "status") {
+        value = STATUS_WORDS[String(value).trim().toLowerCase()];
+        if (!value) throw new Error(`${item.name}: choose Pass, Warning, or Fail.`);
+      }
       else value = String(value);
       let status;
       try { status = evaluate(item.type, value, item.limits); } catch (err) { throw new Error(`${item.name}: ${err.message}`); }
-      rows.push({ test_id: item.test_id, value_num: item.type === "text" ? null : Number(value), value_text: item.type === "text" ? value : null,
+      const textual = item.type === "text" || item.type === "status";
+      rows.push({ test_id: item.test_id, value_num: textual ? null : Number(value), value_text: textual ? value : null,
         limits: item.limits, status, comment: text(raw, "comment") });
     }
     if (missing.length) throw new Error("Missing results for: " + missing.join(", "));
@@ -679,31 +809,44 @@
   // ---- seed ---------------------------------------------------------------------
 
   function seed() {
+    // seed-data.js: one daily template per machine type, and the machines that get a copy of each.
+    // (An older seed with a single {setup, checks} is still accepted.)
     const sys = { id: 0, role: "admin" };
-    const seedData = window.PORTAL_SEED || { setup: "", checks: [] };
-    const templateId = insert("queues", { name: "Daily QA template", description: seedData.setup, active: 1, is_template: 1, template_id: null });
-    seedData.checks.forEach((c, position) => {
-      const id = insert("tests", { name: c.name, category: c.category, type: c.type, unit: c.unit || "", description: c.description || "",
-        expected: c.expected ?? null, warn: c.warn ?? null, fail: c.fail ?? null, tol_mode: c.tol_mode || "absolute", active: 1, owner_queue_id: templateId });
-      insert("queue_items", { queue_id: templateId, test_id: id, position, expected: null, warn: null, fail: null, tol_mode: null });
-    });
-    for (const name of ["GTR1", "GTR2", "GTR5"]) {
-      const machineId = insert("machines", { name, kind: "Proton gantry", location: "", notes: "", active: 1, created_at: now() });
-      const sysUser = { ...sys, id: 0 };
-      try {
-        duplicateQueue({ ...sysUser, role: "admin" }, templateId, { name: `Daily QA – ${name}`, machine_id: machineId, frequency: "daily", weekdays: [0, 1, 2, 3, 4] });
-      } catch (err) {
-        console.error(err);
+    const seedData = window.PORTAL_SEED || {};
+    const templates = seedData.templates || [{ name: "Daily QA template", kind: "Proton gantry", setup: seedData.setup || "", checks: seedData.checks || [] }];
+    const machines = seedData.machines || ["GTR1", "GTR2", "GTR5"].map((name) => ({ name, kind: "Proton gantry" }));
+    const byKind = {};
+    for (const tpl of templates) {
+      const templateId = insert("queues", { name: tpl.name, description: tpl.setup || "", active: 1, is_template: 1, template_id: null });
+      (byKind[tpl.kind] = byKind[tpl.kind] || []).push({ ...tpl, id: templateId });
+      (tpl.checks || []).forEach((c, position) => {
+        const id = insert("tests", { name: c.name, category: c.category, type: c.type, unit: c.unit || "", description: c.description || "",
+          expected: c.expected ?? null, warn: c.warn ?? null, fail: c.fail ?? null, tol_mode: c.tol_mode || "absolute", active: 1, owner_queue_id: templateId });
+        insert("queue_items", { queue_id: templateId, test_id: id, position, expected: null, warn: null, fail: null, tol_mode: null });
+      });
+    }
+    for (const m of machines) {
+      const machineId = insert("machines", { name: m.name, kind: m.kind || "", location: m.location || "", notes: m.notes || "", active: 1, created_at: now() });
+      for (const tpl of byKind[m.kind] || []) {
+        try {
+          duplicateQueue({ ...sys, role: "admin" }, tpl.id, { name: `${tpl.list || "Daily QA"} – ${m.name}`, machine_id: machineId,
+            frequency: tpl.frequency || "daily", weekdays: m.weekdays || [0, 1, 2, 3, 4] });
+        } catch (err) {
+          console.error(err);
+        }
       }
     }
-    audit(null, "seed", "portal", null, { template: "Daily QA template", machines: ["GTR1", "GTR2", "GTR5"] });
+    audit(null, "seed", "portal", null, { templates: templates.map((t) => t.name), machines: machines.map((m) => m.name) });
   }
 
   // ---- router -------------------------------------------------------------------
 
   const ready = (async () => {
+    let fromFile = null;
+    try { fromFile = await readDbFile(); } catch (err) { console.error(err); }
     const stored = await readState();
-    if (stored) S = stored;
+    if (fromFile) S = fromFile;
+    else if (stored) S = stored;
     else { seed(); save(); }
   })();
 
@@ -750,8 +893,10 @@
   route("POST", "/api/machines", (u, m, body) => saveMachine(u, body));
   route("PUT", "/api/machines/(\\d+)", (u, m, body) => saveMachine(u, body, Number(m[1])));
   route("GET", "/api/machines/(\\d+)/assignments", (u, m) => listAssignments(Number(m[1])));
-  route("GET", "/api/tests", () => S.tests.map((t) => ({ ...t, owner_name: t.owner_queue_id ? (byId("queues", t.owner_queue_id) || {}).name || null : null }))
-    .sort((a, b) => (b.active - a.active) || String(a.owner_name).localeCompare(String(b.owner_name)) || a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
+  route("GET", "/api/tests", () => S.tests.map((t) => ({ ...t, owner_name: t.owner_queue_id ? (byId("queues", t.owner_queue_id) || {}).name || null : null,
+      position: (S.queue_items.find((i) => i.test_id === t.id && i.queue_id === t.owner_queue_id) || {}).position ?? null }))
+    .sort((a, b) => (b.active - a.active) || String(a.owner_name).localeCompare(String(b.owner_name)) || ((a.position ?? 1e9) - (b.position ?? 1e9))
+      || a.category.localeCompare(b.category) || a.name.localeCompare(b.name)));
   route("POST", "/api/tests", (u, m, body) => saveTest(u, body));
   route("PUT", "/api/tests/(\\d+)", (u, m, body) => saveTest(u, body, Number(m[1])));
   route("GET", "/api/queues", () => listQueues());
@@ -764,6 +909,9 @@
   route("GET", "/api/assignments/(\\d+)/template", (u, m) => runTemplate(Number(m[1])));
   route("PUT", "/api/assignments/(\\d+)/overrides", (u, m, body) => saveOverrides(u, Number(m[1]), body));
   route("POST", "/api/assignments/(\\d+)/runs", (u, m, body) => submitRun(u, Number(m[1]), body));
+  route("GET", "/api/assignments/(\\d+)/files", (u, m) => listImportFiles(Number(m[1])));
+  route("GET", "/api/assignments/(\\d+)/file", (u, m, body, q) => readImportFile(Number(m[1]), q.path));
+  route("GET", "/api/dbfile", () => dbFileInfo());
   route("POST", "/api/assignments/(\\d+)/sphinx/preview", (u, m, body) => sphinxPreview(u, Number(m[1]), body.file || {}));
   route("POST", "/api/assignments/(\\d+)/sphinx/tests", (u, m, body) => sphinxAddTests(u, Number(m[1]), body.file || {}));
   route("POST", "/api/assignments/(\\d+)/sphinx/import", (u, m, body) => importSphinx(u, Number(m[1]), body));
@@ -786,6 +934,61 @@
     audit(u.id, "restore", "portal", null, { exported_at: body.exported_at });
     return { ok: true };
   });
+
+  // Called by the interface from a click (the pickers need a user gesture).
+  window.localFolders = {
+    async choose(assignmentId) {
+      await ready;
+      const handle = await window.showDirectoryPicker({ mode: "read" });
+      const a = get("assignments", assignmentId, "Schedule");
+      await kvPut(FOLDER_PREFIX + a.id, handle);
+      a.import_folder = handle.name;
+      save();
+      audit(currentUser() ? currentUser().id : null, "update", "assignment", a.id, { import_folder: handle.name });
+      return handle.name;
+    },
+    async request(assignmentId) {
+      const handle = await folderHandle(assignmentId);
+      if (!handle) return "none";
+      return handle.requestPermission({ mode: "read" });
+    },
+    async clear(assignmentId) {
+      await ready;
+      await kvDelete(FOLDER_PREFIX + assignmentId);
+      const a = get("assignments", assignmentId, "Schedule");
+      a.import_folder = "";
+      save();
+    },
+  };
+  window.localDbFile = {
+    async choose() {
+      await ready;
+      const handle = await window.showSaveFilePicker({ suggestedName: "qa-portal-database.json",
+        types: [{ description: "QA portal database", accept: { "application/json": [".json"] } }] });
+      const existing = await (await handle.getFile()).text();
+      if (existing.trim()) {
+        const backup = JSON.parse(existing);
+        if (!validState(backup.state)) throw new Error(`${handle.name} is not a portal database file.`);
+        if (!confirm(`${handle.name} already holds a portal database (saved ${backup.exported_at || "unknown"}). Load it and replace what is in this browser?`)) return null;
+        S = backup.state;
+      }
+      await kvPut(DB_FILE_KEY, handle);
+      save();
+      await writeDbFile();
+      return handle.name;
+    },
+    async reconnect() {
+      const handle = await dbFileHandle();
+      if (!handle) return "none";
+      const permission = await handle.requestPermission({ mode: "readwrite" });
+      if (permission === "granted") {
+        const fromFile = await readDbFile();
+        if (fromFile) { S = fromFile; save(); }
+      }
+      return permission;
+    },
+    async clear() { await kvDelete(DB_FILE_KEY); },
+  };
 
   window.localApi = async function localApi(method, path, body) {
     await ready;

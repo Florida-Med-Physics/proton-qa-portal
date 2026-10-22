@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS tests (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT '',
-    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'text')),
+    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'status', 'text')),
     unit TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     expected REAL,
@@ -66,11 +66,12 @@ CREATE TABLE IF NOT EXISTS assignments (
     id INTEGER PRIMARY KEY,
     machine_id INTEGER NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
     queue_id INTEGER NOT NULL REFERENCES queues(id),
-    frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom')),
+    frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom', 'asneeded')),
     interval_days INTEGER,
     weekdays TEXT NOT NULL DEFAULT '0,1,2,3,4',
     start_date TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
+    import_folder TEXT NOT NULL DEFAULT '',
     UNIQUE (machine_id, queue_id)
 );
 CREATE TABLE IF NOT EXISTS assignment_overrides (
@@ -171,6 +172,51 @@ class Database:
                     UNIQUE (owner_queue_id, category, name));
                 INSERT INTO tests_new (id, name, category, type, unit, description, expected, warn, fail, tol_mode, active)
                     SELECT id, name, category, type, unit, description, expected, warn, fail, tol_mode, active FROM tests;
+                DROP TABLE tests;
+                ALTER TABLE tests_new RENAME TO tests;
+                COMMIT;
+                PRAGMA foreign_keys = ON;
+            """)
+        assignment_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(assignments)")}
+        if assignment_columns and "import_folder" not in assignment_columns:
+            self.conn.execute("ALTER TABLE assignments ADD COLUMN import_folder TEXT NOT NULL DEFAULT ''")
+        assignments_sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'assignments'").fetchone()
+        if assignments_sql and "'asneeded'" not in assignments_sql[0]:
+            # The 'asneeded' frequency was added (SRS QA on SRS days); SQLite cannot change a CHECK, so rebuild.
+            self.conn.executescript("""
+                PRAGMA foreign_keys = OFF;
+                BEGIN;
+                CREATE TABLE assignments_new (
+                    id INTEGER PRIMARY KEY,
+                    machine_id INTEGER NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
+                    queue_id INTEGER NOT NULL REFERENCES queues(id),
+                    frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'annual', 'custom', 'asneeded')),
+                    interval_days INTEGER,
+                    weekdays TEXT NOT NULL DEFAULT '0,1,2,3,4',
+                    start_date TEXT NOT NULL,
+                    active INTEGER NOT NULL DEFAULT 1,
+                    import_folder TEXT NOT NULL DEFAULT '',
+                    UNIQUE (machine_id, queue_id));
+                INSERT INTO assignments_new SELECT id, machine_id, queue_id, frequency, interval_days, weekdays, start_date, active, import_folder FROM assignments;
+                DROP TABLE assignments;
+                ALTER TABLE assignments_new RENAME TO assignments;
+                COMMIT;
+                PRAGMA foreign_keys = ON;
+            """)
+        tests_sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tests'").fetchone()
+        if tests_sql and "'status'" not in tests_sql[0]:
+            # The 'status' check type (Pass / Warning / Fail) was added; SQLite cannot change a CHECK, so rebuild.
+            self.conn.executescript("""
+                PRAGMA foreign_keys = OFF;
+                BEGIN;
+                CREATE TABLE tests_new (
+                    id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '',
+                    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'status', 'text')), unit TEXT NOT NULL DEFAULT '',
+                    description TEXT NOT NULL DEFAULT '', expected REAL, warn REAL, fail REAL,
+                    tol_mode TEXT NOT NULL DEFAULT 'absolute' CHECK (tol_mode IN ('absolute', 'percent')),
+                    active INTEGER NOT NULL DEFAULT 1, owner_queue_id INTEGER REFERENCES queues(id),
+                    UNIQUE (owner_queue_id, category, name));
+                INSERT INTO tests_new SELECT id, name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id FROM tests;
                 DROP TABLE tests;
                 ALTER TABLE tests_new RENAME TO tests;
                 COMMIT;

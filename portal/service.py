@@ -2,10 +2,16 @@
 
 import base64
 import binascii
-from datetime import date
+import hashlib
+from datetime import date, datetime
+from pathlib import Path
 
 from . import auth, checklist, qa, sphinx
 from .db import now
+
+TEST_TYPES = ("numeric", "boolean", "status", "text")
+# Accepted spellings for a status check: Pass / Warning / Fail.
+STATUS_WORDS = {"pass": "pass", "passed": "pass", "warn": "warn", "warning": "warn", "fail": "fail", "failed": "fail"}
 
 
 class PortalError(Exception):
@@ -142,8 +148,10 @@ def save_machine(db, user, data, machine_id=None):
 # ---- test library ----------------------------------------------------------
 
 def list_tests(db, user):
-    return db.all("SELECT t.*, q.name AS owner_name FROM tests t LEFT JOIN queues q ON q.id = t.owner_queue_id "
-                  "ORDER BY t.active DESC, q.name, t.category, t.name")
+    return db.all("SELECT t.*, q.name AS owner_name, "
+                  "(SELECT MIN(qi.position) FROM queue_items qi WHERE qi.test_id = t.id AND qi.queue_id = t.owner_queue_id) AS position "
+                  "FROM tests t LEFT JOIN queues q ON q.id = t.owner_queue_id "
+                  "ORDER BY t.active DESC, q.name, position, t.category, t.name")
 
 
 def _owner(db, data, current=None):
@@ -157,8 +165,8 @@ def _owner(db, data, current=None):
 def save_test(db, user, data, test_id=None):
     require(user, "configure")
     test_type = data.get("type") or "numeric"
-    if test_type not in ("numeric", "boolean", "text"):
-        raise PortalError("Test type must be numeric, boolean, or text.")
+    if test_type not in TEST_TYPES:
+        raise PortalError("Test type must be numeric, boolean, status, or text.")
     limits = _limits(data, allow_blank_mode=False) if test_type == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": "absolute"}
     name, category = _text(data, "name", required=True), _text(data, "category")
     existing = _get(db, "tests", test_id) if test_id is not None else None
@@ -297,6 +305,7 @@ def save_assignment(db, user, data, assignment_id=None):
     except ValueError:
         raise PortalError("Start date must be YYYY-MM-DD.")
     active = _flag(data, "active")
+    folder = _text(data, "import_folder")
     if assignment_id is None:
         machine = _get(db, "machines", int(data.get("machine_id") or 0))
         queue = _get(db, "queues", int(data.get("queue_id") or 0))
@@ -304,15 +313,59 @@ def save_assignment(db, user, data, assignment_id=None):
             raise PortalError(f"'{queue['name']}' is a template. Duplicate it, then schedule the copy.")
         if db.one("SELECT id FROM assignments WHERE machine_id = ? AND queue_id = ?", (machine["id"], queue["id"])):
             raise PortalError(f"'{queue['name']}' is already scheduled on {machine['name']}.")
-        assignment_id = db.run("INSERT INTO assignments (machine_id, queue_id, frequency, interval_days, weekdays, start_date, active) "
-                               "VALUES (?, ?, ?, ?, ?, ?, ?)", (machine["id"], queue["id"], frequency, interval, weekdays, start, active))
+        assignment_id = db.run("INSERT INTO assignments (machine_id, queue_id, frequency, interval_days, weekdays, start_date, active, import_folder) "
+                               "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (machine["id"], queue["id"], frequency, interval, weekdays, start, active, folder))
         db.audit(user["id"], "create", "assignment", assignment_id, machine=machine["name"], queue=queue["name"], frequency=frequency)
     else:
         _get(db, "assignments", assignment_id)
-        db.run("UPDATE assignments SET frequency = ?, interval_days = ?, weekdays = ?, start_date = ?, active = ? WHERE id = ?",
-               (frequency, interval, weekdays, start, active, assignment_id))
-        db.audit(user["id"], "update", "assignment", assignment_id, frequency=frequency, weekdays=weekdays, start=start, active=active)
+        db.run("UPDATE assignments SET frequency = ?, interval_days = ?, weekdays = ?, start_date = ?, active = ?, import_folder = ? WHERE id = ?",
+               (frequency, interval, weekdays, start, active, folder, assignment_id))
+        db.audit(user["id"], "update", "assignment", assignment_id, frequency=frequency, weekdays=weekdays, start=start, active=active,
+                 import_folder=folder)
     return {"id": assignment_id}
+
+
+# ---- default import folder (where each scheduled list's export files appear) ----------------
+
+IMPORT_EXTENSIONS = (".xls",)  # Sphinx exports today; DQA3 exports once that importer exists.
+
+
+def _import_root(assignment):
+    folder = assignment["import_folder"]
+    if not folder:
+        raise PortalError("This list has no default import folder. Set one under Change schedule.")
+    root = Path(folder).expanduser()
+    if not root.is_dir():
+        raise PortalError(f"Import folder not found: {folder}")
+    return root.resolve()
+
+
+def list_import_files(db, user, assignment_id, limit=40):
+    """Newest export files in the list's default folder (searched recursively), with any run already recorded from each."""
+    assignment = _get(db, "assignments", assignment_id)
+    if not assignment["import_folder"]:
+        return {"folder": "", "files": []}
+    root = _import_root(assignment)
+    paths = [p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in IMPORT_EXTENSIONS and not p.name.startswith("~$")]
+    paths.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    files = []
+    for path in paths[:limit]:
+        stat = path.stat()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        run = db.one("SELECT id, qa_date FROM runs WHERE source_ref = ?", (digest,))
+        files.append({"name": path.name, "path": path.relative_to(root).as_posix(), "size": stat.st_size,
+                      "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="minutes"),
+                      "run_id": run["id"] if run else None, "qa_date": run["qa_date"] if run else None})
+    return {"folder": str(root), "files": files}
+
+
+def read_import_file(db, user, assignment_id, relative):
+    """One file from the default folder, in the same {name, data} form as an uploaded file."""
+    root = _import_root(_get(db, "assignments", assignment_id))
+    target = (root / (relative or "")).resolve()
+    if root not in target.parents or not target.is_file() or target.suffix.lower() not in IMPORT_EXTENSIONS:
+        raise PortalError("That file is not in this list's import folder.")
+    return {"name": target.name, "data": base64.b64encode(target.read_bytes()).decode()}
 
 
 def run_template(db, user, assignment_id):
@@ -362,7 +415,7 @@ def dashboard(db, user, today=None):
     for machine in db.all("SELECT * FROM machines WHERE active = 1 ORDER BY name"):
         queues = [a for a in list_assignments(db, user, machine["id"], today) if a["active"]]
         for a in queues:
-            last = db.one("SELECT id, overall, review_status FROM runs WHERE assignment_id = ? ORDER BY qa_date DESC, id DESC LIMIT 1", (a["id"],))
+            last = db.one("SELECT id, overall, review_status, qa_date FROM runs WHERE assignment_id = ? ORDER BY qa_date DESC, id DESC LIMIT 1", (a["id"],))
             a["last_run"] = last
         machine["queues"] = queues
         machine["pending_review"] = db.one("SELECT COUNT(*) AS n FROM runs WHERE machine_id = ? AND review_status = 'pending'", (machine["id"],))["n"]
@@ -399,6 +452,10 @@ def submit_run(db, user, assignment_id, data):
                 raise PortalError(f"{item['name']}: enter a number.")
         elif item["type"] == "boolean":
             value = value in (True, 1, "1", "true", "pass", "yes")
+        elif item["type"] == "status":
+            value = STATUS_WORDS.get(str(value).strip().lower())
+            if value is None:
+                raise PortalError(f"{item['name']}: choose Pass, Warning, or Fail.")
         else:
             value = str(value)
         try:
@@ -412,8 +469,8 @@ def submit_run(db, user, assignment_id, data):
         raise PortalError("This queue has no tests.")
     source_ref = _text(data, "source_ref") or None
     _check_not_imported(db, source_ref)
-    rows = [{"test_id": item["test_id"], "value_num": float(value) if item["type"] != "text" else None,
-             "value_text": value if item["type"] == "text" else None, "limits": item["limits"], "status": status, "comment": comment}
+    rows = [{"test_id": item["test_id"], "value_num": float(value) if item["type"] in ("numeric", "boolean") else None,
+             "value_text": value if item["type"] in ("text", "status") else None, "limits": item["limits"], "status": status, "comment": comment}
             for item, value, status, comment in results]
     return _insert_run(db, user, template, qa_date.isoformat(), rows, _text(data, "comment"),
                        "sphinx" if source_ref else "manual", source_ref, "pending")

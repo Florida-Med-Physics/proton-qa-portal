@@ -47,6 +47,9 @@ class EvaluateTests(unittest.TestCase):
         self.assertEqual(qa.evaluate("boolean", True, {}), "pass")
         self.assertEqual(qa.evaluate("boolean", False, {}), "fail")
         self.assertEqual(qa.evaluate("text", "ok", {}), "recorded")
+        self.assertEqual(qa.evaluate("status", "warn", {}), "warn")
+        self.assertEqual(qa.evaluate("status", "pass", {}), "pass")
+        self.assertEqual(qa.evaluate("status", "bogus", {}), "fail")
         self.assertEqual(qa.overall(["pass", "recorded", "warn", "pass"]), "warn")
         self.assertEqual(qa.overall(["warn", "fail"]), "fail")
 
@@ -76,6 +79,14 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual(qa.next_due(custom, date(2026, 1, 5)), date(2026, 1, 15))
         future_start = {"frequency": "weekly", "start_date": "2026-12-01"}
         self.assertEqual(qa.next_due(future_start, date(2026, 10, 1)), date(2026, 12, 1))
+
+    def test_as_needed_is_never_due(self):
+        a = {"frequency": "asneeded", "start_date": "2026-01-01", "weekdays": "0,1,2,3,4"}
+        self.assertIsNone(qa.next_due(a, None))
+        self.assertEqual(qa.due_state(a, None, date(2026, 3, 2))["state"], "ready")
+        self.assertEqual(qa.due_state(a, date(2026, 3, 2), date(2026, 3, 2))["state"], "done")
+        self.assertEqual(qa.due_state(a, date(2026, 3, 1), date(2026, 3, 2))["state"], "ready")
+        self.assertIn("As needed", qa.describe_schedule(a))
 
     def test_describe(self):
         self.assertEqual(qa.describe_schedule({"frequency": "daily", "weekdays": "0,1,2,3,4"}), "Daily (weekdays)")
@@ -150,6 +161,50 @@ class ServiceTests(unittest.TestCase):
         own = self.submit("physicist")
         with self.assertRaisesRegex(PortalError, "someone other"):
             service.review_run(self.db, self.users["physicist"], own["id"], {"decision": "approved"})
+
+    def test_status_check_pass_warn_fail(self):
+        admin = self.users["admin"]
+        water = service.save_test(self.db, admin, {"name": "Water level", "category": "Safety", "type": "status"})["id"]
+        queue = service.save_queue(self.db, admin, {"name": "Linac daily (synthetic)", "items": [{"test_id": water}]})["id"]
+        machine = service.save_machine(self.db, admin, {"name": "synthetic linac", "kind": "Linac"})["id"]
+        assignment = service.save_assignment(self.db, admin, {"machine_id": machine, "queue_id": queue, "frequency": "daily"})["id"]
+        submit = lambda value: service.submit_run(self.db, self.users["therapist"], assignment,
+                                                  {"results": [{"test_id": water, "value": value}]})
+        self.assertEqual(submit("Warning")["overall"], "warn")
+        self.assertEqual(submit("pass")["overall"], "pass")
+        run = service.get_run(self.db, admin, submit("fail")["id"])
+        self.assertEqual((run["results"][0]["status"], run["results"][0]["value_text"], run["results"][0]["value_num"]), ("fail", "fail", None))
+        with self.assertRaisesRegex(PortalError, "choose Pass, Warning, or Fail"):
+            submit("maybe")
+        with self.assertRaisesRegex(PortalError, "numeric, boolean, status, or text"):
+            service.save_test(self.db, admin, {"name": "Odd", "type": "tristate"})
+
+    def test_default_import_folder(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        admin = self.users["admin"]
+        self.assertEqual(service.list_import_files(self.db, admin, self.assignment), {"folder": "", "files": []})
+        with tempfile.TemporaryDirectory() as tmp:
+            older, newer = Path(tmp, "G1_old.xls"), Path(tmp, "sub", "G1_new.xls")
+            newer.parent.mkdir()
+            older.write_bytes(b"synthetic old export")
+            newer.write_bytes(b"synthetic new export")
+            Path(tmp, "notes.txt").write_text("ignored")
+            os.utime(older, (1_700_000_000, 1_700_000_000))
+            service.save_assignment(self.db, admin, {"frequency": "daily", "import_folder": tmp}, self.assignment)
+            listing = service.list_import_files(self.db, admin, self.assignment)
+            self.assertEqual([f["path"] for f in listing["files"]], ["sub/G1_new.xls", "G1_old.xls"])
+            self.assertIsNone(listing["files"][0]["run_id"])
+            upload = service.read_import_file(self.db, admin, self.assignment, "sub/G1_new.xls")
+            self.assertEqual(upload["name"], "G1_new.xls")
+            with self.assertRaisesRegex(PortalError, "not in this list's import folder"):
+                service.read_import_file(self.db, admin, self.assignment, "../outside.xls")
+            with self.assertRaisesRegex(PortalError, "not in this list's import folder"):
+                service.read_import_file(self.db, admin, self.assignment, "notes.txt")
+        service.save_assignment(self.db, admin, {"frequency": "daily", "import_folder": "/nonexistent/folder"}, self.assignment)
+        with self.assertRaisesRegex(PortalError, "Import folder not found"):
+            service.list_import_files(self.db, admin, self.assignment)
 
     def test_submit_rules(self):
         self.assertEqual(self.submit("therapist", door="fail")["overall"], "fail")
@@ -234,7 +289,7 @@ class HttpTests(unittest.TestCase):
     def test_static_files(self):
         response, raw = self.request("GET", "/")
         self.assertEqual(response.status, 200)
-        self.assertIn(b"Proton QA Portal", raw)
+        self.assertIn(b"Physics QA Portal", raw)
         self.assertIn("default-src 'self'", response.getheader("Content-Security-Policy"))
         self.assertEqual(self.request("GET", "/../portal/db.py")[0].status, 404)
         self.assertEqual(self.request("GET", "/app.js")[0].status, 200)

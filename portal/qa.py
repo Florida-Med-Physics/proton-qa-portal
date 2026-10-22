@@ -13,7 +13,8 @@ from datetime import date, timedelta
 
 STATUS_RANK = {"pass": 0, "recorded": 0, "warn": 1, "fail": 2}
 MONTH_STEPS = {"monthly": 1, "quarterly": 3, "semiannual": 6, "annual": 12}
-FREQUENCIES = ("daily", "weekly", "monthly", "quarterly", "semiannual", "annual", "custom")
+FREQUENCIES = ("daily", "weekly", "monthly", "quarterly", "semiannual", "annual", "custom", "asneeded")
+# "asneeded": run on the days it is needed (SRS QA on SRS treatment days); never due or overdue on its own.
 WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 _EPS = 1e-9
 
@@ -46,6 +47,9 @@ def evaluate(test_type, value, limits):
     """Return 'pass', 'warn', 'fail', or 'recorded' (no limits to judge against)."""
     if test_type == "boolean":
         return "pass" if value else "fail"
+    if test_type == "status":
+        # The person performing QA picks Pass / Warning / Fail directly (as on a RadMachine checklist).
+        return value if value in ("pass", "warn", "fail") else "fail"
     if test_type == "text":
         return "recorded"
     dev = deviation(value, limits.get("expected"), limits.get("tol_mode"))
@@ -85,6 +89,8 @@ def next_due(assignment, last_done):
     """Date the queue is next due, given the date of its last completed run (or None)."""
     start = date.fromisoformat(assignment["start_date"])
     freq = assignment["frequency"]
+    if freq == "asneeded":
+        return None
     if freq == "daily":
         days = parse_weekdays(assignment.get("weekdays"))
         candidate = max(start, last_done + timedelta(days=1)) if last_done else start
@@ -103,6 +109,9 @@ def next_due(assignment, last_done):
 
 def due_state(assignment, last_done, today):
     due = next_due(assignment, last_done)
+    if due is None:
+        return {"next_due": None, "state": "done" if last_done == today else "ready",
+                "last_done": last_done.isoformat() if last_done else None}
     if due < today:
         state = "overdue"
     elif due == today:
@@ -125,4 +134,6 @@ def describe_schedule(assignment):
         return "Daily (" + ", ".join(WEEKDAY_NAMES[d] for d in days) + ")"
     if freq == "custom":
         return f"Every {assignment.get('interval_days') or 1} days"
+    if freq == "asneeded":
+        return "As needed (run on the days it applies)"
     return freq.capitalize()
