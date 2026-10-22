@@ -1372,7 +1372,7 @@ async function renderPerform(assignmentId) {
         if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
         return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
       };
-      const numberCell = (it) => el("td", { class: "qa-n" }, checkNumber(it.description) || "");
+      const numberCell = (it) => el("td", { class: "qa-n" }, firstHeader === "Axis" ? "" : checkNumber(it.description) || "");
       const trRows = members.map((it) => {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
@@ -1405,7 +1405,7 @@ async function renderPerform(assignmentId) {
         return [row, chart];
       });
       const widths = firstHeader !== "Test" ? ["3%", "9%", "5%", "9%", "13%", "9%", "8%", "6%", "34%", "4%"] : ["3%", "22%", "5%", "7%", "15%", "8%", "8%", "5%", "23%", "4%"];
-      const tableEl = sortable(el("table", { class: "measure-table" },
+      const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
@@ -1460,11 +1460,11 @@ async function renderPerform(assignmentId) {
         const numbers = [checkNumber(m.axes[0].description), checkNumber((m.calc || m.axes[m.axes.length - 1]).description)].filter(Boolean);
         rows.push(measureTable(members, {
           firstHeader: "Axis",
-          title: el("div", { class: "measure-title" }, el("strong", {}, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}: ` : "", m.base, m.unitTag ? ` ${m.unitTag}` : ""),
+          title: el("div", { class: "measure-title" }, el("strong", {}, numbers.length ? `${numbers[0]}: ` : "", m.base, m.unitTag ? ` ${m.unitTag}` : ""),
             helpText((m.calc || m.axes[0]).description, { inline: true })),
           directions: null,
           label: (it) => `${m.base} ${it.axisLabel}`,
-          firstCell: (it) => el("strong", { class: it.axisLabel === "3D" ? "" : `axis-val axis-${"XYZ".indexOf(it.axisLabel)}` }, it.axisLabel),
+          firstCell: (it) => el("strong", {}, it.axisLabel),
         }));
       }
       emitPlain();

@@ -728,3 +728,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .measure-table td.qa-unit { white-space: nowrap; }
 .measure-table th { white-space: nowrap; letter-spacing: 0.04em; }
 .measure-table td.qa-comment { text-align: center; }
+
+/* An X / Y / Z table reads as one item: no lines between its rows. */
+.axis-table tbody tr:not(:last-child) td { border-bottom: 0; }
+.axis-table tbody td { padding-top: 4px; padding-bottom: 4px; }
