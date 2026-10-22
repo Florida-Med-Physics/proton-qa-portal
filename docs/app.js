@@ -925,9 +925,9 @@ async function renderPerform(assignmentId) {
       // As in the myQA template: the numbered title, then its directions block, then the result.
       const directions = helpText(item.description);
       rows.push(el("div", { class: `check-row${directions ? " with-directions" : ""}` },
+        directions,
         el("div", { class: "check-name" }, el("strong", {}, checkNumber(item.description) ? `${checkNumber(item.description)}: ` : "", item.name.startsWith(category + " – ") ? item.name.slice(category.length + 3) : item.name),
           item.type === "numeric" ? el("div", { class: "muted small" }, limitsText(item.limits, item.unit)) : null, note),
-        directions,
         el("div", { class: "check-input" }, control, item.type === "numeric" && item.unit ? el("span", { class: "muted small" }, item.unit) : null),
         statusCell,
         el("div", { class: "check-note" }, noteToggle, comment)));
@@ -1134,11 +1134,13 @@ async function renderQueueEditor(id) {
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = (item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       const n = sectionNumber(t);
-      const head = n !== lastSection ? el("tr", { class: "group" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n)))) : null;
+      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n)))) : null;
+      const directions = helpText(t.description);
+      const dirRow = directions ? el("tr", { class: "directions-row" }, el("td", { colspan: 7 }, directions)) : null;
       lastSection = n;
       const number = checkNumber(t.description);
-      return [head, el("tr", { class: "compact" },
-        el("td", { class: "item-cell" }, el("strong", {}, number ? `${number}: ` : "", shortName), helpText(t.description)),
+      return [head, dirRow, el("tr", { class: `compact${dirRow ? " after-directions" : ""}` },
+        el("td", { class: "item-cell" }, el("strong", {}, number ? `${number}: ` : "", shortName)),
         el("td", {}, t.category || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
