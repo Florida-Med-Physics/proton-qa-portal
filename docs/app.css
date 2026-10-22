@@ -322,3 +322,7 @@ tr.row-overdue td:first-child { border-left: 3px solid var(--fail); }
 .axis-val { color: var(--axis); font-weight: 600; }
 .spark-head .axis-legend { margin-left: auto; margin-right: 6px; }
 h2 .axis-legend { vertical-align: middle; }
+
+/* Machines tab: a header row per machine, its QA lists indented beneath. */
+tr.machine-row td { background: var(--surface-2); }
+td.indent { padding-left: 28px; }

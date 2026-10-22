@@ -220,7 +220,8 @@ function evaluate(type, value, limits) {
 // Three places to go, as in myQA: Perform QA (the worklist, review and past results), QA Setup, QA Trends.
 const NAV = [
   ["#/", "Perform QA", null, ["#/", "#", "#/perform", "#/runs"]],
-  ["#/setup", "Setup QA", "configure", ["#/setup", "#/machines", "#/queues", "#/tests", "#/users", "#/audit", "#/assignments"]],
+  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/users", "#/audit"]],
+  ["#/machines", "Machines", "configure", ["#/machines", "#/assignments"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
 ];
 
@@ -376,65 +377,51 @@ async function renderDashboard() {
   }
 }
 
-// Setup QA reads like Perform QA: one table per machine type, one row per QA list, actions on the right.
+/// Setup QA: the QA lists themselves (templates and each machine's copy), all editable. Same layout as Perform QA.
 async function renderSetup() {
-  page("Setup QA", "What each machine is checked against, and how often.");
-  const [data, queues] = await Promise.all([api("GET", "/api/dashboard"), api("GET", "/api/queues")]);
-  const byId = Object.fromEntries(queues.map((q) => [q.id, q]));
-  const templates = queues.filter((q) => q.is_template);
-  const scheduled = data.machines.reduce((n, m) => n + m.queues.length, 0);
   const editable = can("configure");
+  page("Setup QA", "The QA lists and the tests in them. Open a list to edit its tests, order and limits.",
+    editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
+  const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
+  const templates = queues.filter((q) => q.is_template);
+  const lists = queues.filter((q) => !q.is_template);
   app.append(el("p", { class: "lead" },
-    `${data.machines.length} machines · ${scheduled} scheduled QA ${scheduled === 1 ? "list" : "lists"} · ${templates.length} ${templates.length === 1 ? "template" : "templates"}.`,
-    editable ? [" ", el("a", { class: "small", href: "#/machines" }, "Add a machine")] : ""));
+    `${templates.length} ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine ${lists.length === 1 ? "list" : "lists"}. `,
+    el("span", { class: "muted small" }, "A template is the master copy; copying it to a machine gives that machine its own editable list.")));
 
-  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
-  const groups = new Map();
-  for (const machine of data.machines) {
-    const kind = machine.kind || "Other";
-    if (!groups.has(kind)) groups.set(kind, []);
-    groups.get(kind).push(machine);
-  }
-  const rank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
-  for (const [kind, machines] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
-    const rows = machines.flatMap((machine) => {
-      if (!machine.queues.length) {
-        return [el("tr", {}, el("td", {}, el("strong", {}, machine.name)), el("td", { class: "muted", colspan: 3 }, "Nothing scheduled."),
-          el("td", { class: "right" }, editable ? el("a", { class: "button small", href: `#/machines/${machine.id}` }, "Add a QA list") : null))];
-      }
-      return machine.queues.map((a, i) => {
-        const q = byId[a.queue_id] || {};
-        return el("tr", {},
-          el("td", {}, i === 0 ? el("a", { href: `#/machines/${machine.id}` }, el("strong", {}, machine.name)) : ""),
-          el("td", {}, queueLabel(a.queue_name, machine.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
-          el("td", {}, a.schedule),
-          el("td", { class: "num" }, q.item_count ?? ""),
-          el("td", { class: "right" }, el("div", { class: "row nowrap end" },
-            el("a", { class: "button small", href: `#/queues/${a.queue_id}` }, "Tests"),
-            editable ? el("a", { class: "button small", href: `#/assignments/${a.id}/limits` }, "Limits") : null,
-            editable ? el("button", { class: "small", onclick: () => modal(`${a.queue_name}: schedule`, scheduleForm(a), async (d, form) => {
-              await api("PUT", `/api/assignments/${a.id}`, scheduleData(d, form));
-              toast("Schedule saved");
-              route();
-            }) }, "Schedule") : null)));
-      });
-    });
-    app.append(el("h2", { class: "section-head" }, kind), table(["Machine", "QA list", "Schedule", "#Tests", ""], rows));
-  }
+  const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end" },
+    el("a", { class: "button small primary", href: `#/queues/${q.id}` }, editable ? "Edit tests" : "Tests"),
+    editable ? el("button", { class: "small", onclick: () => duplicateDialog(q, machines) }, q.is_template ? "Copy to a machine" : "Duplicate") : null));
 
   app.append(el("h2", { class: "section-head" }, "Templates"));
   app.append(templates.length ? table(["Template", "#Tests", "Copies on", ""], templates.map((t) => el("tr", {},
     el("td", {}, el("strong", {}, t.name)),
     el("td", { class: "num" }, t.item_count),
-    el("td", { class: "muted" }, queues.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
-    el("td", { class: "right" }, el("div", { class: "row nowrap end" },
-      el("a", { class: "button small", href: `#/queues/${t.id}` }, "Tests"),
-      editable ? el("button", { class: "small", onclick: () => duplicateDialog(t, data.machines) }, "Copy to a machine") : null)))))
-    : el("div", { class: "card empty" }, "No templates yet."));
+    el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
+    actions(t))))
+    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
+
+  // Machine lists, grouped by the machine type they run on.
+  const kindOf = Object.fromEntries(machines.map((m) => [m.name, m.kind || "Other"]));
+  const groups = new Map();
+  for (const q of lists) {
+    const first = (q.machines || "").split(", ")[0];
+    const kind = first ? kindOf[first] || "Other" : "Not on a machine";
+    if (!groups.has(kind)) groups.set(kind, []);
+    groups.get(kind).push(q);
+  }
+  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator", "Other", "Not on a machine"];
+  const rank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
+  for (const [kind, list] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
+    app.append(el("h2", { class: "section-head" }, kind), table(["QA list", "Machine", "#Tests", ""], list.map((q) => el("tr", { class: q.active ? "" : "muted" },
+      el("td", {}, el("strong", {}, q.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+      el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
+      el("td", { class: "num" }, q.item_count),
+      actions(q)))));
+  }
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
     el("a", { class: "button small", href: "#/tests" }, "All tests"),
-    el("a", { class: "button small", href: "#/queues" }, "All QA lists"),
     can("manage_users") ? el("a", { class: "button small", href: "#/users" }, "People") : null,
     el("a", { class: "button small", href: "#/audit" }, "Audit log")));
 
@@ -529,19 +516,95 @@ function machineForm(machine) {
     el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!machine.active }), "Active"));
 }
 
+// Machines: create machines and decide which QA lists each one runs, and how often. Same layout as Perform QA.
+async function addListDialog(machine, assigned) {
+  const all = await api("GET", "/api/queues");
+  const templates = all.filter((q) => q.active && q.is_template);
+  const free = all.filter((q) => q.active && !q.is_template && !assigned.some((a) => a.queue_id === q.id));
+  if (!templates.length && !free.length) return toast("No QA lists to add. Make a template under Setup QA first.", true);
+  const sameKind = templates.find((t) => (t.name || "").toLowerCase().includes((machine.kind || "~").toLowerCase()));
+  const pick = el("div", { class: "form-grid" },
+    field("Start from", select("source", [...templates.map((q) => [`t${q.id}`, `Template: ${q.name}`]), ...free.map((q) => [`q${q.id}`, `Existing list: ${q.name}`])],
+      `t${(sameKind || templates[0] || {}).id}`), "wide"),
+    field("Name for this machine's copy", el("input", { name: "name", placeholder: `Daily QA – ${machine.name}` }), "wide"),
+    scheduleForm(null));
+  const source = pick.querySelector("[name=source]");
+  const nameField = pick.querySelector("[name=name]").closest(".field");
+  const sync = () => (nameField.hidden = !source.value.startsWith("t"));
+  source.addEventListener("change", sync);
+  sync();
+  modal(`Add a QA list to ${machine.name}`, pick, async (data, form) => {
+    const schedule = { ...scheduleData(data, form), machine_id: machine.id };
+    if (data.source.startsWith("t")) {
+      await api("POST", `/api/queues/${data.source.slice(1)}/duplicate`, { ...schedule, name: data.name || `Daily QA – ${machine.name}` });
+    } else {
+      await api("POST", "/api/assignments", { ...schedule, queue_id: Number(data.source.slice(1)) });
+    }
+    toast("QA list added");
+    route();
+  }, "Add");
+}
+
 async function renderMachines() {
-  const machines = await api("GET", "/api/machines");
-  page("Machines", "Each machine gets its own scheduled QA queues.", can("configure") ? [el("button", {
+  const editable = can("configure");
+  page("Machines", "Each machine and the QA lists it runs.", editable ? [el("button", {
     class: "primary",
     onclick: () => modal("Add machine", machineForm(), async (data) => {
-      const result = await api("POST", "/api/machines", data);
-      location.hash = `#/machines/${result.id}`;
+      await api("POST", "/api/machines", data);
+      toast("Machine added");
+      route();
     }),
   }, "Add machine")] : []);
-  app.append(table(["Name", "Type", "Location", "Status"], machines.map((m) =>
-    el("tr", { class: "clickable", onclick: () => (location.hash = `#/machines/${m.id}`) },
-      el("td", {}, el("strong", {}, m.name)), el("td", {}, m.kind), el("td", {}, m.location),
-      el("td", {}, m.active ? chip("pass", "Active") : chip("", "Retired")))), "No machines yet."));
+  const machines = await api("GET", "/api/machines");
+  const assignments = Object.fromEntries(await Promise.all(machines.map(async (m) => [m.id, await api("GET", `/api/machines/${m.id}/assignments`)])));
+  const queues = Object.fromEntries((await api("GET", "/api/queues")).map((q) => [q.id, q]));
+  const active = machines.filter((m) => m.active);
+  const scheduled = active.reduce((n, m) => n + assignments[m.id].filter((a) => a.active).length, 0);
+  app.append(el("p", { class: "lead" }, `${active.length} machines · ${scheduled} scheduled QA ${scheduled === 1 ? "list" : "lists"}.`));
+  if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
+
+  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
+  const groups = new Map();
+  for (const m of machines) {
+    const kind = m.active ? m.kind || "Other" : "Retired";
+    if (!groups.has(kind)) groups.set(kind, []);
+    groups.get(kind).push(m);
+  }
+  const rank = (k) => (k === "Retired" ? 99 : (KIND_ORDER.indexOf(k) + 1 || KIND_ORDER.length + 1));
+  for (const [kind, list] of [...groups].sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b))) {
+    const rows = list.flatMap((machine) => {
+      const mine = assignments[machine.id];
+      const head = el("tr", { class: "machine-row" },
+        el("td", { colspan: 4 }, el("strong", {}, machine.name), machine.location ? el("span", { class: "muted small" }, ` · ${machine.location}`) : null,
+          machine.active ? null : [" ", chip("", "Retired")]),
+        el("td", { class: "right" }, editable ? el("div", { class: "row nowrap end" },
+          el("button", { class: "small", onclick: () => addListDialog(machine, mine) }, "Add a QA list"),
+          el("button", { class: "small", onclick: () => modal(`Edit ${machine.name}`, machineForm(machine), async (data) => {
+            await api("PUT", `/api/machines/${machine.id}`, data);
+            toast("Machine saved");
+            route();
+          }) }, "Edit machine")) : null));
+      const lines = mine.length ? mine.map((a) => {
+        const q = queues[a.queue_id] || {};
+        return el("tr", { class: a.active ? "" : "muted" },
+          el("td", { class: "indent" }, queueLabel(a.queue_name, machine.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+          el("td", {}, a.schedule),
+          el("td", {}, chip(a.active ? a.state : "", scheduleStatus(a))),
+          el("td", { class: "num" }, q.item_count ?? ""),
+          el("td", { class: "right" }, el("div", { class: "row nowrap end" },
+            el("a", { class: "button small", href: `#/queues/${a.queue_id}` }, editable ? "Edit tests" : "Tests"),
+            editable ? el("a", { class: "button small", href: `#/assignments/${a.id}/limits` }, "Limits") : null,
+            editable ? el("button", { class: "small", onclick: () => modal(`${a.queue_name}: schedule`, scheduleForm(a), async (d, form) => {
+              await api("PUT", `/api/assignments/${a.id}`, scheduleData(d, form));
+              toast("Schedule saved");
+              route();
+            }) }, "Schedule") : null,
+            editable ? el("button", { class: "small", onclick: () => importSphinxDialog(a) }, "Import") : null)));
+      }) : [el("tr", {}, el("td", { class: "indent muted", colspan: 5 }, "No QA lists yet."))];
+      return [head, ...lines];
+    });
+    app.append(el("h2", { class: "section-head" }, kind), table(["QA list", "Schedule", "Status", "#Tests", ""], rows));
+  }
 }
 
 function scheduleForm(assignment, queues) {
