@@ -2276,8 +2276,9 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   const statH = keyH + lineH * series.length + 6;
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
-  const xi = Object.fromEntries(dates.map((d, i) => [d, i]));
-  const x = (d) => L + (dates.length === 1 ? (W - L - R) / 2 : (xi[d] * (W - L - R)) / (dates.length - 1));
+  const timeOf = (d) => new Date(d + "T00:00").getTime();
+  const t0 = timeOf(dates[0]), t1 = timeOf(dates[dates.length - 1]);
+  const x = (d) => L + (t1 === t0 ? (W - L - R) / 2 : ((timeOf(d) - t0) * (W - L - R)) / (t1 - t0));
   const val = (p) => (delta ? asDeviation(p).dev : p.value);
   // Reference line and bands: around 0 on a Δ chart, around the reference on an absolute chart (one series only).
   const ref = (multi && !delta ? [] : series[0].points).map((p) => {
@@ -2328,17 +2329,20 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
 
   // X axis: dates, and the axis title.
   kids.push(svg("line", { class: "axis-base", x1: L, x2: W - R, y1: plotBottom, y2: plotBottom }));
-  const labels = small ? 4 : 6;
-  const every = Math.max(1, Math.ceil(dates.length / labels));
-  const multiYear = dates[0].slice(0, 4) !== dates[dates.length - 1].slice(0, 4);
-  const fmtDate = (d) => new Date(d + "T00:00").toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-  dates.forEach((d, i) => {
-    if (i % every === 0 || i === dates.length - 1) {
-      if (i === dates.length - 1 && i % every !== 0 && dates.length > 1 && x(d) - x(dates[i - (i % every)]) < 95) return;
-      const anchor = i === 0 ? "start" : i === dates.length - 1 ? "end" : "middle";
-      kids.push(svg("text", { x: x(d), y: plotBottom + 14, "text-anchor": anchor }, fmtDate(d)));
-    }
+  // A vertical line at the start of every month; a label on every n-th so they never collide.
+  const first = new Date(dates[0] + "T00:00"), last = new Date(dates[dates.length - 1] + "T00:00");
+  const months = [];
+  for (let m = new Date(first.getFullYear(), first.getMonth() + 1, 1); m <= last; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
+  const maxLabels = small ? 4 : 8;
+  const step = Math.max(1, Math.ceil((months.length + 1) / maxLabels));
+  const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  const monthLabel = (dt) => dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  months.forEach((m, i) => {
+    const xm = x(iso(m));
+    kids.push(svg("line", { class: "month-line", x1: xm, x2: xm, y1: T, y2: plotBottom }));
+    if (i % step === 0) kids.push(svg("text", { class: "month-label", x: xm, y: plotBottom + 14, "text-anchor": "middle" }, monthLabel(m)));
   });
+  if (!months.length) kids.push(svg("text", { x: (L + W - R) / 2, y: plotBottom + 14, "text-anchor": "middle" }, monthLabel(first)));
   kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, "Date QA performed"));
 
   series.forEach((s, k) => {
@@ -2347,8 +2351,26 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     // A line from each result to the next, then the dots on top.
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${multi ? cls : "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
-      plot.push(svg("circle", { class: `dot ${multi ? cls : "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
-        svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`)));
+      const dot = svg("circle", { class: `dot ${multi ? cls : "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
+        svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`));
+      dot.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const svgEl = dot.ownerSVGElement;
+        const was = dot.classList.contains("selected");
+        svgEl.querySelectorAll(".dot.selected").forEach((d) => d.classList.remove("selected"));
+        svgEl.querySelectorAll(".dot-label").forEach((g) => g.remove());
+        if (was) return;
+        dot.classList.add("selected");
+        const when = new Date(p.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+        const d = asDeviation(p);
+        const lines = [`${when}${multi ? ` · ${s.label}` : ""}`, `${fmt(p.value)}${u}`, p.expected !== null && p.expected !== undefined ? `Δ ${signed(d.dev)}${u}` : ""].filter(Boolean);
+        const cx = x(p.qa_date), cy = y(val(p));
+        const lineH2 = small ? 12 : 14, pad = 6, width = Math.max(...lines.map((t) => t.length)) * (small ? 6.2 : 7.2) + pad * 2, height = lines.length * lineH2 + pad * 2;
+        const bx = Math.min(Math.max(L, cx - width / 2), W - R - width), by = cy - height - 12 < T ? cy + 12 : cy - height - 12;
+        svgEl.append(svg("g", { class: "dot-label" }, svg("rect", { x: bx, y: by, width, height, rx: 4 }),
+          ...lines.map((t, i) => svg("text", { x: bx + pad, y: by + pad + (i + 1) * lineH2 - 3 }, t))));
+      });
+      plot.push(dot);
     }
   });
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);

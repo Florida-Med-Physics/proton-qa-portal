@@ -807,3 +807,14 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --band-warn: rgba(120, 180, 230, 0.26); } }
 :root[data-theme="dark"] { --band-warn: rgba(120, 180, 230, 0.26); }
 .chart .outlier, .spark .outlier { fill: none; stroke: var(--fail); stroke-width: 2; }
+
+/* Chart: green inside warning; month gridlines; a clicked dot lights up with its details. */
+:root { --band-warn: rgba(29, 122, 70, 0.22); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --band-warn: rgba(80, 200, 120, 0.22); } }
+:root[data-theme="dark"] { --band-warn: rgba(80, 200, 120, 0.22); }
+.chart .month-line, .spark .month-line { stroke: var(--border); stroke-width: 1; }
+.chart .month-label, .spark .month-label { fill: var(--muted); }
+.chart .dot, .spark .dot { cursor: pointer; }
+.chart .dot.selected, .spark .dot.selected { stroke: var(--uf-orange); stroke-width: 3; r: 6; }
+.dot-label rect { fill: var(--surface); stroke: var(--uf-orange); stroke-width: 1.5; }
+.dot-label text { fill: var(--text); font-size: 13px; font-weight: 600; }
