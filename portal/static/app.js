@@ -271,7 +271,7 @@ async function renderHome() {
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}`, onclick: (e) => e.stopPropagation() }, "Trends")));
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "14%"], ["Active QA lists", "26%"], ["Today", "14%"], ["Last result", "26%"], ["#To review", "10%"], ["", "10%"]], rows));
+      fixedTable([["Machine", "13%"], ["Active QA lists", "22%"], ["Today", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["", "9%"]], rows));
   }
 }
 
@@ -451,7 +451,7 @@ async function renderDashboard() {
       });
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "20%"], ["QA list", "30%"], ["Status", "18%"], ["Last result", "20%"], ["", "12%"]], rows));
+      fixedTable([["Machine", "14%"], ["QA list", "28%"], ["Status", "24%"], ["Last result", "22%"], ["", "12%"]], rows));
   }
 }
 

@@ -506,3 +506,17 @@ th + th, td + td { border-left: 1px solid var(--border); }
 tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, tr.group td { border-left: 0; }
 /* Setup QA action buttons wrap rather than overflow the table. */
 .fixed-table td.right .row.nowrap.end { flex-wrap: wrap; row-gap: 4px; }
+
+/* Header in two rows: tabs and the signed-in person on top; portal name (left) and UF Health logo (centre) below. */
+.topbar {
+  display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: "nav nav who" "title logo spacer";
+  align-items: center; row-gap: 6px; column-gap: 16px; padding: 8px 24px 10px;
+}
+#nav { grid-area: nav; }
+.who { grid-area: who; margin-left: 0; justify-self: end; }
+.brand-title { grid-area: title; order: 0; justify-self: start; padding: 0; margin: 0; }
+.brand { grid-area: logo; order: 0; margin: 0; justify-self: center; }
+.brand-logo { width: 170px; height: 34px; }
+@media (max-width: 760px) { .topbar { grid-template-columns: 1fr auto; grid-template-areas: "nav who" "title logo"; } .brand { justify-self: end; } }
+/* Status chips may wrap inside narrow table cells instead of overflowing. */
+.fixed-table .chip { white-space: normal; line-height: 1.3; }
