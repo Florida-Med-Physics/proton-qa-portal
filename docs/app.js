@@ -1335,14 +1335,63 @@ async function renderPerform(assignmentId) {
     // Every measured (numeric) test is a row in a table: Measurement, Reference, Tolerance, Action, Status, Comment,
     // History (under its QA dates) and Trends. Repeated measurements (per energy or spot) share a titled table.
     const measureTable = (members, { firstHeader, title, directions, firstCell, label }) => {
-      const dates = [...new Set(members.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
+      const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
+      const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
+      const histChips = (it, unit) => {
+        const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
+        return dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—"));
+      };
+      const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
+      const axisRow = (g) => {
+        const unit = g.axes[0].unit && g.axes[0].unit !== "unitless" ? g.axes[0].unit : "";
+        const parts = g.axes.map((it) => { drawn.add(it.test_id); return { it, ...buildEntry(it) }; });
+        const calc = g.calc ? (drawn.add(g.calc.test_id), { it: g.calc, ...buildEntry(g.calc) }) : null;
+        for (const x of [...parts, calc].filter(Boolean)) { x.comment.hidden = true; x.noteToggle.hidden = true; }
+        parts[0].comment.hidden = false;                       // one comment for the whole offset
+        const statusCell = el("div", { class: "status-cell" });
+        const dlt = el("div", { class: "delta-slot" });
+        const refresh = () => {
+          const sts = parts.map((x) => x.entry.status()).filter(Boolean);
+          const worst = sts.reduce((w, st) => (STATUS_RANK[st] > STATUS_RANK[w] ? st : w), sts[0]);
+          statusCell.replaceChildren(sts.length ? chip(worst) : "");
+          dlt.replaceChildren(...present(parts.map((x, k) => x.control.value.trim() !== "" && deltaBadge(Number(x.control.value), x.it.limits, unit)
+            ? [el("span", { class: `axis-val axis-${k}` }, `${x.it.axis} `), deltaBadge(Number(x.control.value), x.it.limits, unit), " "] : null)));
+        };
+        parts.forEach((x) => x.control.addEventListener("input", refresh));
+        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+        const trend = el("button", { type: "button", class: "icon-btn", title: "Show the X, Y and Z trend here", onclick: () => {
+          const series = parts.map((x) => ({ label: x.it.axis, points: (history[x.it.test_id] || []).slice(-60) })).filter((x) => x.points.length);
+          if (!series.length) return toast("No results yet for this test.", true);
+          if (chart.hidden) chart.firstChild.replaceChildren(
+            el("div", { class: "row" }, el("strong", {}, g.base), el("span", { class: "spacer" }),
+              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${parts.map((x) => x.it.test_id).join(",")}&range=365` }, "Full trend")),
+            seriesChart(series, unit, { small: true }));
+          chart.hidden = !chart.hidden;
+        } }, trendIcon(16));
+        const perAxis = (f) => parts.map((x, k) => el("div", { class: `axis-val axis-${k}` }, `${x.it.axis} `, f(x.it)));
+        const numbers = [checkNumber(g.axes[0].description), checkNumber((g.calc || g.axes[g.axes.length - 1]).description)].filter(Boolean);
+        const row = el("tr", {},
+          el("td", {}, el("strong", {}, numbers.length ? `${numbers[0]}–${numbers[numbers.length - 1]}: ` : "", g.base, g.unitTag ? ` ${g.unitTag}` : ""),
+            named && g.axes[0].category ? el("div", { class: "category-tag" }, categoryLabel(g.axes[0].category)) : null,
+            (() => { const d = helpText((g.calc || g.axes[0]).description); if (d) d.classList.add("in-cell"); return d; })(), ...parts.map((x) => x.note), calc ? calc.note : null),
+          el("td", {}, el("div", { class: "axis-inputs" }, ...parts.map((x, k) => el("label", { class: `axis-field axis-${k}` }, el("span", { class: "axis-key" }, x.it.axis), x.control)),
+            unit ? el("span", { class: "muted small" }, unit) : null),
+            calc ? el("div", { class: "axis-calc muted small" }, "3D ", calc.control, unit ? ` ${unit}` : "") : null, dlt),
+          el("td", { class: "num" }, perAxis((it) => refCell(it, unit))),
+          el("td", { class: "num" }, perAxis((it) => limitText(it.limits.warn, it.limits, unit))),
+          el("td", { class: "num" }, perAxis((it) => limitText(it.limits.fail, it.limits, unit))),
+          el("td", {}, statusCell),
+          el("td", {}, parts[0].comment),
+          el("td", { class: "history-cell" }, dates.length ? parts.map((x, k) => el("div", { class: "hist-axis" }, el("span", { class: `axis-key axis-${k}` }, x.it.axis), histChips(x.it, unit))) : el("span", { class: "muted small" }, "—")),
+          el("td", {}, trend));
+        return [row, chart];
+      };
       const trRows = members.map((it) => {
+        if (it.axes) return axisRow(it);
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
         comment.hidden = false; noteToggle.hidden = true;          // the table has its own comment column
-        const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        const past = dates.map((d) => byDate.get(d) || null);
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
           const pts = (history[it.test_id] || []).slice(-60);
@@ -1364,11 +1413,11 @@ async function renderPerform(assignmentId) {
           el("td", { class: "num" }, limitText(it.limits.fail, it.limits, unit)),
           el("td", {}, statusCell),
           el("td", {}, comment),
-          el("td", { class: "history-cell" }, dates.length ? past.map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")) : el("span", { class: "muted small" }, "—")),
+          el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader === "Energy" ? ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"] : ["24%", "11%", "9%", "8%", "8%", "7%", "11%", "18%", "4%"];
+      const widths = firstHeader === "Energy" ? ["9%", "13%", "10%", "9%", "9%", "8%", "13%", "24%", "5%"] : ["21%", "17%", "8%", "8%", "8%", "7%", "10%", "17%", "4%"];
       return el("div", { class: "measure-block" }, title, directions,
         el("div", { class: "table-wrap measure-wrap" }, sortable(el("table", { class: "measure-table" },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
@@ -1380,9 +1429,22 @@ async function renderPerform(assignmentId) {
     const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : it.name;
     // Single measurements that follow one another share one table; the row carries the number, name and directions.
     let pending = [];
+    const foldAxes = (list) => {
+      const out = [];
+      for (let i = 0; i < list.length; i++) {
+        const a = axisParts(list[i].name), b = axisParts((list[i + 1] || {}).name), c = axisParts((list[i + 2] || {}).name);
+        if (a && b && c && a.axis === "X" && b.axis === "Y" && c.axis === "Z" && a.base === b.base && b.base === c.base) {
+          const next = list[i + 3];
+          const calc = next && /\[calc: 3d-offset\]/.test(next.description || "") ? next : null;
+          out.push({ axes: [list[i], list[i + 1], list[i + 2]].map((it, k) => ({ ...it, axis: "XYZ"[k] })), calc, base: a.base, unitTag: a.unitTag });
+          i += calc ? 3 : 2;
+        } else out.push(list[i]);
+      }
+      return out;
+    };
     const flush = () => {
       if (!pending.length) return;
-      rows.push(measureTable(pending, { firstHeader: "Test", title: null, directions: null, label: shortName,
+      rows.push(measureTable(foldAxes(pending), { firstHeader: "Test", title: null, directions: null, label: shortName,
         firstCell: (it) => [el("strong", {}, checkNumber(it.description) ? `${checkNumber(it.description)}: ` : "", shortName(it)),
           named && it.category ? el("div", { class: "category-tag" }, categoryLabel(it.category)) : null,
           (() => { const d = helpText(it.description); if (d) d.classList.add("in-cell"); return d; })()] }));
@@ -1922,7 +1984,13 @@ function stats(points) {
 }
 
 /// Tests that differ only by a final X, Y or Z ("Spot 140 MeV – Position X" / "… Y") share one chart.
-const AXIS_NAME = /^(.*\S)\s+([XYZ])$/;
+const AXIS_NAME = /^(.*\S)\s+([XYZ])(\s*\[[^\]]*\])?$/;
+// {base, axis, unitTag} for a test named for one axis of an X/Y/Z set, else null.
+function axisParts(name) {
+  const m = AXIS_NAME.exec(name || "");
+  if (!m) return null;
+  return { base: m[1].replace(/\s*[-–]$/, ""), axis: m[2], unitTag: (m[3] || "").trim() };
+}
 // Rotations of one thing (couch pitch, roll, rotation) also share a chart.
 const ROTATION_NAME = /^(.*\S)\s+(Pitch|Roll|Rotation)$/;
 const AXIS_ORDER = { X: 0, Y: 1, Z: 2, Pitch: 0, Roll: 1, Rotation: 2 };
@@ -1932,7 +2000,7 @@ function axisGroups(items) {
   for (const item of items) {
     const r = ROTATION_NAME.exec(item.name);
     const m = AXIS_NAME.exec(item.name) || r;
-    const prefix = m ? m[1].replace(/\s*–$/, "") : "";
+    const prefix = m ? m[1].replace(/\s*[-–]$/, "") : "";
     const key = m ? `${item.category}|${prefix}|${r ? "rot" : "xyz"}` : `${item.category}|#${item.test_id}`;
     const base = !m ? item.name : r ? `${prefix} – Pitch, Roll and Rotation` : prefix;
     if (!groups.has(key)) groups.set(key, { base, category: item.category, members: [] });

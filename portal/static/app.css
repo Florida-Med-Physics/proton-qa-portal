@@ -632,3 +632,20 @@ th { overflow-wrap: normal; word-break: normal; }
 .delta.st-fail { background: var(--fail-bg); color: var(--fail); }
 .delta.st-recorded { background: var(--surface-2); color: var(--muted); }
 .delta-slot { margin-top: 3px; min-height: 0; }
+
+/* X, Y and Z of one offset on one row. */
+.axis-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.axis-field { display: inline-flex; align-items: center; gap: 3px; }
+.axis-field .result-input { width: 62px; min-width: 0; }
+.axis-key { font-weight: 700; font-size: 11px; color: var(--axis, var(--muted)); }
+.axis-field.axis-0, .hist-axis .axis-key.axis-0 { --axis: var(--accent); }
+.axis-field.axis-1, .hist-axis .axis-key.axis-1 { --axis: #d9822b; }
+.axis-field.axis-2, .hist-axis .axis-key.axis-2 { --axis: #8e6bd1; }
+.axis-calc { margin-top: 4px; }
+.axis-calc .result-input { width: 70px; min-width: 0; }
+.hist-axis { white-space: nowrap; }
+.hist-axis .axis-key { display: inline-block; width: 12px; }
+
+.axis-field .axis-key { display: inline-block; min-width: 14px; text-align: center; padding: 1px 4px; border-radius: 3px; background: var(--axis); color: #fff; }
+.axis-field .result-input { width: 56px; }
+.axis-inputs { gap: 4px; }
