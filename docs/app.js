@@ -2248,7 +2248,7 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
   const draw = () => {
     const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
-        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? (unit || "Value") : "Δ from reference"))) : null;
+        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? `Absolute${unit ? ` ${unit}` : ""}` : "Delta from Reference"))) : null;
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);
@@ -2312,7 +2312,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
       svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  const yTitle = delta ? (unit ? `Δ from reference (${unit})` : "Δ from reference") : unit || "Value";
+  const yTitle = delta ? (unit ? `Delta from reference (${unit})` : "Delta from reference") : unit ? `Absolute (${unit})` : "Value";   // the unit never changes between the two views
   kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
 
   // X axis: dates, and the axis title.

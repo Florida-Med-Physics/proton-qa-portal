@@ -791,3 +791,8 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 /* Top bar: keep every tab visible on a 1250 px window now the fonts are larger. */
 .topbar { gap: 10px; }
 @media (max-width: 1400px) { #nav a { padding: 15px 7px; font-size: 14px; } .brand-sub { display: none; } .topbar-search { width: 140px; } }
+
+/* Chart bands: within warning is green; between warning and action is amber. */
+:root { --band-warn: rgba(29, 122, 70, 0.16); --band-fail: rgba(240, 160, 40, 0.18); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --band-warn: rgba(80, 200, 120, 0.18); --band-fail: rgba(240, 170, 60, 0.16); } }
+:root[data-theme="dark"] { --band-warn: rgba(80, 200, 120, 0.18); --band-fail: rgba(240, 170, 60, 0.16); }
