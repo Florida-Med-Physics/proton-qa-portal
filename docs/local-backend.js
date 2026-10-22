@@ -1225,6 +1225,16 @@
   route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));
   route("POST", "/api/assignments", (u, m, body) => saveAssignment(u, body));
   route("PUT", "/api/assignments/(\\d+)", (u, m, body) => saveAssignment(u, body, Number(m[1])));
+  route("GET", "/api/assignments/(\\d+)/draft", (u, m) => { const d = (S.drafts || []).find((x) => x.assignment_id === Number(m[1]) && x.user_id === u.id); return d ? { ...d.data, saved_at: d.saved_at } : null; });
+  route("PUT", "/api/assignments/(\\d+)/draft", (u, m, body) => {
+    require(u, "perform");
+    S.drafts = (S.drafts || []).filter((x) => !(x.assignment_id === Number(m[1]) && x.user_id === u.id));
+    const saved_at = now();
+    S.drafts.push({ assignment_id: Number(m[1]), user_id: u.id, data: { qa_date: body.qa_date, comment: body.comment || "", results: body.results || [] }, saved_at });
+    save();
+    return { saved_at };
+  });
+  route("POST", "/api/assignments/(\\d+)/draft/clear", (u, m) => { S.drafts = (S.drafts || []).filter((x) => !(x.assignment_id === Number(m[1]) && x.user_id === u.id)); save(); return { ok: true }; });
   route("GET", "/api/assignments/(\\d+)/template", (u, m) => runTemplate(Number(m[1])));
   route("PUT", "/api/assignments/(\\d+)/overrides", (u, m, body) => saveOverrides(u, Number(m[1]), body));
   route("POST", "/api/assignments/(\\d+)/runs", (u, m, body) => submitRun(u, Number(m[1]), body));

@@ -615,7 +615,8 @@ td.history-cell, th.history-cell { padding-left: 6px; }
 .spark .key-text { font-size: 17px; }   /* small charts are scaled down, so the key is drawn larger */
 .chart-box .chart-mode { display: flex; gap: 10px; justify-content: flex-end; margin: 0 0 2px; }
 .chart-box.small .chart-mode { gap: 6px; }
-.chart-mode .link.on { font-weight: 700; color: var(--uf-orange); text-decoration: none; }
+.chart-mode .link { color: var(--text); text-decoration: none; }
+.chart-mode .link.on { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }   /* same colour either way; the chosen one is bold and underlined */
 .chart-box svg { display: block; width: 100%; height: auto; }
 /* Headers wrap at spaces only, never mid-word. */
 th { overflow-wrap: normal; word-break: normal; }
@@ -682,3 +683,7 @@ th { overflow-wrap: normal; word-break: normal; }
 .hist-row .hist[hidden] { display: none; }
 .history-cell { white-space: nowrap; }
 .hist-axis .hist-row { vertical-align: middle; }
+
+/* Perform QA: the list's title row is frozen at the top of the page while scrolling. */
+.sticky-head { position: sticky; top: 0; z-index: 6; background: var(--bg, var(--surface)); padding: 10px 0 8px; margin: -8px 0 12px; border-bottom: 2px solid var(--uf-orange); }
+.sticky-head h1 { font-size: 20px; margin: 0; }

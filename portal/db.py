@@ -122,6 +122,13 @@ CREATE TABLE IF NOT EXISTS audit (
     entity_id INTEGER,
     detail TEXT NOT NULL DEFAULT '{}'
 );
+CREATE TABLE IF NOT EXISTS drafts (
+    assignment_id INTEGER NOT NULL REFERENCES assignments(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    data TEXT NOT NULL,
+    saved_at TEXT NOT NULL,
+    PRIMARY KEY (assignment_id, user_id)
+);
 CREATE INDEX IF NOT EXISTS runs_by_assignment ON runs (assignment_id, qa_date);
 CREATE INDEX IF NOT EXISTS results_by_test ON results (test_id);
 CREATE UNIQUE INDEX IF NOT EXISTS runs_by_source ON runs (source_ref) WHERE source_ref IS NOT NULL;

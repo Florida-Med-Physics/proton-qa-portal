@@ -403,6 +403,28 @@ def seed_defaults(db, user, seed=None):
     return {"templates": [t["name"] for t in seed.get("templates", [])], "machines": machines}
 
 
+# ---- drafts: a Perform QA page saved part-way, per user and list --------------
+
+def get_draft(db, user, assignment_id):
+    row = db.one("SELECT data, saved_at FROM drafts WHERE assignment_id = ? AND user_id = ?", (assignment_id, user["id"]))
+    return {**json.loads(row["data"]), "saved_at": row["saved_at"]} if row else None
+
+
+def save_draft(db, user, assignment_id, data):
+    require(user, "perform")
+    _get(db, "assignments", assignment_id)
+    payload = {"qa_date": data.get("qa_date"), "comment": data.get("comment") or "", "results": data.get("results") or []}
+    db.run("INSERT INTO drafts (assignment_id, user_id, data, saved_at) VALUES (?, ?, ?, ?) "
+           "ON CONFLICT(assignment_id, user_id) DO UPDATE SET data = excluded.data, saved_at = excluded.saved_at",
+           (assignment_id, user["id"], json.dumps(payload), now()))
+    return {"saved_at": now()}
+
+
+def delete_draft(db, user, assignment_id):
+    db.run("DELETE FROM drafts WHERE assignment_id = ? AND user_id = ?", (assignment_id, user["id"]))
+    return {"ok": True}
+
+
 # ---- machine assignments (scheduled queues) ---------------------------------
 
 def _last_done(db, assignment_id):

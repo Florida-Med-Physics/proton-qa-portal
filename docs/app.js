@@ -1250,6 +1250,7 @@ async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
   const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends`).catch(() => ({})) : {};
   page(t.queue.name, t.assignment.schedule);
+  app.querySelector(".page-head").classList.add("sticky-head");        // the list's name stays in view while scrolling
   if (t.queue.description) {
     app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
   }
@@ -1408,7 +1409,7 @@ async function renderPerform(assignmentId) {
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
         const dlt = el("div", { class: "delta-slot" });
-        const showDelta = () => { const v = Number(control.value); dlt.replaceChildren(control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : ""); };
+        const showDelta = () => { const v = Number(control.value); dlt.replaceChildren(...present([control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : null])); };
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           el("td", {}, firstCell(it), note),
@@ -1578,7 +1579,8 @@ async function renderPerform(assignmentId) {
     try {
       const results = inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value.trim(), comment: i.comment.value }));
       const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef });
-      toast(`Saved. Overall: ${capitalize(result.overall)}`);
+      api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
+      toast(`Submitted. Overall: ${capitalize(result.overall)}`);
       location.hash = `#/runs/${result.id}`;
     } catch (err) {
       error.textContent = err.message;
@@ -1587,9 +1589,42 @@ async function renderPerform(assignmentId) {
     }
   } }, "Submit for review");
   app.append(el("details", { class: "card" }, el("summary", {}, "Notes for the reviewer"), runComment), error);
+  // Save keeps what has been entered so far (per user and list) without submitting; it is restored when the page is opened again.
+  const draftNote = el("span", { class: "muted small" });
+  const saveDraft = el("button", { type: "button", onclick: async () => {
+    saveDraft.disabled = true;
+    try {
+      const results = inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value, comment: i.comment.value }));
+      const r = await api("PUT", `/api/assignments/${assignmentId}/draft`, { qa_date: qaDate.value, comment: runComment.value, results });
+      draftNote.textContent = `Saved ${r.saved_at.slice(0, 16).replace("T", " ")}`;
+      toast("Saved. Nothing is submitted yet.");
+    } catch (err) {
+      toast(err.message, true);
+    }
+    saveDraft.disabled = false;
+  } }, "Save");
   app.append(el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
-    el("div", { class: "spacer" }), el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), submit));
+    el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit));
   refresh();
+  try {
+    const draft = await api("GET", `/api/assignments/${assignmentId}/draft`);
+    if (draft) {
+      const byTest = Object.fromEntries(inputs.map((i) => [i.item.test_id, i]));
+      for (const r of draft.results || []) {
+        const e = byTest[r.test_id];
+        if (!e) continue;
+        if (r.value !== undefined && r.value !== null && r.value !== "") { e.input.value = r.value; e.input.dispatchEvent(new Event("input")); }
+        if (r.comment) { e.comment.value = r.comment; e.comment.hidden = false; }
+      }
+      if (draft.qa_date) qaDate.value = draft.qa_date;
+      if (draft.comment) runComment.value = draft.comment;
+      draftNote.textContent = `Saved ${String(draft.saved_at).slice(0, 16).replace("T", " ")}`;
+      refresh();
+      toast("Restored what was saved earlier.");
+    }
+  } catch (err) {
+    console.error(err);
+  }
   if (state.applySphinxOnLoad && state.sphinxFile) {
     state.applySphinxOnLoad = false;
     await applySphinx();
@@ -2063,7 +2098,7 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
   const draw = () => {
     const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
-        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? "Absolute" : "Δ from reference"))) : null;
+        onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? (unit || "Value") : "Δ from reference"))) : null;
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);

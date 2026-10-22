@@ -140,6 +140,21 @@ def edit_assignment(db, user, m, body, q):
     return service.save_assignment(db, user, body, int(m[1]))
 
 
+@route("GET", r"/api/assignments/(\d+)/draft")
+def get_draft(db, user, m, body, q):
+    return service.get_draft(db, user, int(m[1]))
+
+
+@route("PUT", r"/api/assignments/(\d+)/draft")
+def save_draft(db, user, m, body, q):
+    return service.save_draft(db, user, int(m[1]), body)
+
+
+@route("POST", r"/api/assignments/(\d+)/draft/clear")
+def delete_draft(db, user, m, body, q):
+    return service.delete_draft(db, user, int(m[1]))
+
+
 @route("GET", r"/api/assignments/(\d+)/template")
 def template(db, user, m, body, q):
     return service.run_template(db, user, int(m[1]))
