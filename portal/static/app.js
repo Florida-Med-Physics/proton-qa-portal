@@ -93,6 +93,17 @@ function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
 }
 
+function decimalsOf(values, cap = 3) {
+  let d = 0;
+  for (const v of values) {
+    if (v === null || v === undefined || !Number.isFinite(Number(v))) continue;
+    const text = String(Math.round(Number(v) * 10000) / 10000);
+    const i = text.indexOf(".");
+    if (i >= 0) d = Math.max(d, Math.min(cap, text.length - i - 1));
+  }
+  return d;
+}
+
 function fmt(value, digits) {
   if (value === null || value === undefined || value === "") return "";
   const n = Number(value);
@@ -1417,11 +1428,12 @@ async function renderPerform(assignmentId) {
     const measureTable = (members, { firstHeader, title, directions, firstCell, label }) => {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
+      const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value)) : el("span", { class: "hist empty" }, "—")));
+        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value, dp)) : el("span", { class: "hist empty" }, "—")));
       };
-      const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
+      const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => {
         if (it.type !== "numeric") return null;
         const l = it.limits || {};
@@ -2107,10 +2119,10 @@ function histDateSlot(d) {
   return el("span", { class: "hist date", title: histDateLabel(d) },
     el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear())));
 }
-function histChips(points, dates, unit) {
+function histChips(points, dates, unit, dp) {
   const byDate = new Map((points || []).map((h) => [h.qa_date, h]));
   return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h
-    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value))
+    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value, dp))
     : el("span", { class: "hist empty" }, "—")));
 }
 function latestDates(pointLists, count = 5) {
@@ -2376,6 +2388,7 @@ async function renderTrendOverview(machines, machineId, range) {
   const trendTable = (members, { firstHeader, title, firstCell, chartTogether }) => {
     const dates = latestDates(members.map((it) => it.points));
     const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
+    const dp = decimalsOf(members.flatMap((it) => [...it.points.slice(-5).map((h) => h.value), latest(it.points).expected ?? (it.limits || {}).expected]));
     const rows = members.flatMap((it, k) => {
       const unit = unitOf(it), p = latest(it.points);
       const baseline = p.expected ?? (it.limits || {}).expected;
@@ -2392,11 +2405,11 @@ async function renderTrendOverview(machines, machineId, range) {
         firstHeader !== "Test" ? (k === 0 ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null) : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""),
         el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine({ limits: { warn: p.warn, fail: p.fail, tol_mode: p.tol_mode } }, unit) : null),
         el("td", { class: "qa-unit" }, unit),
-        el("td", { class: "num" }, baseline === null || baseline === undefined ? el("span", { class: "muted" }, "—") : `${fmt(baseline)} ${unit}`.trim()),
-        el("td", { class: "num" }, `${fmt(p.value)} ${unit}`.trim()),
+        el("td", { class: "num" }, baseline === null || baseline === undefined ? el("span", { class: "muted" }, "—") : `${fmt(baseline, dp)} ${unit}`.trim()),
+        el("td", { class: "num" }, `${fmt(p.value, dp)} ${unit}`.trim()),
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
-        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit) : el("span", { class: "muted small" }, "—")),
+        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
       return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
