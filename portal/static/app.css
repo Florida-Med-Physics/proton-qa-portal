@@ -763,7 +763,7 @@ button.chip-filter:hover { filter: brightness(0.95); }
 .measure-title .qa-limits { font-size: 14px; font-weight: 600; margin-top: 2px; }
 
 /* "Spot 1 · 226.4 MeV" stays on one line in energy and axis tables. */
-.energy-table td.qa-label strong, .trend-table:not(.test-table) td.qa-label strong { white-space: nowrap; }
+.energy-table td.qa-label strong { white-space: nowrap; }
 
 /* Pass-rate rings. */
 .ring-row { display: flex; flex-wrap: wrap; gap: 18px 28px; margin: 4px 0 16px; }

@@ -2467,7 +2467,7 @@ async function renderTrendOverview(machines, machineId, range) {
       return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
     });
     const widths = firstHeader === "Test" ? ["3%", "27%", "4%", "8%", "9%", "9%", "8%", "27%", "5%"] : ["3%", "19%", "4%", "8%", "9%", "9%", "8%", "35%", "5%"];
-    const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}` },
+    const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
       el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
       el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : "" }, h))),
         dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {})) : null),
