@@ -7,6 +7,13 @@
 
 const state = { user: null, cache: {} };
 const app = document.getElementById("app");
+// Nothing on the page may ever read "null" or "undefined": the main container drops empty children instead of
+// turning them into text (native append/replaceChildren would), and flattens arrays of elements.
+const present = (kids) => kids.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false);
+for (const method of ["append", "prepend", "replaceChildren"]) {
+  const native = app[method].bind(app);
+  app[method] = (...kids) => native(...present(kids));
+}
 const ROLE_LABEL = { admin: "Admin", physicist: "Physicist", therapist: "Therapist" };
 const STATE_LABEL = { overdue: "Overdue", due: "Due", done: "Done today", upcoming: "Upcoming" };
 const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", semiannual: "Semiannual", annual: "Annual", custom: "Custom interval",
