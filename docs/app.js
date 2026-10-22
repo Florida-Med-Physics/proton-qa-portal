@@ -318,7 +318,8 @@ function renderLogin() {
   const error = el("p", { class: "error" });
   const form = el("form", {},
     el("img", { class: "brand-logo", src: "uf-proton-logo.png", alt: "UF Health Proton Therapy Institute" }),
-    el("h1", {}, el("span", { class: "brand-uf" }, "UF"), "HPTI Machine QA Portal"),
+    el("h1", { class: "login-title" }, el("img", { class: "login-mark", src: "gatorqa-logo.svg", alt: "" }), "GatorQA"),
+    el("p", { class: "muted login-sub" }, "UFHPTI Machine QA"),
     window.localApi
       ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
         field("Your name", el("input", { name: "username", autocomplete: "name", required: true, autofocus: true })),
