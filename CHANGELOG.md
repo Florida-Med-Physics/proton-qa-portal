@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- GATORQA-DESIGN.md: the plan for bringing GatorQA onto floridaphysics.com alongside its Monthly QA page (shared platform and template schema, PASS / WARNING / ACTION, entries stored with derived values plus template version, trends for monthly and daily, on-site agent with a nightly local copy).
 - Eyeline GTR4 has one daily list, "Eyeline Daily QA" (sections Administrative / Dosimetry: PDD / Dosimetry: Output (partial) / Imaging / Safety), replacing the three separate lists.
 - Machine Trends: the table is Test · Reference · Warn · Fail · History (values under their QA dates, as in Perform QA) · Trends, and a search box narrows it to matching tests. Axis labels (X / Y / Z) are plain coloured letters, not boxes.
 - Perform QA: a Save button keeps what has been entered (per user and list) without submitting, and it is restored when the list is opened again; the list's title row stays frozen at the top while scrolling. Chart toggle reads "<unit> | Δ from reference" in one colour, the chosen one underlined.
