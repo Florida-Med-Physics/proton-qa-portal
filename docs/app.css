@@ -775,3 +775,9 @@ button.chip-filter:hover { filter: brightness(0.95); }
 .ring-pct { font-size: 18px; font-weight: 700; fill: var(--text); }
 .ring-title { font-size: 12px; font-weight: 600; margin-top: 4px; }
 .ring-sub { font-size: 11px; color: var(--muted); }
+
+/* Per-test pass ring in the "30 days" column. */
+.ring.mini { width: auto; }
+.ring.mini .ring-svg { width: 44px; height: 44px; }
+.ring.mini .ring-pct { font-size: 22px; }
+td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }

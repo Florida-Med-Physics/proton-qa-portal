@@ -2110,6 +2110,12 @@ function bandValue(point, key, sign) {
   return point.expected + sign * tol;
 }
 
+function miniRing(counts) {
+  const ring = passRing(counts, "", "");
+  ring.classList.add("mini");
+  return ring;
+}
+
 function passRing(counts, title, sub) {
   const total = (counts.pass || 0) + (counts.warn || 0) + (counts.fail || 0);
   const pct = total ? Math.round((100 * (counts.pass || 0)) / total) : null;
@@ -2124,7 +2130,7 @@ function passRing(counts, title, sub) {
   kids.push(svg("text", { class: "ring-pct", x: 44, y: 44, "text-anchor": "middle", "dominant-baseline": "central" }, pct === null ? "—" : `${pct}%`));
   return el("div", { class: "ring", title: total ? `${counts.pass || 0} pass · ${counts.warn || 0} warning · ${counts.fail || 0} action of ${total} results` : "No results in this period" },
     svg("svg", { viewBox: "0 0 88 88", class: "ring-svg", role: "img", "aria-label": `${title}: ${pct === null ? "no results" : pct + "% passed"}` }, kids),
-    el("div", { class: "ring-title" }, title), sub ? el("div", { class: "ring-sub" }, sub) : null);
+    title ? el("div", { class: "ring-title" }, title) : null, sub ? el("div", { class: "ring-sub" }, sub) : null);
 }
 
 function filterRange(points, range) {
@@ -2371,11 +2377,7 @@ async function renderTrendOverview(machines, machineId, range) {
     app.append(el("div", { class: "card empty" }, numeric.length ? "No results in this period." : `${machine.name} has no measured tests scheduled.`));
     return;
   }
-  const tally = (items) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const it of items) for (const pt of it.points) if (pt.status in c) c[pt.status]++; return c; };
-  const rangeLabel = { "30": "last 30 days", "90": "last 3 months", "365": "last year", all: "all history" }[range] || `last ${range} days`;
-  const sections = [...new Set(withData.map((i) => sectionOf(i)))].sort();
-  app.append(el("div", { class: "ring-row" }, passRing(tally(withData), `${machine.name} · all tests`, `passed, ${rangeLabel}`),
-    ...sections.map((sec) => passRing(tally(withData.filter((i) => sectionOf(i) === sec)), sec, `passed, ${rangeLabel}`))));
+  const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of filterRange(all[it.test_id] || [], "30")) if (pt.status in c) c[pt.status]++; return c; };
   const groups = axisGroups(withData);
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
@@ -2446,7 +2448,7 @@ async function renderTrendOverview(machines, machineId, range) {
       const baseline = p.expected ?? (it.limits || {}).expected;
       const href = hrefFor(chartTogether ? members.map((m) => m.test_id) : [it.test_id]);
       // Trends: the dot icon opens the chart under the row (the whole X / Y / Z set at once for an axis table).
-      const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+      const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
       const series = chartTogether ? members.map((m) => ({ label: m.axisLabel || m.name, points: m.points })) : [{ label: it.name, points: it.points }];
       const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: (e) => {
         e.stopPropagation();
@@ -2462,15 +2464,16 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
         el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
+        el("td", { class: "ring-cell" }, miniRing(tally30(it))),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
       return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
     });
-    const widths = firstHeader === "Test" ? ["3%", "27%", "4%", "8%", "9%", "9%", "8%", "27%", "5%"] : ["3%", "19%", "4%", "8%", "9%", "9%", "8%", "35%", "5%"];
+    const widths = firstHeader === "Test" ? ["3%", "25%", "4%", "8%", "9%", "9%", "8%", "22%", "7%", "5%"] : ["3%", "18%", "4%", "8%", "9%", "9%", "8%", "29%", "7%", "5%"];
     const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
       el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : "" }, h))),
-        dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {})) : null),
+      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h))),
+        dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {}), el("th", {})) : null),
       el("tbody", {}, rows)));
     if (title && firstHeader !== "Test") {
       const p0 = latest(members[0].points);
