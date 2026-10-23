@@ -641,7 +641,12 @@ This cannot be undone. Lists with recorded results cannot be deleted; archive th
 async function renderSetup() {
   const editable = can("configure");
   page("Setup QA", "The QA lists and the tests in them. Open a list to edit its tests, order and limits.",
-    editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
+    editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list"),
+      el("button", { onclick: () => modal("Add machine", machineForm(), async (data) => {
+        const machine = await api("POST", "/api/machines", data);
+        toast("Machine added. Choose the QA lists it runs.");
+        location.hash = `#/machines/${machine.id}`;
+      }, "Add machine") }, "Add machine")] : []);
   const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
   const schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
   const setActive = async (a, active) => {
@@ -777,6 +782,7 @@ async function renderSetup() {
 
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
+    el("a", { class: "button small", href: "#/machines" }, "Manage machines"),
     el("a", { class: "button small", href: "#/tests" }, "All tests"),
     can("manage_users") ? el("a", { class: "button small", href: "#/users" }, "People") : null,
     el("a", { class: "button small", href: "#/audit" }, "Audit log")));

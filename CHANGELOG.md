@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Setup QA: expose Add machine at the top and Manage machines below; new machines open directly to QA list scheduling.
+
 - Add Archive to template menus and a restorable Archived templates section; keep results and per-machine settings and prevent performing archived templates.
 
 - Setup QA: group QA Template Lists into Proton, Photon, Brachytherapy and Simulation, with search across all groups.
