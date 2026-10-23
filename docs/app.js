@@ -1736,22 +1736,34 @@ function importSphinxDialog(a) {
 // Schedule one list on machines: every ticked machine runs this same list (no copies).
 async function scheduleDialog(list, machines, schedules) {
   if (!schedules) schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
-  const on = new Set(schedules.filter((a) => a.queue_id === list.id).map((a) => a.machine_id));
+  const existing = new Map(schedules.filter((a) => a.queue_id === list.id).map((a) => [a.machine_id, a]));
+  const on = new Set([...existing.values()].filter((a) => a.active).map((a) => a.machine_id));
   const body = el("div", {},
-    el("p", { class: "muted" }, `Every ticked machine runs "${list.name}" itself, so an edit to the list reaches all of them.`),
+    el("p", { class: "muted" }, `Tick machines to schedule "${list.name}". Untick a machine to pause its schedule; its results and settings are kept.`),
     el("div", { class: "form-grid" },
       field("Machines", el("div", { class: "machine-picks" }, machines.filter((m) => m.active).map((m) => el("label", { class: "check" },
-        el("input", { type: "checkbox", name: "machines", value: String(m.id), checked: on.has(m.id), disabled: on.has(m.id) }), m.name,
+        el("input", { type: "checkbox", name: "machines", value: String(m.id), checked: on.has(m.id) }), m.name,
         on.has(m.id) ? el("span", { class: "muted small" }, " (scheduled)") : null))), "wide")),
     el("div", { class: "schedule-part" }, scheduleForm(null)));
   modal(`Schedule ${list.name}`, body, async (data, form) => {
-    const chosen = [...body.querySelectorAll("[name=machines]")].filter((c) => c.checked && !c.disabled).map((c) => Number(c.value));
-    if (!chosen.length) throw new Error("Tick at least one machine.");
+    const choices = [...body.querySelectorAll("[name=machines]")];
     const schedule = scheduleData(data, form);
-    for (const machineId of chosen) await api("POST", "/api/assignments", { ...schedule, machine_id: machineId, queue_id: list.id });
-    toast(chosen.length === 1 ? "Scheduled on 1 machine" : `Scheduled on ${chosen.length} machines`);
+    for (const control of choices) {
+      const machineId = Number(control.value), previous = existing.get(machineId);
+      if (previous) {
+        if (!!previous.active === control.checked) continue;
+        await api("PUT", `/api/assignments/${previous.id}`, {
+          frequency: previous.frequency, interval_days: previous.interval_days,
+          weekdays: String(previous.weekdays).split(",").filter(Boolean).map(Number),
+          start_date: previous.start_date, import_folder: previous.import_folder || "", active: control.checked,
+        });
+      } else if (control.checked) {
+        await api("POST", "/api/assignments", { ...schedule, active: true, machine_id: machineId, queue_id: list.id });
+      }
+    }
+    toast("Machine schedules saved");
     route();
-  }, "Schedule");
+  }, "Save");
 }
 
 // A separate list under a new name (its tests are copied, so it can then be changed on its own).

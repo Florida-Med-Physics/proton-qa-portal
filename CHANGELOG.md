@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Schedule dialog: allow existing machines to be unticked or reactivated while keeping their settings and history.
+
 - QA Template Lists: place the options menu between the pencil and name and remove the Actions column.
 
 - Template limits: label Default Warning and Default Action and use radio buttons to select per-machine limits.
