@@ -625,7 +625,6 @@
     const q = get("queues", queueId, "QA list");
     const archived = data.archived !== false;
     q.active = archived ? 0 : 1;
-    for (const a of S.assignments) if (a.queue_id === q.id) a.active = archived ? 0 : 1;
     save();
     audit(user.id, archived ? "archive" : "restore", "queue", q.id, { name: q.name });
     return { ok: true };
@@ -690,7 +689,7 @@
   };
   function listAssignments(machineId, today) {
     today = today || new Date();
-    return S.assignments.filter((a) => a.machine_id === Number(machineId)).map((a) => ({
+    return S.assignments.filter((a) => a.machine_id === Number(machineId) && byId("queues", a.queue_id).active).map((a) => ({
       ...a, queue_name: byId("queues", a.queue_id).name, schedule: describeSchedule(a), ...dueState(a, lastDone(a.id), today),
       override_count: S.overrides.filter((o) => o.assignment_id === a.id).length,
     })).sort((a, b) => (b.active - a.active) || a.queue_name.localeCompare(b.queue_name));

@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Schedules: remove Actions and Last Modified columns.
+
+- Machine Schedules: add per-machine Active switches and preserve machine settings when toggling the shared list.
+
 - Setup QA: combine template list actions into one vertical three-dot menu at the right.
 
 - Machine Values: show Default when a schedule uses the list defaults.

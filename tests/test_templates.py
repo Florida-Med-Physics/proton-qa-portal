@@ -139,6 +139,12 @@ class ArchiveDeleteTests(unittest.TestCase):
         with self.assertRaises(PortalError):
             service.archive_queue(self.db, self.users["therapist"], self.queue, {"archived": True})
 
+    def test_list_activation_preserves_inactive_machine_schedule(self):
+        self.db.run("UPDATE assignments SET active = 0 WHERE id = ?", (self.assignment,))
+        service.archive_queue(self.db, self.admin, self.queue, {"archived": True})
+        service.archive_queue(self.db, self.admin, self.queue, {"archived": False})
+        self.assertEqual(self.db.one("SELECT active FROM assignments WHERE id = ?", (self.assignment,))["active"], 0)
+
     def test_delete_only_without_results(self):
         service.submit_run(self.db, self.users["therapist"], self.assignment, {"results": [{"test_id": self.test, "value": "pass"}]})
         with self.assertRaisesRegex(PortalError, "Archive it instead"):

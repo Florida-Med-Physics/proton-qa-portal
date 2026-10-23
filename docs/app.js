@@ -723,25 +723,24 @@ async function renderSetup() {
     .sort((x, y) => kindRankOf(x) - kindRankOf(y) || x.name.localeCompare(y.name)).flatMap((m) => {
       const mine = schedules.filter((a) => a.machine_id === m.id).map((a) => ({ a, q: lists.find((q) => q.id === a.queue_id) })).filter((x) => x.q)
         .sort((x, y) => (y.a.active - x.a.active) || (FREQ_ORDER[x.a.frequency] ?? 9) - (FREQ_ORDER[y.a.frequency] ?? 9) || x.q.name.localeCompare(y.q.name));
-      return [el("tr", { class: "machine-row" }, el("td", { colspan: 5 }, el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" },
+      return [el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" },
         el("strong", {}, m.name)), m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...mine.map(({ a, q }) => el("tr", { class: a.active ? "" : "muted" },
         el("td", { class: "indent" }, el("div", { class: "name-with-edit" }, iconBtn("✎", editable ? "Edit tests (all machines)" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
           el("span", {}, el("a", { href: `#/queues/${q.id}` }, el("strong", {}, q.name)),
             a.active ? el("span", { class: "active-tag" }, " (Active)") : el("span", { class: "inactive-tag" }, " (Inactive)")))),
         el("td", { class: "small" }, a.schedule),
+        el("td", {}, el("label", { class: "check" },
+          el("input", { type: "checkbox", role: "switch", checked: !!a.active, disabled: !editable,
+            "aria-label": `Active: ${q.name} on ${m.name}`,
+            onchange: async (e) => { e.target.disabled = true; await setActive(a, e.target.checked); e.target.disabled = false; e.target.checked = !!a.active; },
+          }), el("span", { class: a.active ? "active-tag" : "inactive-tag" }, a.active ? "Active" : "Inactive"))),
         el("td", { class: "center" }, a.override_count
           ? el("a", { href: `#/assignments/${a.id}/limits`, title: "Values that differ on this machine" }, `${a.override_count} ${a.override_count === 1 ? "test" : "tests"}`)
           : el("span", { class: "muted small" }, "Default")),
-        el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
-          editable ? moreMenu([
-            [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active), a.active ? "Stop scheduling this list on the machine" : "Schedule this list on the machine"],
-            ["Values for this machine", () => (location.hash = `#/assignments/${a.id}/limits`), "Baselines or limits that differ on this machine only"],
-            ["Schedule and import folder", () => (location.hash = `#/machines/${m.id}`), "Change how often it is due and where its files arrive"],
-          ]) : null)),
-        modified(q)))];
+        ) )];
     });
-  const scheduleTable = fixedTable([["QA List", "32%"], ["Schedule", "26%"], ["Machine Values", "12%"], ["Actions", "10%"], ["Last Modified", "20%"]], scheduleRows,
+  const scheduleTable = fixedTable([["QA List", "45%"], ["Schedule", "25%"], ["Active", "15%"], ["Machine Values", "15%"]], scheduleRows,
     "No lists scheduled yet. Use ＋ on a list above to schedule it on machines.");
   app.append(filterBox(scheduleTable, "Search machine schedules"), scheduleTable);
 

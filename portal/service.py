@@ -385,13 +385,12 @@ def reevaluate_queue(db, user, queue_id):
 
 
 def archive_queue(db, user, queue_id, data):
-    """Hide a QA list (and its schedules) without deleting anything; restoring brings both back."""
+    """Hide a QA list without deleting anything; preserve each machine's activation setting."""
     require(user, "configure")
     queue = _get(db, "queues", queue_id)
     archived = bool(data.get("archived", True))
     with db.transaction():
         db.run("UPDATE queues SET active = ? WHERE id = ?", (0 if archived else 1, queue_id))
-        db.run("UPDATE assignments SET active = ? WHERE queue_id = ?", (0 if archived else 1, queue_id))
         db.audit(user["id"], "archive" if archived else "restore", "queue", queue_id, name=queue["name"])
     return {"ok": True}
 
@@ -509,7 +508,7 @@ def _last_done(db, assignment_id):
 def list_assignments(db, user, machine_id, today=None):
     today = today or date.today()
     rows = db.all("SELECT a.*, q.name AS queue_name, (SELECT COUNT(*) FROM assignment_overrides o WHERE o.assignment_id = a.id) AS override_count "
-                  "FROM assignments a JOIN queues q ON q.id = a.queue_id WHERE a.machine_id = ? ORDER BY a.active DESC, q.name", (machine_id,))
+                  "FROM assignments a JOIN queues q ON q.id = a.queue_id WHERE a.machine_id = ? AND q.active = 1 ORDER BY a.active DESC, q.name", (machine_id,))
     for row in rows:
         row["schedule"] = qa.describe_schedule(row)
         row.update(qa.due_state(row, _last_done(db, row["id"]), today))
