@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Setup QA: rename QA Template Lists and add an Active/Inactive status column, keeping inactive lists available for reactivation.
+
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added

@@ -636,7 +636,7 @@ This cannot be undone. Lists with recorded results cannot be deleted; archive th
   }
 }
 
-// Setup QA: the QA lists themselves (templates and each machine's copy), all editable. Same layout as Perform QA.
+// Setup QA: shared QA template lists and their machine schedules.
 async function renderSetup() {
   const editable = can("configure");
   page("Setup QA", "The QA lists and the tests in them. Open a list to edit its tests, order and limits.",
@@ -653,12 +653,11 @@ async function renderSetup() {
       toast(err.message, true);
     }
   };
-  // Archived lists are hidden here and everywhere else; they come back from the Archived section below.
-  const archivedLists = queues.filter((q) => !q.active);
+  // Keep inactive lists visible here so they can be reactivated.
   const lists = queues.filter((q) => q.active);
   const schedulesOf = (q) => schedules.filter((a) => a.queue_id === q.id);
   const machineOf = (a) => machines.find((m) => m.id === a.machine_id) || {};
-  app.append(el("p", { class: "lead" }, `${lists.length} QA ${lists.length === 1 ? "list" : "lists"}. `,
+  app.append(el("p", { class: "lead" }, `${queues.length} QA Template ${queues.length === 1 ? "List" : "Lists"}. `,
     el("span", { class: "muted small" }, "Each list is one list, shared by every machine it is scheduled on. A value that differs on one machine is set on that machine's schedule.")));
 
   const iconBtn = (glyph, title, onclick, cls = "") => el("button", { type: "button", class: `icon-action ${cls}`, title, "aria-label": title, onclick }, glyph);
@@ -676,9 +675,9 @@ async function renderSetup() {
   };
   const modified = (q) => el("td", { class: "small muted" }, q.modified_at ? el("span", {}, q.modified_at.slice(0, 16).replace("T", " "), el("br"), q.modified_by || "") : "—");
 
-  app.append(el("h2", { class: "section-head" }, "QA Lists"));
+  app.append(el("h2", { class: "section-head" }, "QA Template Lists"));
   const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
-  const listRows = lists.slice().sort((x, y) => (schedulesOf(y).length > 0) - (schedulesOf(x).length > 0) || x.name.localeCompare(y.name)).map((q) => el("tr", {},
+  const listRows = queues.slice().sort((x, y) => (schedulesOf(y).length > 0) - (schedulesOf(x).length > 0) || x.name.localeCompare(y.name)).map((q) => el("tr", {},
     el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editableName(q, editable))),
     el("td", {}, schedulesOf(q).length
       ? el("div", { class: "sched-chips" }, schedulesOf(q).sort((a, b) => String(machineOf(a).name).localeCompare(String(machineOf(b).name))).map((a) =>
@@ -686,18 +685,34 @@ async function renderSetup() {
           machineOf(a).name, a.active ? null : " (Inactive)")))
       : el("span", { class: "muted small" }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
+    el("td", {}, editable ? select("active", [["1", "Active"], ["0", "Inactive"]], q.active ? "1" : "0", {
+      "aria-label": `Status for ${q.name}`,
+      title: "Applies to this list on all scheduled machines",
+      onchange: async (e) => {
+        const control = e.target;
+        control.disabled = true;
+        try {
+          await api("POST", `/api/queues/${q.id}/archive`, { archived: control.value === "0" });
+          toast(`${q.name} set ${control.value === "1" ? "active" : "inactive"}`);
+          route();
+        } catch (err) {
+          control.value = q.active ? "1" : "0";
+          control.disabled = false;
+          toast(err.message, true);
+        }
+      },
+    }) : (q.active ? "Active" : "Inactive")),
     el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
       editable ? iconBtn("＋", "Schedule on machines", () => scheduleDialog(q, machines, schedules)) : null,
       editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
       editable ? moreMenu([
         ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
         ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
-        ["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"],
       ]) : null)),
     modified(q)));
-  const listTable = fixedTable([["QA List", "33%"], ["Scheduled On", "28%"], ["Tests", "7%"], ["Actions", "12%"], ["Last Modified", "20%"]], listRows,
+  const listTable = fixedTable([["QA Template List", "29%"], ["Scheduled On", "23%"], ["Tests", "6%"], ["Status", "12%"], ["Actions", "13%"], ["Last Modified", "17%"]], listRows,
     "No QA lists yet. Make one with New QA list.");
-  app.append(filterBox(listTable, "Search QA lists"), listTable);
+  app.append(filterBox(listTable, "Search QA Template Lists"), listTable);
 
   // Each machine's schedules: which of the lists it runs, how often, and any values of its own.
   const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator"];
@@ -729,15 +744,6 @@ async function renderSetup() {
     "No lists scheduled yet. Use ＋ on a list above to schedule it on machines.");
   app.append(filterBox(scheduleTable, "Search machine schedules"), scheduleTable);
 
-  if (archivedLists.length) {
-    app.append(el("details", { class: "archived" }, el("summary", {}, `Archived QA lists (${archivedLists.length})`),
-      el("p", { class: "muted small" }, "Hidden from Perform QA, Machines and Trends. Their tests and results are kept."),
-      table(["QA list", "#Tests", ""], archivedLists.map((q) => el("tr", { class: "muted" },
-        el("td", {}, el("strong", {}, q.name)), el("td", { class: "num" }, q.item_count),
-        el("td", { class: "right" }, editable ? el("div", { class: "row nowrap end" },
-          el("button", { class: "small primary", onclick: () => archiveList(q, false) }, "Restore"),
-          el("button", { class: "small danger", onclick: () => deleteList(q) }, "Delete")) : null))))));
-  }
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
     el("a", { class: "button small", href: "#/tests" }, "All tests"),
