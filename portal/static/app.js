@@ -1646,11 +1646,17 @@ async function renderPerform(assignmentId) {
     submit.disabled = true;
     try {
       const results = inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value.trim(), comment: i.comment.value }));
+      autosaveStopped = true;
+      clearTimeout(autosaveTimer);
+      await draftWrites;
       const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef });
-      api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
+      await api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
+      try { await downloadQaReport(result.id); }
+      catch (err) { toast("QA completed. PDF could not download; use Download PDF report on the saved run.", true); }
       toast(`Submitted. Overall: ${capitalize(result.overall)}`);
       location.hash = `#/runs/${result.id}`;
     } catch (err) {
+      autosaveStopped = false;
       error.textContent = err.message;
     } finally {
       submit.disabled = false;
@@ -1659,18 +1665,31 @@ async function renderPerform(assignmentId) {
   app.append(el("details", { class: "card" }, el("summary", {}, "Notes for the reviewer"), runComment), error);
   // Save keeps what has been entered so far (per user and list) without submitting; it is restored when the page is opened again.
   const draftNote = el("span", { class: "muted small" });
+  let autosaveTimer, autosaveStopped = false;
+  let draftWrites = Promise.resolve();
+  const persistDraft = () => {
+    if (autosaveStopped) return draftWrites;
+    const data = { qa_date: qaDate.value, comment: runComment.value,
+      results: inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value, comment: i.comment.value })) };
+    draftNote.textContent = "Saving…";
+    draftWrites = draftWrites.catch(() => {}).then(async () => {
+      const saved = await api("PUT", `/api/assignments/${assignmentId}/draft`, data);
+      draftNote.textContent = `Saved ${saved.saved_at.slice(11, 19)}`;
+    }).catch((err) => { draftNote.textContent = "Not saved - use Save draft"; toast(err.message, true); });
+    return draftWrites;
+  };
+  const queueAutosave = () => {
+    if (autosaveStopped) return;
+    clearTimeout(autosaveTimer);
+    draftNote.textContent = "Unsaved changes";
+    autosaveTimer = setTimeout(persistDraft, 600);
+  };
   const saveDraft = el("button", { type: "button", onclick: async () => {
+    clearTimeout(autosaveTimer);
     saveDraft.disabled = true;
-    try {
-      const results = inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value, comment: i.comment.value }));
-      const r = await api("PUT", `/api/assignments/${assignmentId}/draft`, { qa_date: qaDate.value, comment: runComment.value, results });
-      draftNote.textContent = `Saved ${r.saved_at.slice(0, 16).replace("T", " ")}`;
-      toast("Saved. Nothing is submitted yet.");
-    } catch (err) {
-      toast(err.message, true);
-    }
+    await persistDraft();
     saveDraft.disabled = false;
-  } }, "Save");
+  } }, "Save draft");
   app.append(el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit));
   refresh();
@@ -1693,6 +1712,11 @@ async function renderPerform(assignmentId) {
   } catch (err) {
     console.error(err);
   }
+  for (const control of [...inputs.flatMap((i) => [i.input, i.comment]), qaDate, runComment]) {
+    control.addEventListener("input", queueAutosave);
+    control.addEventListener("change", queueAutosave);
+  }
+  // Programmatic imports also persist their filled measurements.
   if (state.applySphinxOnLoad && state.sphinxFile) {
     state.applySphinxOnLoad = false;
     await applySphinx();
@@ -2167,9 +2191,72 @@ async function renderRuns() {
       el("td", {}, r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)))), "No runs match."));
 }
 
+// A self-contained PDF exporter shared by the server and browser builds.
+function qaReportPdf(run) {
+  const clean = (value) => String(value ?? "").replace(/Δ/g, 'Deviation').replace(/±/g, '+/-').replace(/[–—]/g, '-').replace(/°/g, ' deg').replace(/[^\x20-\x7e\n]/g, '?');
+  const wrap = (value, width = 92) => clean(value).split('\n').flatMap((line) => {
+    const out = [];
+    while (line.length > width) { let at = line.lastIndexOf(' ', width); if (at < 1) at = width; out.push(line.slice(0, at)); line = line.slice(at).trimStart(); }
+    out.push(line); return out;
+  });
+  const verdict = (v) => ({ pass: 'PASS', warn: 'WARNING', fail: 'ACTION' }[v] || clean(v || 'Recorded').toUpperCase());
+  const lines = [run.queue_name, `Machine: ${run.machine_name} | QA date: ${run.qa_date} | Run: ${run.id}`,
+    `Performed by: ${run.performer_name || run.performer || ''} | Recorded: ${run.performed_at || ''}`,
+    `Overall: ${verdict(run.overall)} | Review: ${run.review_status || 'pending'}`];
+  if (run.reviewed_at) lines.push(`Reviewed by: ${run.reviewer_name || run.reviewer || ''} | ${run.reviewed_at}`);
+  if (run.comment) lines.push(`Notes: ${run.comment}`);
+  if (run.review_comment) lines.push(`Review note: ${run.review_comment}`);
+  lines.push('');
+  const blocks = [lines.flatMap((x) => wrap(x))];
+  for (const [index, r] of (run.results || []).entries()) {
+    const unit = r.unit && r.unit !== 'unitless' ? r.unit : '';
+    const value = r.type === 'boolean' ? (r.value_num ? 'Yes' : 'No') : r.type === 'numeric' ? `${r.value_num ?? ''} ${unit}` : r.value_text || '';
+    const block = [`${index + 1}. ${r.name}`, `Result: ${value} | ${verdict(r.status)}`];
+    if (r.type === 'numeric') {
+      const suffix = r.tol_mode === 'percent' ? '%' : unit;
+      block.push(`Baseline: ${r.expected ?? 'Not set'} ${unit} | Warning: +/- ${r.warn ?? 'Not set'} ${suffix} | Action: +/- ${r.fail ?? 'Not set'} ${suffix}`);
+      if (r.expected != null && r.value_num != null) block.push(`Deviation: ${Number((r.value_num - r.expected).toPrecision(7))} ${unit}`);
+    }
+    if (r.comment) block.push(`Comment: ${r.comment}`);
+    blocks.push([...block.flatMap((x) => wrap(x)), '']);
+  }
+  const pages = [[]];
+  for (const block of blocks) {
+    if (pages.at(-1).length && pages.at(-1).length + block.length > 44) pages.push([]);
+    for (const line of block) { if (pages.at(-1).length >= 44) pages.push([]); pages.at(-1).push(line); }
+  }
+  const objects = [null, '<< /Type /Catalog /Pages 2 0 R >>', '', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
+  const pageIds = [];
+  const escape = (s) => clean(s).replace(/([\\()])/g, '\\$1');
+  pages.forEach((page, index) => {
+    const pageId = objects.length, streamId = pageId + 1; pageIds.push(pageId);
+    const stream = `BT /F1 15 Tf 48 750 Td (${escape('GatorQA - QA Completion Report')}) Tj ET\n` +
+      page.map((line, row) => `BT /F1 10 Tf 48 ${720 - row * 14} Td (${escape(line)}) Tj ET`).join('\n') +
+      `\nBT /F1 8 Tf 48 40 Td (Run ${escape(run.id)} | Page ${index + 1} of ${pages.length} | Review status: ${escape(run.review_status || 'pending')}) Tj ET`;
+    objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${streamId} 0 R >>`);
+    objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);
+  });
+  objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`;
+  let pdf = '%PDF-1.4\n', offsets = [0];
+  for (let id = 1; id < objects.length; id++) { offsets.push(pdf.length); pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`; }
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n` + offsets.slice(1).map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new Blob([pdf], { type: 'application/pdf' });
+}
+async function downloadQaReport(id) {
+  const run = await api('GET', `/api/runs/${id}`);
+  const url = URL.createObjectURL(qaReportPdf(run));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `QA-${run.machine_name}-${run.qa_date}-run-${id}.pdf`.replace(/[^a-zA-Z0-9._-]/g, '_');
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(run.queue_name, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`);
+  page(run.queue_name, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`, [el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report")]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
     el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),
