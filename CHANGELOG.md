@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Setup QA: combine template list actions into one vertical three-dot menu at the right.
+
 - Machine Values: show Default when a schedule uses the list defaults.
 
 - QA Template Lists: label the column Active and use one on/off control with green Active text.

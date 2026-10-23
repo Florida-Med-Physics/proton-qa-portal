@@ -664,7 +664,7 @@ async function renderSetup() {
   const moreMenu = (items) => {
     const menu = el("div", { class: "more-menu", hidden: true }, ...items.filter(Boolean).map(([label, fn, title]) =>
       el("button", { type: "button", class: "more-item", title: title || null, onclick: () => { menu.hidden = true; fn(); } }, label)));
-    const wrap = el("span", { class: "more-wrap" }, iconBtn("⋯", "More actions", (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; }), menu);
+    const wrap = el("span", { class: "more-wrap" }, iconBtn("⋮", "More actions", (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; }), menu);
     document.addEventListener("click", () => { menu.hidden = true; });
     return wrap;
   };
@@ -704,11 +704,11 @@ async function renderSetup() {
         },
       }), el("span", { class: q.active ? "active-tag" : "inactive-tag" }, q.active ? "Active" : "Inactive"))),
     el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
-      editable ? iconBtn("＋", "Schedule on machines", () => scheduleDialog(q, machines, schedules)) : null,
-      editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
       editable ? moreMenu([
+        ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
         ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
         ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
+        ["Delete", () => deleteList(q), "Delete only if it has no results"],
       ]) : null)),
     ));
   const listTable = fixedTable([["QA Template List", "35%"], ["Scheduled On", "29%"], ["Tests", "7%"], ["Active", "14%"], ["Actions", "15%"]], listRows,
