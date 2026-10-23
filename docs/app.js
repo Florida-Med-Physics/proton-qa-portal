@@ -373,21 +373,23 @@ async function renderHome() {
     const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
     if (!machines.length) continue;
     const rows = machines.map((m) => {
-      const worst = m.queues.reduce((w, q) => (q.state === "overdue" ? "overdue" : w === "overdue" ? w : q.state === "due" ? "due" : w), "done");
+      // The one list people start every day: the most frequent (Daily); other lists stay on Perform QA.
+      const main = [...m.queues].sort((p, q) => (FREQ_ORDER[p.frequency] ?? 9) - (FREQ_ORDER[q.frequency] ?? 9) || p.queue_name.localeCompare(q.queue_name))[0];
+      const worst = main ? (main.state === "overdue" ? "overdue" : main.state === "due" ? "due" : "done") : "done";
       const lasts = m.queues.filter((q) => q.last_run);
       const lastRun = lasts.sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""))[0];
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
         el("td", {}, el("strong", {}, m.name)),
-        el("td", {}, m.queues.length ? [...m.queues].sort((p, q) => (FREQ_ORDER[p.frequency] ?? 9) - (FREQ_ORDER[q.frequency] ?? 9) || p.queue_name.localeCompare(q.queue_name)).map((q) => el("div", { class: "small list-line" },
-          can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}`, onclick: (e) => e.stopPropagation() }, "▶") : null,
-          q.queue_name)) : el("span", { class: "muted small" }, "None")),
-        el("td", {}, m.queues.length ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? (([q]) => dueIn(q.next_due, q.frequency))(m.queues.filter((q) => q.state === "due").sort((x, y) => x.next_due.localeCompare(y.next_due))) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
+        el("td", {}, main ? el("div", { class: "small list-line" },
+          can("perform") ? el("a", { class: "start-dot", href: `#/perform/${main.id}`, title: `Start ${main.queue_name}`, "aria-label": `Start ${main.queue_name}`, onclick: (e) => e.stopPropagation() }, "▶") : null,
+          main.queue_name) : el("span", { class: "muted small" }, "None")),
+        el("td", {}, main ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? dueIn(main.next_due, main.frequency) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
         el("td", {}, lastRun ? el("div", { class: "last-result-row" }, lastCounts[m.id] ? miniRing(lastCounts[m.id]) : null, el("span", { class: "last-result-text" }, chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`))) : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "13%"], ["Active QA lists", "22%"], ["Due Date", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["Trends", "9%"]], rows));
+      fixedTable([["Machine", "13%"], ["Daily QA", "22%"], ["Due Date", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["Trends", "9%"]], rows));
   }
 }
 
