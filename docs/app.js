@@ -675,9 +675,8 @@ async function renderSetup() {
     editable ? moreMenu([["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"]]) : null));
 
   app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "29%"], [second, "25%"], ["Tests", "7%"], ["Actions", "18%"], ["Last Modified", "11%"], ["Modified By", "10%"]];
-  const modified = (q) => [el("td", { class: "small muted" }, q.modified_at ? q.modified_at.slice(0, 16).replace("T", " ") : "—"),
-    el("td", { class: "small muted" }, q.modified_by || "—")];
+  const SETUP_COLS = (first, second) => [[first, "29%"], [second, "25%"], ["Tests", "7%"], ["Actions", "18%"], ["Last Modified", "21%"]];
+  const modified = (q) => [el("td", { class: "small muted" }, q.modified_at ? el("span", {}, q.modified_at.slice(0, 16).replace("T", " "), el("br"), q.modified_by || "") : "—")];
   const templateTable = templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
     el("td", {}, editableName(t, editable)),
     el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
@@ -1862,8 +1861,7 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           select("", [["", `Default (${t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], item.tol_mode || "",
             { disabled: !editable, onchange: (e) => { item.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
-        el("td", { class: "small" }, m.modified_at ? m.modified_at.slice(0, 16).replace("T", " ") : el("span", { class: "muted" }, "—")),
-        el("td", { class: "small" }, m.modified_by || el("span", { class: "muted" }, "—")),
+        el("td", { class: "small" }, m.modified_at ? el("span", {}, m.modified_at.slice(0, 16).replace("T", " "), el("br"), m.modified_by || "") : el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
@@ -1875,7 +1873,7 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Warning / Action", "Modified Date", "Modified By", ""].map((h) => el("th", {}, h)))), body))
+      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Warning / Action", "Last Modified", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
