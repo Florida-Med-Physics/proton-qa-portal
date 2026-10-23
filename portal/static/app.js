@@ -1460,9 +1460,11 @@ async function renderPerform(assignmentId) {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
+      const unitsHere = [...new Set(tests.filter((it) => it.type === "numeric").map((it) => (it.unit && it.unit !== "unitless" ? it.unit : "")))];
+      const sharedUnit = unitsHere.length === 1 ? unitsHere[0] : null;          // one unit: it goes in the header; mixed: on each chip
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value, dp)) : el("span", { class: "hist empty" }, "—")));
+        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${!sharedUnit && unit ? ` ${unit}` : ""}`) : el("span", { class: "hist empty" }, "—")));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => {
@@ -1511,7 +1513,7 @@ async function renderPerform(assignmentId) {
       const widths = firstHeader !== "Test" ? ["3%", "19%", "5%", "9%", "12%", "9%", "8%", "6%", "25%", "4%"] : ["3%", "30%", "5%", "7%", "13%", "8%", "8%", "5%", "17%", "4%"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
+          el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h === "History" && sharedUnit ? `History (${sharedUnit})` : h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
@@ -2197,10 +2199,10 @@ function histDateSlot(d) {
   return el("span", { class: "hist date", title: histDateLabel(d) },
     el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear())));
 }
-function histChips(points, dates, unit, dp) {
+function histChips(points, dates, unit, dp, showUnit = false) {
   const byDate = new Map((points || []).map((h) => [h.qa_date, h]));
   return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h
-    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, fmt(h.value, dp))
+    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${showUnit && unit ? ` ${unit}` : ""}`)
     : el("span", { class: "hist empty" }, "—")));
 }
 function latestDates(pointLists, count = 5) {
@@ -2521,6 +2523,8 @@ async function renderTrendOverview(machines, machineId, range) {
     const dates = latestDates(members.map((it) => it.points));
     const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
     const dp = decimalsOf(members.flatMap((it) => [...it.points.slice(-5).map((h) => h.value), latest(it.points).expected ?? (it.limits || {}).expected]));
+    const unitsHere = [...new Set(members.map(unitOf))];
+    const sharedUnit = unitsHere.length === 1 ? unitsHere[0] : null;          // one unit: it goes in the header; mixed: on each chip
     const rows = members.flatMap((it, k) => {
       const unit = unitOf(it), p = latest(it.points);
       const baseline = p.expected ?? (it.limits || {}).expected;
@@ -2541,7 +2545,7 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "num" }, `${fmt(p.value, dp)} ${unit}`.trim()),
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
-        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
+        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp, !sharedUnit) : el("span", { class: "muted small" }, "—")),
         el("td", { class: "ring-cell" }, miniRing(tally30(it))),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
@@ -2550,7 +2554,7 @@ async function renderTrendOverview(machines, machineId, range) {
     const widths = firstHeader === "Test" ? ["3%", "25%", "4%", "8%", "9%", "9%", "8%", "22%", "7%", "5%"] : ["3%", "18%", "4%", "8%", "9%", "9%", "8%", "29%", "7%", "5%"];
     const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
       el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h))),
+      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h === "History" && sharedUnit ? `History (${sharedUnit})` : h))),
         dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {}), el("th", {})) : null),
       el("tbody", {}, rows)));
     if (title && firstHeader !== "Test") {
