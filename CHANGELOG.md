@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Setup QA: use Active/Inactive radio buttons for each QA template list and remove its Last Modified column.
+
 - Setup QA: rename QA Template Lists and add an Active/Inactive status column, keeping inactive lists available for reactivation.
 
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.

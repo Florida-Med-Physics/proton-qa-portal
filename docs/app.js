@@ -685,23 +685,25 @@ async function renderSetup() {
           machineOf(a).name, a.active ? null : " (Inactive)")))
       : el("span", { class: "muted small" }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
-    el("td", {}, editable ? select("active", [["1", "Active"], ["0", "Inactive"]], q.active ? "1" : "0", {
-      "aria-label": `Status for ${q.name}`,
-      title: "Applies to this list on all scheduled machines",
-      onchange: async (e) => {
-        const control = e.target;
-        control.disabled = true;
-        try {
-          await api("POST", `/api/queues/${q.id}/archive`, { archived: control.value === "0" });
-          toast(`${q.name} set ${control.value === "1" ? "active" : "inactive"}`);
-          route();
-        } catch (err) {
-          control.value = q.active ? "1" : "0";
-          control.disabled = false;
-          toast(err.message, true);
-        }
-      },
-    }) : (q.active ? "Active" : "Inactive")),
+    el("td", {}, el("div", { role: "radiogroup", "aria-label": `Status for ${q.name}` },
+      [["1", "Active"], ["0", "Inactive"]].map(([value, label]) => el("label", { class: "check" },
+        el("input", { type: "radio", name: `list-status-${q.id}`, value, checked: Boolean(q.active) === (value === "1"), disabled: !editable,
+          onchange: async (e) => {
+            const controls = [...e.target.closest('[role="radiogroup"]').querySelectorAll("input")];
+            controls.forEach((control) => { control.disabled = true; });
+            try {
+              await api("POST", `/api/queues/${q.id}/archive`, { archived: value === "0" });
+              toast(`${q.name} set ${value === "1" ? "active" : "inactive"}`);
+              route();
+            } catch (err) {
+              controls.forEach((control) => {
+                control.checked = Boolean(q.active) === (control.value === "1");
+                control.disabled = false;
+              });
+              toast(err.message, true);
+            }
+          },
+        }), label)))),
     el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
       editable ? iconBtn("＋", "Schedule on machines", () => scheduleDialog(q, machines, schedules)) : null,
       editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
@@ -709,8 +711,8 @@ async function renderSetup() {
         ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
         ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
       ]) : null)),
-    modified(q)));
-  const listTable = fixedTable([["QA Template List", "29%"], ["Scheduled On", "23%"], ["Tests", "6%"], ["Status", "12%"], ["Actions", "13%"], ["Last Modified", "17%"]], listRows,
+    ));
+  const listTable = fixedTable([["QA Template List", "35%"], ["Scheduled On", "29%"], ["Tests", "7%"], ["Status", "14%"], ["Actions", "15%"]], listRows,
     "No QA lists yet. Make one with New QA list.");
   app.append(filterBox(listTable, "Search QA Template Lists"), listTable);
 
