@@ -998,7 +998,22 @@
     retireSplitEyelineLists();
     instantiateSeedTemplates();
     mergeCopies();
+    restoreMonthlySchedules();
   })();
+
+  // An earlier Sphinx step switched off every other list on the proton gantries, monthly QA included; it now only
+  // touches other daily lists. Switch those monthly schedules back on once.
+  function restoreMonthlySchedules() {
+    if (S.monthlyRestored) return;
+    let n = 0;
+    for (const a of S.assignments) {
+      const q = byId("queues", a.queue_id);
+      if (q && /Monthly QA/.test(q.name) && a.frequency === "monthly" && !a.active) { a.active = 1; n++; }
+    }
+    S.monthlyRestored = true;
+    if (n) audit(null, "upgrade", "assignments", null, { monthly_reactivated: n });
+    save();
+  }
 
   // Schedule a list on a machine unless that machine already runs it (or an old copy of it).
   function scheduleOn(user, list, machine, opts) {
