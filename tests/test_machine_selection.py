@@ -63,6 +63,15 @@ class MachineSelectionTests(unittest.TestCase):
         self.assertEqual(added, [])
         self.assertEqual(self.template(1)['items'], [])
 
+    def test_archived_template_blocks_completion_and_restores_machine_exceptions(self):
+        aid = self.assignments[1]
+        service.save_test_selection(self.db, self.user, aid, {'excluded': [self.base], 'added': [self.extra]})
+        service.archive_queue(self.db, self.user, self.queue, {'archived': True})
+        with self.assertRaisesRegex(service.PortalError, 'not active'):
+            service.submit_run(self.db, self.user, aid, {'qa_date': '2026-10-22', 'results': [{'test_id': self.extra, 'value': 'yes'}]})
+        service.archive_queue(self.db, self.user, self.queue, {'archived': False})
+        self.assertEqual([i['test_id'] for i in self.template(1)['items']], [self.extra])
+
     def test_hdr_seed_has_two_on_demand_shells(self):
         db=Database(':memory:');user=make_users(db)['admin'];service.seed_defaults(db,user)
         hdr=next(m for m in service.list_machines(db,user) if m['name']=='HDR Flexitron')

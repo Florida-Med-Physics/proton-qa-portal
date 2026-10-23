@@ -644,7 +644,7 @@ def run_template(db, user, assignment_id):
                                  "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"], machine["id"])) or {}).get("value_text") if test["type"] == "text" else None,
         })
     assignment["schedule"] = qa.describe_schedule(assignment)
-    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"]}, "items": [i for i in all_items if not i["excluded"]], "all_items": all_items, "test_selection": selection}
+    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"], "active": queue["active"]}, "items": [i for i in all_items if not i["excluded"]], "all_items": all_items, "test_selection": selection}
 
 
 def save_overrides(db, user, assignment_id, data):
@@ -686,7 +686,7 @@ def dashboard(db, user, today=None):
 def submit_run(db, user, assignment_id, data):
     require(user, "perform")
     template = run_template(db, user, assignment_id)
-    if not template["assignment"]["active"] or not template["machine"]["active"]:
+    if not template["assignment"]["active"] or not template["machine"]["active"] or not template["queue"]["active"]:
         raise PortalError("This queue is not active on this machine.")
     try:
         qa_date = date.fromisoformat(data.get("qa_date") or date.today().isoformat())

@@ -756,7 +756,7 @@
           .filter((x) => x.run && x.run.machine_id === a.machine_id)                      // this machine's last entry
           .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
     });
-    return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
+    return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description, active: queue.active }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
   }
   function saveOverrides(user, assignmentId, data) {
     require(user, "configure");
@@ -801,7 +801,7 @@
   function submitRun(user, assignmentId, data) {
     require(user, "perform");
     const t = runTemplate(assignmentId);
-    if (!t.assignment.active || !t.machine.active) throw new Error("This queue is not active on this machine.");
+    if (!t.assignment.active || !t.machine.active || !t.queue.active) throw new Error("This queue is not active on this machine.");
     const qaDate = data.qa_date || todayIso();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(qaDate)) throw new Error("QA date must be YYYY-MM-DD.");
     if (qaDate > todayIso()) throw new Error("QA date cannot be in the future.");

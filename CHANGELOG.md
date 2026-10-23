@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Add Archive to template menus and a restorable Archived templates section; keep results and per-machine settings and prevent performing archived templates.
+
 - Setup QA: group QA Template Lists into Proton, Photon, Brachytherapy and Simulation, with search across all groups.
 
 - Keep one shared template with per-machine excluded and extra tests, a searchable Customize tests checklist and Reset to template; machine-only Sphinx imports respect exclusions.

@@ -654,7 +654,7 @@ async function renderSetup() {
       toast(err.message, true);
     }
   };
-  // Keep inactive lists visible here so they can be reactivated.
+  // Archived templates are kept in their own restorable section.
   const lists = queues.filter((q) => q.active);
   const schedulesOf = (q) => schedules.filter((a) => a.queue_id === q.id);
   const machineOf = (a) => machines.find((m) => m.id === a.machine_id) || {};
@@ -684,6 +684,7 @@ async function renderSetup() {
       ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
       ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
       ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
+      ["Archive", () => archiveList(q, true), "Hide this template and its scheduled lists; keep results and machine settings"],
       ["Delete", () => deleteList(q), "Delete only if it has no results"],
     ]) : null, editableName(q, editable))),
     el("td", {}, schedulesOf(q).length
@@ -706,7 +707,7 @@ async function renderSetup() {
     return ["Unassigned"];
   };
   const templateSections = el("div");
-  const sortedTemplates = queues.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sortedTemplates = lists.slice().sort((a, b) => a.name.localeCompare(b.name));
   for (const modality of [...MODALITIES, "Unassigned"]) {
     const group = sortedTemplates.filter((q) => templateModalities(q).includes(modality));
     if (!group.length) continue;
@@ -727,6 +728,14 @@ async function renderSetup() {
   } });
   app.append(el("div", { class: "filter-row" }, templateSearch), templateSections);
   if (!queues.length) templateSections.append(el("p", { class: "muted" }, "No QA template lists yet. Make one with New QA list."));
+
+  const archivedTemplates = queues.filter((q) => !q.active);
+  if (archivedTemplates.length) app.append(el("details", { class: "archived" },
+    el("summary", {}, `Archived templates (${archivedTemplates.length})`),
+    el("p", { class: "muted small" }, "Archived templates are hidden from active QA. Results and each machine's settings are kept."),
+    table(["QA Template List", "Tests", ""], archivedTemplates.sort((a, b) => a.name.localeCompare(b.name)).map((q) => el("tr", {},
+      el("td", {}, el("a", { href: `#/queues/${q.id}` }, q.name)), el("td", { class: "num" }, q.item_count),
+      el("td", {}, editable ? el("button", { type: "button", onclick: () => archiveList(q, false) }, "Restore") : null))))));
 
   // Each machine's schedules: which of the lists it runs, how often, and any values of its own.
   const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator", "HDR brachytherapy"];
@@ -1363,6 +1372,10 @@ function wireCalculations(entries) {
 
 async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
+  if (t.queue.active === 0) {
+    page(t.queue.name, "This template is archived.", [el("a", { class: "button", href: "#/setup" }, "Back to Setup QA")]);
+    return;
+  }
   const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends`).catch(() => ({})) : {};
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
