@@ -563,24 +563,23 @@ async function renderDashboard() {
   for (const modality of MODALITIES) {
     const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
     if (!machines.length) continue;
-    // Whatever is due comes first (overdue, then due today, then as-needed), then upcoming and done lists.
-    const STATE_ORDER = { overdue: 0, due: 1, ready: 2, upcoming: 3, done: 4 };
-    const flat = machines.flatMap((machine) => machine.queues.map((q) => ({ machine, q })));
-    flat.sort((a, b) => (STATE_ORDER[a.q.state] ?? 9) - (STATE_ORDER[b.q.state] ?? 9) || kindRank(a.machine.kind) - kindRank(b.machine.kind) || a.machine.name.localeCompare(b.machine.name));
-    const idle = machines.filter((m) => !m.queues.length).map((m) => el("tr", {}, el("td", {}, el("strong", {}, m.name)), el("td", { class: "muted", colspan: 3 }, "Nothing scheduled.")));
-    const rows = [...flat.map(({ machine, q }, i) => {
-        const due = startable(q.state);
+    // Grouped by machine, as on Setup QA: a header row per machine, then its lists (daily first, then monthly, …).
+    const rows = machines.flatMap((machine) => {
+      const header = el("tr", { class: "machine-row" }, el("td", { colspan: 3 }, el("strong", {}, machine.name), machine.kind ? el("span", { class: "muted small" }, ` · ${machine.kind}`) : null));
+      if (!machine.queues.length) return [header, el("tr", {}, el("td", { class: "muted indent", colspan: 3 }, "Nothing scheduled."))];
+      const lists = [...machine.queues].sort((a, b) => (FREQ_ORDER[a.frequency] ?? 9) - (FREQ_ORDER[b.frequency] ?? 9) || a.queue_name.localeCompare(b.queue_name));
+      return [header, ...lists.map((q) => {
         const last = q.last_run;
-        // A small green start button in front of the list name opens the list, like the Start button.
+        // A small green start button in front of the list name opens the list.
         const go = can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}` }, "▶") : null;
-        return el("tr", { class: `${q.state === "overdue" ? "row-overdue" : ""} ${i === 0 || flat[i - 1].machine !== machine ? "first-of-machine" : ""}` },
-          el("td", {}, el("strong", {}, machine.name)),
-          el("td", { class: "list-cell" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
+        return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
+          el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
           el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")));
-      }), ...idle];
+      })];
+    });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "15%"], ["QA list", "35%"], ["Status", "26%"], ["Last result", "24%"]], rows));
+      fixedTable([["QA list", "44%"], ["Status", "30%"], ["Last result", "26%"]], rows));
   }
 }
 

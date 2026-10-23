@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Perform QA is grouped by machine like Setup QA: a header row per machine, then its lists (daily above monthly); the Machine column is gone.
 - Dashboard: a ring beside each machine's last result shows the share of its tests that passed in that run, and a green start dot sits before each list in Active QA lists (daily above monthly, with space between). CLAUDE.md now carries Brook's look-and-behaviour preferences.
 - Setup QA actions are three icons per row — pencil (edit tests), plus (instantiate on a machine / duplicate), trash (delete) — with Set Active, Make Template, Re-evaluate and Archive behind a small "⋯" menu.
 - Trend charts: the absolute view of an X / Y / Z set is drawn as stacked subplots (one per axis, each on its own scale around its own reference) instead of one squashed axis.
