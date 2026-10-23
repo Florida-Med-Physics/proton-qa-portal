@@ -22,16 +22,19 @@ class TemplateTests(unittest.TestCase):
         service.save_queue(self.db, self.admin, {"name": "Daily template", "is_template": True, "description": "Setup steps.",
                                                  "items": [{"test_id": self.door}, {"test_id": self.depth, "warn": 0.4}]}, self.template)
 
-    def test_template_cannot_be_scheduled(self):
-        with self.assertRaisesRegex(PortalError, "template"):
-            service.save_assignment(self.db, self.admin, {"machine_id": self.machine, "queue_id": self.template, "frequency": "daily"})
+    def test_list_is_scheduled_itself(self):
+        # One list, scheduled directly: no per-machine copy is made.
+        a = service.save_assignment(self.db, self.admin, {"machine_id": self.machine, "queue_id": self.template, "frequency": "daily"})["id"]
+        t = service.run_template(self.db, self.admin, a)
+        self.assertEqual([i["test_id"] for i in t["items"]], [self.door, self.depth])
+        self.assertEqual(self.db.one("SELECT COUNT(*) AS n FROM queues")["n"], 1)
 
     def test_duplicate_copies_checks_with_effective_limits(self):
         copy = service.duplicate_queue(self.db, self.admin, self.template, {"name": "Daily QA – Synthetic GTR", "machine_id": self.machine,
                                                                             "frequency": "daily", "weekdays": [0, 1, 2, 3, 4]})
         self.assertIn("assignment_id", copy)
         q = service.get_queue(self.db, self.admin, copy["id"])
-        self.assertEqual((q["template_id"], q["is_template"], q["description"]), (self.template, 0, "Setup steps."))
+        self.assertEqual((q["template_id"], q["is_template"], q["description"]), (None, 0, "Setup steps."))   # a separate list
         self.assertEqual([i["name"] for i in q["items"]], ["Safety – Door interlock", "Energy 100 MeV – Distal depth"])
         self.assertNotIn(self.depth, [i["test_id"] for i in q["items"]])  # its own copies, not the template's checks
         owned = self.db.all("SELECT * FROM tests WHERE owner_queue_id = ? ORDER BY id", (copy["id"],))
@@ -55,11 +58,6 @@ class TemplateTests(unittest.TestCase):
         listed = {t["name"]: t["owner_name"] for t in service.list_tests(self.db, self.admin)}
         self.assertEqual((listed["Shared note"], listed["Energy 100 MeV – Distal depth"]), (None, "Daily template"))
 
-    def test_scheduled_list_cannot_become_template(self):
-        copy = service.duplicate_queue(self.db, self.admin, self.template, {"name": "On a machine", "machine_id": self.machine, "frequency": "daily"})
-        with self.assertRaisesRegex(PortalError, "cannot become a template"):
-            service.save_queue(self.db, self.admin, {"name": "On a machine", "is_template": True}, copy["id"])
-
     def test_therapist_cannot_duplicate(self):
         with self.assertRaises(PortalError):
             service.duplicate_queue(self.db, self.users["therapist"], self.template, {"name": "Nope"})
@@ -72,14 +70,14 @@ class MigrationTests(unittest.TestCase):
         result = service.seed_defaults(db, users["admin"])
         self.assertEqual(result["machines"], ["GTR1", "GTR2", "GTR5", "Eyeline GTR4", "TrueBeam", "Linac 1", "Ethos", "Big Bore CT (7064)", "MRI Sim"])
         lists = {q["name"]: q for q in service.list_queues(db, users["admin"])}
-        self.assertIn("Daily QA – TrueBeam", lists)
-        self.assertIn("SRS QA – TrueBeam", lists)
-        self.assertTrue(lists["Daily QA template – TrueBeam (TG-142 / TG-198)"]["is_template"])
+        self.assertNotIn("Daily QA – TrueBeam", lists)                     # no per-machine copies
+        self.assertEqual(lists["Daily QA template – TrueBeam (TG-142 / TG-198)"]["machines"], "TrueBeam")
+        self.assertEqual(lists["Monthly QA template – Proton gantry (TG-224)"]["machines"], "GTR1, GTR2, GTR5")
         truebeam = next(m for m in service.list_machines(db, users["admin"]) if m["name"] == "TrueBeam")
         schedules = {a["queue_name"]: a for a in service.list_assignments(db, users["admin"], truebeam["id"])}
-        self.assertEqual(schedules["SRS QA – TrueBeam"]["frequency"], "asneeded")
-        self.assertEqual(schedules["Daily QA – TrueBeam"]["frequency"], "daily")
-        items = service.run_template(db, users["admin"], schedules["Daily QA – TrueBeam"]["id"])["items"]
+        self.assertEqual(schedules["SRS QA template – TrueBeam (Dose Pro)"]["frequency"], "asneeded")
+        self.assertEqual(schedules["Daily QA template – TrueBeam (TG-142 / TG-198)"]["frequency"], "daily")
+        items = service.run_template(db, users["admin"], schedules["Daily QA template – TrueBeam (TG-142 / TG-198)"]["id"])["items"]
         self.assertEqual(len(items), 25)
         self.assertEqual(items[0]["type"], "status")
         with self.assertRaisesRegex(PortalError, "already has machines"):

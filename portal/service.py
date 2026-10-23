@@ -182,121 +182,88 @@ def save_test(db, user, data, test_id=None):
                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values)
         db.audit(user["id"], "create", "test", test_id, name=name, owner=owner, **limits)
     else:
-        template = db.one("SELECT id FROM queues WHERE id = ? AND is_template = 1", (existing["owner_queue_id"],)) if existing["owner_queue_id"] else None
-        with db.transaction():
-            followers = _template_followers(db, template["id"]) if template else []
-            db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
-                   "tol_mode = ?, active = ?, owner_queue_id = ? WHERE id = ?", values + (test_id,))
-            db.audit(user["id"], "update", "test", test_id, name=name, owner=owner, **limits)
-            synced = _sync_followers(db, user, template["id"], followers) if template else []
-        return {"id": test_id, "synced": synced}
-    return {"id": test_id, "synced": []}
+        db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
+               "tol_mode = ?, active = ?, owner_queue_id = ? WHERE id = ?", values + (test_id,))
+        db.audit(user["id"], "update", "test", test_id, name=name, owner=owner, **limits)
+    return {"id": test_id}
 
 
 # ---- queues ----------------------------------------------------------------
 
-def _signature(db, queue_id):
-    """What each test of a list looks like, by position: name plus the settings a copy can change."""
-    rows = db.all("SELECT qi.position, qi.expected, qi.warn, qi.fail, qi.tol_mode, t.name, t.unit, t.description, "
-                  "t.expected AS t_expected, t.warn AS t_warn, t.fail AS t_fail, t.tol_mode AS t_tol_mode "
-                  "FROM queue_items qi JOIN tests t ON t.id = qi.test_id WHERE qi.queue_id = ? ORDER BY qi.position", (queue_id,))
-    out = []
-    for r in rows:
-        limits = qa.resolve_limits({"expected": r["t_expected"], "warn": r["t_warn"], "fail": r["t_fail"], "tol_mode": r["t_tol_mode"]},
-                                   {"expected": r["expected"], "warn": r["warn"], "fail": r["fail"], "tol_mode": r["tol_mode"]})
-        out.append((r["name"], r["unit"] or "", r["description"] or "", limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
-    return out
-
-
-def changes_from_template(db, queue_id, template_id):
-    """Number of tests that differ between a machine's list and the template it came from (None without a template)."""
-    if not template_id:
-        return None
-    mine, theirs = _signature(db, queue_id), _signature(db, template_id)
-    by_name_mine = {s[0]: s for s in mine}
-    by_name_theirs = {s[0]: s for s in theirs}
-    changed = sum(1 for n, s in by_name_mine.items() if n in by_name_theirs and s != by_name_theirs[n])
-    added = sum(1 for n in by_name_mine if n not in by_name_theirs)
-    removed = sum(1 for n in by_name_theirs if n not in by_name_mine)
-    reordered = 0 if [s[0] for s in mine if s[0] in by_name_theirs] == [s[0] for s in theirs if s[0] in by_name_mine] else 1
-    return changed + added + removed + reordered
-
-
-def _template_followers(db, template_id):
-    """Before a template edit: the machine lists that should get the same edit, i.e. Auto-sync is ticked and the list is
-    identical to the template right now. Their tests are paired with the template's by position (the lists are identical)."""
-    template_items = [r["test_id"] for r in db.all("SELECT test_id FROM queue_items WHERE queue_id = ? ORDER BY position", (template_id,))]
-    now_sig = _signature(db, template_id)
-    followers = []
-    for q in db.all("SELECT id, name FROM queues WHERE template_id = ? AND auto_sync = 1 AND is_template = 0", (template_id,)):
-        if _signature(db, q["id"]) != now_sig:
-            continue                                        # changed on its machine: it keeps its own tests and limits
-        mine = [r["test_id"] for r in db.all("SELECT test_id FROM queue_items WHERE queue_id = ? ORDER BY position", (q["id"],))]
-        followers.append({"id": q["id"], "name": q["name"], "pairs": dict(zip(template_items, mine))})
-    return followers
-
-
-def _sync_followers(db, user, template_id, followers):
-    """After a template edit (inside the caller's transaction): make each follower match the template again, with the
-    same tests, order, names, units, notes and limits. A test that left the template leaves the list; if it has
-    recorded results its row is kept (history is never deleted), otherwise it is removed. Each sync is audited."""
-    if not followers:
-        return []
-    template = _get(db, "queues", template_id)
-    items = db.all("SELECT * FROM queue_items WHERE queue_id = ? ORDER BY position", (template_id,))
-    synced = []
-    for f in followers:
-        qid = f["id"]
-        owned = {r["id"]: r for r in db.all("SELECT * FROM tests WHERE owner_queue_id = ?", (qid,))}
-        # Free every name first, so renames and swaps in the template never collide with the list's unique names.
-        for tid in owned:
-            db.run("UPDATE tests SET name = name || ' ~sync' || id WHERE id = ?", (tid,))
-        db.run("DELETE FROM queue_items WHERE queue_id = ?", (qid,))
-        used = set()
-        for item in items:
-            src = _get(db, "tests", item["test_id"])
-            limits = qa.resolve_limits(src, item)
-            fields = (src["name"], src["category"], src["type"], src["unit"], src["description"],
-                      limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"])
-            mine = f["pairs"].get(src["id"])
-            if mine in owned and mine not in used:
-                db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
-                       "tol_mode = ?, active = 1 WHERE id = ?", fields + (mine,))
-            else:
-                mine = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) "
-                              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)", fields + (qid,))
-            used.add(mine)
-            db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (qid, mine, item["position"]))
-        for tid, row in owned.items():
-            if tid in used:
-                continue
-            if db.one("SELECT 1 FROM results WHERE test_id = ? LIMIT 1", (tid,)):
-                taken = db.one("SELECT 1 FROM tests WHERE name = ? AND category = ? AND owner_queue_id = ? AND id != ?", (row["name"], row["category"], qid, tid))
-                db.run("UPDATE tests SET name = ? WHERE id = ?", (row["name"] + (" (removed from list)" if taken else ""), tid))
-            else:
-                db.run("DELETE FROM tests WHERE id = ?", (tid,))
-        db.audit(user["id"], "auto_sync", "queue", qid, name=f["name"], template=template["name"], tests=len(items))
-        synced.append(f["name"])
-    return synced
-
-
-def set_auto_sync(db, user, queue_id, data):
-    """Tick or untick Auto-sync on a machine list made from a template."""
+def merge_copies(db, user):
+    """Make every QA list one object. Each per-machine copy that has the same tests (name and type, in order) as the list it
+    was made from is folded back into that list: its schedules, runs, results and drafts move onto the list's tests, any
+    limit that differed becomes that machine's own value (an override on its schedule), and the copy is removed. Tests
+    dropped from a copy that still carry results move with their history (into a same-named test of the list when that is
+    safe). A copy whose tests differ stays as a list of its own. Audited; run once, after a backup."""
     require(user, "configure")
-    queue = _get(db, "queues", queue_id)
-    if not queue["template_id"]:
-        raise PortalError("Only a list made from a template can follow it.")
-    on = bool(data.get("auto_sync"))
-    db.run("UPDATE queues SET auto_sync = ? WHERE id = ?", (1 if on else 0, queue_id))
-    db.audit(user["id"], "auto_sync_on" if on else "auto_sync_off", "queue", queue_id, name=queue["name"])
-    return {"id": queue_id, "auto_sync": on, "changes": changes_from_template(db, queue_id, queue["template_id"])}
+    merged, kept = [], []
+    items_of = lambda qid: db.all("SELECT qi.*, t.name, t.type FROM queue_items qi JOIN tests t ON t.id = qi.test_id "
+                                  "WHERE qi.queue_id = ? ORDER BY qi.position", (qid,))
+    with db.transaction():
+        for copy in db.all("SELECT * FROM queues WHERE template_id IS NOT NULL AND is_template = 0 ORDER BY id"):
+            source = db.one("SELECT * FROM queues WHERE id = ?", (copy["template_id"],))
+            mine = items_of(copy["id"])
+            theirs = items_of(source["id"]) if source else []
+            schedules = db.all("SELECT * FROM assignments WHERE queue_id = ?", (copy["id"],))
+            same = source is not None and [(i["name"], i["type"]) for i in mine] == [(i["name"], i["type"]) for i in theirs]
+            clash = source is not None and any(db.one("SELECT 1 FROM assignments WHERE queue_id = ? AND machine_id = ?", (source["id"], a["machine_id"]))
+                                               for a in schedules)
+            if not same or clash:
+                db.run("UPDATE queues SET template_id = NULL WHERE id = ?", (copy["id"],))
+                kept.append(copy["name"])
+                continue
+            pair = {m["test_id"]: t["test_id"] for m, t in zip(mine, theirs)}
+            sids = [a["id"] for a in schedules]
+            for sid in sids:
+                for old, new in pair.items():
+                    db.run("UPDATE assignment_overrides SET test_id = ? WHERE assignment_id = ? AND test_id = ?", (new, sid, old))
+            for m, t in zip(mine, theirs):
+                own = qa.resolve_limits(_get(db, "tests", m["test_id"]), m)
+                shared = qa.resolve_limits(_get(db, "tests", t["test_id"]), t)
+                if own != shared:
+                    for sid in sids:
+                        if not db.one("SELECT 1 FROM assignment_overrides WHERE assignment_id = ? AND test_id = ?", (sid, t["test_id"])):
+                            db.run("INSERT INTO assignment_overrides (assignment_id, test_id, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?)",
+                                   (sid, t["test_id"], own["expected"], own["warn"], own["fail"], own["tol_mode"]))
+            for old, new in pair.items():
+                db.run("UPDATE results SET test_id = ? WHERE test_id = ?", (new, old))
+            for t in db.all("SELECT * FROM tests WHERE owner_queue_id = ?", (copy["id"],)):
+                if t["id"] in pair:
+                    continue
+                if not db.one("SELECT 1 FROM results WHERE test_id = ? LIMIT 1", (t["id"],)):
+                    db.run("DELETE FROM tests WHERE id = ?", (t["id"],))
+                    continue
+                twin = db.one("SELECT id FROM tests WHERE owner_queue_id = ? AND name = ? AND category = ?", (source["id"], t["name"], t["category"]))
+                overlap = twin and db.one("SELECT 1 FROM results a JOIN results b ON a.run_id = b.run_id WHERE a.test_id = ? AND b.test_id = ? LIMIT 1",
+                                          (t["id"], twin["id"]))
+                if twin and not overlap:
+                    db.run("UPDATE results SET test_id = ? WHERE test_id = ?", (twin["id"], t["id"]))
+                    db.run("DELETE FROM tests WHERE id = ?", (t["id"],))
+                else:
+                    db.run("UPDATE tests SET owner_queue_id = ?, name = ? WHERE id = ?",
+                           (source["id"], f"{t['name']} ({copy['name']})" if twin else t["name"], t["id"]))
+            runs = db.one("SELECT COUNT(*) AS n FROM runs WHERE queue_id = ?", (copy["id"],))["n"]
+            db.run("UPDATE runs SET queue_id = ? WHERE queue_id = ?", (source["id"], copy["id"]))
+            db.run("UPDATE assignments SET queue_id = ? WHERE queue_id = ?", (source["id"], copy["id"]))
+            for sid in sids:
+                for d in db.all("SELECT rowid AS rid, data FROM drafts WHERE assignment_id = ?", (sid,)):
+                    data = json.loads(d["data"])
+                    for r in data.get("results") or []:
+                        r["test_id"] = pair.get(int(r.get("test_id") or 0), r.get("test_id"))
+                    db.run("UPDATE drafts SET data = ? WHERE rowid = ?", (json.dumps(data), d["rid"]))
+            db.run("DELETE FROM queue_items WHERE queue_id = ?", (copy["id"],))
+            db.run("DELETE FROM tests WHERE owner_queue_id = ? AND id NOT IN (SELECT test_id FROM results)", (copy["id"],))
+            db.run("UPDATE queues SET template_id = NULL WHERE template_id = ?", (copy["id"],))
+            db.run("DELETE FROM queues WHERE id = ?", (copy["id"],))
+            db.audit(user["id"], "merge", "queue", source["id"], name=source["name"], merged=copy["name"], runs=runs,
+                     machines=[a["machine_id"] for a in schedules])
+            merged.append(copy["name"])
+    return {"merged": merged, "kept": kept}
 
 
 def list_queues(db, user):
-    queues = _list_queues(db)
-    for q in queues:
-        q["changes"] = changes_from_template(db, q["id"], q.get("template_id"))
-    return queues
+    return _list_queues(db)
 
 
 def _list_queues(db):
@@ -328,6 +295,9 @@ def get_queue(db, user, queue_id):
         row = changed.get(item["test_id"]) or made or {}
         item["modified_at"] = row.get("at")
         item["modified_by"] = row.get("full_name") or row.get("username") or ("starting data" if row else None)
+    # The machines that run this very list (one object, shared; each machine may hold its own values as overrides).
+    queue["schedules"] = db.all("SELECT a.id, a.machine_id, a.active, m.name AS machine FROM assignments a JOIN machines m ON m.id = a.machine_id "
+                                "WHERE a.queue_id = ? ORDER BY m.name", (queue_id,))
     return queue
 
 
@@ -348,11 +318,7 @@ def save_queue(db, user, data, queue_id=None):
         raise PortalError("A check can only appear once in a QA list.")
     existing = _get(db, "queues", queue_id) if queue_id is not None else None
     is_template = _flag(data, "is_template", bool(existing["is_template"]) if existing else False)
-    if is_template and existing and db.one("SELECT id FROM assignments WHERE queue_id = ?", (queue_id,)):
-        raise PortalError("This list is scheduled on a machine, so it cannot become a template. Duplicate it instead.")
-    synced = []
     with db.transaction():
-        followers = _template_followers(db, queue_id) if existing and existing["is_template"] and is_template else []
         if queue_id is None:
             queue_id = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, ?, ?)",
                               (name, _text(data, "description"), _flag(data, "active"), is_template))
@@ -373,8 +339,7 @@ def save_queue(db, user, data, queue_id=None):
                 old = before.get(test_id)
                 if old is None or any(old[k] != limits[k] for k in limits):
                     db.audit(user["id"], "update_limits" if old else "add_to_list", "test", test_id, queue=name, **limits)
-        synced = _sync_followers(db, user, queue_id, followers)
-    return {"id": queue_id, "synced": synced}
+    return {"id": queue_id}
 
 
 def rename_queue(db, user, queue_id, data):
@@ -396,12 +361,14 @@ def reevaluate_queue(db, user, queue_id):
     queue = _get(db, "queues", queue_id)
     changed = 0
     runs = set()
+    overrides = {(o["machine_id"], o["test_id"]): o for o in db.all(
+        "SELECT o.*, a.machine_id FROM assignment_overrides o JOIN assignments a ON a.id = o.assignment_id WHERE a.queue_id = ?", (queue_id,))}
     with db.transaction():
         for item in db.all("SELECT qi.*, t.type FROM queue_items qi JOIN tests t ON t.id = qi.test_id WHERE qi.queue_id = ?", (queue_id,)):
             test = _get(db, "tests", item["test_id"])
-            limits = qa.resolve_limits(test, item)
-            for res in db.all("SELECT res.id, res.run_id, res.value_num, res.value_text, res.status FROM results res JOIN runs r ON r.id = res.run_id "
+            for res in db.all("SELECT res.id, res.run_id, res.value_num, res.value_text, res.status, r.machine_id FROM results res JOIN runs r ON r.id = res.run_id "
                               "WHERE res.test_id = ? AND r.queue_id = ?", (test["id"], queue_id)):
+                limits = qa.resolve_limits(test, item, overrides.get((res["machine_id"], test["id"])))   # that machine's own values
                 value = res["value_num"] if test["type"] == "numeric" else (res["value_num"] if test["type"] == "boolean" else res["value_text"])
                 if value is None:
                     continue
@@ -458,7 +425,7 @@ def duplicate_queue(db, user, source_id, data):
     with db.transaction():
         as_template = _flag(data, "as_template", default=False)
         queue_id = db.run("INSERT INTO queues (name, description, active, is_template, template_id) VALUES (?, ?, 1, ?, ?)",
-                          (name, source["description"], 1 if as_template else 0, None if as_template else source_id))
+                          (name, source["description"], 1 if as_template else 0, None))
         for item in source["items"]:
             test = _get(db, "tests", item["test_id"])
             limits = qa.resolve_limits(test, item)
@@ -504,8 +471,9 @@ def seed_defaults(db, user, seed=None):
         machine_id = save_machine(db, user, {"name": m["name"], "kind": m.get("kind", ""), "location": m.get("location", ""), "notes": m.get("notes", "")})["id"]
         machines.append(m["name"])
         for tpl in by_kind.get(m.get("kind", ""), []):
-            duplicate_queue(db, user, tpl["id"], {"name": f"{tpl.get('list') or 'Daily QA'} – {m['name']}", "machine_id": machine_id,
-                                                 "frequency": tpl.get("frequency") or "daily", "weekdays": m.get("weekdays", [0, 1, 2, 3, 4])})
+            # The same list on every machine of its kind (no per-machine copies).
+            save_assignment(db, user, {"machine_id": machine_id, "queue_id": tpl["id"], "frequency": tpl.get("frequency") or "daily",
+                                       "weekdays": m.get("weekdays", [0, 1, 2, 3, 4])})
     return {"templates": [t["name"] for t in seed.get("templates", [])], "machines": machines}
 
 
@@ -540,8 +508,8 @@ def _last_done(db, assignment_id):
 
 def list_assignments(db, user, machine_id, today=None):
     today = today or date.today()
-    rows = db.all("SELECT a.*, q.name AS queue_name FROM assignments a JOIN queues q ON q.id = a.queue_id "
-                  "WHERE a.machine_id = ? ORDER BY a.active DESC, q.name", (machine_id,))
+    rows = db.all("SELECT a.*, q.name AS queue_name, (SELECT COUNT(*) FROM assignment_overrides o WHERE o.assignment_id = a.id) AS override_count "
+                  "FROM assignments a JOIN queues q ON q.id = a.queue_id WHERE a.machine_id = ? ORDER BY a.active DESC, q.name", (machine_id,))
     for row in rows:
         row["schedule"] = qa.describe_schedule(row)
         row.update(qa.due_state(row, _last_done(db, row["id"]), today))
@@ -572,8 +540,6 @@ def save_assignment(db, user, data, assignment_id=None):
     if assignment_id is None:
         machine = _get(db, "machines", int(data.get("machine_id") or 0))
         queue = _get(db, "queues", int(data.get("queue_id") or 0))
-        if queue["is_template"]:
-            raise PortalError(f"'{queue['name']}' is a template. Duplicate it, then schedule the copy.")
         if db.one("SELECT id FROM assignments WHERE machine_id = ? AND queue_id = ?", (machine["id"], queue["id"])):
             raise PortalError(f"'{queue['name']}' is already scheduled on {machine['name']}.")
         assignment_id = db.run("INSERT INTO assignments (machine_id, queue_id, frequency, interval_days, weekdays, start_date, active, import_folder) "
@@ -647,8 +613,8 @@ def run_template(db, user, assignment_id):
             "limits": qa.resolve_limits(test, item, override),
             "queue_limits": qa.resolve_limits(test, item),
             "override": {k: override[k] for k in ("expected", "warn", "fail", "tol_mode")} if override else None,
-            "last_text": (db.one("SELECT res.value_text FROM results res JOIN runs r ON r.id = res.run_id WHERE res.test_id = ? AND res.value_text <> '' "
-                                 "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"],)) or {}).get("value_text") if test["type"] == "text" else None,
+            "last_text": (db.one("SELECT res.value_text FROM results res JOIN runs r ON r.id = res.run_id WHERE res.test_id = ? AND r.machine_id = ? AND res.value_text <> '' "
+                                 "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"], machine["id"])) or {}).get("value_text") if test["type"] == "text" else None,
         })
     assignment["schedule"] = qa.describe_schedule(assignment)
     return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"]}, "items": items}

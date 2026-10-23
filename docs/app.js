@@ -643,7 +643,6 @@ async function renderSetup() {
     editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
   const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
   const schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
-  const instanceOf = (q) => schedules.find((a) => a.queue_id === q.id);
   const setActive = async (a, active) => {
     try {
       await api("PUT", `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(",").map(Number),
@@ -656,11 +655,11 @@ async function renderSetup() {
   };
   // Archived lists are hidden here and everywhere else; they come back from the Archived section below.
   const archivedLists = queues.filter((q) => !q.active);
-  const templates = queues.filter((q) => q.is_template && q.active);
-  const lists = queues.filter((q) => !q.is_template && q.active);
-  app.append(el("p", { class: "lead" },
-    `${templates.length} QA list ${templates.length === 1 ? "template" : "templates"} · ${lists.length} machine-specific QA ${lists.length === 1 ? "list" : "lists"}. `,
-    el("span", { class: "muted small" }, "A template is the master copy; instantiating it on a machine gives that machine its own editable list.")));
+  const lists = queues.filter((q) => q.active);
+  const schedulesOf = (q) => schedules.filter((a) => a.queue_id === q.id);
+  const machineOf = (a) => machines.find((m) => m.id === a.machine_id) || {};
+  app.append(el("p", { class: "lead" }, `${lists.length} QA ${lists.length === 1 ? "list" : "lists"}. `,
+    el("span", { class: "muted small" }, "Each list is one list, shared by every machine it is scheduled on. A value that differs on one machine is set on that machine's schedule.")));
 
   const iconBtn = (glyph, title, onclick, cls = "") => el("button", { type: "button", class: `icon-action ${cls}`, title, "aria-label": title, onclick }, glyph);
   const moreMenu = (items) => {
@@ -670,77 +669,71 @@ async function renderSetup() {
     document.addEventListener("click", () => { menu.hidden = true; });
     return wrap;
   };
-  const actions = (q) => el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
-    iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
-    editable ? iconBtn("＋", q.is_template ? "Instantiate on a machine" : "Duplicate", () => duplicateDialog(q, machines)) : null,
-    editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
-    editable ? moreMenu([["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"]]) : null));
+  const reevaluate = (q) => async () => {
+    if (!confirm(`Re-evaluate every recorded result on "${q.name}" against the limits it has now (each machine's own values included)? Verdicts and stored limits are rewritten; this is logged.`)) return;
+    try { const r = await api("POST", `/api/queues/${q.id}/reevaluate`, {}); toast(`Re-evaluated ${r.runs} runs; ${r.changed} verdicts changed.`); route(); }
+    catch (err) { toast(err.message, true); }
+  };
+  const modified = (q) => el("td", { class: "small muted" }, q.modified_at ? el("span", {}, q.modified_at.slice(0, 16).replace("T", " "), el("br"), q.modified_by || "") : "—");
 
-  app.append(el("h2", { class: "section-head" }, "QA List Templates"));
-  const SETUP_COLS = (first, second) => [[first, "29%"], [second, "25%"], ["Tests", "7%"], ["Actions", "18%"], ["Last Modified", "21%"]];
-  const modified = (q) => [el("td", { class: "small muted" }, q.modified_at ? el("span", {}, q.modified_at.slice(0, 16).replace("T", " "), el("br"), q.modified_by || "") : "—")];
-  const templateTable = templates.length ? fixedTable(SETUP_COLS("QA List Template", "Copies on"), templates.map((t) => el("tr", {},
-    el("td", {}, editableName(t, editable)),
-    el("td", { class: "muted" }, lists.filter((q) => q.template_id === t.id).map((q) => q.machines).filter(Boolean).join(", ") || "none yet"),
-    el("td", { class: "center" }, t.item_count),
-    actions(t), modified(t))))
-    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one.");
-  app.append(filterBox(templateTable, "Search QA list templates"), templateTable);
+  app.append(el("h2", { class: "section-head" }, "QA Lists"));
+  const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
+  const listRows = lists.slice().sort((x, y) => (schedulesOf(y).length > 0) - (schedulesOf(x).length > 0) || x.name.localeCompare(y.name)).map((q) => el("tr", {},
+    el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editableName(q, editable))),
+    el("td", {}, schedulesOf(q).length
+      ? el("div", { class: "sched-chips" }, schedulesOf(q).sort((a, b) => String(machineOf(a).name).localeCompare(String(machineOf(b).name))).map((a) =>
+        el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: `#/machines/${a.machine_id}`, title: `${a.schedule}${a.active ? "" : " · inactive"}` },
+          machineOf(a).name, a.active ? null : " (Inactive)")))
+      : el("span", { class: "muted small" }, "Not scheduled")),
+    el("td", { class: "center" }, q.item_count),
+    el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
+      editable ? iconBtn("＋", "Schedule on machines", () => scheduleDialog(q, machines, schedules)) : null,
+      editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
+      editable ? moreMenu([
+        ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
+        ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
+        ["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"],
+      ]) : null)),
+    modified(q)));
+  const listTable = fixedTable([["QA List", "33%"], ["Scheduled On", "28%"], ["Tests", "7%"], ["Actions", "12%"], ["Last Modified", "20%"]], listRows,
+    "No QA lists yet. Make one with New QA list.");
+  app.append(filterBox(listTable, "Search QA lists"), listTable);
 
-  // Bottom table: every QA list instantiated on a machine (a copy of a template), one row each.
-  const kindOf = Object.fromEntries(machines.map((m) => [m.name, m.kind || "Other"]));
-  const KIND_ORDER = ["Proton gantry", "Linac", "CT simulator", "MRI simulator"];
-  const rank = (q) => { const k = kindOf[(q.machines || "").split(", ")[0]]; const i = KIND_ORDER.indexOf(k); return q.machines ? (i < 0 ? KIND_ORDER.length : i) : 99; };
-  const ordered = lists.slice().sort((x, y) => rank(x) - rank(y) || (x.machines || "").localeCompare(y.machines || "") || x.name.localeCompare(y.name));
-  app.append(el("h2", { class: "section-head" }, "Machine-Assigned QA List Instances"),
-    el("p", { class: "muted" }, "Each list here is that machine's own copy. Edits made here change only that machine's list; they do not affect the template it came from. "
-      + "With Auto-sync ticked, a list that still matches its template takes every later template edit."));
-  const byMachine = new Map();
-  for (const q of ordered) {
-    const a = instanceOf(q);
-    const m = a ? machines.find((x) => x.id === a.machine_id) : null;
-    const key = m ? m.name : "Not on a machine";
-    if (!byMachine.has(key)) byMachine.set(key, []);
-    byMachine.get(key).push(q);
-  }
-  const machineRows = [...byMachine].flatMap(([name, qs]) => {
-    const m = machines.find((x) => x.name === name);
-    return [el("tr", { class: "machine-row" }, el("td", { colspan: 7 }, m ? el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" }, el("strong", {}, name)) : el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
-      ...qs.map((q) => {
-        const a = instanceOf(q);
-        const live = !!(a && a.active);
-        return el("tr", { class: live ? "" : "muted" },
-          el("td", { class: "indent" }, editableName(q, editable), live ? el("span", { class: "active-tag" }, " (Active)") : a ? el("span", { class: "inactive-tag" }, " (Inactive)") : null),
-          el("td", {}, q.template_name ? [q.template_name, el("div", { class: `small ${q.changes ? "changed-note" : "muted"}` },
-            q.changes ? `Changed (${q.changes} ${q.changes === 1 ? "test" : "tests"})` : "No changes")] : el("span", { class: "muted" }, "—")),
-          el("td", { class: "center" }, q.template_id ? autoSyncBox(q, editable) : el("span", { class: "muted" }, "—")),
-          el("td", { class: "center" }, q.item_count),
-          el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
-            iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
-            editable ? iconBtn("＋", "Duplicate onto a machine", () => duplicateDialog(q, machines)) : null,
-            editable ? iconBtn("🗑", "Delete (only if it has no results)", () => deleteList(q), "danger") : null,
-            editable ? moreMenu([
-              a ? [live ? "Set Inactive" : "Set Active", () => setActive(a, !live), live ? "Stop scheduling this list on the machine" : "Schedule this list on the machine"] : null,
-              ["Make Template", () => templateDialog(q), "Save a copy of this list as a new template"],
-              ["Re-evaluate", async () => {
-                if (!confirm(`Re-evaluate every recorded result on "${q.name}" against the limits it has now? Verdicts and stored limits are rewritten; this is logged.`)) return;
-                try { const r = await api("POST", `/api/queues/${q.id}/reevaluate`, {}); toast(`Re-evaluated ${r.runs} runs; ${r.changed} verdicts changed.`); route(); }
-                catch (err) { toast(err.message, true); }
-              }, "Re-judge every recorded result against the current limits (logged)"],
-              ["Archive", () => archiveList(q, true), "Hide this list (nothing is deleted)"],
-            ]) : null)),
-          modified(q));
-      })];
-  });
-  const instanceTable = fixedTable([["QA List", "26%"], ["Generated from", "22%"], ["Auto-sync", "9%"], ["Tests", "6%"], ["Actions", "17%"], ["Last Modified", "20%"]],
-    machineRows, "No QA lists on machines yet. Instantiate a template on a machine.");
-  app.append(filterBox(instanceTable, "Search machine-assigned QA lists"), instanceTable);
+  // Each machine's schedules: which of the lists it runs, how often, and any values of its own.
+  const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator"];
+  const kindRankOf = (m) => { const i = KIND_ORDER.indexOf(m.kind); return i < 0 ? KIND_ORDER.length : i; };
+  app.append(el("h2", { class: "section-head" }, "Machine Schedules"));
+  const scheduleRows = machines.filter((m) => schedules.some((a) => a.machine_id === m.id && lists.some((q) => q.id === a.queue_id)))
+    .sort((x, y) => kindRankOf(x) - kindRankOf(y) || x.name.localeCompare(y.name)).flatMap((m) => {
+      const mine = schedules.filter((a) => a.machine_id === m.id).map((a) => ({ a, q: lists.find((q) => q.id === a.queue_id) })).filter((x) => x.q)
+        .sort((x, y) => (y.a.active - x.a.active) || (FREQ_ORDER[x.a.frequency] ?? 9) - (FREQ_ORDER[y.a.frequency] ?? 9) || x.q.name.localeCompare(y.q.name));
+      return [el("tr", { class: "machine-row" }, el("td", { colspan: 5 }, el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" },
+        el("strong", {}, m.name)), m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
+      ...mine.map(({ a, q }) => el("tr", { class: a.active ? "" : "muted" },
+        el("td", { class: "indent" }, el("div", { class: "name-with-edit" }, iconBtn("✎", editable ? "Edit tests (all machines)" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
+          el("span", {}, el("a", { href: `#/queues/${q.id}` }, el("strong", {}, q.name)),
+            a.active ? el("span", { class: "active-tag" }, " (Active)") : el("span", { class: "inactive-tag" }, " (Inactive)")))),
+        el("td", { class: "small" }, a.schedule),
+        el("td", { class: "center" }, a.override_count
+          ? el("a", { href: `#/assignments/${a.id}/limits`, title: "Values that differ on this machine" }, `${a.override_count} ${a.override_count === 1 ? "test" : "tests"}`)
+          : el("span", { class: "muted small" }, "None")),
+        el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
+          editable ? moreMenu([
+            [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active), a.active ? "Stop scheduling this list on the machine" : "Schedule this list on the machine"],
+            ["Values for this machine", () => (location.hash = `#/assignments/${a.id}/limits`), "Baselines or limits that differ on this machine only"],
+            ["Schedule and import folder", () => (location.hash = `#/machines/${m.id}`), "Change how often it is due and where its files arrive"],
+          ]) : null)),
+        modified(q)))];
+    });
+  const scheduleTable = fixedTable([["QA List", "32%"], ["Schedule", "26%"], ["Machine Values", "12%"], ["Actions", "10%"], ["Last Modified", "20%"]], scheduleRows,
+    "No lists scheduled yet. Use ＋ on a list above to schedule it on machines.");
+  app.append(filterBox(scheduleTable, "Search machine schedules"), scheduleTable);
 
   if (archivedLists.length) {
     app.append(el("details", { class: "archived" }, el("summary", {}, `Archived QA lists (${archivedLists.length})`),
       el("p", { class: "muted small" }, "Hidden from Perform QA, Machines and Trends. Their tests and results are kept."),
-      table(["QA list", "Kind", "#Tests", ""], archivedLists.map((q) => el("tr", { class: "muted" },
-        el("td", {}, el("strong", {}, q.name)), el("td", {}, q.is_template ? "Template" : "Machine list"), el("td", { class: "num" }, q.item_count),
+      table(["QA list", "#Tests", ""], archivedLists.map((q) => el("tr", { class: "muted" },
+        el("td", {}, el("strong", {}, q.name)), el("td", { class: "num" }, q.item_count),
         el("td", { class: "right" }, editable ? el("div", { class: "row nowrap end" },
           el("button", { class: "small primary", onclick: () => archiveList(q, false) }, "Restore"),
           el("button", { class: "small danger", onclick: () => deleteList(q) }, "Delete")) : null))))));
@@ -845,27 +838,14 @@ function machineForm(machine) {
 // Machines: create machines and decide which QA lists each one runs, and how often. Same layout as Perform QA.
 async function addListDialog(machine, assigned) {
   const all = await api("GET", "/api/queues");
-  const templates = all.filter((q) => q.active && q.is_template);
-  const free = all.filter((q) => q.active && !q.is_template && !assigned.some((a) => a.queue_id === q.id));
-  if (!templates.length && !free.length) return toast("No QA lists to add. Make a template under Setup QA first.", true);
-  const sameKind = templates.find((t) => (t.name || "").toLowerCase().includes((machine.kind || "~").toLowerCase()));
+  const offered = all.filter((q) => q.active && !assigned.some((a) => a.queue_id === q.id));
+  if (!offered.length) return toast("Every QA list is already on this machine. Make a new one under Setup QA.", true);
+  const sameKind = offered.find((t) => (t.name || "").toLowerCase().includes((machine.kind || "~").toLowerCase()));
   const pick = el("div", { class: "form-grid" },
-    field("Start from", select("source", [...templates.map((q) => [`t${q.id}`, `Template: ${q.name}`]), ...free.map((q) => [`q${q.id}`, `Existing list: ${q.name}`])],
-      `t${(sameKind || templates[0] || {}).id}`), "wide"),
-    field("Name for this machine's copy", el("input", { name: "name", placeholder: `Daily QA – ${machine.name}` }), "wide"),
+    field("QA list", select("queue_id", offered.map((q) => [q.id, q.name]), (sameKind || offered[0]).id), "wide"),
     scheduleForm(null));
-  const source = pick.querySelector("[name=source]");
-  const nameField = pick.querySelector("[name=name]").closest(".field");
-  const sync = () => (nameField.hidden = !source.value.startsWith("t"));
-  source.addEventListener("change", sync);
-  sync();
   modal(`Add a QA list to ${machine.name}`, pick, async (data, form) => {
-    const schedule = { ...scheduleData(data, form), machine_id: machine.id };
-    if (data.source.startsWith("t")) {
-      await api("POST", `/api/queues/${data.source.slice(1)}/duplicate`, { ...schedule, name: data.name || `Daily QA – ${machine.name}` });
-    } else {
-      await api("POST", "/api/assignments", { ...schedule, queue_id: Number(data.source.slice(1)) });
-    }
+    await api("POST", "/api/assignments", { ...scheduleData(data, form), machine_id: machine.id, queue_id: Number(data.queue_id) });
     toast("QA list added");
     route();
   }, "Add");
@@ -909,7 +889,7 @@ async function renderMachines() {
       const lines = mine.length ? mine.map((a) => {
         const q = queues[a.queue_id] || {};
         return el("tr", { class: a.active ? "" : "muted" },
-          el("td", { class: "indent" }, a.queue_name, q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+          el("td", { class: "indent" }, a.queue_name),
           el("td", {}, a.schedule),
           el("td", {}, chip(a.active ? a.state : "", scheduleStatus(a))),
           el("td", { class: "num" }, q.item_count ?? ""),
@@ -1067,25 +1047,13 @@ async function renderMachine(id) {
     }) }, "Edit"));
     actions.push(el("button", { class: "primary", onclick: async () => {
       const all = await api("GET", "/api/queues");
-      const templates = all.filter((q) => q.active && q.is_template);
-      const free = all.filter((q) => q.active && !q.is_template && !assignments.some((a) => a.queue_id === q.id));
-      if (!templates.length && !free.length) return toast("No QA lists to add. Make a template first.", true);
+      const offered = all.filter((q) => q.active && !assignments.some((a) => a.queue_id === q.id));
+      if (!offered.length) return toast("Every QA list is already on this machine. Make a new one under Setup QA.", true);
       const pick = el("div", { class: "form-grid" },
-        field("Start from", select("source", [...templates.map((q) => [`t${q.id}`, `Template: ${q.name}`]), ...free.map((q) => [`q${q.id}`, `Existing list: ${q.name}`])], templates[0] ? `t${templates[0].id}` : ""), "wide"),
-        field("Name for this machine's copy", el("input", { name: "name", placeholder: `Daily QA – ${machine.name}` }), "wide"),
+        field("QA list", select("queue_id", offered.map((q) => [q.id, q.name]), offered[0].id), "wide"),
         scheduleForm(null));
-      const source = pick.querySelector("[name=source]");
-      const nameField = pick.querySelector("[name=name]").closest(".field");
-      const sync = () => (nameField.hidden = !source.value.startsWith("t"));
-      source.addEventListener("change", sync);
-      sync();
       modal(`Add a QA list to ${machine.name}`, pick, async (data, form) => {
-        const schedule = { ...scheduleData(data, form), machine_id: Number(id) };
-        if (data.source.startsWith("t")) {
-          await api("POST", `/api/queues/${data.source.slice(1)}/duplicate`, { ...schedule, name: data.name || `Daily QA – ${machine.name}` });
-        } else {
-          await api("POST", "/api/assignments", { ...schedule, queue_id: Number(data.source.slice(1)) });
-        }
+        await api("POST", "/api/assignments", { ...scheduleData(data, form), machine_id: Number(id), queue_id: Number(data.queue_id) });
         toast("QA list added");
         route();
       }, "Add");
@@ -1368,8 +1336,8 @@ function wireCalculations(entries) {
 async function renderPerform(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
   const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends`).catch(() => ({})) : {};
-  page(t.queue.name, t.assignment.schedule);
-  app.querySelector(".page-head").classList.add("sticky-head");        // the list's name stays in view while scrolling
+  page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
+  app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
     app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
   }
@@ -1767,64 +1735,47 @@ function importSphinxDialog(a) {
 // ---------------------------------------------------------------------------
 
 // Save a machine's list back as a template: a new master copy; the machine keeps its own list untouched.
-function templateDialog(source) {
+// Schedule one list on machines: every ticked machine runs this same list (no copies).
+async function scheduleDialog(list, machines, schedules) {
+  if (!schedules) schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
+  const on = new Set(schedules.filter((a) => a.queue_id === list.id).map((a) => a.machine_id));
   const body = el("div", {},
-    el("p", { class: "muted" }, `Every test in "${source.name}" is copied into a new template. ${source.name} stays on its machine as it is.`),
-    el("div", { class: "form-grid" }, field("Template name", el("input", { name: "name", required: true, value: `${source.name.replace(/\s*–\s*[^–]+$/, "")} template` }), "wide")));
-  modal(`Make a template from ${source.name}`, body, async (data) => {
-    const r = await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name, as_template: true });
-    toast("Template created");
-    location.hash = `#/queues/${r.id}`;
-  }, "Make Template");
-}
-
-// "Test saved. Also updated: Monthly QA – GTR1, Monthly QA – GTR2" when Auto-sync carried a template edit to machine lists.
-const syncedNote = (said, r) => (r && r.synced && r.synced.length ? `${said}. Also updated (Auto-sync): ${r.synced.join(", ")}` : said);
-
-function duplicateDialog(source, machines) {
-  // The copy keeps the source's name; tick every machine that should get its own list (one list is created per machine,
-  // all on the same schedule). A template is "instantiated"; a machine's list is "duplicated".
-  const verb = source.is_template ? "Instantiate on a Machine" : "Duplicate";
-  const active = machines.filter((m) => m.active);
-  const body = el("div", {},
-    el("p", { class: "muted" }, `Every test in "${source.name}" is copied, so each new list's limits can be adjusted on its own.`),
+    el("p", { class: "muted" }, `Every ticked machine runs "${list.name}" itself, so an edit to the list reaches all of them.`),
     el("div", { class: "form-grid" },
-      field("Name for the copy", el("input", { name: "name", required: true, value: source.name }), "wide"),
-      field("Schedule on", el("div", { class: "machine-picks" }, active.map((m) =>
-        el("label", { class: "check" }, el("input", { type: "checkbox", name: "machines", value: String(m.id) }), m.name))), "wide")),
-    el("div", { class: "schedule-part", hidden: true }, scheduleForm(null)));
-  const picks = [...body.querySelectorAll("[name=machines]")];
-  const schedulePart = body.querySelector(".schedule-part");
-  picks.forEach((c) => c.addEventListener("change", () => (schedulePart.hidden = !picks.some((x) => x.checked))));
-  modal(`${verb} ${source.name}`, body, async (data, form) => {
-    const chosen = picks.filter((c) => c.checked).map((c) => Number(c.value));
-    if (!chosen.length) {
-      const r = await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name, machine_id: null });
-      toast("QA list created");
-      location.hash = `#/queues/${r.id}`;
-      return;
-    }
+      field("Machines", el("div", { class: "machine-picks" }, machines.filter((m) => m.active).map((m) => el("label", { class: "check" },
+        el("input", { type: "checkbox", name: "machines", value: String(m.id), checked: on.has(m.id), disabled: on.has(m.id) }), m.name,
+        on.has(m.id) ? el("span", { class: "muted small" }, " (scheduled)") : null))), "wide")),
+    el("div", { class: "schedule-part" }, scheduleForm(null)));
+  modal(`Schedule ${list.name}`, body, async (data, form) => {
+    const chosen = [...body.querySelectorAll("[name=machines]")].filter((c) => c.checked && !c.disabled).map((c) => Number(c.value));
+    if (!chosen.length) throw new Error("Tick at least one machine.");
     const schedule = scheduleData(data, form);
-    for (const machineId of chosen) await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name, machine_id: machineId, ...schedule });
-    toast(chosen.length === 1 ? "QA list created" : `${chosen.length} QA lists created`);
-    location.hash = "#/setup";
+    for (const machineId of chosen) await api("POST", "/api/assignments", { ...schedule, machine_id: machineId, queue_id: list.id });
+    toast(chosen.length === 1 ? "Scheduled on 1 machine" : `Scheduled on ${chosen.length} machines`);
     route();
-  }, verb);
+  }, "Schedule");
 }
 
-// Auto-sync tick box for a machine list made from a template. It only acts while the list matches the template.
-function autoSyncBox(q, editable) {
-  const box = el("input", { type: "checkbox", checked: !!q.auto_sync, disabled: !editable, "aria-label": `Auto-sync ${q.name} with ${q.template_name}`,
-    title: q.changes ? "This list differs from its template, so template edits will not reach it until it matches again" : "Template edits are copied to this list" });
-  box.addEventListener("click", (e) => e.stopPropagation());
-  box.addEventListener("change", async () => {
-    try {
-      const r = await api("POST", `/api/queues/${q.id}/auto-sync`, { auto_sync: box.checked });
-      toast(!r.auto_sync ? `Auto-sync off for ${q.name}` : r.changes ? `Auto-sync on for ${q.name}. It differs from its template in ${r.changes} ${r.changes === 1 ? "test" : "tests"}, so it will not follow until it matches.` : `Auto-sync on for ${q.name}`);
-      route();
-    } catch (err) { box.checked = !box.checked; toast(err.message, true); }
-  });
-  return box;
+// A separate list under a new name (its tests are copied, so it can then be changed on its own).
+function copyDialog(source) {
+  const body = el("div", {},
+    el("p", { class: "muted" }, `Every test in "${source.name}" is copied into a new, separate list. "${source.name}" is not changed.`),
+    el("div", { class: "form-grid" }, field("Name of the new list", el("input", { name: "name", required: true, value: `${source.name} (copy)` }), "wide")));
+  modal(`Duplicate ${source.name}`, body, async (data) => {
+    const r = await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name });
+    toast("QA list created");
+    location.hash = `#/queues/${r.id}`;
+  }, "Duplicate");
+}
+
+// The page title (and, below it, a table's header row) stays pinned while scrolling.
+function stickyHead() {
+  const head = app.querySelector(".page-head");
+  if (!head) return;
+  head.classList.add("sticky-head");
+  const set = () => document.documentElement.style.setProperty("--sticky-top", `${head.offsetHeight}px`);
+  set();
+  if (window.ResizeObserver) new ResizeObserver(set).observe(head);
 }
 
 async function renderQueues() {
@@ -1834,11 +1785,11 @@ async function renderQueues() {
   const templates = queues.filter((q) => q.is_template);
   const lists = queues.filter((q) => !q.is_template);
   const row = (q) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/queues/${q.id}`) },
-    el("td", {}, el("strong", {}, q.name), q.template_name ? el("div", { class: "muted small" }, `from ${q.template_name}`) : null),
+    el("td", {}, el("strong", {}, q.name)),
     el("td", { class: "num" }, q.item_count),
-    el("td", {}, q.is_template ? el("span", { class: "muted" }, "—") : q.machines || el("span", { class: "muted" }, "not scheduled")),
+    el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
     el("td", {}, q.active ? "" : chip("", "Inactive")),
-    el("td", {}, can("configure") ? el("button", { onclick: (e) => { e.stopPropagation(); duplicateDialog(q, machines); } }, "Duplicate") : null));
+    el("td", {}, can("configure") ? el("button", { onclick: (e) => { e.stopPropagation(); copyDialog(q); } }, "Duplicate") : null));
   app.append(el("h2", {}, "QA List Templates"));
   app.append(templates.length ? table(["QA List Template", "#Tests", "Machines", "", ""], templates.map(row))
     : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
@@ -1851,17 +1802,34 @@ async function renderQueueEditor(id) {
   const [tests, queue, machines] = await Promise.all([api("GET", "/api/tests"), isNew ? null : api("GET", `/api/queues/${id}`), api("GET", "/api/machines")]);
   const q = queue || { name: "", description: "", active: 1, is_template: 0, items: [] };
   const editable = can("configure");
-  page(isNew ? "New QA list" : q.name, q.is_template ? "Template. Duplicate it to put it on a machine." : "Blank limits use each test's default, shown in grey.",
-    !isNew && editable ? [el("button", { onclick: () => duplicateDialog(q, machines) }, "Duplicate")] : []);
+  const where = (q.schedules || []).map((s) => `${s.machine}${s.active ? "" : " (inactive)"}`).join(", ");
+  page(isNew ? "New QA list" : q.name, isNew ? "" : where ? `Scheduled on ${where}. This is the list each of them performs and trends; an edit here applies to all of them.`
+    : "Not scheduled on a machine yet.",
+    !isNew && editable ? [el("button", { onclick: () => scheduleDialog(q, machines, null) }, "Schedule on machines"), el("button", { onclick: () => copyDialog(q) }, "Duplicate")] : []);
+  stickyHead();
   const info = el("form", { class: "card" }, el("div", { class: "form-grid" },
     field("Name", el("input", { name: "name", value: q.name, required: true, disabled: !editable, placeholder: "e.g. Daily QA template" })),
     field("Setup instructions (shown when performing)", el("textarea", { name: "description", disabled: !editable }, q.description), "wide"),
-    el("label", { class: "check" }, el("input", { type: "checkbox", name: "is_template", checked: !!q.is_template, disabled: !editable }), "Template (master copy; not scheduled directly)"),
     el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!q.active, disabled: !editable }), "Active")));
   app.append(info);
 
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));
   let items = q.items.map((i) => ({ test_id: i.test_id, expected: i.expected, warn: i.warn, fail: i.fail, tol_mode: i.tol_mode }));
+  // "Values for": the list's default baseline / Warning / Action (every machine), or one machine's own values,
+  // which override the default on that machine only (blank = use the default, shown in grey).
+  let valuesFor = "";
+  let saveBtn = null;
+  const machineValues = {};
+  const machineName = (aid) => ((q.schedules || []).find((x) => String(x.id) === String(aid)) || {}).machine || "";
+  const valuesPick = (q.schedules || []).length ? select("values_for", [["", "All machines (default)"], ...q.schedules.map((x) => [x.id, `${x.machine} only`])], "",
+    { "aria-label": "Values for", onchange: async (e) => {
+      valuesFor = e.target.value;
+      if (valuesFor && !machineValues[valuesFor]) {
+        const t = await api("GET", `/api/assignments/${valuesFor}/template`);
+        machineValues[valuesFor] = Object.fromEntries(t.items.map((i) => [i.test_id, { ...(i.override || {}) }]));
+      }
+      draw();
+    } }) : null;
   const changed = Object.fromEntries(q.items.map((i) => [i.test_id, i]));
   const body = el("tbody");
   const holder = el("div");
@@ -1870,45 +1838,55 @@ async function renderQueueEditor(id) {
     const sectionCats = new Map();
     for (const it of items) { const t = byId[it.test_id]; const n = sectionNumber(t); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(t.category); }
     let lastSection = null;
+    const numbers = blockNumbers(items.map((i) => ({ ...byId[i.test_id], test_id: i.test_id })));
     body.replaceChildren(...items.flatMap((item, index) => {
       const t = byId[item.test_id];
       const numeric = t.type === "numeric";
-      const input = (name, props) => el("input", { type: "number", step: "any", value: item[name] ?? "", placeholder: fmt(t[name]), disabled: !editable || !numeric,
-        oninput: (e) => (item[name] = e.target.value), ...(props || {}) });
+      const own = valuesFor ? (machineValues[valuesFor][item.test_id] = machineValues[valuesFor][item.test_id] || {}) : null;
+      const target = own || item;            // what the inputs edit: this machine's own values, or the list's default
+      const fallback = (name) => (own ? (item[name] ?? t[name]) : t[name]);
+      const input = (name, props) => el("input", { type: "number", step: "any", value: target[name] ?? "", placeholder: fmt(fallback(name)), disabled: !editable || !numeric,
+        class: own && target[name] !== undefined && target[name] !== null && target[name] !== "" ? "own-value" : null,
+        title: own ? `${machineName(valuesFor)} only. Blank uses the default (${fmt(fallback(name))}).` : null,
+        oninput: (e) => { target[name] = e.target.value; e.target.classList.toggle("own-value", !!own && e.target.value !== ""); }, ...(props || {}) });
       const m = changed[item.test_id] || {};
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
-      const tolUnit = (item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
+      const tolUnit = ((own && own.tol_mode) || item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       const n = sectionNumber(t);
       const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
       const directions = helpText(t.description);
       const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 7 }, directions)) : null;
       lastSection = n;
-      const number = checkNumber(t.description);
+      const number = numbers.get(item.test_id);
       return [head, el("tr", { class: `compact${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable ? "true" : null },
-        el("td", { class: "item-cell" }, editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
-          el("strong", {}, number ? `${number}: ` : "", shortName)),
+        el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
+          editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
+          editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
+            await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+            toast("Test saved");
+            route();
+          }) }, "✎") : null,
+          el("strong", {}, number ? `${number}: ` : "", shortName))),
         el("td", {}, categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit ? el("span", { class: "muted small" }, t.unit) : chip("fail", "unit missing"))
+        el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, "Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
-          select("", [["", `Default (${t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], item.tol_mode || "",
-            { disabled: !editable, onchange: (e) => { item.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
+          select("", [["", `Default (${own ? item.tol_mode || t.tol_mode : t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || "",
+            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
         el("td", { class: "small" }, m.modified_at ? el("span", {}, m.modified_at.slice(0, 16).replace("T", " "), el("br"), m.modified_by || "") : el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
-          el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-            const r = await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
-            toast(syncedNote("Test saved", r));
-            route();
-          }) }, "✎"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
-    holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", {},
-      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Expected", "Warning / Action", "Last Modified", ""].map((h) => el("th", {}, h)))), body))
+    holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
+      el("thead", {}, el("tr", {}, ["Test Name", "Category", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
+        valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Warning / Action (Default)", "Last Modified", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
+    if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} values` : "Save";
+    holder.classList.toggle("machine-mode", !!valuesFor);
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
       ...tests.filter((t) => t.active && (!t.owner_queue_id || String(t.owner_queue_id) === id) && !items.some((i) => i.test_id === t.id))
@@ -1942,7 +1920,8 @@ async function renderQueueEditor(id) {
       },
     };
   }
-  app.append(el("h2", {}, "Tests"), holder);
+  app.append(el("div", { class: "row values-for" }, el("h2", {}, "Tests"),
+    valuesPick ? el("label", { class: "inline", title: "Default values apply on every machine; a machine's own value replaces the default on that machine only" }, "Values for ", valuesPick) : null), holder);
   if (editable) {
     const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => modal("New test for this list", testForm(), async (data) => {
       const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
@@ -1952,15 +1931,22 @@ async function renderQueueEditor(id) {
     const error = el("p", { class: "error" });
     const save = async () => {
       error.textContent = "";
+      if (valuesFor) {
+        const overrides = Object.entries(machineValues[valuesFor]).map(([tid, o]) => ({ test_id: Number(tid), expected: o.expected ?? "", warn: o.warn ?? "",
+          fail: o.fail ?? "", tol_mode: o.tol_mode || "" }));
+        await api("PUT", `/api/assignments/${valuesFor}/overrides`, { overrides });
+        toast(`${machineName(valuesFor)} values saved`);
+        return;
+      }
       const payload = { ...formData(info), items };
       const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
-      toast(syncedNote("QA list saved", result));
+      toast("QA list saved");
       location.hash = `#/queues/${result.id}`;
       if (!isNew) route();
     };
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
     app.append(error, el("div", { class: "row" }, el("a", { class: "button", href: "#/queues" }, "Back"),
-      el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
+      saveBtn = el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
   }
   draw();
 }
@@ -1998,8 +1984,8 @@ async function renderTests() {
   const holder = el("div", { class: "stack" });
   const shortName = (t) => t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
   const edit = (t) => editable ? () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-    const r = await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
-    toast(syncedNote("Test saved", r));
+    await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+    toast("Test saved");
     route();
   }) : null;
   const limitCells = (t) => [
@@ -2309,9 +2295,9 @@ function yAxisLabel(names) {
   return t.split(" ").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
 
-const trendKey = (show) => (show ? [
-  el("span", { class: "key-item" }, el("span", { class: "key-swatch fit" }), "Trend (Straight-Line Fit)"),
-  el("span", { class: "key-item" }, el("span", { class: "key-swatch fit forecast" }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)] : []);
+const trendKey = (show, multi = false) => (show ? [
+  el("span", { class: "key-item" }, el("span", { class: `key-swatch fit${multi ? " multi" : ""}` }), multi ? "Trend (Straight-Line Fit, Each Series)" : "Trend (Straight-Line Fit)"),
+  el("span", { class: "key-item" }, el("span", { class: `key-swatch fit forecast${multi ? " multi" : ""}` }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)] : []);
 
 function seriesChart(series, unit, { small = false, delta = null, yLabel = null } = {}) {
   yLabel = yLabel || yAxisLabel(series.map((x) => x.label));
@@ -2346,7 +2332,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
       drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
       drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
-      ...trendKey(series.some((x) => x.points.length >= 3)));
+      ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1));
     box.replaceChildren(buttons, drawSeries(series, unit, { small, delta, yLabel }), key);
   };
   draw();
@@ -2611,7 +2597,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
     return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
   };
   // One read-only table: # · Test · Unit · Baseline · Latest · Deviation · Result · History · Trends.
-  const trendTable = (members, { firstHeader, title, firstCell, chartTogether }) => {
+  const trendTable = (members, { firstHeader, title, firstCell, chartTogether, familyChart }) => {
     const dates = latestDates(members.map((it) => it.points));
     const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
     const dp = decimalsOf(members.flatMap((it) => [...it.points.slice(-5).map((h) => h.value), latest(it.points).expected ?? (it.limits || {}).expected]));
@@ -2655,7 +2641,13 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
       if (line) title.append(line);
     }
     fitHistoryRows(tableEl, dates.length);
-    return el("div", { class: "measure-block" }, title, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+    // Energy / spot tables: every row on one chart below the table (Δ from Reference puts them on one scale).
+    const together = familyChart && members.length > 1
+      ? el("details", { class: "family-chart", open: true }, el("summary", {}, "Chart"),
+        seriesChart(members.map((m) => ({ label: (measureParts(m.name) || {}).rowLabel || m.name, points: m.points })), unitOf(members[0]),
+          { delta: true, yLabel: yAxisLabel(members.map((m) => m.name)) }))
+      : null;
+    return el("div", { class: "measure-block" }, title, el("div", { class: "table-wrap measure-wrap" }, tableEl), together);
   };
   const foldAxes = (list) => {
     const out = [];
@@ -2707,7 +2699,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
       const mp0 = measureParts(it.name);
       const family = families.get(`${mp0.metric}|${it.unit || ""}`).slice().sort((a, b) => measureParts(a.name).sortKey - measureParts(b.name).sortKey);
       family.forEach((f) => drawn.add(f.test_id));
-      blocks.push(trendTable(family, { firstHeader: "Energy", title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel)),
+      blocks.push(trendTable(family, { firstHeader: "Energy", familyChart: true, title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel)),
         firstCell: (f) => el("strong", {}, measureParts(f.name).rowLabel) }));
     }
     flush();
@@ -2768,8 +2760,8 @@ async function renderSearch() {
     el("td", {}, el("a", { href: `#/machines/${m.id}` }, el("strong", {}, m.name))), el("td", { class: "muted" }, m.kind || "—"),
     el("td", {}, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}` }, "Trends")))),
     [["Machine", "40%"], ["Kind", "40%"], ["", "20%"]]);
-  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.template_name || ""} ${x.machines || ""}`)).map((x) => el("tr", {},
-    el("td", {}, el("a", { href: `#/queues/${x.id}` }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.is_template ? "Template" : x.machines || "Not on a machine"),
+  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.machines || ""}`)).map((x) => el("tr", {},
+    el("td", {}, el("a", { href: `#/queues/${x.id}` }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.machines || "Not scheduled"),
     el("td", { class: "center" }, x.item_count))),
     [["QA list", "50%"], ["Where", "40%"], ["Tests", "10%"]]);
   const byQueue = new Map(queues.map((x) => [x.id, x]));

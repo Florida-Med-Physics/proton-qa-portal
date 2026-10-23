@@ -116,35 +116,57 @@ class ServiceTests(unittest.TestCase):
             "qa_date": qa_date or date.today().isoformat(),
             "results": [{"test_id": self.dist, "value": dist}, {"test_id": self.door, "value": door}]})
 
-    def test_auto_sync_follows_template_only_when_unchanged(self):
+    def test_one_list_shared_by_machines(self):
         admin = self.users["admin"]
-        tpl = service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": []})["id"]
-        a = service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 100, "warn": 0.5, "fail": 1, "owner_queue_id": tpl})["id"]
-        b = service.save_test(self.db, admin, {"name": "Output", "unit": "%", "expected": 100, "warn": 2, "fail": 3, "owner_queue_id": tpl})["id"]
-        service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": [{"test_id": a}, {"test_id": b}]}, tpl)
-        follow = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy follows"})["id"]
-        stay = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy stays"})["id"]
-        edited = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy edited"})["id"]
-        service.set_auto_sync(self.db, admin, follow, {"auto_sync": True})
-        service.set_auto_sync(self.db, admin, edited, {"auto_sync": True})
-        mine = service.get_queue(self.db, admin, edited)["items"][0]["test_id"]
-        service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 100, "warn": 0.4, "fail": 1, "owner_queue_id": edited}, mine)
+        other = service.save_machine(self.db, admin, {"name": "Synthetic Gantry B"})["id"]
+        second = service.save_assignment(self.db, admin, {"machine_id": other, "queue_id": self.queue, "frequency": "daily",
+                                                          "weekdays": [0, 1, 2, 3, 4, 5, 6], "start_date": "2026-01-01"})["id"]
+        # An edit to the list (order, default limits) is what every machine performs.
+        service.save_test(self.db, admin, {"name": "Distal depth", "category": "Energy", "unit": "mm", "expected": 101, "warn": 0.9, "fail": 1.0}, self.dist)
+        service.save_queue(self.db, admin, {"name": "Synthetic daily", "items": [{"test_id": self.dist}, {"test_id": self.door}, {"test_id": self.note}]}, self.queue)
+        for a in (self.assignment, second):
+            t = service.run_template(self.db, admin, a)
+            self.assertEqual([i["test_id"] for i in t["items"]], [self.dist, self.door, self.note])
+            self.assertEqual((t["items"][0]["limits"]["expected"], t["items"][0]["limits"]["warn"]), (101, 0.9))
+        # A machine's own Warning / Action replaces the default there only.
+        service.save_overrides(self.db, admin, second, {"overrides": [{"test_id": self.dist, "warn": "0.4", "fail": "0.6"}]})
+        mine = service.run_template(self.db, admin, second)["items"][0]["limits"]
+        theirs = service.run_template(self.db, admin, self.assignment)["items"][0]["limits"]
+        self.assertEqual((mine["expected"], mine["warn"], mine["fail"]), (101, 0.4, 0.6))
+        self.assertEqual((theirs["warn"], theirs["fail"]), (0.9, 1.0))
+        self.assertEqual({s["machine"] for s in service.get_queue(self.db, admin, self.queue)["schedules"]}, {"Synthetic Gantry A", "Synthetic Gantry B"})
+        counts = {a["machine_id"]: a["override_count"] for a in service.list_assignments(self.db, admin, other)}
+        self.assertEqual(counts[other], 1)
 
-        # A limit edit on the template reaches only the ticked list that still matched.
-        r = service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 101, "warn": 0.5, "fail": 1, "owner_queue_id": tpl}, a)
-        self.assertEqual(r["synced"], ["Copy follows"])
-        self.assertEqual(service.changes_from_template(self.db, follow, tpl), 0)
-        self.assertEqual(service.changes_from_template(self.db, stay, tpl), 1)
-        self.assertEqual(service.changes_from_template(self.db, edited, tpl), 1)
+    def test_merge_copies_into_one_list(self):
+        admin = self.users["admin"]
+        tpl = service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True})["id"]
+        rng = service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 100, "warn": 0.5, "fail": 1, "owner_queue_id": tpl})["id"]
+        service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": [{"test_id": rng}]}, tpl)
+        other = service.save_machine(self.db, admin, {"name": "Synthetic Gantry B"})["id"]
+        # An old-style per-machine copy, with a limit of its own and recorded history.
+        copy = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy – B", "machine_id": other, "frequency": "daily",
+                                                             "weekdays": [0, 1, 2, 3, 4, 5, 6], "start_date": "2026-01-01"})
+        self.db.run("UPDATE queues SET template_id = ? WHERE id = ?", (tpl, copy["id"]))
+        copy_test = service.get_queue(self.db, admin, copy["id"])["items"][0]["test_id"]
+        service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 100, "warn": 0.4, "fail": 1, "owner_queue_id": copy["id"]}, copy_test)
+        run = service.submit_run(self.db, self.users["physicist"], copy["assignment_id"], {"qa_date": "2026-02-02", "results": [{"test_id": copy_test, "value": "100.1"}]})
+        # A copy whose tests differ stays a list of its own.
+        odd = service.duplicate_queue(self.db, admin, tpl, {"name": "Odd copy"})["id"]
+        extra = service.save_test(self.db, admin, {"name": "Extra", "type": "text", "owner_queue_id": odd})["id"]
+        service.save_queue(self.db, admin, {"name": "Odd copy", "items": [*[{"test_id": i["test_id"]} for i in service.get_queue(self.db, admin, odd)["items"]], {"test_id": extra}]}, odd)
+        self.db.run("UPDATE queues SET template_id = ? WHERE id = ?", (tpl, odd))
 
-        # Adding, reordering and removing tests on the template carries over too.
-        c = service.save_test(self.db, admin, {"name": "Flatness", "unit": "%", "expected": 0, "warn": 1, "fail": 2, "owner_queue_id": tpl})["id"]
-        r = service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": [{"test_id": c}, {"test_id": a}]}, tpl)
-        self.assertEqual(r["synced"], ["Copy follows"])
-        self.assertEqual([i["name"] for i in service.get_queue(self.db, admin, follow)["items"]], ["Flatness", "Range"])
-        self.assertEqual(service.changes_from_template(self.db, follow, tpl), 0)
-        with self.assertRaisesRegex(PortalError, "made from a template"):
-            service.set_auto_sync(self.db, admin, tpl, {"auto_sync": True})
+        out = service.merge_copies(self.db, admin)
+        self.assertEqual((out["merged"], out["kept"]), (["Copy – B"], ["Odd copy"]))
+        self.assertIsNone(self.db.one("SELECT id FROM queues WHERE id = ?", (copy["id"],)))
+        self.assertEqual(self.db.one("SELECT queue_id FROM assignments WHERE id = ?", (copy["assignment_id"],))["queue_id"], tpl)
+        self.assertEqual(self.db.one("SELECT queue_id FROM runs WHERE id = ?", (run["id"],))["queue_id"], tpl)
+        self.assertEqual(self.db.one("SELECT test_id FROM results WHERE run_id = ?", (run["id"],))["test_id"], rng)
+        limits = service.run_template(self.db, admin, copy["assignment_id"])["items"][0]["limits"]
+        self.assertEqual(limits["warn"], 0.4)                       # the copy's own limit became that machine's value
+        self.assertEqual(service.trend(self.db, admin, other, rng)["points"][0]["value"], 100.1)
+        self.assertIsNone(self.db.one("SELECT template_id FROM queues WHERE id = ?", (odd,))["template_id"])
 
     def test_permissions(self):
         with self.assertRaises(PortalError) as err:

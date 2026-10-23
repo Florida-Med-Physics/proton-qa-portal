@@ -505,13 +505,10 @@
       audit(user.id, "create", "test", id, { name, owner });
       return { id };
     }
-    const template = existing.owner_queue_id ? S.queues.find((q) => q.id === existing.owner_queue_id && q.is_template) : null;
-    const followers = template ? templateFollowers(template.id) : [];
     Object.assign(existing, row);
     save();
     audit(user.id, "update", "test", existing.id, { name, owner });
-    const synced = template ? syncFollowers(user, template.id, followers) : [];
-    return { id: existing.id, synced };
+    return { id: existing.id };
   }
 
   function queueItems(queueId) {
@@ -530,81 +527,14 @@
   }
   function getQueue(id) {
     const q = get("queues", id, "QA list");
-    return { ...q, items: queueItems(q.id) };
-  }
-  // What each test of a list looks like, by position (name plus what a copy can change), to count differences from its template.
-  function signature(queueId) {
-    return S.queue_items.filter((i) => i.queue_id === queueId).sort((a, b) => a.position - b.position).map((i) => {
-      const t = byId("tests", i.test_id) || {};
-      const l = resolveLimits(t, i);
-      return [t.name, t.unit || "", t.description || "", l.expected, l.warn, l.fail, l.tol_mode].map((v) => (v === undefined ? null : v)).join("\u0001");
-    });
-  }
-  function changesFromTemplate(queueId, templateId) {
-    if (!templateId || !byId("queues", templateId)) return null;
-    const mine = signature(queueId), theirs = signature(templateId);
-    const name = (s) => s.split("\u0001")[0];
-    const mineBy = new Map(mine.map((s) => [name(s), s])), theirsBy = new Map(theirs.map((s) => [name(s), s]));
-    let n = 0;
-    for (const [k, s] of mineBy) n += theirsBy.has(k) ? (theirsBy.get(k) !== s ? 1 : 0) : 1;
-    for (const k of theirsBy.keys()) if (!mineBy.has(k)) n++;
-    const orderMine = mine.map(name).filter((k) => theirsBy.has(k)).join("|"), orderTheirs = theirs.map(name).filter((k) => mineBy.has(k)).join("|");
-    return n + (orderMine === orderTheirs ? 0 : 1);
-  }
-  // Auto-sync (mirrors service._template_followers / _sync_followers): before a template edit, the machine lists with
-  // Auto-sync ticked that match it exactly; after the edit, each is made to match it again.
-  function templateFollowers(templateId) {
-    const ids = (qid) => S.queue_items.filter((i) => i.queue_id === qid).sort((a, b) => a.position - b.position).map((i) => i.test_id);
-    const now = signature(templateId).join("\u0002");
-    const tpl = ids(templateId);
-    return S.queues.filter((q) => q.template_id === templateId && q.auto_sync && !q.is_template && signature(q.id).join("\u0002") === now)
-      .map((q) => { const mine = ids(q.id); return { id: q.id, name: q.name, pairs: new Map(tpl.map((t, k) => [t, mine[k]])) }; });
-  }
-  function syncFollowers(user, templateId, followers) {
-    if (!followers.length) return [];
-    const template = byId("queues", templateId);
-    const items = S.queue_items.filter((i) => i.queue_id === templateId).sort((a, b) => a.position - b.position);
-    const synced = [];
-    for (const f of followers) {
-      const owned = new Map(S.tests.filter((t) => t.owner_queue_id === f.id).map((t) => [t.id, t]));
-      S.queue_items = S.queue_items.filter((i) => i.queue_id !== f.id);
-      const used = new Set();
-      for (const item of items) {
-        const src = byId("tests", item.test_id);
-        const l = resolveLimits(src, item);
-        const fields = { name: src.name, category: src.category, type: src.type, unit: src.unit, description: src.description,
-          expected: l.expected, warn: l.warn, fail: l.fail, tol_mode: l.tol_mode, active: 1 };
-        let mine = f.pairs.get(src.id);
-        if (owned.has(mine) && !used.has(mine)) Object.assign(owned.get(mine), fields);
-        else mine = insert("tests", { ...fields, owner_queue_id: f.id });
-        used.add(mine);
-        insert("queue_items", { queue_id: f.id, test_id: mine, position: item.position, expected: null, warn: null, fail: null, tol_mode: null });
-      }
-      for (const [tid, t] of owned) {
-        if (used.has(tid)) continue;
-        if (S.results.some((r) => r.test_id === tid)) {
-          if (S.tests.some((x) => x.id !== tid && x.owner_queue_id === f.id && x.name === t.name && x.category === t.category)) t.name += " (removed from list)";
-        } else S.tests = S.tests.filter((x) => x.id !== tid);
-      }
-      save();
-      audit(user.id, "auto_sync", "queue", f.id, { name: f.name, template: template.name, tests: items.length });
-      synced.push(f.name);
-    }
-    return synced;
-  }
-  function setAutoSync(user, queueId, data) {
-    require(user, "configure");
-    const q = get("queues", queueId, "QA list");
-    if (!q.template_id) throw new Error("Only a list made from a template can follow it.");
-    q.auto_sync = data.auto_sync ? 1 : 0;
-    save();
-    audit(user.id, q.auto_sync ? "auto_sync_on" : "auto_sync_off", "queue", q.id, { name: q.name });
-    return { id: q.id, auto_sync: !!q.auto_sync, changes: changesFromTemplate(q.id, q.template_id) };
+    // The machines that run this very list (one object, shared; each machine may hold its own values as overrides).
+    const schedules = S.assignments.filter((a) => a.queue_id === q.id).map((a) => ({ id: a.id, machine_id: a.machine_id, active: a.active,
+      machine: (byId("machines", a.machine_id) || {}).name })).sort((a, b) => String(a.machine).localeCompare(String(b.machine)));
+    return { ...q, items: queueItems(q.id), schedules };
   }
   function listQueues() {
     return S.queues.map((q) => ({
       ...q,
-      changes: changesFromTemplate(q.id, q.template_id),
       item_count: S.queue_items.filter((i) => i.queue_id === q.id).length,
       machine_count: S.assignments.filter((a) => a.queue_id === q.id && a.active).length,
       template_name: q.template_id ? (byId("queues", q.template_id) || {}).name || null : null,
@@ -628,9 +558,7 @@
     if (new Set(items.map((i) => i.test_id)).size !== items.length) throw new Error("A check can only appear once in a QA list.");
     const existing = queueId ? get("queues", queueId, "QA list") : null;
     const isTemplate = flag(data, "is_template", existing ? !!existing.is_template : false);
-    if (isTemplate && existing && S.assignments.some((a) => a.queue_id === existing.id)) throw new Error("This list is scheduled on a machine, so it cannot become a template. Duplicate it instead.");
     const fields = { name, description: text(data, "description"), active: flag(data, "active"), is_template: isTemplate };
-    const followers = existing && existing.is_template && isTemplate ? templateFollowers(existing.id) : [];
     let id;
     if (!existing) {
       id = insert("queues", { ...fields, template_id: null });
@@ -650,8 +578,7 @@
         }
       }
     }
-    const synced = syncFollowers(user, id, followers);
-    return { id, synced };
+    return { id };
   }
   // Archive hides a list and its schedules; delete is refused once any result exists (mirrors service.py).
   function renameQueue(user, queueId, data) {
@@ -671,11 +598,12 @@
     const rank = { pass: 0, recorded: 0, warn: 1, fail: 2 };
     const runs = new Set();
     let changed = 0;
+    const own = new Map(S.overrides.map((o) => { const a = byId("assignments", o.assignment_id); return a && a.queue_id === q.id ? [`${a.machine_id}|${o.test_id}`, o] : null; }).filter(Boolean));
     for (const item of S.queue_items.filter((i) => i.queue_id === q.id)) {
       const test = byId("tests", item.test_id);
       if (!test) continue;
-      const limits = resolveLimits(test, item);
       for (const res of S.results.filter((r) => r.test_id === test.id && (byId("runs", r.run_id) || {}).queue_id === q.id)) {
+        const limits = resolveLimits(test, item, own.get(`${byId("runs", res.run_id).machine_id}|${test.id}`));   // that machine's own values
         const value = test.type === "text" ? res.value_text : res.value_num;
         if (value === null || value === undefined) continue;
         const status = evaluate(test.type, test.type === "boolean" ? (res.value_num ? "pass" : "fail") : value, limits);
@@ -724,7 +652,7 @@
     const name = required(data, "name");
     if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase())) throw new Error(`A QA list named '${name}' already exists.`);
     const asTemplate = !!flag(data, "as_template", false);
-    const id = insert("queues", { name, description: source.description, active: 1, is_template: asTemplate ? 1 : 0, template_id: asTemplate ? null : source.id });
+    const id = insert("queues", { name, description: source.description, active: 1, is_template: asTemplate ? 1 : 0, template_id: null });
     for (const item of source.items) {
       const test = byId("tests", item.test_id);
       const limits = resolveLimits(test, item);
@@ -764,6 +692,7 @@
     today = today || new Date();
     return S.assignments.filter((a) => a.machine_id === Number(machineId)).map((a) => ({
       ...a, queue_name: byId("queues", a.queue_id).name, schedule: describeSchedule(a), ...dueState(a, lastDone(a.id), today),
+      override_count: S.overrides.filter((o) => o.assignment_id === a.id).length,
     })).sort((a, b) => (b.active - a.active) || a.queue_name.localeCompare(b.queue_name));
   }
   function saveAssignment(user, data, assignmentId) {
@@ -781,7 +710,6 @@
     const active = flag(data, "active");
     if (!assignmentId) {
       const machine = get("machines", data.machine_id), queue = get("queues", data.queue_id, "QA list");
-      if (queue.is_template) throw new Error(`'${queue.name}' is a template. Duplicate it, then schedule the copy.`);
       if (S.assignments.some((a) => a.machine_id === machine.id && a.queue_id === queue.id)) throw new Error(`'${queue.name}' is already scheduled on ${machine.name}.`);
       const id = insert("assignments", { machine_id: machine.id, queue_id: queue.id, frequency, interval_days: interval, weekdays, start_date: start, active,
         import_folder: text(data, "import_folder") });
@@ -807,6 +735,7 @@
         limits: resolveLimits(test, item, o), queue_limits: resolveLimits(test, item),
         override: o ? { expected: o.expected, warn: o.warn, fail: o.fail, tol_mode: o.tol_mode } : null,
         last_text: test.type === "text" ? (S.results.filter((r) => r.test_id === test.id && r.value_text).map((r) => ({ r, run: byId("runs", r.run_id) }))
+          .filter((x) => x.run && x.run.machine_id === a.machine_id)                      // this machine's last entry
           .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
     });
     return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description }, items };
@@ -1039,8 +968,8 @@
       const machineId = insert("machines", { name: m.name, kind: m.kind || "", location: m.location || "", notes: m.notes || "", active: 1, created_at: now() });
       for (const tpl of byKind[m.kind] || []) {
         try {
-          duplicateQueue({ ...sys, role: "admin" }, tpl.id, { name: `${tpl.list || "Daily QA"} – ${m.name}`, machine_id: machineId,
-            frequency: tpl.frequency || "daily", weekdays: m.weekdays || [0, 1, 2, 3, 4] });
+          // The same list on every machine of its kind (no per-machine copies).
+          saveAssignment({ ...sys, role: "admin" }, { machine_id: machineId, queue_id: tpl.id, frequency: tpl.frequency || "daily", weekdays: m.weekdays || [0, 1, 2, 3, 4] });
         } catch (err) {
           console.error(err);
         }
@@ -1068,7 +997,65 @@
     reassignSphinx();
     retireSplitEyelineLists();
     instantiateSeedTemplates();
+    mergeCopies();
   })();
+
+  // Schedule a list on a machine unless that machine already runs it (or an old copy of it).
+  function scheduleOn(user, list, machine, opts) {
+    const has = S.assignments.some((a) => a.machine_id === machine.id && (a.queue_id === list.id || (byId("queues", a.queue_id) || {}).template_id === list.id));
+    if (has) return false;
+    saveAssignment(user, { machine_id: machine.id, queue_id: list.id, frequency: opts.frequency || "daily", weekdays: [0, 1, 2, 3, 4], import_folder: opts.import_folder || "" });
+    return true;
+  }
+
+  // One QA list object (mirrors service.merge_copies): each per-machine copy with the same tests as the list it came from
+  // is folded back into it (schedules, runs, results, drafts; differing limits become that machine's own values).
+  function mergeCopies() {
+    const itemsOf = (qid) => S.queue_items.filter((i) => i.queue_id === qid).sort((a, b) => a.position - b.position);
+    const key = (i) => { const t = byId("tests", i.test_id) || {}; return `${t.name}\u0001${t.type}`; };
+    const merged = [];
+    let touched = false;
+    for (const copy of S.queues.filter((q) => q.template_id && !q.is_template)) {
+      const source = byId("queues", copy.template_id);
+      const mine = itemsOf(copy.id), theirs = source ? itemsOf(source.id) : [];
+      const schedules = S.assignments.filter((a) => a.queue_id === copy.id);
+      const same = !!source && mine.length === theirs.length && mine.every((i, k) => key(i) === key(theirs[k]));
+      const clash = !!source && schedules.some((a) => S.assignments.some((b) => b.queue_id === source.id && b.machine_id === a.machine_id));
+      touched = true;
+      if (!same || clash) { copy.template_id = null; continue; }
+      const pair = new Map(mine.map((i, k) => [i.test_id, theirs[k].test_id]));
+      const sids = new Set(schedules.map((a) => a.id));
+      for (const o of S.overrides) if (sids.has(o.assignment_id) && pair.has(o.test_id)) o.test_id = pair.get(o.test_id);
+      mine.forEach((i, k) => {
+        const own = resolveLimits(byId("tests", i.test_id), i), shared = resolveLimits(byId("tests", theirs[k].test_id), theirs[k]);
+        if (["expected", "warn", "fail", "tol_mode"].every((f) => (own[f] ?? null) === (shared[f] ?? null))) return;
+        for (const a of schedules) if (!S.overrides.some((o) => o.assignment_id === a.id && o.test_id === theirs[k].test_id)) {
+          S.overrides.push({ assignment_id: a.id, test_id: theirs[k].test_id, expected: own.expected, warn: own.warn, fail: own.fail, tol_mode: own.tol_mode });
+        }
+      });
+      for (const r of S.results) if (pair.has(r.test_id)) r.test_id = pair.get(r.test_id);
+      const withResults = new Set(S.results.map((r) => r.test_id));
+      for (const t of S.tests.filter((x) => x.owner_queue_id === copy.id && !pair.has(x.id))) {
+        if (!withResults.has(t.id)) { S.tests = S.tests.filter((x) => x !== t); continue; }
+        const twin = S.tests.find((x) => x.owner_queue_id === source.id && x.name === t.name && x.category === t.category);
+        const runsOf = (id) => new Set(S.results.filter((r) => r.test_id === id).map((r) => r.run_id));
+        const overlap = twin && [...runsOf(t.id)].some((rid) => runsOf(twin.id).has(rid));
+        if (twin && !overlap) { for (const r of S.results) if (r.test_id === t.id) r.test_id = twin.id; S.tests = S.tests.filter((x) => x !== t); }
+        else { if (twin) t.name = `${t.name} (${copy.name})`; t.owner_queue_id = source.id; }
+      }
+      for (const r of S.runs) if (r.queue_id === copy.id) r.queue_id = source.id;
+      for (const a of schedules) a.queue_id = source.id;
+      for (const d of S.drafts || []) if (sids.has(d.assignment_id)) for (const r of (d.data && d.data.results) || []) if (pair.has(Number(r.test_id))) r.test_id = pair.get(Number(r.test_id));
+      S.queue_items = S.queue_items.filter((i) => i.queue_id !== copy.id);
+      const stillUsed = new Set(S.results.map((r) => r.test_id));
+      S.tests = S.tests.filter((x) => !(x.owner_queue_id === copy.id && !stillUsed.has(x.id)));
+      for (const q of S.queues) if (q.template_id === copy.id) q.template_id = null;
+      S.queues = S.queues.filter((q) => q !== copy);
+      merged.push(copy.name);
+    }
+    if (merged.length) audit(null, "merge", "queues", null, { merged });
+    if (touched) save();
+  }
 
   // The three separate Eyeline lists became one "Eyeline Daily QA"; drop the split ones where nothing was recorded on them.
   function retireSplitEyelineLists() {
@@ -1099,9 +1086,8 @@
       if (!tpl) continue;
       for (const m of S.machines.filter((x) => x.kind === t.kind && x.active)) {
         const name = `${t.list || "Daily QA"} – ${m.name}`;
-        if (S.queues.some((q) => q.name === name) || S.queues.some((q) => q.template_id === tpl.id && S.assignments.some((a) => a.queue_id === q.id && a.machine_id === m.id))) continue;
-        duplicateQueue(admin, tpl.id, { name, machine_id: m.id, frequency: t.frequency || "daily", weekdays: [0, 1, 2, 3, 4] });
-        made++;
+        if (S.queues.some((q) => q.name === name)) continue;   // an older copy (merged or kept as its own list)
+        if (scheduleOn(admin, tpl, m, { frequency: t.frequency || "daily" })) made++;
       }
     }
     if (made) { audit(null, "upgrade", "queues", null, { instantiated: made }); save(); }
@@ -1171,14 +1157,14 @@
       let folder = "";
       for (const a of S.assignments.filter((x) => x.machine_id === m.id && x.active)) {
         const q = byId("queues", a.queue_id);
-        if (!q || q.template_id === tpl.id) continue;
+        if (!q || q.id === tpl.id || q.template_id === tpl.id || a.frequency !== "daily") continue;   // only the other daily lists step aside
         folder = folder || a.import_folder || "";
         a.active = 0;
         a.import_folder = "";
       }
       const name = `PBS Daily QA (Sphinx) – ${m.name}`;
       if (S.queues.some((q) => q.name === name)) continue;
-      duplicateQueue(admin, tpl.id, { name, machine_id: m.id, frequency: "daily", weekdays: [0, 1, 2, 3, 4], import_folder: folder });
+      scheduleOn(admin, tpl, m, { frequency: "daily", import_folder: folder });
     }
     S.sphinxAssigned = true;
     audit(null, "upgrade", "assignments", null, { sphinx: "assigned to proton gantries" });
@@ -1215,7 +1201,11 @@
         q = byId("queues", id);
       }
       const items = S.queue_items.filter((i) => i.queue_id === q.id).sort((a, b) => a.position - b.position).map((i) => byId("tests", i.test_id));
+      const seedKey = JSON.stringify([t.setup || "", t.checks]);
+      S.seedApplied = S.seedApplied || {};
+      if (S.seedApplied[t.name] === seedKey) continue;     // already applied: later edits to this shared list are kept
       const same = items.length === t.checks.length && items.every((x, k) => x && x.name === t.checks[k].name && (x.description || "") === (t.checks[k].description || "") && (x.unit || "") === (t.checks[k].unit || ""));
+      S.seedApplied[t.name] = seedKey;
       if (same) continue;
       const old = new Set(items.map((x) => x && x.id));
       S.queue_items = S.queue_items.filter((i) => i.queue_id !== q.id);
@@ -1357,7 +1347,6 @@
   route("PUT", "/api/queues/(\\d+)", (u, m, body) => saveQueue(u, body, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/duplicate", (u, m, body) => duplicateQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/rename", (u, m, body) => renameQueue(u, Number(m[1]), body));
-  route("POST", "/api/queues/(\\d+)/auto-sync", (u, m, body) => setAutoSync(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/reevaluate", (u, m) => reevaluateQueue(u, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/archive", (u, m, body) => archiveQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));

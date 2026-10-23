@@ -12,6 +12,11 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Setup QA and the list editor: the edit pencil sits to the left of each list or test name.
+- **[Physics review]** One QA list object: a list is scheduled on machines directly and Setup QA, Perform QA and Machine Trends all read it; per-machine copies were merged into their lists (history moved intact; differing limits became that machine's own values); Auto-sync removed.
+- List editor: "Values for" switch edits the default baseline / Warning / Action or one machine's own values; numbering matches Perform QA and Trends; header row pinned; blank unit shows nothing.
+- Setup QA: one QA Lists table (Scheduled On) and a Machine Schedules table (Machine Values); Perform QA titles name the machine.
+- Machine Trends: a chart of every energy (or spot) under each energy table, opening on Δ from Reference.
 - Machine Trends: the machine, a new QA list picker and the period sit in a frozen row at the top of the page.
 - **[Physics review]** Auto-sync: a machine list with Auto-sync ticked (Setup QA, off by default) that still matches its template takes every later template edit (limits, names, units, notes, order, tests added or removed); lists changed on their machine are left alone. Removed tests with results are kept as records; each sync is audited.
 - Dashboard shows only each machine's Daily QA list (its most frequent list) with the start arrow, and its Due Date follows that list; monthly and other lists stay on Perform QA.

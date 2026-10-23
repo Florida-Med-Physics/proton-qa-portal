@@ -891,3 +891,50 @@ tr.quick-trend .spark .axis-title { font-size: 15px; }
 .trends-head .row { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .trends-head select { width: auto; min-width: 150px; }
 .trends-head select[name="list"] { min-width: 230px; }
+
+/* Setup QA: the machines a list is scheduled on, as small links. */
+.sched-chips { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.sched-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: 13px; color: var(--text); text-decoration: none; }
+.sched-chip:hover { border-color: var(--accent); }
+.sched-chip.off { color: var(--muted); border-style: dashed; }
+
+/* List editor: the header row stays pinned under the page title while scrolling. */
+table.list-editor thead th { position: sticky; top: var(--sticky-top, 0px); z-index: 5; background: var(--surface); box-shadow: 0 1px 0 var(--border); }
+
+/* List editor: "Values for" switch; a machine's own value stands out from the grey default. */
+.values-for { align-items: center; gap: 16px; }
+.values-for h2 { margin: 0; }
+.values-for select { width: auto; min-width: 220px; }
+.machine-mode table.list-editor thead th { background: var(--surface-2); }
+input.own-value { border-color: var(--uf-orange, #fa4616); background: rgba(250, 70, 22, 0.06); font-weight: 600; }
+
+/* Six series colours (spot tables chart six spots); fits on a several-series chart take their series' colour. */
+.chart .series.axis-3, .spark .series.axis-3 { stroke: #00897b; }
+.dot.axis-3 { fill: #00897b; }
+.stats-line.axis-3 { fill: #00897b; font-weight: 600; }
+.key-swatch.line.axis-3, .key-swatch.line.axis-3::after { border-color: #00897b; background-color: #00897b; }
+.outlier.axis-3 { stroke: #00897b; }
+.chart .series.axis-4, .spark .series.axis-4 { stroke: #8d6e63; }
+.dot.axis-4 { fill: #8d6e63; }
+.stats-line.axis-4 { fill: #8d6e63; font-weight: 600; }
+.key-swatch.line.axis-4, .key-swatch.line.axis-4::after { border-color: #8d6e63; background-color: #8d6e63; }
+.outlier.axis-4 { stroke: #8d6e63; }
+.chart .series.axis-5, .spark .series.axis-5 { stroke: #546e7a; }
+.dot.axis-5 { fill: #546e7a; }
+.stats-line.axis-5 { fill: #546e7a; font-weight: 600; }
+.key-swatch.line.axis-5, .key-swatch.line.axis-5::after { border-color: #546e7a; background-color: #546e7a; }
+.outlier.axis-5 { stroke: #546e7a; }
+.chart .fit.axis-0, .spark .fit.axis-0 { stroke: var(--accent); }
+.chart .fit.axis-1, .spark .fit.axis-1 { stroke: #d9822b; }
+.chart .fit.axis-2, .spark .fit.axis-2 { stroke: #8e6bd1; }
+.chart .fit.axis-3, .spark .fit.axis-3 { stroke: #00897b; }
+.chart .fit.axis-4, .spark .fit.axis-4 { stroke: #8d6e63; }
+.chart .fit.axis-5, .spark .fit.axis-5 { stroke: #546e7a; }
+.key-swatch.fit.multi { border-top-color: var(--muted); }
+.family-chart { margin: 8px 0 4px; }
+.family-chart > summary { cursor: pointer; font-weight: 600; color: var(--muted); font-size: 14px; }
+.family-chart .chart-box { margin-top: 6px; }
+
+/* Setup QA: the edit pencil sits to the left of each list name. */
+.name-with-edit { display: flex; align-items: center; gap: 10px; }
+.name-with-edit .icon-action { flex: none; }
