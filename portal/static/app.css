@@ -938,3 +938,6 @@ input.own-value { border-color: var(--uf-orange, #fa4616); background: rgba(250,
 /* Setup QA: the edit pencil sits to the left of each list name. */
 .name-with-edit { display: flex; align-items: center; gap: 10px; }
 .name-with-edit .icon-action { flex: none; }
+
+/* Menus beside list names open into the table. */
+.name-with-edit .more-menu { left: 0; right: auto; }

@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Keep menus beside edit pencils opening toward the table contents.
+
 - Machine Schedules: place all list options, including Edit, in a three-dot menu beside the pencil.
 
 - Machine Schedules: remove Actions and Last Modified columns.
