@@ -20,15 +20,16 @@ const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quart
   asneeded: "As needed (e.g. SRS days)" };
 // A list can be started when it is due, overdue, or "as needed".
 const startable = (state) => state === "due" || state === "overdue" || state === "ready";
-// Hours left until the end of the due day (QA is due by the end of that day).
-const DAILY_DUE_TIME = "06:00";                 // daily lists are due at 6:00 am on each weekday
-function dueIn(iso, frequency) {
-  const daily = frequency === "daily";
-  const end = new Date(iso + (daily ? `T${DAILY_DUE_TIME}:00` : "T23:59:59"));
-  const when = daily ? `${shortDate(iso)} 6:00 AM` : shortDate(iso);
-  if (end <= Date.now()) return `Due now (${when})`;
-  const hours = Math.max(1, Math.round((end - Date.now()) / 3600000));
-  return `Due in ${hours} ${hours === 1 ? "hour" : "hours"} (${when})`;
+// Daily QA is due at 6 AM; other lists are due at the end of the scheduled day.
+const DAILY_DUE_TIME = "06:00";
+function dueIn(iso, frequency, now = Date.now()) {
+  if (!iso) return "As needed";
+  const end = new Date(iso + (frequency === "daily" ? `T${DAILY_DUE_TIME}:00` : "T23:59:59"));
+  if (!Number.isFinite(end.getTime())) return "Not scheduled";
+  const hours = (end - now) / 3600000;
+  if (hours <= 0) return "Due now";
+  if (hours < 24) return `Due in ${Math.ceil(hours)} Hours`;
+  return `Due in ${Math.ceil(hours / 24)} Days`;
 }
 function scheduleStatus(a) {
   if (!a.active) return "Paused";
@@ -36,7 +37,7 @@ function scheduleStatus(a) {
   if (a.state === "due") return dueIn(a.next_due, a.frequency);
   if (a.state === "done") return "Done today";
   if (a.state === "ready") return a.last_done ? `As needed · last run ${shortDate(a.last_done)}` : "As needed";
-  return `Next due ${shortDate(a.next_due)}`;
+  return dueIn(a.next_due, a.frequency);
 }
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const STATUS_RANK = { pass: 0, recorded: 0, warn: 1, fail: 2 };
@@ -383,7 +384,7 @@ async function renderHome() {
         el("td", {}, main ? el("div", { class: "small list-line" },
           can("perform") ? el("a", { class: "start-dot", href: `#/perform/${main.id}`, title: `Start ${main.queue_name}`, "aria-label": `Start ${main.queue_name}`, onclick: (e) => e.stopPropagation() }, "▶") : null,
           main.queue_name) : el("span", { class: "muted small" }, "None")),
-        el("td", {}, main ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : worst === "due" ? dueIn(main.next_due, main.frequency) : "Up to date") : el("span", { class: "muted small" }, "Nothing scheduled")),
+        el("td", {}, main ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : dueIn(main.next_due, main.frequency)) : el("span", { class: "muted small" }, "Nothing scheduled")),
         el("td", {}, lastRun ? el("div", { class: "last-result-row" }, lastCounts[m.id] ? miniRing(lastCounts[m.id]) : null, el("span", { class: "last-result-text" }, chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`))) : el("span", { class: "muted small" }, "No runs yet")),
         el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
         el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));

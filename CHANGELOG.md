@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Show due countdowns in Hours below 24 hours and Days for longer deadlines.
+
 - Perform QA: autosave drafts while entering results, automatically download a completion PDF, and allow report downloads from saved runs.
 
 - Template usability: test search with counts, sticky save controls, clear unsaved status, and protection against switching limit scopes before saving.
