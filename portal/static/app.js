@@ -1827,6 +1827,10 @@ async function renderQueueEditor(id) {
   // "Values for": the list's default baseline / Warning / Action (every machine), or one machine's own values,
   // which override the default on that machine only (blank = use the default, shown in grey).
   let valuesFor = "";
+  let dirty = false;
+  const markDirty = () => { dirty = true; unsaved.hidden = false; };
+  let searchTerm = "";
+  const searchCount = el("span", { class: "muted small", role: "status" });
   let saveBtn = null;
   const machineValues = {};
   const machineName = (aid) => ((q.schedules || []).find((x) => String(x.id) === String(aid)) || {}).machine || "";
@@ -1835,6 +1839,11 @@ async function renderQueueEditor(id) {
       el("label", { class: "check" }, el("input", { type: "radio", name: "values_for", value, checked: value === "",
         onchange: async (e) => {
           const controls = [...valuesPick.querySelectorAll("input")];
+          if (dirty) {
+            controls.forEach((control) => { control.checked = control.value === valuesFor; });
+            toast("Save your changes before switching machines or defaults.", true);
+            return;
+          }
           controls.forEach((control) => { control.disabled = true; });
           try {
             if (value && !machineValues[value]) {
@@ -1883,7 +1892,16 @@ async function renderQueueEditor(id) {
         seen.add(member.item.test_id);
       }
     });
-    body.replaceChildren(...displayed.flatMap(({ item, index, axis }) => {
+    const matches = displayed.filter(({ item }) => {
+      const family = familyOf.get(item.test_id);
+      const text = (family || [{ item }]).map((member) => {
+        const t = byId[member.item.test_id];
+        return `${t.name} ${t.category || ""} ${t.description || ""}`;
+      }).join(" ").toLowerCase();
+      return searchTerm.split(/\s+/).every((word) => text.includes(word));
+    });
+    searchCount.textContent = `${matches.length} of ${items.length} tests`;
+    body.replaceChildren(...matches.flatMap(({ item, index, axis }) => {
       const t = byId[item.test_id];
       const numeric = t.type === "numeric";
       const own = valuesFor ? (machineValues[valuesFor][item.test_id] = machineValues[valuesFor][item.test_id] || {}) : null;
@@ -1930,11 +1948,12 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
+    if (!matches.length && items.length) body.append(el("tr", {}, el("td", { colspan: 5, class: "muted" }, "No matching tests. Clear the search to see all tests.")));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
       el("thead", {}, el("tr", {}, ["Test Name", "Category", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
         valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Default Warning / Default Action", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
-    if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} values` : "Save";
+    if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} limits` : "Save defaults";
     holder.classList.toggle("machine-mode", !!valuesFor);
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
@@ -1944,7 +1963,12 @@ async function renderQueueEditor(id) {
   const picker = el("select", { onchange: (e) => { if (e.target.value) { items.push({ test_id: Number(e.target.value) }); draw(); } } });
   // Drag and drop: drag a test row (by its handle) onto another test to move it there; Save keeps the new order.
   let dragFrom = null;
-  const unsaved = el("span", { class: "chip due", hidden: true }, "Order changed: Save to keep it");
+  const unsaved = el("span", { class: "chip due", hidden: true, role: "status" }, "Unsaved changes");
+  info.addEventListener("input", markDirty);
+  holder.addEventListener("input", markDirty);
+  holder.addEventListener("change", markDirty);
+  holder.addEventListener("click", (e) => { if (e.target.closest("button")) markDirty(); });
+  picker.addEventListener("change", markDirty);
   function dragProps(index) {
     if (!editable) return {};
     return {
@@ -1964,13 +1988,16 @@ async function renderQueueEditor(id) {
         const [moved] = items.splice(dragFrom, 1);
         items.splice(index, 0, moved);
         dragFrom = null;
-        unsaved.hidden = false;
+        markDirty();
         draw();
       },
     };
   }
   app.append(el("div", { class: "row values-for" }, el("h2", {}, "Tests"),
     valuesPick ? el("div", { title: "Default limits apply to all machines. Select a machine to specify its limits." }, valuesPick) : null), holder);
+  const search = el("input", { type: "search", placeholder: "Find a test, category or instruction…", "aria-label": "Find tests", oninput: (e) => { searchTerm = e.target.value.trim().toLowerCase(); draw(); } });
+  holder.before(el("div", { class: "row template-search" }, search, el("button", { type: "button", onclick: () => { search.value = ""; searchTerm = ""; draw(); search.focus(); } }, "Clear"), searchCount),
+    el("p", { class: "muted small" }, "Default limits apply to all machines. Select a machine above to set its own limits; blank fields use the defaults."));
   if (editable) {
     const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => modal("New test for this list", testForm(), async (data) => {
       const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
@@ -1985,16 +2012,20 @@ async function renderQueueEditor(id) {
           fail: o.fail ?? "", tol_mode: o.tol_mode || "" }));
         await api("PUT", `/api/assignments/${valuesFor}/overrides`, { overrides });
         toast(`${machineName(valuesFor)} values saved`);
+        dirty = false;
+        unsaved.hidden = true;
         return;
       }
       const payload = { ...formData(info), items };
       const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
+      dirty = false;
+      unsaved.hidden = true;
       toast("QA list saved");
       location.hash = `#/queues/${result.id}`;
       if (!isNew) route();
     };
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
-    app.append(error, el("div", { class: "row" }, el("a", { class: "button", href: "#/queues" }, "Back"),
+    app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/queues" }, "Back"),
       saveBtn = el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
   }
   draw();

@@ -943,3 +943,6 @@ input.own-value { border-color: var(--uf-orange, #fa4616); background: rgba(250,
 .name-with-edit .more-menu { left: 0; right: auto; }
 
 .list-editor tr.grouped-axis-row td { border-top: 0; border-bottom: 0; }
+
+.template-search input { flex: 1; min-width: 180px; }
+.template-save-bar { position: sticky; bottom: 0; z-index: 15; background: var(--surface); padding: 12px 0; border-top: 1px solid var(--border); }
