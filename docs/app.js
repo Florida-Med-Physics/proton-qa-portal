@@ -726,7 +726,7 @@ async function renderSetup() {
           el("input", { type: "checkbox", role: "switch", checked: !!a.active, disabled: !editable,
             "aria-label": `Active: ${q.name} on ${m.name}`,
             onchange: async (e) => { e.target.disabled = true; await setActive(a, e.target.checked); e.target.disabled = false; e.target.checked = !!a.active; },
-          }), el("span", { class: a.active ? "active-tag" : "inactive-tag" }, a.active ? "Active" : "Inactive"))),
+          }))),
         el("td", { class: "center" }, a.override_count
           ? el("a", { href: `#/assignments/${a.id}/limits`, title: "Values that differ on this machine" }, `${a.override_count} ${a.override_count === 1 ? "test" : "tests"}`)
           : el("span", { class: "muted small" }, "Default")),

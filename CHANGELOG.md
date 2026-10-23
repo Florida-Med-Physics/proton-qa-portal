@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Schedules: show Active/Inactive only beside the QA list name, leaving the toggle without repeated text.
+
 - Schedule dialog: allow existing machines to be unticked or reactivated while keeping their settings and history.
 
 - QA Template Lists: place the options menu between the pencil and name and remove the Actions column.
