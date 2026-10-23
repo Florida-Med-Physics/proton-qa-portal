@@ -693,7 +693,8 @@ async function renderSetup() {
   const rank = (q) => { const k = kindOf[(q.machines || "").split(", ")[0]]; const i = KIND_ORDER.indexOf(k); return q.machines ? (i < 0 ? KIND_ORDER.length : i) : 99; };
   const ordered = lists.slice().sort((x, y) => rank(x) - rank(y) || (x.machines || "").localeCompare(y.machines || "") || x.name.localeCompare(y.name));
   app.append(el("h2", { class: "section-head" }, "Machine-Assigned QA List Instances"),
-    el("p", { class: "muted" }, "Each list here is that machine's own copy. Edits made here change only that machine's list; they do not affect the template it came from."));
+    el("p", { class: "muted" }, "Each list here is that machine's own copy. Edits made here change only that machine's list; they do not affect the template it came from. "
+      + "With Auto-sync ticked, a list that still matches its template takes every later template edit."));
   const byMachine = new Map();
   for (const q of ordered) {
     const a = instanceOf(q);
@@ -704,7 +705,7 @@ async function renderSetup() {
   }
   const machineRows = [...byMachine].flatMap(([name, qs]) => {
     const m = machines.find((x) => x.name === name);
-    return [el("tr", { class: "machine-row" }, el("td", { colspan: 6 }, m ? el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" }, el("strong", {}, name)) : el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
+    return [el("tr", { class: "machine-row" }, el("td", { colspan: 7 }, m ? el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" }, el("strong", {}, name)) : el("strong", {}, name), m && m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...qs.map((q) => {
         const a = instanceOf(q);
         const live = !!(a && a.active);
@@ -712,6 +713,7 @@ async function renderSetup() {
           el("td", { class: "indent" }, editableName(q, editable), live ? el("span", { class: "active-tag" }, " (Active)") : a ? el("span", { class: "inactive-tag" }, " (Inactive)") : null),
           el("td", {}, q.template_name ? [q.template_name, el("div", { class: `small ${q.changes ? "changed-note" : "muted"}` },
             q.changes ? `Changed (${q.changes} ${q.changes === 1 ? "test" : "tests"})` : "No changes")] : el("span", { class: "muted" }, "—")),
+          el("td", { class: "center" }, q.template_id ? autoSyncBox(q, editable) : el("span", { class: "muted" }, "—")),
           el("td", { class: "center" }, q.item_count),
           el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
             iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
@@ -730,7 +732,8 @@ async function renderSetup() {
           modified(q));
       })];
   });
-  const instanceTable = fixedTable(SETUP_COLS("QA List", "Generated from"), machineRows, "No QA lists on machines yet. Instantiate a template on a machine.");
+  const instanceTable = fixedTable([["QA List", "26%"], ["Generated from", "22%"], ["Auto-sync", "9%"], ["Tests", "6%"], ["Actions", "17%"], ["Last Modified", "20%"]],
+    machineRows, "No QA lists on machines yet. Instantiate a template on a machine.");
   app.append(filterBox(instanceTable, "Search machine-assigned QA lists"), instanceTable);
 
   if (archivedLists.length) {
@@ -1775,6 +1778,9 @@ function templateDialog(source) {
   }, "Make Template");
 }
 
+// "Test saved. Also updated: Monthly QA – GTR1, Monthly QA – GTR2" when Auto-sync carried a template edit to machine lists.
+const syncedNote = (said, r) => (r && r.synced && r.synced.length ? `${said}. Also updated (Auto-sync): ${r.synced.join(", ")}` : said);
+
 function duplicateDialog(source, machines) {
   // The copy keeps the source's name; tick every machine that should get its own list (one list is created per machine,
   // all on the same schedule). A template is "instantiated"; a machine's list is "duplicated".
@@ -1804,6 +1810,21 @@ function duplicateDialog(source, machines) {
     location.hash = "#/setup";
     route();
   }, verb);
+}
+
+// Auto-sync tick box for a machine list made from a template. It only acts while the list matches the template.
+function autoSyncBox(q, editable) {
+  const box = el("input", { type: "checkbox", checked: !!q.auto_sync, disabled: !editable, "aria-label": `Auto-sync ${q.name} with ${q.template_name}`,
+    title: q.changes ? "This list differs from its template, so template edits will not reach it until it matches again" : "Template edits are copied to this list" });
+  box.addEventListener("click", (e) => e.stopPropagation());
+  box.addEventListener("change", async () => {
+    try {
+      const r = await api("POST", `/api/queues/${q.id}/auto-sync`, { auto_sync: box.checked });
+      toast(!r.auto_sync ? `Auto-sync off for ${q.name}` : r.changes ? `Auto-sync on for ${q.name}. It differs from its template in ${r.changes} ${r.changes === 1 ? "test" : "tests"}, so it will not follow until it matches.` : `Auto-sync on for ${q.name}`);
+      route();
+    } catch (err) { box.checked = !box.checked; toast(err.message, true); }
+  });
+  return box;
 }
 
 async function renderQueues() {
@@ -1879,8 +1900,8 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
           el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-            await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
-            toast("Test saved");
+            const r = await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+            toast(syncedNote("Test saved", r));
             route();
           }) }, "✎"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
@@ -1933,7 +1954,7 @@ async function renderQueueEditor(id) {
       error.textContent = "";
       const payload = { ...formData(info), items };
       const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
-      toast("QA list saved");
+      toast(syncedNote("QA list saved", result));
       location.hash = `#/queues/${result.id}`;
       if (!isNew) route();
     };
@@ -1977,8 +1998,8 @@ async function renderTests() {
   const holder = el("div", { class: "stack" });
   const shortName = (t) => t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
   const edit = (t) => editable ? () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-    await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
-    toast("Test saved");
+    const r = await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+    toast(syncedNote("Test saved", r));
     route();
   }) : null;
   const limitCells = (t) => [
@@ -2513,12 +2534,12 @@ function judgedByList(item, points) {
     recorded_status: p.status, status: evaluate("numeric", p.value, L) }));
 }
 
-async function renderTrendOverview(machines, machineId, range) {
+async function renderTrendOverview(machines, machineId, range, listId = "") {
   const machine = machines.find((m) => String(m.id) === String(machineId));
   const loading = el("div", { class: "card empty" }, `Loading ${machine.name} trends…`);
   app.append(loading);
   const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
-  const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
+  const templates = await Promise.all(assignments.filter((a) => a.active && (!listId || String(a.id) === String(listId))).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
   const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric"));
   const all = numeric.length ? await api("GET", `/api/machines/${machineId}/trends`) : {};
   loading.remove();
@@ -2580,7 +2601,7 @@ async function renderTrendOverview(machines, machineId, range) {
   }
   const sectionCats = new Map();
   for (const key of boxes.keys()) { const [n, c] = key.split("|"); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(c); }
-  const hrefFor = (ids) => `#/trends?machine_id=${machineId}&test_id=${ids.join(",")}&range=${range}`;
+  const hrefFor = (ids) => `#/trends?machine_id=${machineId}${listId ? `&list=${listId}` : ""}&test_id=${ids.join(",")}&range=${range}`;
   const limitsLine = (it, unit) => {
     const l = it.limits || {};
     const suf = l.tol_mode === "percent" ? "%" : unit;
@@ -2768,15 +2789,18 @@ async function renderTrends() {
   const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (fallback && fallback.id);
   const range = params.get("range") || "90";
   const testIds = (params.get("test_id") || "").split(",").filter(Boolean);
-  page("Machine Trends", testIds.length ? "Over time, against the QA list's current limits." : "Every measured test on this machine, against the QA list's current limits. Click one for detail.");
+  // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
+  const lists = machineId ? (await api("GET", `/api/machines/${machineId}/assignments`)).filter((a) => a.active) : [];
+  const listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
-  const form = el("div", { class: "row" },
-    select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { onchange: (e) => go({ machine_id: e.target.value, range }) }),
-    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { onchange: (e) => go({ machine_id: machineId, test_id: testIds.join(","), range: e.target.value }) }),
-    testIds.length ? el("a", { class: "button", href: `#/trends?machine_id=${machineId}&range=${range}` }, "← All tests") : null);
-  app.append(form, el("br"));
+  page("Machine Trends", null, [
+    select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { "aria-label": "Machine", onchange: (e) => go({ machine_id: e.target.value, range }) }),
+    select("list", [["", "All QA lists"], ...lists.map((a) => [a.id, a.queue_name])], listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }),
+    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
+    testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
+  app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
-  if (!testIds.length) return renderTrendOverview(machines, machineId, range);
+  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
   const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
   const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));

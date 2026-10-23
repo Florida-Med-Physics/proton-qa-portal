@@ -258,6 +258,11 @@ def dbinfo(db, user, m, body, q):
             "size": path.stat().st_size if path and path.exists() else 0}
 
 
+@route("POST", r"/api/queues/(\d+)/auto-sync")
+def queue_auto_sync(db, user, m, body, q):
+    return service.set_auto_sync(db, user, int(m[1]), body)
+
+
 @route("GET", r"/api/machines/(\d+)/trends")
 def machine_trends(db, user, m, body, q):
     return service.machine_trends(db, user, int(m[1]))

@@ -885,3 +885,9 @@ tr.quick-trend .spark .axis-title { font-size: 15px; }
 /* Instantiate dialog: machines as a grid of tick boxes. */
 .machine-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; }
 .machine-picks label.check { font-weight: 500; }
+
+/* Machine Trends: title and the machine / QA list / period pickers frozen at the top. */
+.trends-head { align-items: center; }
+.trends-head .row { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.trends-head select { width: auto; min-width: 150px; }
+.trends-head select[name="list"] { min-width: 230px; }

@@ -12,6 +12,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- Machine Trends: the machine, a new QA list picker and the period sit in a frozen row at the top of the page.
+- **[Physics review]** Auto-sync: a machine list with Auto-sync ticked (Setup QA, off by default) that still matches its template takes every later template edit (limits, names, units, notes, order, tests added or removed); lists changed on their machine are left alone. Removed tests with results are kept as records; each sync is audited.
 - Dashboard shows only each machine's Daily QA list (its most frequent list) with the start arrow, and its Due Date follows that list; monthly and other lists stay on Perform QA.
 - Energy rows read "226.4 MeV" (no "Spot n"); the 30-Day Avg shows its Δ from the list baseline underneath.
 - Chart statistics (Mean, SD, 95% CI, Range, Outlier, Trend, projection) are shown to three significant figures.

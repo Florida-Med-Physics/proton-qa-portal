@@ -116,6 +116,36 @@ class ServiceTests(unittest.TestCase):
             "qa_date": qa_date or date.today().isoformat(),
             "results": [{"test_id": self.dist, "value": dist}, {"test_id": self.door, "value": door}]})
 
+    def test_auto_sync_follows_template_only_when_unchanged(self):
+        admin = self.users["admin"]
+        tpl = service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": []})["id"]
+        a = service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 100, "warn": 0.5, "fail": 1, "owner_queue_id": tpl})["id"]
+        b = service.save_test(self.db, admin, {"name": "Output", "unit": "%", "expected": 100, "warn": 2, "fail": 3, "owner_queue_id": tpl})["id"]
+        service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": [{"test_id": a}, {"test_id": b}]}, tpl)
+        follow = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy follows"})["id"]
+        stay = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy stays"})["id"]
+        edited = service.duplicate_queue(self.db, admin, tpl, {"name": "Copy edited"})["id"]
+        service.set_auto_sync(self.db, admin, follow, {"auto_sync": True})
+        service.set_auto_sync(self.db, admin, edited, {"auto_sync": True})
+        mine = service.get_queue(self.db, admin, edited)["items"][0]["test_id"]
+        service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 100, "warn": 0.4, "fail": 1, "owner_queue_id": edited}, mine)
+
+        # A limit edit on the template reaches only the ticked list that still matched.
+        r = service.save_test(self.db, admin, {"name": "Range", "unit": "mm", "expected": 101, "warn": 0.5, "fail": 1, "owner_queue_id": tpl}, a)
+        self.assertEqual(r["synced"], ["Copy follows"])
+        self.assertEqual(service.changes_from_template(self.db, follow, tpl), 0)
+        self.assertEqual(service.changes_from_template(self.db, stay, tpl), 1)
+        self.assertEqual(service.changes_from_template(self.db, edited, tpl), 1)
+
+        # Adding, reordering and removing tests on the template carries over too.
+        c = service.save_test(self.db, admin, {"name": "Flatness", "unit": "%", "expected": 0, "warn": 1, "fail": 2, "owner_queue_id": tpl})["id"]
+        r = service.save_queue(self.db, admin, {"name": "Synthetic template", "is_template": True, "items": [{"test_id": c}, {"test_id": a}]}, tpl)
+        self.assertEqual(r["synced"], ["Copy follows"])
+        self.assertEqual([i["name"] for i in service.get_queue(self.db, admin, follow)["items"]], ["Flatness", "Range"])
+        self.assertEqual(service.changes_from_template(self.db, follow, tpl), 0)
+        with self.assertRaisesRegex(PortalError, "made from a template"):
+            service.set_auto_sync(self.db, admin, tpl, {"auto_sync": True})
+
     def test_permissions(self):
         with self.assertRaises(PortalError) as err:
             service.save_machine(self.db, self.users["therapist"], {"name": "X"})

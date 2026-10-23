@@ -505,10 +505,13 @@
       audit(user.id, "create", "test", id, { name, owner });
       return { id };
     }
+    const template = existing.owner_queue_id ? S.queues.find((q) => q.id === existing.owner_queue_id && q.is_template) : null;
+    const followers = template ? templateFollowers(template.id) : [];
     Object.assign(existing, row);
     save();
     audit(user.id, "update", "test", existing.id, { name, owner });
-    return { id: existing.id };
+    const synced = template ? syncFollowers(user, template.id, followers) : [];
+    return { id: existing.id, synced };
   }
 
   function queueItems(queueId) {
@@ -548,6 +551,56 @@
     const orderMine = mine.map(name).filter((k) => theirsBy.has(k)).join("|"), orderTheirs = theirs.map(name).filter((k) => mineBy.has(k)).join("|");
     return n + (orderMine === orderTheirs ? 0 : 1);
   }
+  // Auto-sync (mirrors service._template_followers / _sync_followers): before a template edit, the machine lists with
+  // Auto-sync ticked that match it exactly; after the edit, each is made to match it again.
+  function templateFollowers(templateId) {
+    const ids = (qid) => S.queue_items.filter((i) => i.queue_id === qid).sort((a, b) => a.position - b.position).map((i) => i.test_id);
+    const now = signature(templateId).join("\u0002");
+    const tpl = ids(templateId);
+    return S.queues.filter((q) => q.template_id === templateId && q.auto_sync && !q.is_template && signature(q.id).join("\u0002") === now)
+      .map((q) => { const mine = ids(q.id); return { id: q.id, name: q.name, pairs: new Map(tpl.map((t, k) => [t, mine[k]])) }; });
+  }
+  function syncFollowers(user, templateId, followers) {
+    if (!followers.length) return [];
+    const template = byId("queues", templateId);
+    const items = S.queue_items.filter((i) => i.queue_id === templateId).sort((a, b) => a.position - b.position);
+    const synced = [];
+    for (const f of followers) {
+      const owned = new Map(S.tests.filter((t) => t.owner_queue_id === f.id).map((t) => [t.id, t]));
+      S.queue_items = S.queue_items.filter((i) => i.queue_id !== f.id);
+      const used = new Set();
+      for (const item of items) {
+        const src = byId("tests", item.test_id);
+        const l = resolveLimits(src, item);
+        const fields = { name: src.name, category: src.category, type: src.type, unit: src.unit, description: src.description,
+          expected: l.expected, warn: l.warn, fail: l.fail, tol_mode: l.tol_mode, active: 1 };
+        let mine = f.pairs.get(src.id);
+        if (owned.has(mine) && !used.has(mine)) Object.assign(owned.get(mine), fields);
+        else mine = insert("tests", { ...fields, owner_queue_id: f.id });
+        used.add(mine);
+        insert("queue_items", { queue_id: f.id, test_id: mine, position: item.position, expected: null, warn: null, fail: null, tol_mode: null });
+      }
+      for (const [tid, t] of owned) {
+        if (used.has(tid)) continue;
+        if (S.results.some((r) => r.test_id === tid)) {
+          if (S.tests.some((x) => x.id !== tid && x.owner_queue_id === f.id && x.name === t.name && x.category === t.category)) t.name += " (removed from list)";
+        } else S.tests = S.tests.filter((x) => x.id !== tid);
+      }
+      save();
+      audit(user.id, "auto_sync", "queue", f.id, { name: f.name, template: template.name, tests: items.length });
+      synced.push(f.name);
+    }
+    return synced;
+  }
+  function setAutoSync(user, queueId, data) {
+    require(user, "configure");
+    const q = get("queues", queueId, "QA list");
+    if (!q.template_id) throw new Error("Only a list made from a template can follow it.");
+    q.auto_sync = data.auto_sync ? 1 : 0;
+    save();
+    audit(user.id, q.auto_sync ? "auto_sync_on" : "auto_sync_off", "queue", q.id, { name: q.name });
+    return { id: q.id, auto_sync: !!q.auto_sync, changes: changesFromTemplate(q.id, q.template_id) };
+  }
   function listQueues() {
     return S.queues.map((q) => ({
       ...q,
@@ -577,6 +630,7 @@
     const isTemplate = flag(data, "is_template", existing ? !!existing.is_template : false);
     if (isTemplate && existing && S.assignments.some((a) => a.queue_id === existing.id)) throw new Error("This list is scheduled on a machine, so it cannot become a template. Duplicate it instead.");
     const fields = { name, description: text(data, "description"), active: flag(data, "active"), is_template: isTemplate };
+    const followers = existing && existing.is_template && isTemplate ? templateFollowers(existing.id) : [];
     let id;
     if (!existing) {
       id = insert("queues", { ...fields, template_id: null });
@@ -596,7 +650,8 @@
         }
       }
     }
-    return { id };
+    const synced = syncFollowers(user, id, followers);
+    return { id, synced };
   }
   // Archive hides a list and its schedules; delete is refused once any result exists (mirrors service.py).
   function renameQueue(user, queueId, data) {
@@ -1302,6 +1357,7 @@
   route("PUT", "/api/queues/(\\d+)", (u, m, body) => saveQueue(u, body, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/duplicate", (u, m, body) => duplicateQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/rename", (u, m, body) => renameQueue(u, Number(m[1]), body));
+  route("POST", "/api/queues/(\\d+)/auto-sync", (u, m, body) => setAutoSync(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/reevaluate", (u, m) => reevaluateQueue(u, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/archive", (u, m, body) => archiveQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));

@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS queues (
     description TEXT NOT NULL DEFAULT '',
     active INTEGER NOT NULL DEFAULT 1,
     is_template INTEGER NOT NULL DEFAULT 0,
-    template_id INTEGER REFERENCES queues(id)
+    template_id INTEGER REFERENCES queues(id),
+    auto_sync INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS queue_items (
     id INTEGER PRIMARY KEY,
@@ -164,6 +165,10 @@ class Database:
         if queue_columns and "is_template" not in queue_columns:
             self.conn.execute("ALTER TABLE queues ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0")
             self.conn.execute("ALTER TABLE queues ADD COLUMN template_id INTEGER REFERENCES queues(id)")
+        queue_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(queues)")}
+        if queue_columns and "auto_sync" not in queue_columns:
+            # A machine list can follow later edits to its template (off unless ticked in Setup QA).
+            self.conn.execute("ALTER TABLE queues ADD COLUMN auto_sync INTEGER NOT NULL DEFAULT 0")
         test_columns = {r[1] for r in self.conn.execute("PRAGMA table_info(tests)")}
         if test_columns and "owner_queue_id" not in test_columns:
             # Checks now belong to one QA list; the unique key changes, so the table is rebuilt.

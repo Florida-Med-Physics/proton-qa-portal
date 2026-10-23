@@ -182,10 +182,15 @@ def save_test(db, user, data, test_id=None):
                          "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values)
         db.audit(user["id"], "create", "test", test_id, name=name, owner=owner, **limits)
     else:
-        db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
-               "tol_mode = ?, active = ?, owner_queue_id = ? WHERE id = ?", values + (test_id,))
-        db.audit(user["id"], "update", "test", test_id, name=name, owner=owner, **limits)
-    return {"id": test_id}
+        template = db.one("SELECT id FROM queues WHERE id = ? AND is_template = 1", (existing["owner_queue_id"],)) if existing["owner_queue_id"] else None
+        with db.transaction():
+            followers = _template_followers(db, template["id"]) if template else []
+            db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
+                   "tol_mode = ?, active = ?, owner_queue_id = ? WHERE id = ?", values + (test_id,))
+            db.audit(user["id"], "update", "test", test_id, name=name, owner=owner, **limits)
+            synced = _sync_followers(db, user, template["id"], followers) if template else []
+        return {"id": test_id, "synced": synced}
+    return {"id": test_id, "synced": []}
 
 
 # ---- queues ----------------------------------------------------------------
@@ -215,6 +220,76 @@ def changes_from_template(db, queue_id, template_id):
     removed = sum(1 for n in by_name_theirs if n not in by_name_mine)
     reordered = 0 if [s[0] for s in mine if s[0] in by_name_theirs] == [s[0] for s in theirs if s[0] in by_name_mine] else 1
     return changed + added + removed + reordered
+
+
+def _template_followers(db, template_id):
+    """Before a template edit: the machine lists that should get the same edit, i.e. Auto-sync is ticked and the list is
+    identical to the template right now. Their tests are paired with the template's by position (the lists are identical)."""
+    template_items = [r["test_id"] for r in db.all("SELECT test_id FROM queue_items WHERE queue_id = ? ORDER BY position", (template_id,))]
+    now_sig = _signature(db, template_id)
+    followers = []
+    for q in db.all("SELECT id, name FROM queues WHERE template_id = ? AND auto_sync = 1 AND is_template = 0", (template_id,)):
+        if _signature(db, q["id"]) != now_sig:
+            continue                                        # changed on its machine: it keeps its own tests and limits
+        mine = [r["test_id"] for r in db.all("SELECT test_id FROM queue_items WHERE queue_id = ? ORDER BY position", (q["id"],))]
+        followers.append({"id": q["id"], "name": q["name"], "pairs": dict(zip(template_items, mine))})
+    return followers
+
+
+def _sync_followers(db, user, template_id, followers):
+    """After a template edit (inside the caller's transaction): make each follower match the template again, with the
+    same tests, order, names, units, notes and limits. A test that left the template leaves the list; if it has
+    recorded results its row is kept (history is never deleted), otherwise it is removed. Each sync is audited."""
+    if not followers:
+        return []
+    template = _get(db, "queues", template_id)
+    items = db.all("SELECT * FROM queue_items WHERE queue_id = ? ORDER BY position", (template_id,))
+    synced = []
+    for f in followers:
+        qid = f["id"]
+        owned = {r["id"]: r for r in db.all("SELECT * FROM tests WHERE owner_queue_id = ?", (qid,))}
+        # Free every name first, so renames and swaps in the template never collide with the list's unique names.
+        for tid in owned:
+            db.run("UPDATE tests SET name = name || ' ~sync' || id WHERE id = ?", (tid,))
+        db.run("DELETE FROM queue_items WHERE queue_id = ?", (qid,))
+        used = set()
+        for item in items:
+            src = _get(db, "tests", item["test_id"])
+            limits = qa.resolve_limits(src, item)
+            fields = (src["name"], src["category"], src["type"], src["unit"], src["description"],
+                      limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"])
+            mine = f["pairs"].get(src["id"])
+            if mine in owned and mine not in used:
+                db.run("UPDATE tests SET name = ?, category = ?, type = ?, unit = ?, description = ?, expected = ?, warn = ?, fail = ?, "
+                       "tol_mode = ?, active = 1 WHERE id = ?", fields + (mine,))
+            else:
+                mine = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) "
+                              "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)", fields + (qid,))
+            used.add(mine)
+            db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (qid, mine, item["position"]))
+        for tid, row in owned.items():
+            if tid in used:
+                continue
+            if db.one("SELECT 1 FROM results WHERE test_id = ? LIMIT 1", (tid,)):
+                taken = db.one("SELECT 1 FROM tests WHERE name = ? AND category = ? AND owner_queue_id = ? AND id != ?", (row["name"], row["category"], qid, tid))
+                db.run("UPDATE tests SET name = ? WHERE id = ?", (row["name"] + (" (removed from list)" if taken else ""), tid))
+            else:
+                db.run("DELETE FROM tests WHERE id = ?", (tid,))
+        db.audit(user["id"], "auto_sync", "queue", qid, name=f["name"], template=template["name"], tests=len(items))
+        synced.append(f["name"])
+    return synced
+
+
+def set_auto_sync(db, user, queue_id, data):
+    """Tick or untick Auto-sync on a machine list made from a template."""
+    require(user, "configure")
+    queue = _get(db, "queues", queue_id)
+    if not queue["template_id"]:
+        raise PortalError("Only a list made from a template can follow it.")
+    on = bool(data.get("auto_sync"))
+    db.run("UPDATE queues SET auto_sync = ? WHERE id = ?", (1 if on else 0, queue_id))
+    db.audit(user["id"], "auto_sync_on" if on else "auto_sync_off", "queue", queue_id, name=queue["name"])
+    return {"id": queue_id, "auto_sync": on, "changes": changes_from_template(db, queue_id, queue["template_id"])}
 
 
 def list_queues(db, user):
@@ -275,7 +350,9 @@ def save_queue(db, user, data, queue_id=None):
     is_template = _flag(data, "is_template", bool(existing["is_template"]) if existing else False)
     if is_template and existing and db.one("SELECT id FROM assignments WHERE queue_id = ?", (queue_id,)):
         raise PortalError("This list is scheduled on a machine, so it cannot become a template. Duplicate it instead.")
+    synced = []
     with db.transaction():
+        followers = _template_followers(db, queue_id) if existing and existing["is_template"] and is_template else []
         if queue_id is None:
             queue_id = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, ?, ?)",
                               (name, _text(data, "description"), _flag(data, "active"), is_template))
@@ -296,7 +373,8 @@ def save_queue(db, user, data, queue_id=None):
                 old = before.get(test_id)
                 if old is None or any(old[k] != limits[k] for k in limits):
                     db.audit(user["id"], "update_limits" if old else "add_to_list", "test", test_id, queue=name, **limits)
-    return {"id": queue_id}
+        synced = _sync_followers(db, user, queue_id, followers)
+    return {"id": queue_id, "synced": synced}
 
 
 def rename_queue(db, user, queue_id, data):
