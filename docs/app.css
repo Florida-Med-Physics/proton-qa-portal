@@ -946,3 +946,17 @@ input.own-value { border-color: var(--uf-orange, #fa4616); background: rgba(250,
 
 .template-search input { flex: 1; min-width: 180px; }
 .template-save-bar { position: sticky; bottom: 0; z-index: 15; background: var(--surface); padding: 12px 0; border-top: 1px solid var(--border); }
+
+.machine-test-choices { max-height: 50vh; overflow-y: auto; display: grid; gap: 12px; margin: 16px 0; }
+.machine-test-choices .check { flex-wrap: wrap; }
+
+/* Keep test names and category phrases readable rather than splitting every word. */
+.measure-table td.qa-label, .measure-title, .list-editor td:nth-child(2) { overflow-wrap: break-word; word-break: normal; }
+.list-editor th:nth-child(1) { width: 32%; }
+.list-editor th:nth-child(2) { width: 18%; }
+.list-editor th:nth-child(3) { width: 17%; }
+.list-editor th:nth-child(4) { width: 25%; }
+.list-editor th:nth-child(5) { width: 8%; }
+
+.values-for .check { white-space: nowrap; }
+.values-for input[type="radio"] { width: auto; flex: none; }

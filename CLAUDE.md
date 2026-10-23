@@ -88,3 +88,12 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
 
 DQA3 sample export and MPC results format (TrueBeam importers), the Dose Pro procedure, the TG-66
 daily table (CT Sim tolerances), and the MRI daily items.
+
+## Portal updates agreed with Brook (2026-10-22)
+
+- Automatically publish requested portal edits to GitHub and Pages after checks; verify live files.
+- Favor therapist ease and low cognitive load: one shared template, simple machine selection, explicit exception labels.
+- A machine may exclude shared tests or add machine-only tests without copying the list. Selection is stored on the assignment; template changes remain live. Do not rewrite historical results.
+- Setup uses QA Template Lists; row controls are pencil, vertical three-dot menu, name. No Actions column. Activation is per machine; display Active/Inactive beside the name, not repeated beside the toggle.
+- HDR Flexitron has Daily QA and Source Exchange QA on demand. The seed lists are empty until approved departmental checks are supplied; do not invent clinical tests or limits.
+- Additional regression checks: `node tests/test_autosave.cjs` and `node tests/test_report.cjs`.

@@ -3870,6 +3870,22 @@ window.PORTAL_SEED = {
      "description": "Template 4.11. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
     }
    ]
+  },
+  {
+   "name": "Daily QA – HDR Flexitron",
+   "kind": "HDR brachytherapy",
+   "list": "Daily QA",
+   "frequency": "asneeded",
+   "setup": "Add the approved departmental HDR checklist before use.",
+   "checks": []
+  },
+  {
+   "name": "Source Exchange QA – HDR Flexitron",
+   "kind": "HDR brachytherapy",
+   "list": "Source Exchange QA",
+   "frequency": "asneeded",
+   "setup": "Add the approved departmental HDR checklist before use.",
+   "checks": []
   }
  ],
  "machines": [
@@ -3909,6 +3925,10 @@ window.PORTAL_SEED = {
   {
    "name": "MRI Sim",
    "kind": "MRI simulator"
+  },
+  {
+   "name": "HDR Flexitron",
+   "kind": "HDR brachytherapy"
   }
  ]
 };

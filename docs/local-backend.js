@@ -722,22 +722,41 @@
     audit(user.id, "update", "assignment", a.id, { frequency, weekdays, start, active, import_folder: a.import_folder || "" });
     return { id: a.id };
   }
+  function testSelection(a) {
+    return typeof a.test_selection === "string" ? JSON.parse(a.test_selection || "{}") : a.test_selection || {};
+  }
+  function saveTestSelection(user, assignmentId, data) {
+    require(user, "configure");
+    const a = get("assignments", assignmentId, "Schedule"), base = new Set(getQueue(a.queue_id).items.map((i) => i.test_id));
+    if (![data.added || [], data.excluded || []].every(Array.isArray)) throw new Error("Choose valid tests.");
+    const excluded = [...new Set((data.excluded || []).map(Number))], added = [...new Set((data.added || []).map(Number))];
+    for (const tid of [...excluded, ...added]) {
+      const t = get("tests", tid, "Test");
+      if (t.owner_queue_id && t.owner_queue_id !== a.queue_id) throw new Error("That test belongs to another QA list.");
+      if (added.includes(tid) && !t.active) throw new Error("Choose an active test.");
+    }
+    a.test_selection = { excluded, added: added.filter((tid) => !base.has(tid)) };
+    save(); audit(user.id, "update", "test_selection", a.id, a.test_selection);
+    return { ok: true, ...a.test_selection };
+  }
   function runTemplate(assignmentId) {
     const a = get("assignments", assignmentId, "Schedule");
     const machine = get("machines", a.machine_id);
     const queue = getQueue(a.queue_id);
     const overrides = Object.fromEntries(S.overrides.filter((o) => o.assignment_id === a.id).map((o) => [o.test_id, o]));
-    const items = queue.items.map((item) => {
+    const selection = testSelection(a), base = new Set(queue.items.map((i) => i.test_id));
+    const extra = (selection.added || []).filter((tid) => !base.has(tid)).map((test_id) => ({ test_id }));
+    const allItems = [...queue.items, ...extra].map((item) => {
       const test = byId("tests", item.test_id);
       const o = overrides[test.id];
-      return { test_id: test.id, name: test.name, category: test.category, type: test.type, unit: test.unit, description: test.description,
+      return { excluded: (selection.excluded || []).includes(test.id), machine_only: !base.has(test.id), test_id: test.id, name: test.name, category: test.category, type: test.type, unit: test.unit, description: test.description,
         limits: resolveLimits(test, item, o), queue_limits: resolveLimits(test, item),
         override: o ? { expected: o.expected, warn: o.warn, fail: o.fail, tol_mode: o.tol_mode } : null,
         last_text: test.type === "text" ? (S.results.filter((r) => r.test_id === test.id && r.value_text).map((r) => ({ r, run: byId("runs", r.run_id) }))
           .filter((x) => x.run && x.run.machine_id === a.machine_id)                      // this machine's last entry
           .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
     });
-    return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description }, items };
+    return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
   }
   function saveOverrides(user, assignmentId, data) {
     require(user, "configure");
@@ -868,8 +887,11 @@
   function sphinxTestIds(user, t, measurements, create) {
     const inQueue = Object.fromEntries(t.items.map((i) => [`${i.category}|${i.name}`, i.test_id]));
     const byMeaning = Object.fromEntries(t.items.filter((i) => canonicalKey(i.name)).map((i) => [canonicalKey(i.name), i.test_id]));
+    const excluded = (t.all_items || []).filter((i) => i.excluded);
+    const isExcluded = (m) => excluded.some((i) => (i.category === m.category && i.name === m.name) || (canonicalKey(i.name) && canonicalKey(i.name) === canonicalKey(m.name)));
     const ids = {}, added = [];
     for (const m of measurements) {
+      if (isExcluded(m)) continue;
       const key = `${m.category}|${m.name}`;
       if (!inQueue[key] && byMeaning[canonicalKey(m.name)]) inQueue[key] = byMeaning[canonicalKey(m.name)];
       if (inQueue[key]) { ids[key] = inQueue[key]; continue; }
@@ -879,8 +901,8 @@
       const existing = S.tests.find((x) => x.owner_queue_id === queueId && x.category === m.category && x.name === m.name);
       const testId = existing ? existing.id : saveTest(user, { category: m.category, name: m.name, unit: m.unit, ...fileLimits(m), owner_queue_id: queueId,
         description: `Measured by Sphinx. Export label: ${m.sphinx_label}.` }).id;
-      const position = S.queue_items.filter((i) => i.queue_id === queueId).reduce((p, i) => Math.max(p, i.position), -1) + 1;
-      insert("queue_items", { queue_id: queueId, test_id: testId, position, expected: null, warn: null, fail: null, tol_mode: null });
+      const assignment = get("assignments", t.assignment.id), selection = testSelection(assignment);
+      assignment.test_selection = { ...selection, added: [...new Set([...(selection.added || []), testId])] };
       ids[key] = inQueue[key] = testId;
       added.push(m.name);
     }
@@ -894,7 +916,9 @@
     const items = Object.fromEntries(t.items.map((i) => [`${i.category}|${i.name}`, i]));
     const byMeaning = Object.fromEntries(t.items.filter((i) => canonicalKey(i.name)).map((i) => [canonicalKey(i.name), i]));
     const matched = [], unmatched = [];
+    const excluded = (t.all_items || []).filter((i) => i.excluded);
     for (const m of parsed.measurements) {
+      if (excluded.some((i) => (i.category === m.category && i.name === m.name) || (canonicalKey(i.name) && canonicalKey(i.name) === canonicalKey(m.name)))) continue;
       const item = items[`${m.category}|${m.name}`] || byMeaning[canonicalKey(m.name)];
       if (!item) { unmatched.push({ category: m.category, name: m.name, unit: m.unit }); continue; }
       const fl = fileLimits(m);
@@ -929,7 +953,7 @@
         continue;
       }
       if (added.length) t = runTemplate(assignmentId);
-      const rows = parsed.measurements.map((m) => {
+      const rows = parsed.measurements.filter((m) => ids[`${m.category}|${m.name}`]).map((m) => {
         const limits = fileLimits(m);
         let ours;
         try { ours = evaluate("numeric", m.result, limits); } catch { ours = "recorded"; }
@@ -937,6 +961,7 @@
         return { test_id: ids[`${m.category}|${m.name}`], value_num: m.result, value_text: null, limits, status,
           comment: status !== ours ? `Sphinx: ${m.sphinx_status}; portal rule on the rounded values gives ${ours}.` : "" };
       });
+      if (!rows.length) { skipped.push({ file: u.name, reason: "No included tests match this machine's list." }); continue; }
       const comment = `Imported from ${parsed.filename}. Sphinx finished ${parsed.finished.replace("T", " ")}${parsed.sphinx_user ? " by " + parsed.sphinx_user : ""}.`;
       const run = insertRun(user, t, parsed.qa_date, rows, comment, "sphinx", parsed.sha256, historical ? "imported" : "pending");
       imported.push({ file: parsed.filename, run_id: run.id, qa_date: parsed.qa_date, overall: run.overall });
@@ -1377,6 +1402,7 @@
   });
   route("POST", "/api/assignments/(\\d+)/draft/clear", (u, m) => { S.drafts = (S.drafts || []).filter((x) => !(x.assignment_id === Number(m[1]) && x.user_id === u.id)); save(); return { ok: true }; });
   route("GET", "/api/assignments/(\\d+)/template", (u, m) => runTemplate(Number(m[1])));
+  route("PUT", "/api/assignments/(\\d+)/tests", (u, m, body) => saveTestSelection(u, Number(m[1]), body));
   route("PUT", "/api/assignments/(\\d+)/overrides", (u, m, body) => saveOverrides(u, Number(m[1]), body));
   route("POST", "/api/assignments/(\\d+)/runs", (u, m, body) => submitRun(u, Number(m[1]), body));
   route("GET", "/api/assignments/(\\d+)/files", (u, m) => listImportFiles(Number(m[1])));

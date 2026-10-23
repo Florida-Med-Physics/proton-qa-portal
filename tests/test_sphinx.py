@@ -4,6 +4,7 @@ import base64
 import contextlib
 import io
 import tempfile
+import json
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -242,7 +243,8 @@ class CommandLineTests(unittest.TestCase):
             self.assertIn("Done: 0 imported, 2 skipped.", out.getvalue())
             db = Database(db_path)
             self.assertEqual(db.one("SELECT COUNT(*) AS n FROM runs WHERE review_status = 'imported'")["n"], 2)
-            self.assertEqual(db.one("SELECT COUNT(*) AS n FROM queue_items")["n"], 5)
+            self.assertEqual(db.one("SELECT COUNT(*) AS n FROM queue_items")["n"], 0)
+            self.assertEqual(len(json.loads(db.one("SELECT test_selection FROM assignments")["test_selection"])["added"]), 5)
             self.assertEqual(db.one("SELECT COUNT(*) AS n FROM tests WHERE owner_queue_id IS NULL")["n"], 0)
             db.close()
 

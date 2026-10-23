@@ -68,7 +68,7 @@ class MigrationTests(unittest.TestCase):
         db = Database(":memory:")
         users = make_users(db)
         result = service.seed_defaults(db, users["admin"])
-        self.assertEqual(result["machines"], ["GTR1", "GTR2", "GTR5", "Eyeline GTR4", "TrueBeam", "Linac 1", "Ethos", "Big Bore CT (7064)", "MRI Sim"])
+        self.assertEqual(result["machines"], ["GTR1", "GTR2", "GTR5", "Eyeline GTR4", "TrueBeam", "Linac 1", "Ethos", "Big Bore CT (7064)", "MRI Sim", "HDR Flexitron"])
         lists = {q["name"]: q for q in service.list_queues(db, users["admin"])}
         self.assertNotIn("Daily QA – TrueBeam", lists)                     # no per-machine copies
         self.assertEqual(lists["Daily QA template – TrueBeam (TG-142 / TG-198)"]["machines"], "TrueBeam")

@@ -519,9 +519,9 @@ function queryParams() {
 // ---------------------------------------------------------------------------
 
 // Proton gantries, then Photon (TrueBeam, Synergy, Ethos), then Simulation (CT and MRI simulators).
-const MODALITIES = ["Proton", "Photon", "Simulation"];
-const modalityOf = (kind) => (/proton/i.test(kind || "") ? "Proton" : /simulat/i.test(kind || "") ? "Simulation" : "Photon");
-const KIND_RANK = ["Proton gantry", "Linac", "Elekta Synergy", "Varian Ethos", "CT simulator", "MRI simulator"];
+const MODALITIES = ["Proton", "Photon", "Brachytherapy", "Simulation"];
+const modalityOf = (kind) => (/hdr|brachy/i.test(kind || "") ? "Brachytherapy" : /proton/i.test(kind || "") ? "Proton" : /simulat/i.test(kind || "") ? "Simulation" : "Photon");
+const KIND_RANK = ["Proton gantry", "Linac", "Elekta Synergy", "Varian Ethos", "CT simulator", "MRI simulator", "HDR brachytherapy"];
 const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RANK.length : i; };
 
 // A table with fixed column widths, so the Proton and Photon tables line up at the same width.
@@ -699,7 +699,7 @@ async function renderSetup() {
   app.append(filterBox(listTable, "Search QA Template Lists"), listTable);
 
   // Each machine's schedules: which of the lists it runs, how often, and any values of its own.
-  const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator"];
+  const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator", "HDR brachytherapy"];
   const kindRankOf = (m) => { const i = KIND_ORDER.indexOf(m.kind); return i < 0 ? KIND_ORDER.length : i; };
   app.append(el("h2", { class: "section-head" }, "Machine Schedules"));
   const scheduleRows = machines.filter((m) => schedules.some((a) => a.machine_id === m.id && lists.some((q) => q.id === a.queue_id)))
@@ -1478,7 +1478,7 @@ async function renderPerform(assignmentId) {
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader !== "Test" ? ["3%", "19%", "5%", "9%", "12%", "9%", "8%", "6%", "25%", "4%"] : ["3%", "30%", "5%", "7%", "13%", "8%", "8%", "5%", "17%", "4%"];
+      const widths = firstHeader !== "Test" ? ["3%", "27%", "5%", "8%", "12%", "8%", "8%", "5%", "20%", "4%"] : ["3%", "36%", "5%", "7%", "12%", "8%", "8%", "5%", "12%", "4%"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
@@ -1844,7 +1844,7 @@ async function renderQueueEditor(id) {
   const info = el("form", { class: "card" }, el("div", { class: "form-grid" },
     field("Name", el("input", { name: "name", value: q.name, required: true, disabled: !editable, placeholder: "e.g. Daily QA template" })),
     field("Setup instructions (shown when performing)", el("textarea", { name: "description", disabled: !editable }, q.description), "wide"),
-    el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!q.active, disabled: !editable }), "Active")));
+    el("input", { type: "hidden", name: "active", value: q.active ? "1" : "" })));
   app.append(info);
 
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));
@@ -1858,9 +1858,10 @@ async function renderQueueEditor(id) {
   const searchCount = el("span", { class: "muted small", role: "status" });
   let saveBtn = null;
   const machineValues = {};
+  const machineSelections = {};
   const machineName = (aid) => ((q.schedules || []).find((x) => String(x.id) === String(aid)) || {}).machine || "";
-  const valuesPick = (q.schedules || []).length ? el("div", { class: "row", role: "radiogroup", "aria-label": "Limits for" },
-    [["", "Default limits"], ...q.schedules.map((x) => [String(x.id), x.machine])].map(([value, label]) =>
+  const valuesPick = (q.schedules || []).length ? el("div", { class: "row", role: "radiogroup", "aria-label": "Tests and limits for" },
+    [["", "Default template"], ...q.schedules.map((x) => [String(x.id), x.machine])].map(([value, label]) =>
       el("label", { class: "check" }, el("input", { type: "radio", name: "values_for", value, checked: value === "",
         onchange: async (e) => {
           const controls = [...valuesPick.querySelectorAll("input")];
@@ -1873,7 +1874,8 @@ async function renderQueueEditor(id) {
           try {
             if (value && !machineValues[value]) {
               const template = await api("GET", `/api/assignments/${value}/template`);
-              machineValues[value] = Object.fromEntries(template.items.map((i) => [i.test_id, { ...(i.override || {}) }]));
+              machineValues[value] = Object.fromEntries((template.all_items || template.items).map((i) => [i.test_id, { ...(i.override || {}) }]));
+              machineSelections[value] = template.test_selection || {};
             }
             valuesFor = value;
             draw();
@@ -1888,14 +1890,57 @@ async function renderQueueEditor(id) {
   const changed = Object.fromEntries(q.items.map((i) => [i.test_id, i]));
   const body = el("tbody");
   const holder = el("div");
+  const customizationNote = el("p", { class: "muted small", role: "status" });
+  const reloadMachine = async () => {
+    const template = await api("GET", `/api/assignments/${valuesFor}/template`);
+    machineSelections[valuesFor] = template.test_selection || {};
+    machineValues[valuesFor] = Object.fromEntries((template.all_items || template.items).map((i) => [i.test_id, { ...(i.override || {}) }]));
+    draw();
+  };
+  const customizeButton = el("button", { type: "button", hidden: true, onclick: () => {
+    if (dirty) { toast("Save your changes before customizing tests.", true); return; }
+    const selection = machineSelections[valuesFor] || {};
+    const baseIds = new Set(items.map((i) => i.test_id));
+    const checked = new Set([...baseIds].filter((tid) => !(selection.excluded || []).includes(tid)).concat(selection.added || []));
+    const candidates = tests.filter((t) => t.active && (!t.owner_queue_id || String(t.owner_queue_id) === String(id)));
+    const rows = candidates.filter((t) => baseIds.has(t.id) || checked.has(t.id)).map((t) =>
+      el("label", { class: "check" }, el("input", { type: "checkbox", value: String(t.id), checked: checked.has(t.id), onchange: (e) => {
+        if (e.target.checked) checked.add(t.id); else checked.delete(t.id);
+      } }), t.name, el("span", { class: "muted small" }, baseIds.has(t.id) ? "Template" : `${machineName(valuesFor)} only`)));
+    const rowsBox = el("div", { class: "machine-test-choices" }, rows);
+    const add = select("extra_test", [["", "Add an existing test…"], ...candidates.filter((t) => !baseIds.has(t.id) && !checked.has(t.id)).map((t) => [t.id, t.name])], "", {
+      onchange: (e) => {
+        if (!e.target.value) return;
+        const tid = Number(e.target.value), t = byId[tid]; checked.add(tid);
+        rowsBox.append(el("label", { class: "check" }, el("input", { type: "checkbox", value: String(tid), checked: true, onchange: (e) => { if (e.target.checked) checked.add(tid); else checked.delete(tid); } }), t.name, el("span", { class: "muted small" }, `${machineName(valuesFor)} only`)));
+        e.target.selectedOptions[0].disabled = true; e.target.value = "";
+      },
+    });
+    modal(`Tests for ${machineName(valuesFor)}`, el("div", {},
+      el("p", { class: "muted" }, "Checked tests are included for this machine. Unchecking a template test affects only this machine."),
+      el("input", { type: "search", placeholder: "Find a test…", "aria-label": "Find tests to include", oninput: (e) => {
+        const query = e.target.value.toLowerCase();
+        [...rowsBox.children].forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
+      } }), rowsBox, add,
+      el("button", { type: "button", onclick: () => { checked.clear(); baseIds.forEach((tid) => checked.add(tid)); rowsBox.querySelectorAll("input").forEach((control) => { control.checked = baseIds.has(Number(control.value)); }); } }, "Reset to template")), async () => {
+      await api("PUT", `/api/assignments/${valuesFor}/tests`, { excluded: [...baseIds].filter((tid) => !checked.has(tid)), added: [...checked].filter((tid) => !baseIds.has(tid)) });
+      await reloadMachine(); toast("Machine tests saved");
+    }, "Save machine tests");
+  } }, "Customize tests");
   const draw = () => {
+    const selection = machineSelections[valuesFor] || {};
+    const baseIds = new Set(items.map((i) => i.test_id));
+    const extras = valuesFor ? (selection.added || []).filter((tid) => !baseIds.has(tid) && byId[tid]).map((test_id) => ({ test_id })) : [];
+    const scopedItems = valuesFor ? [...items.filter((i) => !(selection.excluded || []).includes(i.test_id)), ...extras] : items;
+    customizationNote.textContent = valuesFor ? `${machineName(valuesFor)}: ${(selection.excluded || []).filter((tid) => baseIds.has(tid)).length} excluded · ${extras.length} machine-only tests. Other tests stay synced.` : "Shared tests stay synced on every machine. Select a machine to customize its tests or limits.";
+    customizeButton.hidden = !valuesFor || !editable;
     // Laid out like the myQA sheet: a heading per section, then each numbered item with its directions.
     const sectionCats = new Map();
-    for (const it of items) { const t = byId[it.test_id]; const n = sectionNumber(t); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(t.category); }
+    for (const it of scopedItems) { const t = byId[it.test_id]; const n = sectionNumber(t); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(t.category); }
     let lastSection = null;
-    const numbers = blockNumbers(items.map((i) => ({ ...byId[i.test_id], test_id: i.test_id })));
+    const numbers = blockNumbers(scopedItems.map((i) => ({ ...byId[i.test_id], test_id: i.test_id })));
     const axisFamilies = new Map();
-    items.forEach((item, index) => {
+    scopedItems.forEach((item, index) => {
       const t = byId[item.test_id], axis = t.type === "numeric" ? axisParts(t.name) : null;
       if (!axis) return;
       const key = JSON.stringify([sectionNumber(t), t.category, t.unit, axis.base]);
@@ -1909,7 +1954,7 @@ async function renderQueueEditor(id) {
       for (const member of family) familyOf.set(member.item.test_id, family);
     }
     const displayed = [], seen = new Set();
-    items.forEach((item, index) => {
+    scopedItems.forEach((item, index) => {
       if (seen.has(item.test_id)) return;
       const family = familyOf.get(item.test_id);
       for (const member of family || [{ item, index }]) {
@@ -1925,8 +1970,9 @@ async function renderQueueEditor(id) {
       }).join(" ").toLowerCase();
       return searchTerm.split(/\s+/).every((word) => text.includes(word));
     });
-    searchCount.textContent = `${matches.length} of ${items.length} tests`;
+    searchCount.textContent = `${matches.length} of ${scopedItems.length} tests`;
     body.replaceChildren(...matches.flatMap(({ item, index, axis }) => {
+      if (!valuesFor) index = items.indexOf(item);
       const t = byId[item.test_id];
       const numeric = t.type === "numeric";
       const own = valuesFor ? (machineValues[valuesFor][item.test_id] = machineValues[valuesFor][item.test_id] || {}) : null;
@@ -1951,7 +1997,7 @@ async function renderQueueEditor(id) {
       const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 5 }, directions)) : null;
       lastSection = n;
       const number = numbers.get(item.test_id);
-      return [head, groupHead, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable ? "true" : null },
+      return [head, groupHead, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
           editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
@@ -1959,7 +2005,7 @@ async function renderQueueEditor(id) {
             toast("Test saved");
             route();
           }) }, "✎") : null,
-          el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName))),
+          el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
         el("td", {}, categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
@@ -1968,24 +2014,35 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
             { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
-        el("td", {}, editable ? el("div", { class: "row nowrap" },
+        el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
     if (!matches.length && items.length) body.append(el("tr", {}, el("td", { colspan: 5, class: "muted" }, "No matching tests. Clear the search to see all tests.")));
-    holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
+    holder.replaceChildren(scopedItems.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
       el("thead", {}, el("tr", {}, ["Test Name", "Category", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
         valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Default Warning / Default Action", ""].map((h) => el("th", {}, h)))), body))
-      : el("div", { class: "card empty" }, "No tests in this list yet."));
+      : el("div", { class: "card empty" }, valuesFor ? "No tests included for this machine. Use Customize tests to include tests." : "No tests in this list yet."));
     if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} limits` : "Save defaults";
     holder.classList.toggle("machine-mode", !!valuesFor);
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
-      ...tests.filter((t) => t.active && (!t.owner_queue_id || String(t.owner_queue_id) === id) && !items.some((i) => i.test_id === t.id))
+      ...tests.filter((t) => t.active && (!t.owner_queue_id || String(t.owner_queue_id) === id) && !scopedItems.some((i) => i.test_id === t.id))
         .map((t) => el("option", { value: t.id }, testLabel(t))));
   };
-  const picker = el("select", { onchange: (e) => { if (e.target.value) { items.push({ test_id: Number(e.target.value) }); draw(); } } });
+  const picker = el("select", { onchange: async (e) => {
+    if (!e.target.value) return;
+    const tid = Number(e.target.value);
+    if (valuesFor) {
+      if (dirty) { toast("Save your changes before adding a machine test.", true); return; }
+      try {
+        const selection = machineSelections[valuesFor] || {};
+        await api("PUT", `/api/assignments/${valuesFor}/tests`, { excluded: selection.excluded || [], added: [...(selection.added || []), tid] });
+        await reloadMachine();
+      } catch (err) { toast(err.message, true); }
+    } else { items.push({ test_id: tid }); markDirty(); draw(); }
+  } });
   // Drag and drop: drag a test row (by its handle) onto another test to move it there; Save keeps the new order.
   let dragFrom = null;
   const unsaved = el("span", { class: "chip due", hidden: true, role: "status" }, "Unsaved changes");
@@ -1993,9 +2050,9 @@ async function renderQueueEditor(id) {
   holder.addEventListener("input", markDirty);
   holder.addEventListener("change", markDirty);
   holder.addEventListener("click", (e) => { if (e.target.closest("button")) markDirty(); });
-  picker.addEventListener("change", markDirty);
+
   function dragProps(index) {
-    if (!editable) return {};
+    if (!editable || valuesFor) return {};
     return {
       ondragstart: (e) => { dragFrom = index; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); e.currentTarget.classList.add("dragging"); },
       ondragend: (e) => { e.currentTarget.classList.remove("dragging"); body.querySelectorAll(".drop-before, .drop-after").forEach((r) => r.classList.remove("drop-before", "drop-after")); },
@@ -2019,16 +2076,25 @@ async function renderQueueEditor(id) {
     };
   }
   app.append(el("div", { class: "row values-for" }, el("h2", {}, "Tests"),
-    valuesPick ? el("div", { title: "Default limits apply to all machines. Select a machine to specify its limits." }, valuesPick) : null), holder);
+    valuesPick ? el("div", { title: "Default limits apply to all machines. Select a machine to specify its limits." }, valuesPick) : null, customizeButton), customizationNote, holder);
   const search = el("input", { type: "search", placeholder: "Find a test, category or instruction…", "aria-label": "Find tests", oninput: (e) => { searchTerm = e.target.value.trim().toLowerCase(); draw(); } });
   holder.before(el("div", { class: "row template-search" }, search, el("button", { type: "button", onclick: () => { search.value = ""; searchTerm = ""; draw(); search.focus(); } }, "Clear"), searchCount),
     el("p", { class: "muted small" }, "Default limits apply to all machines. Select a machine above to set its own limits; blank fields use the defaults."));
   if (editable) {
-    const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => modal("New test for this list", testForm(), async (data) => {
+    const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => { if (valuesFor && dirty) { toast("Save your limits before adding a test.", true); return; } modal("New test for this list", testForm(), async (data) => {
       const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
-      items.push({ test_id: r.id });
-      await save();
-    }) }, "New test");
+      if (valuesFor) {
+        const refreshed = await api("GET", "/api/tests");
+        const created = refreshed.find((t) => t.id === r.id); tests.push(created); byId[r.id] = created;
+        const selection = machineSelections[valuesFor] || {};
+        await api("PUT", `/api/assignments/${valuesFor}/tests`, { excluded: selection.excluded || [], added: [...(selection.added || []), r.id] });
+        await reloadMachine();
+        toast(`${machineName(valuesFor)}-only test added`);
+      } else {
+        items.push({ test_id: r.id });
+        await save();
+      }
+    }); } }, "New test");
     const error = el("p", { class: "error" });
     const save = async () => {
       error.textContent = "";

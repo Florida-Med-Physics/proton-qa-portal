@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS assignments (
     start_date TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
     import_folder TEXT NOT NULL DEFAULT '',
+    test_selection TEXT NOT NULL DEFAULT '{}',
     UNIQUE (machine_id, queue_id)
 );
 CREATE TABLE IF NOT EXISTS assignment_overrides (
@@ -234,6 +235,9 @@ class Database:
                 COMMIT;
                 PRAGMA foreign_keys = ON;
             """)
+        columns = {r[1] for r in self.conn.execute("PRAGMA table_info(assignments)")}
+        if columns and "test_selection" not in columns:
+            self.conn.execute("ALTER TABLE assignments ADD COLUMN test_selection TEXT NOT NULL DEFAULT '{}' ")
         self.lock = threading.RLock()
 
     def all(self, sql, params=()):

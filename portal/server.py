@@ -165,6 +165,11 @@ def template(db, user, m, body, q):
     return service.run_template(db, user, int(m[1]))
 
 
+@route("PUT", r"/api/assignments/(\d+)/tests")
+def test_selection(db, user, m, body, q):
+    return service.save_test_selection(db, user, int(m[1]), body)
+
+
 @route("PUT", r"/api/assignments/(\d+)/overrides")
 def overrides(db, user, m, body, q):
     return service.save_overrides(db, user, int(m[1]), body)

@@ -596,17 +596,45 @@ def read_import_file(db, user, assignment_id, relative):
     return {"name": target.name, "data": base64.b64encode(target.read_bytes()).decode()}
 
 
+def save_test_selection(db, user, assignment_id, data):
+    """Store only membership exceptions; shared template items remain live."""
+    require(user, "configure")
+    assignment = _get(db, "assignments", assignment_id)
+    queue_id = assignment["queue_id"]
+    base = {i["test_id"] for i in get_queue(db, user, queue_id)["items"]}
+    try:
+        excluded = list(dict.fromkeys(int(x) for x in data.get("excluded", [])))
+        added = list(dict.fromkeys(int(x) for x in data.get("added", [])))
+    except (TypeError, ValueError):
+        raise PortalError("Choose valid tests.")
+    for tid in excluded + added:
+        test = _get(db, "tests", tid)
+        if test.get("owner_queue_id") not in (None, queue_id):
+            raise PortalError("That test belongs to another QA list.")
+        if tid in added and not test["active"]:
+            raise PortalError("Choose an active test.")
+    selection = {"excluded": excluded, "added": [tid for tid in added if tid not in base]}
+    with db.transaction():
+        db.run("UPDATE assignments SET test_selection = ? WHERE id = ?", (json.dumps(selection), assignment_id))
+        db.audit(user["id"], "update", "test_selection", assignment_id, **selection)
+    return {"ok": True, **selection}
+
+
 def run_template(db, user, assignment_id):
     """The queue as it applies to one machine: each test with its resolved limits."""
     assignment = _get(db, "assignments", assignment_id)
     machine = _get(db, "machines", assignment["machine_id"])
     queue = get_queue(db, user, assignment["queue_id"])
     overrides = {o["test_id"]: o for o in db.all("SELECT * FROM assignment_overrides WHERE assignment_id = ?", (assignment_id,))}
-    items = []
-    for item in queue["items"]:
+    selection = json.loads(assignment.get("test_selection") or "{}")
+    base_ids = {item["test_id"] for item in queue["items"]}
+    added_ids = [tid for tid in selection.get("added", []) if tid not in base_ids]
+    all_items = []
+    for item in queue["items"] + [{"test_id": tid} for tid in added_ids]:
         test = _get(db, "tests", item["test_id"])
         override = overrides.get(test["id"])
-        items.append({
+        all_items.append({
+            "excluded": test["id"] in selection.get("excluded", []), "machine_only": test["id"] not in base_ids,
             "test_id": test["id"], "name": test["name"], "category": test["category"], "type": test["type"],
             "unit": test["unit"], "description": test["description"],
             "limits": qa.resolve_limits(test, item, override),
@@ -616,7 +644,7 @@ def run_template(db, user, assignment_id):
                                  "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"], machine["id"])) or {}).get("value_text") if test["type"] == "text" else None,
         })
     assignment["schedule"] = qa.describe_schedule(assignment)
-    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"]}, "items": items}
+    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"]}, "items": [i for i in all_items if not i["excluded"]], "all_items": all_items, "test_selection": selection}
 
 
 def save_overrides(db, user, assignment_id, data):
@@ -757,11 +785,16 @@ def _file_limits(m):
 
 def _sphinx_test_ids(db, user, template, measurements, create):
     """Map each measurement to a test in this queue, adding library tests and queue items if allowed."""
+    excluded = [i for i in template.get("all_items", []) if i.get("excluded")]
+    excluded_keys = {(i["category"], i["name"]) for i in excluded}
+    excluded_meanings = {sphinx.canonical_key(i["name"]) for i in excluded if sphinx.canonical_key(i["name"])}
     in_queue = {(i["category"], i["name"]): i["test_id"] for i in template["items"]}
     by_meaning = {sphinx.canonical_key(i["name"]): i["test_id"] for i in template["items"] if sphinx.canonical_key(i["name"])}
     ids, added = {}, []
     for m in measurements:
         key = (m["category"], m["name"])
+        if key in excluded_keys or sphinx.canonical_key(m["name"]) in excluded_meanings:
+            continue
         if key not in in_queue and sphinx.canonical_key(m["name"]) in by_meaning:
             in_queue[key] = by_meaning[sphinx.canonical_key(m["name"])]  # same measurement under the list's own wording
         if key in in_queue:
@@ -776,8 +809,10 @@ def _sphinx_test_ids(db, user, template, measurements, create):
         test_id = test["id"] if test else save_test(db, user, {
             "category": m["category"], "name": m["name"], "unit": m["unit"], **_file_limits(m), "owner_queue_id": queue_id,
             "description": f"Measured by Sphinx. Export label: {m['sphinx_label']}."})["id"]
-        position = db.one("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM queue_items WHERE queue_id = ?", (queue_id,))["p"]
-        db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (queue_id, test_id, position))
+        assignment = _get(db, "assignments", template["assignment"]["id"])
+        selection = json.loads(assignment.get("test_selection") or "{}")
+        selection["added"] = list(dict.fromkeys(selection.get("added", []) + [test_id]))
+        db.run("UPDATE assignments SET test_selection = ? WHERE id = ?", (json.dumps(selection), assignment["id"]))
         ids[key] = in_queue[key] = test_id
         added.append(m["name"])
     if added:
@@ -793,8 +828,13 @@ def sphinx_preview(db, user, assignment_id, upload):
     template = run_template(db, user, assignment_id)
     items = {(i["category"], i["name"]): i for i in template["items"]}
     by_meaning = {sphinx.canonical_key(i["name"]): i for i in template["items"] if sphinx.canonical_key(i["name"])}
+    excluded = [i for i in template.get("all_items", []) if i.get("excluded")]
+    excluded_keys = {(i["category"], i["name"]) for i in excluded}
+    excluded_meanings = {sphinx.canonical_key(i["name"]) for i in excluded if sphinx.canonical_key(i["name"])}
     matched, unmatched = [], []
     for m in parsed["measurements"]:
+        if (m["category"], m["name"]) in excluded_keys or sphinx.canonical_key(m["name"]) in excluded_meanings:
+            continue
         item = items.get((m["category"], m["name"])) or by_meaning.get(sphinx.canonical_key(m["name"]))
         if not item:
             unmatched.append(m)
@@ -837,6 +877,8 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
             template = run_template(db, user, assignment_id)
         rows = []
         for m in parsed["measurements"]:
+            if (m["category"], m["name"]) not in ids:
+                continue
             limits = _file_limits(m)
             try:
                 ours = qa.evaluate("numeric", m["result"], limits)
@@ -846,6 +888,9 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
             note = f"Sphinx: {m['sphinx_status']}; portal rule on the rounded values gives {ours}." if status != ours else ""
             rows.append({"test_id": ids[(m["category"], m["name"])], "value_num": m["result"], "value_text": None,
                          "limits": limits, "status": status, "comment": note})
+        if not rows:
+            skipped.append({"file": name, "reason": "No included tests match this machine's list."})
+            continue
         comment = f"Imported from {name}. Sphinx finished {parsed['finished'].replace('T', ' ')}" + \
                   (f" by {parsed['sphinx_user']}." if parsed["sphinx_user"] else ".")
         run = _insert_run(db, user, template, parsed["qa_date"], rows, comment, "sphinx", parsed["sha256"],

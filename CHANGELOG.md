@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Keep one shared template with per-machine excluded and extra tests, a searchable Customize tests checklist and Reset to template; machine-only Sphinx imports respect exclusions.
+- Add HDR Flexitron with Daily QA and Source Exchange QA, both on demand; approved checklists still needed.
+- Widen Perform QA test labels and template category columns for readable names.
+
 - Show due countdowns in Hours below 24 hours and Days for longer deadlines.
 
 - Perform QA: autosave drafts while entering results, automatically download a completion PDF, and allow report downloads from saved runs.

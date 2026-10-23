@@ -113,3 +113,11 @@ Code layout: `portal/db.py` (schema), `portal/auth.py` (passwords, sessions, rol
 - Monthly and annual templates (the model supports them; only the daily template is seeded).
 - Email or in-app notifications for overdue QA or failures.
 - Attachments (images, PDFs) on runs.
+
+### Machine-specific tests without copying a template
+
+Open a QA template and select the machine under **Tests and limits for**. Use **Customize tests** to uncheck shared tests for that machine, or add an existing test. **New test** while a machine is selected adds a machine-only test. Default-template changes still flow to every included shared test; the machine's limit overrides remain its own. **Reset to template** in Customize tests resets test inclusion, leaving limit overrides intact. Previously recorded runs keep their recorded results.
+
+New Sphinx tests added from a machine's export belong only to that machine's schedule; explicitly excluded tests are ignored. Promote a machine-only test to the shared list by selecting Default template and adding it there.
+
+HDR Flexitron starts with **Daily QA** and **Source Exchange QA**, both **as needed**. These are empty list shells: add the department's approved checks and limits before use.
