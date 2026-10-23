@@ -12,7 +12,12 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
-- History columns carry their unit: "History (mm)" in the header when the table shares one unit, or on every value when units differ.
+- Every History value carries its unit ("77.7 mm").
+- **[Physics review]** Trend charts draw a red straight-line (least-squares) fit through the results and project it 4 weeks past the last result (dotted red); the statistics line adds the slope per week and the projected value.
+- **[Physics review]** Machine Trends uses the QA list's current limits (reference, warning, action as resolved for that machine) for the limits line, bands, Δ badges, result chips and 30-day rings; the verdict recorded at QA time is unchanged in Review QA.
+- Chart Y axes name the quantity ("Y Offset (mm)", "Δ Distal Depth (mm)") instead of "Absolute".
+- Inline trend charts fill the row, are taller, use larger text, show their key, and draw the red fit on top of the series.
+- Table cells are centred both ways (test names stay left) and the 30-days ring fits inside its row.
 - Perform QA is grouped by machine like Setup QA: a header row per machine, then its lists (daily above monthly); the Machine column is gone. Numbers are centred in their columns everywhere.
 - Dashboard: a ring beside each machine's last result shows the share of its tests that passed in that run, and a green start dot sits before each list in Active QA lists (daily above monthly, with space between). CLAUDE.md now carries Brook's look-and-behaviour preferences.
 - Setup QA actions are three icons per row — pencil (edit tests), plus (instantiate on a machine / duplicate), trash (delete) — with Set Active, Make Template, Re-evaluate and Archive behind a small "⋯" menu.

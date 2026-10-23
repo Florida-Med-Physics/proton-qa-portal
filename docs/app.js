@@ -1460,11 +1460,9 @@ async function renderPerform(assignmentId) {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
-      const unitsHere = [...new Set(tests.filter((it) => it.type === "numeric").map((it) => (it.unit && it.unit !== "unitless" ? it.unit : "")))];
-      const sharedUnit = unitsHere.length === 1 ? unitsHere[0] : null;          // one unit: it goes in the header; mixed: on each chip
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${!sharedUnit && unit ? ` ${unit}` : ""}`) : el("span", { class: "hist empty" }, "—")));
+        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`) : el("span", { class: "hist empty" }, "—")));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => {
@@ -1491,7 +1489,7 @@ async function renderPerform(assignmentId) {
           if (chart.hidden) chart.firstChild.replaceChildren(
             el("div", { class: "row" }, el("strong", {}, label(it)), el("span", { class: "spacer" }),
               el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
-            seriesChart([{ label: it.name, points: pts }], unit, { small: true }));
+            seriesChart([{ label: it.name, points: pts }], unit, { small: true, yLabel: yAxisLabel([it.name]) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
         const dlt = el("div", { class: "delta-slot" });
@@ -1513,7 +1511,7 @@ async function renderPerform(assignmentId) {
       const widths = firstHeader !== "Test" ? ["3%", "19%", "5%", "9%", "12%", "9%", "8%", "6%", "25%", "4%"] : ["3%", "30%", "5%", "7%", "13%", "8%", "8%", "5%", "17%", "4%"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h === "History" && sharedUnit ? `History (${sharedUnit})` : h))),
+          el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
@@ -2199,10 +2197,10 @@ function histDateSlot(d) {
   return el("span", { class: "hist date", title: histDateLabel(d) },
     el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear())));
 }
-function histChips(points, dates, unit, dp, showUnit = false) {
+function histChips(points, dates, unit, dp) {
   const byDate = new Map((points || []).map((h) => [h.qa_date, h]));
   return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h
-    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${showUnit && unit ? ` ${unit}` : ""}`)
+    ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`)
     : el("span", { class: "hist empty" }, "—")));
 }
 function latestDates(pointLists, count = 5) {
@@ -2269,7 +2267,22 @@ function seriesStats(values) {
 // Several series (X/Y/Z, pitch/roll/rotation): deviation from each one's expected value, on one scale.
 // The y axis is scaled to the data (limit bands are clipped to the plot), carries the unit, and the x axis is dated.
 // Each chart carries its own statistics: n, mean ± SD and range per series.
-function seriesChart(series, unit, { small = false, delta = null } = {}) {
+// The quantity a chart plots, for its Y axis: the test name without unit tags and list prefixes, in Title Case;
+// for an X / Y / Z set the common part without the axis letter ("Offset").
+function yAxisLabel(names) {
+  const clean = (n) => String(n || "").replace(/\s*\[[^\]]*\]/g, "").replace(/^.*:\s*/, "").replace(/^.*\s[–-]\s/, "").trim();
+  let parts = names.map(clean).filter(Boolean);
+  if (parts.length > 1) parts = parts.map((t) => t.replace(/^(X|Y|Z|Pitch|Roll|Rotation)\s+/i, "").replace(/\s+(X|Y|Z|Pitch|Roll|Rotation)$/i, "")).filter(Boolean);
+  const t = parts[0] || "Value";
+  return t.split(" ").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
+}
+
+const trendKey = (show) => (show ? [
+  el("span", { class: "key-item" }, el("span", { class: "key-swatch fit" }), "Trend (Straight-Line Fit)"),
+  el("span", { class: "key-item" }, el("span", { class: "key-swatch fit forecast" }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)] : []);
+
+function seriesChart(series, unit, { small = false, delta = null, yLabel = null } = {}) {
+  yLabel = yLabel || yAxisLabel(series.map((x) => x.label));
   // Absolute values by default for one series; several series (X/Y/Z) start on Δ from reference so they share one scale.
   let mode = delta === null ? (series.length > 1 ? "delta" : "absolute") : (delta ? "delta" : "absolute");
   const hasRef = series.some((x) => x.points.some((pt) => pt.expected !== null && pt.expected !== undefined));
@@ -2286,12 +2299,13 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
     if (multi && !delta) {
       box.replaceChildren(buttons, ...series.map((x) => el("div", { class: "subplot" },
         el("div", { class: "subplot-title" }, x.label),
-        drawSeries([x], unit, { small, delta: false }),
+        drawSeries([x], unit, { small, delta: false, yLabel }),
         el("div", { class: "chart-key" },
           el("span", { class: "key-item" }, el("span", { class: "key-swatch line single" }), x.label),
           x.points.some((pt) => pt.expected !== null && pt.expected !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), "Reference") : null,
           x.points.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
-          x.points.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null))));
+          x.points.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
+          ...trendKey(x.points.length >= 3)))));
       return;
     }
     const drawRef = hasRef && !(multi && !delta);
@@ -2299,26 +2313,43 @@ function seriesChart(series, unit, { small = false, delta = null } = {}) {
       series.map((x, k) => el("span", { class: "key-item" }, el("span", { class: `key-swatch line ${multi ? `axis-${k}` : "single"}` }), `${x.label}${delta ? " (Δ)" : ""}`)),
       drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
-      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null);
-    box.replaceChildren(buttons, drawSeries(series, unit, { small, delta }), key);
+      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
+      ...trendKey(series.some((x) => x.points.length >= 3)));
+    box.replaceChildren(buttons, drawSeries(series, unit, { small, delta, yLabel }), key);
   };
   draw();
   return box;
 }
 
-function drawSeries(series, unit, { small = false, delta = false } = {}) {
+const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
+
+function drawSeries(series, unit, { small = false, delta = false, yLabel = "Value" } = {}) {
   const multi = series.length > 1;
-  const W = small ? 560 : 900, H = small ? 120 : 360;
-  const L = small ? 56 : 70, R = small ? 40 : 40, T = small ? 8 : 20, B = small ? 34 : 52;
-  const lineH = small ? 13 : 16;
+  const W = 900, H = small ? 200 : 360;
+  const L = small ? 78 : 70, R = 40, T = small ? 10 : 20, B = small ? 40 : 52;
+  const lineH = small ? 17 : 16;
   const keyH = 0;                                            // the key is HTML under the chart (see seriesChart)
-  const statH = keyH + lineH * series.length + 6;
+  const statH = keyH + lineH * series.length * (small ? 2 : 1) + 6;   // small charts: statistics on one line, the trend on the next
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
   const timeOf = (d) => new Date(d + "T00:00").getTime();
   const t0 = timeOf(dates[0]), t1 = timeOf(dates[dates.length - 1]);
-  const x = (d) => L + (t1 === t0 ? (W - L - R) / 2 : ((timeOf(d) - t0) * (W - L - R)) / (t1 - t0));
+  const tEnd = t1 + FORECAST_DAYS * 86400000;                 // room on the right for the projection
+  const xt = (t) => L + ((t - t0) * (W - L - R)) / (tEnd - t0);
+  const x = (d) => xt(timeOf(d));
   const val = (p) => (delta ? asDeviation(p).dev : p.value);
+  // Straight-line fit (least squares on days since the first result) per series, projected FORECAST_DAYS ahead.
+  const fits = series.map((s) => {
+    const n = s.points.length;
+    if (n < 3) return null;
+    const xs = s.points.map((p) => (timeOf(p.qa_date) - t0) / 86400000), ys = s.points.map(val);
+    const mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+    const sxx = xs.reduce((a, v) => a + (v - mx) ** 2, 0);
+    if (!sxx) return null;
+    const slope = xs.reduce((a, v, i) => a + (v - mx) * (ys[i] - my), 0) / sxx;
+    const at = (t) => my + slope * ((t - t0) / 86400000 - mx);
+    return { slope, at, end: at(tEnd) };
+  });
   // Reference line and bands: around 0 on a Δ chart, around the reference on an absolute chart (one series only).
   const ref = (multi && !delta ? [] : series[0].points).map((p) => {
     if (delta) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
@@ -2327,6 +2358,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
 
   // Auto-scale to the data only, with a little headroom.
   const values = series.flatMap((s) => s.points.map(val));
+  for (const f of fits) if (f) values.push(f.end);
   for (const b of ref) if (b.w !== null && b.w !== undefined) values.push(b.c + b.w, b.c - b.w);
   let lo = Math.min(...values), hi = Math.max(...values);
   if (lo === hi) {
@@ -2339,15 +2371,17 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   const y = (v) => T + ((hi - v) * (plotBottom - T)) / (hi - lo);
   const clipId = `clip-${Math.random().toString(36).slice(2)}`;
   const kids = [svg("defs", {}, svg("clipPath", { id: clipId }, svg("rect", { x: L, y: T, width: W - L - R, height: plotBottom - T })))];
+  const refX = ref.flatMap((b, i) => (i === ref.length - 1 ? [b, { ...b, d: null }] : [b]));   // the last limits carry on to the right edge
+  const bx = (b) => (b.d === null ? xt(tEnd) : x(b.d));
   const band = (key) => {
     const up = [], dn = [];
-    for (const b of ref) if (b[key] !== null && b[key] !== undefined) { up.push(`${x(b.d)},${y(b.c + b[key])}`); dn.unshift(`${x(b.d)},${y(b.c - b[key])}`); }
+    for (const b of refX) if (b[key] !== null && b[key] !== undefined) { up.push(`${bx(b)},${y(b.c + b[key])}`); dn.unshift(`${bx(b)},${y(b.c - b[key])}`); }
     return up.length ? up.concat(dn).join(" ") : null;
   };
   // A strip from the warning limit out to the action limit, on one side of the reference.
   const strip = (sign) => {
     const outer = [], inner = [];
-    for (const b of ref) if (b.f !== null && b.f !== undefined && b.w !== null && b.w !== undefined) { outer.push(`${x(b.d)},${y(b.c + sign * b.f)}`); inner.unshift(`${x(b.d)},${y(b.c + sign * b.w)}`); }
+    for (const b of refX) if (b.f !== null && b.f !== undefined && b.w !== null && b.w !== undefined) { outer.push(`${bx(b)},${y(b.c + sign * b.f)}`); inner.unshift(`${bx(b)},${y(b.c + sign * b.w)}`); }
     return outer.length ? outer.concat(inner).join(" ") : null;
   };
   const plot = [];
@@ -2355,7 +2389,7 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   if (fail && warn) { for (const sign of [1, -1]) { const pts = strip(sign); if (pts) plot.push(svg("polygon", { class: "band-fail", points: pts })); } }
   else if (fail) plot.push(svg("polygon", { class: "band-fail", points: fail }));
   if (warn) plot.push(svg("polygon", { class: "band-warn", points: warn }));
-  if (ref.length) plot.push(svg("polyline", { class: "expected", points: ref.map((b) => `${x(b.d)},${y(b.c)}`).join(" ") }));
+  if (ref.length) plot.push(svg("polyline", { class: "expected", points: refX.map((b) => `${bx(b)},${y(b.c)}`).join(" ") }));
 
   // Y axis: gridlines, labels, and the unit as the axis title.
   const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
@@ -2363,16 +2397,17 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
       svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
   }
-  const yTitle = delta ? (unit ? `Δ from Reference (${unit})` : "Δ from Reference") : unit ? `Absolute (${unit})` : "Value";   // the unit never changes between the two views
-  kids.push(svg("text", { class: "axis-title", x: 12, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${(T + plotBottom) / 2})` }, yTitle));
+  const shortLabel = small && yLabel.length > 30 ? `${yLabel.slice(0, 29)}…` : yLabel;
+  const yTitle = `${delta ? "Δ " : ""}${shortLabel}${unit ? ` (${unit})` : ""}`;   // "Y Offset (mm)" / "Δ Y Offset (mm)": the unit never changes between the two views
+  kids.push(svg("text", { class: "axis-title", x: 14, y: (T + plotBottom) / 2, "text-anchor": "middle", transform: `rotate(-90 14 ${(T + plotBottom) / 2})` }, yTitle));
 
   // X axis: dates, and the axis title.
   kids.push(svg("line", { class: "axis-base", x1: L, x2: W - R, y1: plotBottom, y2: plotBottom }));
   // A vertical line at the start of every month; a label on every n-th so they never collide.
-  const first = new Date(dates[0] + "T00:00"), last = new Date(dates[dates.length - 1] + "T00:00");
+  const first = new Date(dates[0] + "T00:00"), last = new Date(tEnd);
   const months = [];
   for (let m = new Date(first.getFullYear(), first.getMonth() + 1, 1); m <= last; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
-  const maxLabels = small ? 4 : 8;
+  const maxLabels = small ? 6 : 8;
   const step = Math.max(1, Math.ceil((months.length + 1) / maxLabels));
   const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
   const monthLabel = (dt) => dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
@@ -2384,9 +2419,10 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
   if (!months.length) kids.push(svg("text", { x: (L + W - R) / 2, y: plotBottom + 14, "text-anchor": "middle" }, monthLabel(first)));
   kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, "Date QA performed"));
 
+  plot.push(svg("line", { class: "forecast-line", x1: xt(t1), x2: xt(t1), y1: T, y2: plotBottom }));
   series.forEach((s, k) => {
     const cls = multi ? `axis-${k}` : "";
-    const r = small ? (dates.length > 120 ? 1.8 : 2.4) : (dates.length > 150 ? 2.6 : 3.6);
+    const r = small ? (dates.length > 120 ? 2.2 : 3) : (dates.length > 150 ? 2.6 : 3.6);
     // A line from each result to the next, then the dots on top.
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${multi ? cls : "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
@@ -2412,6 +2448,14 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
       plot.push(dot);
     }
   });
+  series.forEach((s, k) => {
+    const f = fits[k];
+    if (!f) return;
+    const cls = multi ? `axis-${k}` : "single";
+    plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }),
+      svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
+        svg("title", {}, `Projected ${fmt(f.end, 2)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (straight-line fit)`)));
+  });
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
   kids.push(plotGroup);
 
@@ -2426,9 +2470,12 @@ function drawSeries(series, unit, { small = false, delta = false } = {}) {
     // The biggest outlier gets a ring on the chart.
     if (o && st.n > 2) plotGroup.append(svg("circle", { class: `outlier ${multi ? `axis-${k}` : "single"}`, cx: x(o.qa_date), cy: y(val(o)), r: small ? 6 : 9 },
       svg("title", {}, `Biggest outlier: ${fmt(val(o), 2)}${u} on ${oDate}`)));
-    const text = small
-      ? `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Outlier ${fmt(val(o), 2)}${u} (${oDate})`
-      : `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u} · Biggest Outlier ${fmt(val(o), 2)}${u} on ${oDate}`;
+    const f = fits[k];
+    const trend = f ? ` · Trend ${signed(f.slope * 7, 2)}${u}/Week · In ${FORECAST_DAYS / 7} Weeks ${fmt(f.end, 2)}${u}` : "";
+    if (small) return [
+      svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 1) * lineH }, `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Outlier ${fmt(val(o), 2)}${u} (${oDate})`),
+      svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 2) * lineH }, trend.replace(/^ · /, ""))];
+    const text = `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u} · Biggest Outlier ${fmt(val(o), 2)}${u} on ${oDate}${trend}`;
     return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, text)];
   });
   kids.push(...statLines);
@@ -2443,6 +2490,15 @@ function axisLegend(group) {
 
 const signed = (v, d = 2) => `${v >= 0 ? "+" : "−"}${fmt(Math.abs(v), d)}`;
 
+// Trend points judged by the QA list's current limits (the same reference / warning / action the Perform page shows),
+// not by whatever limits were stored with each result. Points keep their recorded verdict in `recorded_status`.
+function judgedByList(item, points) {
+  const L = item.limits || {};
+  if (L.expected === null || L.expected === undefined) return points;
+  return points.map((p) => ({ ...p, expected: L.expected, warn: L.warn ?? null, fail: L.fail ?? null, tol_mode: L.tol_mode || "absolute",
+    recorded_status: p.status, status: evaluate("numeric", p.value, L) }));
+}
+
 async function renderTrendOverview(machines, machineId, range) {
   const machine = machines.find((m) => String(m.id) === String(machineId));
   const loading = el("div", { class: "card empty" }, `Loading ${machine.name} trends…`);
@@ -2452,12 +2508,12 @@ async function renderTrendOverview(machines, machineId, range) {
   const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric"));
   const all = numeric.length ? await api("GET", `/api/machines/${machineId}/trends`) : {};
   loading.remove();
-  const withData = numeric.map((i) => ({ ...i, points: filterRange(all[i.test_id] || [], range) })).filter((i) => i.points.length);
+  const withData = numeric.map((i) => ({ ...i, points: judgedByList(i, filterRange(all[i.test_id] || [], range)) })).filter((i) => i.points.length);
   if (!withData.length) {
     app.append(el("div", { class: "card empty" }, numeric.length ? "No results in this period." : `${machine.name} has no measured tests scheduled.`));
     return;
   }
-  const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of filterRange(all[it.test_id] || [], "30")) if (pt.status in c) c[pt.status]++; return c; };
+  const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of judgedByList(it, filterRange(all[it.test_id] || [], "30"))) if (pt.status in c) c[pt.status]++; return c; };
   const groups = axisGroups(withData);
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
@@ -2523,18 +2579,16 @@ async function renderTrendOverview(machines, machineId, range) {
     const dates = latestDates(members.map((it) => it.points));
     const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
     const dp = decimalsOf(members.flatMap((it) => [...it.points.slice(-5).map((h) => h.value), latest(it.points).expected ?? (it.limits || {}).expected]));
-    const unitsHere = [...new Set(members.map(unitOf))];
-    const sharedUnit = unitsHere.length === 1 ? unitsHere[0] : null;          // one unit: it goes in the header; mixed: on each chip
     const rows = members.flatMap((it, k) => {
       const unit = unitOf(it), p = latest(it.points);
       const baseline = p.expected ?? (it.limits || {}).expected;
       const href = hrefFor(chartTogether ? members.map((m) => m.test_id) : [it.test_id]);
       // Trends: the dot icon opens the chart under the row (the whole X / Y / Z set at once for an axis table).
       const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
-      const series = chartTogether ? members.map((m) => ({ label: m.axisLabel || m.name, points: m.points })) : [{ label: it.name, points: it.points }];
+      const series = chartTogether ? members.map((m) => ({ label: m.axisLabel || m.name, points: m.points })) : [{ label: (measureParts(it.name) || {}).rowLabel || shortName(it), points: it.points }];
       const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: (e) => {
         e.stopPropagation();
-        if (chart.hidden) chart.firstChild.replaceChildren(el("div", { class: "row" }, el("span", { class: "spacer" }), el("a", { class: "small", href }, "Full trend")), seriesChart(series, unit, { small: true }));
+        if (chart.hidden) chart.firstChild.replaceChildren(el("div", { class: "row" }, el("span", { class: "spacer" }), el("a", { class: "small", href }, "Full trend")), seriesChart(series, unit, { small: true, yLabel: yAxisLabel(chartTogether ? members.map((m) => m.name) : [it.name]) }));
         chart.hidden = !chart.hidden;
       } }, trendIcon(16));
       const cells = [
@@ -2545,7 +2599,7 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "num" }, `${fmt(p.value, dp)} ${unit}`.trim()),
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
-        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp, !sharedUnit) : el("span", { class: "muted small" }, "—")),
+        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
         el("td", { class: "ring-cell" }, miniRing(tally30(it))),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
@@ -2554,7 +2608,7 @@ async function renderTrendOverview(machines, machineId, range) {
     const widths = firstHeader === "Test" ? ["3%", "25%", "4%", "8%", "9%", "9%", "8%", "22%", "7%", "5%"] : ["3%", "18%", "4%", "8%", "9%", "9%", "8%", "29%", "7%", "5%"];
     const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
       el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h === "History" && sharedUnit ? `History (${sharedUnit})` : h))),
+      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h))),
         dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {}), el("th", {})) : null),
       el("tbody", {}, rows)));
     if (title && firstHeader !== "Test") {
@@ -2637,7 +2691,7 @@ function renderTrendDetail(group, range) {
     return p.warn !== null ? stat("Limits", `Warning ±${fmt(p.warn)}${u}`, `Action ±${fmt(p.fail)}${u}`) : null;
   })()));
 
-  app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit));
+  app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)) }));
   // One row per date, one column per axis.
   const byDate = new Map();
   group.members.forEach((m, k) => m.points.forEach((p) => {
@@ -2697,7 +2751,7 @@ async function renderTrends() {
   const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (fallback && fallback.id);
   const range = params.get("range") || "90";
   const testIds = (params.get("test_id") || "").split(",").filter(Boolean);
-  page("Machine Trends", testIds.length ? "Over time, against the limits in force when each value was recorded." : "Every measured test on this machine. X, Y and Z share a chart. Click one for detail.");
+  page("Machine Trends", testIds.length ? "Over time, against the QA list's current limits." : "Every measured test on this machine, against the QA list's current limits. Click one for detail.");
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   const form = el("div", { class: "row" },
     select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { onchange: (e) => go({ machine_id: e.target.value, range }) }),
@@ -2707,7 +2761,14 @@ async function renderTrends() {
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   if (!testIds.length) return renderTrendOverview(machines, machineId, range);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
-  const items = data.map((d) => ({ ...d.test, test_id: d.test.id, points: filterRange(d.points, range) })).filter((i) => i.points.length);
+  const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
+  const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
+  const listItems = new Map(templates.flatMap((t) => t.items).map((i) => [String(i.test_id), i]));
+  const items = data.map((d) => {
+    const li = listItems.get(String(d.test.id));
+    const limits = li ? li.limits : { expected: d.test.expected, warn: d.test.warn, fail: d.test.fail, tol_mode: d.test.tol_mode };
+    return { ...d.test, test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)) };
+  }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = axisGroups(items)[0];
   app.append(el("h2", {}, group ? group.base : head.name, group ? axisLegend(group) : null),
