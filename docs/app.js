@@ -1932,7 +1932,7 @@ async function renderQueueEditor(id) {
     }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
       el("thead", {}, el("tr", {}, ["Test Name", "Category", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
-        valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Warning / Action (Default)", ""].map((h) => el("th", {}, h)))), body))
+        valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Default Warning / Default Action", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
     if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} values` : "Save";
     holder.classList.toggle("machine-mode", !!valuesFor);
@@ -2006,8 +2006,8 @@ function testForm(test) {
   const limits = el("div", { class: "form-grid wide" },
     field("Unit", el("input", { name: "unit", value: t.unit || "", placeholder: "mm, %, cGy, °" })),
     field("Expected value", el("input", { name: "expected", type: "number", step: "any", value: t.expected ?? "" })),
-    field("Warning ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
-    field("Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
+    field("Default Warning ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
+    field("Default Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
     field("Limits are", select("tol_mode", [["absolute", "Absolute (same units)"], ["percent", "Percent of expected"]], t.tol_mode)));
   const sync = () => (limits.hidden = type.value !== "numeric");
   type.addEventListener("change", sync);

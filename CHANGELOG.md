@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Use Default Warning and Default Action in the template column heading and individual test editor as well as limit rows.
+
 - Remove Schedule on machines from Machine Schedules menus; retain it in QA Template Lists.
 
 - Machine Schedules: show Active/Inactive only beside the QA list name, leaving the toggle without repeated text.
