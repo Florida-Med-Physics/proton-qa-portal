@@ -848,3 +848,9 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .home-stat { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .home-stat-value { font-size: 34px; font-weight: 700; line-height: 1.1; }
 .home-stat-label { max-width: 90%; }
+
+/* Numbers sit centred in their columns. */
+td.num, th.num, .measure-table td.qa-n, .measure-table td.qa-unit, .measure-table td.qa-dev, .measure-table td.qa-measured, .measure-table td:has(> .chip), .measure-table th { text-align: center; }
+.measure-table th:nth-child(2), .measure-table td.qa-label { text-align: left; }
+.measure-table td.qa-measured .result-input, .measure-table td.qa-measured .text-input { text-align: center; }
+.fixed-table td.center { text-align: center; }
