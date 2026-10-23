@@ -1241,7 +1241,7 @@ function measureParts(name) {
   // "GTR5_Energy [100.00 MeV]: Distal Depth [mm]" -> "Distal Depth [mm]"; "Energy [100 MeV] – Distal Depth" -> "Distal Depth".
   const tail = name.includes(": ") ? name.slice(name.lastIndexOf(": ") + 2) : name.includes(" – ") ? name.slice(name.lastIndexOf(" – ") + 3) : name;
   const metricLabel = tail.replace(/^spot\s*\d+\s*/i, "").trim();
-  const rowLabel = [spot ? `Spot ${spot[1]}` : null, energy ? `${Number(energy[1])} MeV` : null].filter(Boolean).join(" · ");
+  const rowLabel = energy ? `${Number(energy[1])} MeV` : spot ? `Spot ${spot[1]}` : "";
   return { metric: hit[1], metricLabel, rowLabel, sortKey: (spot ? Number(spot[1]) : 0) * 10000 + (energy ? Number(energy[1]) : 0) };
 }
 
@@ -2613,7 +2613,8 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
         el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
-        el("td", { class: "num avg-cell" }, avg30(it) === null ? el("span", { class: "muted" }, "—") : `${fmt(avg30(it), dp)} ${unit}`.trim()),
+        el("td", { class: "num avg-cell" }, avg30(it) === null ? el("span", { class: "muted" }, "—")
+          : el("span", {}, `${fmt(avg30(it), dp)} ${unit}`.trim(), el("br"), deltaBadge(avg30(it), it.limits, unit))),
         el("td", { class: "ring-cell" }, miniRing(tally30(it))),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
