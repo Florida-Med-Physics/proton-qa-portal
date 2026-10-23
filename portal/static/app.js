@@ -1457,7 +1457,7 @@ async function renderPerform(assignmentId) {
     // History (under its QA dates) and Trends. Repeated measurements (per energy or spot) share a titled table.
     const measureTable = (members, { firstHeader, title, directions, firstCell, label }) => {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
-      const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-5).reverse();
+      const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-3).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
@@ -2201,7 +2201,7 @@ function histChips(points, dates, unit, dp) {
     ? el("span", { class: `hist ${h.status}`, title: `${histDateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`)
     : el("span", { class: "hist empty" }, "—")));
 }
-function latestDates(pointLists, count = 5) {
+function latestDates(pointLists, count = 3) {
   return [...new Set(pointLists.flatMap((pts) => (pts || []).map((h) => h.qa_date)))].sort().slice(-count).reverse();
 }
 // Only as many date slots as fit on one line of the History column (re-checked when the window is resized).
@@ -2512,6 +2512,7 @@ async function renderTrendOverview(machines, machineId, range) {
     return;
   }
   const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of judgedByList(it, filterRange(all[it.test_id] || [], "30"))) if (pt.status in c) c[pt.status]++; return c; };
+  const avg30 = (it) => { const v = filterRange(all[it.test_id] || [], "30").map((pt) => pt.value); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const groups = axisGroups(withData);
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
@@ -2582,8 +2583,8 @@ async function renderTrendOverview(machines, machineId, range) {
       const baseline = p.expected ?? (it.limits || {}).expected;
       const href = hrefFor(chartTogether ? members.map((m) => m.test_id) : [it.test_id]);
       // Trends: the dot icon opens the chart under the row (the whole X / Y / Z set at once for an axis table).
-      const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
-      const series = chartTogether ? members.map((m) => ({ label: m.axisLabel || m.name, points: m.points })) : [{ label: (measureParts(it.name) || {}).rowLabel || shortName(it), points: it.points }];
+      const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 11 }));
+      const series = chartTogether ? members.map((m) => ({ label: m.axisLabel || m.name, points: m.points })) : [{ label: (measureParts(it.name) || {}).rowLabel || yAxisLabel([it.name]), points: it.points }];
       const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: (e) => {
         e.stopPropagation();
         if (chart.hidden) chart.firstChild.replaceChildren(el("div", { class: "row" }, el("span", { class: "spacer" }), el("a", { class: "small", href }, "Full trend")), seriesChart(series, unit, { small: true, yLabel: yAxisLabel(chartTogether ? members.map((m) => m.name) : [it.name]) }));
@@ -2598,16 +2599,17 @@ async function renderTrendOverview(machines, machineId, range) {
         el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
         el("td", {}, chip(p.status)),
         el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
+        el("td", { class: "num avg-cell" }, avg30(it) === null ? el("span", { class: "muted" }, "—") : `${fmt(avg30(it), dp)} ${unit}`.trim()),
         el("td", { class: "ring-cell" }, miniRing(tally30(it))),
         chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
       ];
       return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
     });
-    const widths = firstHeader === "Test" ? ["3%", "25%", "4%", "8%", "9%", "9%", "8%", "22%", "7%", "5%"] : ["3%", "18%", "4%", "8%", "9%", "9%", "8%", "29%", "7%", "5%"];
+    const widths = firstHeader === "Test" ? ["3%", "24%", "4%", "8%", "9%", "9%", "8%", "16%", "8%", "6%", "5%"] : ["3%", "17%", "4%", "8%", "9%", "9%", "8%", "23%", "8%", "6%", "5%"];
     const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
       el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h))),
-        dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {}), el("th", {})) : null),
+      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30-Day Avg", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h))),
+        dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {}), el("th", {}), el("th", {})) : null),
       el("tbody", {}, rows)));
     if (title && firstHeader !== "Test") {
       const p0 = latest(members[0].points);

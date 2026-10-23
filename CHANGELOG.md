@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- History shows the last three QA dates; Machine Trends adds a 30-Day Avg column (mean of the last 30 days' values) left of the pass ring.
 - Setup QA and the list editor show one Last Modified column (date, then who) instead of two.
 - The dotted reference (baseline) line on charts is thicker and black.
 - Every History value carries its unit ("77.7 mm").
