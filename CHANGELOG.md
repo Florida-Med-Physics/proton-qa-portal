@@ -17,7 +17,7 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Instantiate on a Machine keeps the template's name and takes several machines at once (tick boxes), creating one list per machine on the same schedule.
 - History shows the last three QA dates; Machine Trends adds a 30-Day Avg column (mean of the last 30 days' values) left of the pass ring.
 - Setup QA and the list editor show one Last Modified column (date, then who) instead of two.
-- The dotted reference (baseline) line on charts is thicker and black.
+- The reference (baseline) line on charts is a solid, thicker black line.
 - Every History value carries its unit ("77.7 mm").
 - **[Physics review]** Trend charts draw a red straight-line (least-squares) fit through the results and project it 4 weeks past the last result (dotted red); the statistics line adds the slope per week and the projected value.
 - **[Physics review]** Machine Trends uses the QA list's current limits (reference, warning, action as resolved for that machine) for the limits line, bands, Δ badges, result chips and 30-day rings; the verdict recorded at QA time is unchanged in Review QA.
