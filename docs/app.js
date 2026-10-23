@@ -1774,22 +1774,33 @@ function templateDialog(source) {
 }
 
 function duplicateDialog(source, machines) {
-  // Name the copy, and optionally put it straight onto a machine. A template is "instantiated"; a machine's list is "duplicated".
+  // The copy keeps the source's name; tick every machine that should get its own list (one list is created per machine,
+  // all on the same schedule). A template is "instantiated"; a machine's list is "duplicated".
   const verb = source.is_template ? "Instantiate on a Machine" : "Duplicate";
+  const active = machines.filter((m) => m.active);
   const body = el("div", {},
-    el("p", { class: "muted" }, `Every test in "${source.name}" is copied, so the new list's limits can be adjusted on its own.`),
+    el("p", { class: "muted" }, `Every test in "${source.name}" is copied, so each new list's limits can be adjusted on its own.`),
     el("div", { class: "form-grid" },
-      field("Name for the copy", el("input", { name: "name", required: true, placeholder: `${source.name.replace(/ template$/i, "")} – GTR2` }), "wide"),
-      field("Schedule on", select("machine_id", [["", "Not yet"], ...machines.filter((m) => m.active).map((m) => [m.id, m.name])], ""))),
+      field("Name for the copy", el("input", { name: "name", required: true, value: source.name }), "wide"),
+      field("Schedule on", el("div", { class: "machine-picks" }, active.map((m) =>
+        el("label", { class: "check" }, el("input", { type: "checkbox", name: "machines", value: String(m.id) }), m.name))), "wide")),
     el("div", { class: "schedule-part", hidden: true }, scheduleForm(null)));
-  const machinePick = body.querySelector("[name=machine_id]");
+  const picks = [...body.querySelectorAll("[name=machines]")];
   const schedulePart = body.querySelector(".schedule-part");
-  machinePick.addEventListener("change", () => (schedulePart.hidden = !machinePick.value));
+  picks.forEach((c) => c.addEventListener("change", () => (schedulePart.hidden = !picks.some((x) => x.checked))));
   modal(`${verb} ${source.name}`, body, async (data, form) => {
-    const payload = { name: data.name, machine_id: data.machine_id || null, ...(data.machine_id ? scheduleData(data, form) : {}) };
-    const r = await api("POST", `/api/queues/${source.id}/duplicate`, payload);
-    toast("QA list created");
-    location.hash = r.assignment_id ? `#/machines/${data.machine_id}` : `#/queues/${r.id}`;
+    const chosen = picks.filter((c) => c.checked).map((c) => Number(c.value));
+    if (!chosen.length) {
+      const r = await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name, machine_id: null });
+      toast("QA list created");
+      location.hash = `#/queues/${r.id}`;
+      return;
+    }
+    const schedule = scheduleData(data, form);
+    for (const machineId of chosen) await api("POST", `/api/queues/${source.id}/duplicate`, { name: data.name, machine_id: machineId, ...schedule });
+    toast(chosen.length === 1 ? "QA list created" : `${chosen.length} QA lists created`);
+    location.hash = "#/setup";
+    route();
   }, verb);
 }
 

@@ -881,3 +881,7 @@ tr.quick-trend .spark .stats-line { font-size: 15px; }
 tr.quick-trend .spark .axis-title { font-size: 15px; }
 .trend-table .chart-box:not(.multi) .chart-key { display: flex; }
 .trend-table .chart-key { font-size: 14px; }
+
+/* Instantiate dialog: machines as a grid of tick boxes. */
+.machine-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; }
+.machine-picks label.check { font-weight: 500; }
