@@ -678,7 +678,7 @@ async function renderSetup() {
 
   app.append(el("h2", { class: "section-head" }, "QA Template Lists"));
   const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
-  const listRows = queues.slice().sort((x, y) => (schedulesOf(y).length > 0) - (schedulesOf(x).length > 0) || x.name.localeCompare(y.name)).map((q) => el("tr", {},
+  const templateRow = (q) => el("tr", {},
     el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editable ? moreMenu([
       ["Edit", () => (location.hash = `#/queues/${q.id}`)],
       ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
@@ -693,10 +693,40 @@ async function renderSetup() {
       : el("span", { class: "muted small" }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
 
-    ));
-  const listTable = fixedTable([["QA Template List", "52%"], ["Scheduled On", "38%"], ["Tests", "10%"]], listRows,
-    "No QA lists yet. Make one with New QA list.");
-  app.append(filterBox(listTable, "Search QA Template Lists"), listTable);
+    );
+  const templateModalities = (q) => {
+    const assigned = [...new Set(schedulesOf(q).map((a) => machines.find((m) => m.id === a.machine_id)).filter(Boolean).map((m) => modalityOf(m.kind)))];
+    if (assigned.length) return assigned;
+    // Unscheduled departmental templates still belong with their modality.
+    const name = q.name.toLowerCase();
+    if (/proton|sphinx|eyeline|tg.?224/.test(name)) return ["Proton"];
+    if (/hdr|flexitron|brachy/.test(name)) return ["Brachytherapy"];
+    if (/simulator|\bct\b|big.?bore|\bmri\b|tg.?66/.test(name)) return ["Simulation"];
+    if (/truebeam|linac|ethos|synergy|tg.?142|tg.?198/.test(name)) return ["Photon"];
+    return ["Unassigned"];
+  };
+  const templateSections = el("div");
+  const sortedTemplates = queues.slice().sort((a, b) => a.name.localeCompare(b.name));
+  for (const modality of [...MODALITIES, "Unassigned"]) {
+    const group = sortedTemplates.filter((q) => templateModalities(q).includes(modality));
+    if (!group.length) continue;
+    const listTable = fixedTable([["QA Template List", "52%"], ["Scheduled On", "38%"], ["Tests", "10%"]], group.map(templateRow), "No QA template lists.");
+    templateSections.append(el("section", { class: "template-modality", "aria-label": `${modality} QA Template Lists` },
+      el("h3", { class: "section-head" }, modality), listTable));
+  }
+  const templateSearch = el("input", { type: "search", class: "filter-box", placeholder: "Search QA Template Lists", "aria-label": "Search QA Template Lists", oninput: (e) => {
+    const words = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const section of templateSections.children) {
+      let visible = 0;
+      for (const row of section.querySelectorAll("tbody tr")) {
+        row.hidden = !words.every((word) => `${section.getAttribute("aria-label")} ${row.textContent}`.toLowerCase().includes(word));
+        if (!row.hidden) visible++;
+      }
+      section.hidden = !visible;
+    }
+  } });
+  app.append(el("div", { class: "filter-row" }, templateSearch), templateSections);
+  if (!queues.length) templateSections.append(el("p", { class: "muted" }, "No QA template lists yet. Make one with New QA list."));
 
   // Each machine's schedules: which of the lists it runs, how often, and any values of its own.
   const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator", "HDR brachytherapy"];
