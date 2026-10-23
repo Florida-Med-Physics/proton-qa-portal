@@ -217,7 +217,7 @@ dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top
 .chart { width: 100%; height: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .chart text { fill: var(--muted); font-size: 13px; }
 .chart .axis { stroke: var(--border); }
-.chart .expected { stroke: var(--muted); stroke-dasharray: 4 4; fill: none; }
+.chart .expected { stroke: var(--text); stroke-width: 2.2; stroke-dasharray: 6 5; fill: none; }
 .chart .series { stroke: var(--accent); fill: none; stroke-width: 1.5; }
 .chart .band-warn { fill: var(--band-warn); }
 .chart .band-fail { fill: var(--band-fail); }
@@ -359,7 +359,7 @@ td.indent { padding-left: 28px; }
 .spark .stats-line { font-size: 13px; fill: var(--text); }
 .spark text { fill: var(--muted); font-size: 13px; }
 .spark .axis { stroke: var(--border); }
-.spark .expected { stroke: var(--muted); stroke-dasharray: 3 3; fill: none; }
+.spark .expected { stroke: var(--text); stroke-width: 2; stroke-dasharray: 5 4; fill: none; }
 .spark .band-fail { fill: var(--band-fail); }
 .stats-line.axis-0 { fill: var(--accent); } .stats-line.axis-1 { fill: #d9822b; } .stats-line.axis-2 { fill: #8e6bd1; }
 .spark { height: auto; }

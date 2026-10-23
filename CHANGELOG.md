@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- The dotted reference (baseline) line on charts is thicker and black.
 - Every History value carries its unit ("77.7 mm").
 - **[Physics review]** Trend charts draw a red straight-line (least-squares) fit through the results and project it 4 weeks past the last result (dotted red); the statistics line adds the slope per week and the projected value.
 - **[Physics review]** Machine Trends uses the QA list's current limits (reference, warning, action as resolved for that machine) for the limits line, bands, Δ badges, result chips and 30-day rings; the verdict recorded at QA time is unchanged in Review QA.
