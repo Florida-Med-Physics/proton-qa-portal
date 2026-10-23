@@ -941,3 +941,5 @@ input.own-value { border-color: var(--uf-orange, #fa4616); background: rgba(250,
 
 /* Menus beside list names open into the table. */
 .name-with-edit .more-menu { left: 0; right: auto; }
+
+.list-editor tr.grouped-axis-row td { border-top: 0; border-bottom: 0; }

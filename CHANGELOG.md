@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Show test modification details only in the individual test editor, not as a list column.
+
+- QA list editor: automatically group related X/Y/Z measurements under one heading and show shared directions once.
+
 - Warning/action level mode: offer only Absolute or Percent, showing the effective mode for inherited values.
 
 - Remove Active from QA Template Lists; activation is controlled per machine in Machine Schedules.

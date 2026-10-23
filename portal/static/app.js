@@ -1838,7 +1838,30 @@ async function renderQueueEditor(id) {
     for (const it of items) { const t = byId[it.test_id]; const n = sectionNumber(t); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(t.category); }
     let lastSection = null;
     const numbers = blockNumbers(items.map((i) => ({ ...byId[i.test_id], test_id: i.test_id })));
-    body.replaceChildren(...items.flatMap((item, index) => {
+    const axisFamilies = new Map();
+    items.forEach((item, index) => {
+      const t = byId[item.test_id], axis = t.type === "numeric" ? axisParts(t.name) : null;
+      if (!axis) return;
+      const key = JSON.stringify([sectionNumber(t), t.category, t.unit, axis.base]);
+      if (!axisFamilies.has(key)) axisFamilies.set(key, []);
+      axisFamilies.get(key).push({ item, index, axis });
+    });
+    const familyOf = new Map();
+    for (const family of axisFamilies.values()) {
+      if (family.length < 2 || new Set(family.map((x) => x.axis.axis)).size !== family.length) continue;
+      family.sort((a, b) => "XYZ".indexOf(a.axis.axis) - "XYZ".indexOf(b.axis.axis));
+      for (const member of family) familyOf.set(member.item.test_id, family);
+    }
+    const displayed = [], seen = new Set();
+    items.forEach((item, index) => {
+      if (seen.has(item.test_id)) return;
+      const family = familyOf.get(item.test_id);
+      for (const member of family || [{ item, index }]) {
+        displayed.push(member);
+        seen.add(member.item.test_id);
+      }
+    });
+    body.replaceChildren(...displayed.flatMap(({ item, index, axis }) => {
       const t = byId[item.test_id];
       const numeric = t.type === "numeric";
       const own = valuesFor ? (machineValues[valuesFor][item.test_id] = machineValues[valuesFor][item.test_id] || {}) : null;
@@ -1852,20 +1875,26 @@ async function renderQueueEditor(id) {
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = ((own && own.tol_mode) || item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       const n = sectionNumber(t);
-      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 7 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
-      const directions = helpText(t.description);
-      const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 7 }, directions)) : null;
+      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 5 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
+      const family = familyOf.get(item.test_id);
+      const firstInFamily = family && family[0].item === item;
+      const lastInFamily = family && family[family.length - 1].item === item;
+      const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 5 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
+      const directions = family
+        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        : helpText(t.description);
+      const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 5 }, directions)) : null;
       lastSection = n;
       const number = numbers.get(item.test_id);
-      return [head, el("tr", { class: `compact${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable ? "true" : null },
+      return [head, groupHead, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
-          editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
+          editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
             await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
             toast("Test saved");
             route();
           }) }, "✎") : null,
-          el("strong", {}, number ? `${number}: ` : "", shortName))),
+          el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName))),
         el("td", {}, categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
@@ -1874,7 +1903,6 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
             { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
-        el("td", { class: "small" }, m.modified_at ? el("span", {}, m.modified_at.slice(0, 16).replace("T", " "), el("br"), m.modified_by || "") : el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
@@ -1882,7 +1910,7 @@ async function renderQueueEditor(id) {
     }).filter(Boolean));
     holder.replaceChildren(items.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
       el("thead", {}, el("tr", {}, ["Test Name", "Category", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
-        valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Warning / Action (Default)", "Last Modified", ""].map((h) => el("th", {}, h)))), body))
+        valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Warning / Action (Default)", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, "No tests in this list yet."));
     if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} values` : "Save";
     holder.classList.toggle("machine-mode", !!valuesFor);
@@ -2201,7 +2229,7 @@ const AXIS_NAME = /^(.*\S)\s+([XYZ])(\s*\[[^\]]*\])?$/;
 function axisParts(name) {
   const m = AXIS_NAME.exec(name || "");
   if (!m) return null;
-  return { base: m[1].replace(/\s*[-–]$/, ""), axis: m[2], unitTag: (m[3] || "").trim() };
+  return { base: m[1].replace(/\s*[-–—]$/, "").trim(), axis: m[2], unitTag: (m[3] || "").trim() };
 }
 // Rotations of one thing (couch pitch, roll, rotation) also share a chart.
 const ROTATION_NAME = /^(.*\S)\s+(Pitch|Roll|Rotation)$/;
