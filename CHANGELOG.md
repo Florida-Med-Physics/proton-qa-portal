@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Values: show Default when a schedule uses the list defaults.
+
 - QA Template Lists: label the column Active and use one on/off control with green Active text.
 
 - Setup QA: use Active/Inactive radio buttons for each QA template list and remove its Last Modified column.

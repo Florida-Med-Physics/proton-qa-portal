@@ -732,7 +732,7 @@ async function renderSetup() {
         el("td", { class: "small" }, a.schedule),
         el("td", { class: "center" }, a.override_count
           ? el("a", { href: `#/assignments/${a.id}/limits`, title: "Values that differ on this machine" }, `${a.override_count} ${a.override_count === 1 ? "test" : "tests"}`)
-          : el("span", { class: "muted small" }, "None")),
+          : el("span", { class: "muted small" }, "Default")),
         el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
           editable ? moreMenu([
             [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active), a.active ? "Stop scheduling this list on the machine" : "Schedule this list on the machine"],
