@@ -678,7 +678,13 @@ async function renderSetup() {
   app.append(el("h2", { class: "section-head" }, "QA Template Lists"));
   const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
   const listRows = queues.slice().sort((x, y) => (schedulesOf(y).length > 0) - (schedulesOf(x).length > 0) || x.name.localeCompare(y.name)).map((q) => el("tr", {},
-    el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editableName(q, editable))),
+    el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editable ? moreMenu([
+      ["Edit", () => (location.hash = `#/queues/${q.id}`)],
+      ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
+      ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
+      ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
+      ["Delete", () => deleteList(q), "Delete only if it has no results"],
+    ]) : null, editableName(q, editable))),
     el("td", {}, schedulesOf(q).length
       ? el("div", { class: "sched-chips" }, schedulesOf(q).sort((a, b) => String(machineOf(a).name).localeCompare(String(machineOf(b).name))).map((a) =>
         el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: `#/machines/${a.machine_id}`, title: `${a.schedule}${a.active ? "" : " · inactive"}` },
@@ -686,15 +692,8 @@ async function renderSetup() {
       : el("span", { class: "muted small" }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
 
-    el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
-      editable ? moreMenu([
-        ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
-        ["Duplicate", () => copyDialog(q), "Make a separate list under a new name"],
-        ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
-        ["Delete", () => deleteList(q), "Delete only if it has no results"],
-      ]) : null)),
     ));
-  const listTable = fixedTable([["QA Template List", "42%"], ["Scheduled On", "35%"], ["Tests", "8%"], ["Actions", "15%"]], listRows,
+  const listTable = fixedTable([["QA Template List", "52%"], ["Scheduled On", "38%"], ["Tests", "10%"]], listRows,
     "No QA lists yet. Make one with New QA list.");
   app.append(filterBox(listTable, "Search QA Template Lists"), listTable);
 

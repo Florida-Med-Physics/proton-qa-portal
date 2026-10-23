@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA Template Lists: place the options menu between the pencil and name and remove the Actions column.
+
 - Template limits: label Default Warning and Default Action and use radio buttons to select per-machine limits.
 
 - Show test modification details only in the individual test editor, not as a list column.
