@@ -685,24 +685,7 @@ async function renderSetup() {
           machineOf(a).name, a.active ? null : " (Inactive)")))
       : el("span", { class: "muted small" }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
-    el("td", {}, el("label", { class: "check" },
-      el("input", { type: "checkbox", role: "switch", checked: !!q.active, disabled: !editable,
-        "aria-label": `Active: ${q.name}`,
-        onchange: async (e) => {
-          const control = e.target;
-          const active = control.checked;
-          control.disabled = true;
-          try {
-            await api("POST", `/api/queues/${q.id}/archive`, { archived: !active });
-            toast(`${q.name} set ${active ? "active" : "inactive"}`);
-            route();
-          } catch (err) {
-            control.checked = !!q.active;
-            control.disabled = false;
-            toast(err.message, true);
-          }
-        },
-      }), el("span", { class: q.active ? "active-tag" : "inactive-tag" }, q.active ? "Active" : "Inactive"))),
+
     el("td", { class: "right" }, el("div", { class: "row nowrap end icon-actions" },
       editable ? moreMenu([
         ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
@@ -711,7 +694,7 @@ async function renderSetup() {
         ["Delete", () => deleteList(q), "Delete only if it has no results"],
       ]) : null)),
     ));
-  const listTable = fixedTable([["QA Template List", "35%"], ["Scheduled On", "29%"], ["Tests", "7%"], ["Active", "14%"], ["Actions", "15%"]], listRows,
+  const listTable = fixedTable([["QA Template List", "42%"], ["Scheduled On", "35%"], ["Tests", "8%"], ["Actions", "15%"]], listRows,
     "No QA lists yet. Make one with New QA list.");
   app.append(filterBox(listTable, "Search QA Template Lists"), listTable);
 
