@@ -679,9 +679,23 @@ async function renderSetup() {
     try { const r = await api("POST", `/api/queues/${q.id}/reevaluate`, {}); toast(`Re-evaluated ${r.runs} runs; ${r.changed} verdicts changed.`); route(); }
     catch (err) { toast(err.message, true); }
   };
-  const modified = (q) => el("td", { class: "small muted" }, q.modified_at ? el("span", {}, q.modified_at.slice(0, 16).replace("T", " "), el("br"), q.modified_by || "") : "—");
+  const scheduleAction = async (a, action, data = {}) => {
+    try {
+      const result = await api("POST", `/api/assignments/${a.id}/${action}`, data);
+      toast(action === "reevaluate" ? `Re-evaluated ${result.runs} runs; ${result.changed} results changed.` : "Machine schedule updated");
+      route();
+    } catch (err) { toast(err.message, true); }
+  };
+  const duplicateSchedule = (a, q, m) => modal(`Duplicate ${q.name} for ${m.name}`,
+    el("div", {}, el("p", { class: "muted" }, "Creates a separate list with this machine's included tests and tolerances. The copy starts inactive."),
+      field("New list name", el("input", { name: "name", required: true, value: `${q.name} – ${m.name} (copy)` }))),
+    async (data) => {
+      await api("POST", `/api/assignments/${a.id}/duplicate`, data);
+      toast("Copy created and set inactive"); route();
+    }, "Duplicate");
 
-  app.append(el("h2", { class: "section-head" }, "QA Template Lists"));
+  app.append(el("h2", { class: "section-head" }, "QA Template Lists"),
+    el("p", { class: "muted small" }, "Edit shared tests here. Each machine keeps its own exceptions and tolerances."));
   const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
   const templateRow = (q) => el("tr", {},
     el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editable ? moreMenu([
@@ -745,27 +759,31 @@ async function renderSetup() {
   // Each machine's schedules: which of the lists it runs, how often, and any values of its own.
   const KIND_ORDER = ["Proton gantry", "Proton eyeline", "Linac", "CT simulator", "MRI simulator", "HDR brachytherapy"];
   const kindRankOf = (m) => { const i = KIND_ORDER.indexOf(m.kind); return i < 0 ? KIND_ORDER.length : i; };
-  app.append(el("h2", { class: "section-head" }, "Machine Schedules"));
-  const scheduleRows = machines.filter((m) => schedules.some((a) => a.machine_id === m.id && lists.some((q) => q.id === a.queue_id)))
+  app.append(el("h2", { class: "section-head" }, "Machine Schedules"),
+    el("p", { class: "muted small" }, "Manage each machine's QA here. Use the three-dot menu for machine-specific actions."));
+  const scheduleRows = machines.filter((m) => schedules.some((a) => a.machine_id === m.id && !a.archived && lists.some((q) => q.id === a.queue_id)))
     .sort((x, y) => kindRankOf(x) - kindRankOf(y) || x.name.localeCompare(y.name)).flatMap((m) => {
-      const mine = schedules.filter((a) => a.machine_id === m.id).map((a) => ({ a, q: lists.find((q) => q.id === a.queue_id) })).filter((x) => x.q)
+      const mine = schedules.filter((a) => a.machine_id === m.id && !a.archived).map((a) => ({ a, q: lists.find((q) => q.id === a.queue_id) })).filter((x) => x.q)
         .sort((x, y) => (y.a.active - x.a.active) || (FREQ_ORDER[x.a.frequency] ?? 9) - (FREQ_ORDER[y.a.frequency] ?? 9) || x.q.name.localeCompare(y.q.name));
       return [el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("a", { class: "machine-link", href: `#/machines/${m.id}`, title: "Schedules, import folders and details for this machine" },
         el("strong", {}, m.name)), m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...mine.map(({ a, q }) => el("tr", { class: a.active ? "" : "muted" },
-        el("td", { class: "indent" }, el("div", { class: "name-with-edit" }, iconBtn("✎", editable ? "Edit tests (all machines)" : "View tests", () => (location.hash = `#/queues/${q.id}`)),
+        el("td", { class: "indent" }, el("div", { class: "name-with-edit" },
           editable ? moreMenu([
-            ["Edit", () => (location.hash = `#/queues/${q.id}`), "Edit tests shared by all machines"],
             [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active)],
-            ["Values for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
-            ["Schedule and import folder", () => (location.hash = `#/machines/${m.id}`)],
-            ["Duplicate", () => copyDialog(q)],
-            ["Re-evaluate", reevaluate(q)],
-            ["Delete", () => deleteList(q), "Delete the shared list only if it has no results"],
+            ["Set tolerances for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
+            ["Duplicate", () => duplicateSchedule(a, q, m)],
+            ["Re-evaluate", () => { if (confirm(`Re-evaluate recorded results for "${q.name}" on ${m.name} using its current tolerances? This updates stored results and is logged.`)) scheduleAction(a, "reevaluate"); }],
+            ["Archive", () => scheduleAction(a, "archive", { archived: true }), "Archive only this machine's schedule"],
+            ["Delete", () => { if (confirm(`Delete "${q.name}" from ${m.name}? The shared template stays. Schedules with recorded results must be archived instead.`)) scheduleAction(a, "delete"); }, "Remove only this machine's schedule; available only without results"],
           ]) : null,
-          el("span", {}, el("a", { href: `#/queues/${q.id}` }, el("strong", {}, q.name)),
+          el("span", {}, el("strong", { title: "Shared tests are edited under QA Template Lists" }, q.name),
             a.active ? el("span", { class: "active-tag" }, " (Active)") : el("span", { class: "inactive-tag" }, " (Inactive)")))),
-        el("td", { class: "small" }, a.schedule),
+        el("td", { class: "small" }, el("div", { class: "schedule-with-edit" }, el("span", {}, a.schedule),
+          editable ? iconBtn("✎", `Edit schedule for ${q.name} on ${m.name}`, () => modal(`${m.name}: ${q.name} schedule`, scheduleForm(a), async (data, form) => {
+            await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
+            toast("Machine schedule saved"); route();
+          }, "Save schedule")) : null)),
         el("td", {}, el("label", { class: "check" },
           el("input", { type: "checkbox", role: "switch", checked: !!a.active, disabled: !editable,
             "aria-label": `Active: ${q.name} on ${m.name}`,
@@ -777,8 +795,15 @@ async function renderSetup() {
         ) )];
     });
   const scheduleTable = fixedTable([["QA List", "45%"], ["Schedule", "25%"], ["Active", "15%"], ["Machine Values", "15%"]], scheduleRows,
-    "No lists scheduled yet. Use ＋ on a list above to schedule it on machines.");
+    "No lists scheduled yet. Use Schedule on machines in a template's three-dot menu.");
+  scheduleTable.classList.add("machine-schedules-table");
   app.append(filterBox(scheduleTable, "Search machine schedules"), scheduleTable);
+  const archivedSchedules = schedules.filter((a) => a.archived);
+  if (archivedSchedules.length) app.append(el("details", { class: "archived" },
+    el("summary", {}, `Archived machine schedules (${archivedSchedules.length})`),
+    table(["Machine", "QA List", ""], archivedSchedules.map((a) => el("tr", {},
+      el("td", {}, machineOf(a).name), el("td", {}, a.queue_name),
+      el("td", {}, editable ? el("button", { onclick: () => scheduleAction(a, "archive", { archived: false }) }, "Restore") : null))))));
 
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
@@ -1119,7 +1144,6 @@ async function renderMachine(id) {
           route();
         }) }, "Change schedule"),
         el("a", { href: `#/assignments/${a.id}/limits` }, "Adjust limits for this machine"),
-        el("a", { href: `#/queues/${a.queue_id}` }, "Edit the tests in this list"),
         el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
     return el("div", { class: "card list-row" },
       el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule)),
@@ -1815,13 +1839,14 @@ async function scheduleDialog(list, machines, schedules) {
     el("p", { class: "muted" }, `Tick machines to schedule "${list.name}". Untick a machine to pause its schedule; its results and settings are kept.`),
     el("div", { class: "form-grid" },
       field("Machines", el("div", { class: "machine-picks" }, machines.filter((m) => m.active).map((m) => el("label", { class: "check" },
-        el("input", { type: "checkbox", name: "machines", value: String(m.id), checked: on.has(m.id) }), m.name,
-        on.has(m.id) ? el("span", { class: "muted small" }, " (scheduled)") : null))), "wide")),
+        el("input", { type: "checkbox", name: "machines", value: String(m.id), checked: on.has(m.id), disabled: !!existing.get(m.id)?.archived }), m.name,
+        existing.get(m.id)?.archived ? el("span", { class: "muted small" }, " (archived — restore in Setup QA)") : on.has(m.id) ? el("span", { class: "muted small" }, " (scheduled)") : null))), "wide")),
     el("div", { class: "schedule-part" }, scheduleForm(null)));
   modal(`Schedule ${list.name}`, body, async (data, form) => {
     const choices = [...body.querySelectorAll("[name=machines]")];
     const schedule = scheduleData(data, form);
     for (const control of choices) {
+      if (control.disabled) continue;
       const machineId = Number(control.value), previous = existing.get(machineId);
       if (previous) {
         if (!!previous.active === control.checked) continue;
@@ -1893,7 +1918,7 @@ async function renderQueueEditor(id) {
   const info = el("form", { class: "card" }, el("div", { class: "form-grid" },
     field("Name", el("input", { name: "name", value: q.name, required: true, disabled: !editable, placeholder: "e.g. Daily QA template" })),
     field("Setup instructions (shown when performing)", el("textarea", { name: "description", disabled: !editable }, q.description), "wide"),
-    el("input", { type: "hidden", name: "active", value: q.active ? "1" : "" })));
+    el("input", { type: "hidden", name: "active", value: q.active ? "1" : "0" })));
   app.append(info);
 
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));

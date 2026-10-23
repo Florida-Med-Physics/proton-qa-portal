@@ -510,9 +510,88 @@ def list_assignments(db, user, machine_id, today=None):
     rows = db.all("SELECT a.*, q.name AS queue_name, (SELECT COUNT(*) FROM assignment_overrides o WHERE o.assignment_id = a.id) AS override_count "
                   "FROM assignments a JOIN queues q ON q.id = a.queue_id WHERE a.machine_id = ? AND q.active = 1 ORDER BY a.active DESC, q.name", (machine_id,))
     for row in rows:
+        row["archived"] = bool(json.loads(row.get("test_selection") or "{}").get("archived"))
+        if row["archived"]:
+            row["active"] = 0
         row["schedule"] = qa.describe_schedule(row)
         row.update(qa.due_state(row, _last_done(db, row["id"]), today))
     return rows
+
+
+def archive_assignment(db, user, assignment_id, data):
+    require(user, "configure")
+    a = _get(db, "assignments", assignment_id)
+    selection = json.loads(a.get("test_selection") or "{}")
+    archived = bool(data.get("archived", True))
+    if archived == bool(selection.get("archived")):
+        return {"ok": True}
+    if archived:
+        selection["active_before_archive"] = bool(a["active"])
+        selection["archived"] = True
+        active = 0
+    else:
+        active = 1 if selection.pop("active_before_archive", True) else 0
+        selection.pop("archived", None)
+    with db.transaction():
+        db.run("UPDATE assignments SET active = ?, test_selection = ? WHERE id = ?", (active, json.dumps(selection), assignment_id))
+        db.audit(user["id"], "archive" if archived else "restore", "assignment", assignment_id)
+    return {"ok": True}
+
+
+def delete_assignment(db, user, assignment_id):
+    require(user, "configure")
+    _get(db, "assignments", assignment_id)
+    if db.one("SELECT id FROM runs WHERE assignment_id = ? LIMIT 1", (assignment_id,)):
+        raise PortalError("This machine schedule has recorded results. Archive it to preserve its history.")
+    with db.transaction():
+        db.run("DELETE FROM assignment_overrides WHERE assignment_id = ?", (assignment_id,))
+        db.run("DELETE FROM drafts WHERE assignment_id = ?", (assignment_id,))
+        db.run("DELETE FROM assignments WHERE id = ?", (assignment_id,))
+        db.audit(user["id"], "delete", "assignment", assignment_id)
+    return {"ok": True}
+
+
+def duplicate_assignment(db, user, assignment_id, data):
+    require(user, "configure")
+    source = run_template(db, user, assignment_id)
+    name = _text(data, "name", required=True)
+    if db.one("SELECT id FROM queues WHERE name = ?", (name,)):
+        raise PortalError("A QA list with that name already exists.")
+    a = source["assignment"]
+    with db.transaction():
+        qid = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, 1, 0)", (name, source["queue"]["description"]))
+        for position, item in enumerate(source["items"]):
+            l = item["limits"]
+            tid = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+                         (item["name"], item["category"], item["type"], item["unit"], item["description"], l["expected"], l["warn"], l["fail"], l["tol_mode"], qid))
+            db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (qid, tid, position))
+        sid = db.run("INSERT INTO assignments (machine_id, queue_id, frequency, interval_days, weekdays, start_date, active, import_folder) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+                     (a["machine_id"], qid, a["frequency"], a["interval_days"], a["weekdays"], a["start_date"], a["import_folder"]))
+        db.audit(user["id"], "duplicate", "assignment", sid, source=assignment_id, queue_id=qid, name=name)
+    return {"id": qid, "assignment_id": sid}
+
+
+def reevaluate_assignment(db, user, assignment_id):
+    require(user, "configure")
+    a = _get(db, "assignments", assignment_id)
+    queue_items = {i["test_id"]: i for i in get_queue(db, user, a["queue_id"])["items"]}
+    overrides = {i["test_id"]: i for i in db.all("SELECT * FROM assignment_overrides WHERE assignment_id = ?", (assignment_id,))}
+    runs, changed = set(), 0
+    with db.transaction():
+        for res in db.all("SELECT res.* FROM results res JOIN runs r ON r.id = res.run_id WHERE r.assignment_id = ?", (assignment_id,)):
+            test = _get(db, "tests", res["test_id"])
+            limits = qa.resolve_limits(test, queue_items.get(test["id"], {}), overrides.get(test["id"]))
+            value = res["value_num"] if test["type"] in ("numeric", "boolean") else res["value_text"]
+            if value is None:
+                continue
+            status = qa.evaluate(test["type"], value, limits)
+            changed += status != res["status"]
+            db.run("UPDATE results SET expected = ?, warn = ?, fail = ?, tol_mode = ?, status = ? WHERE id = ?", (limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], status, res["id"]))
+            runs.add(res["run_id"])
+        for rid in runs:
+            db.run("UPDATE runs SET overall = ? WHERE id = ?", (qa.overall(i["status"] for i in db.all("SELECT status FROM results WHERE run_id = ?", (rid,))), rid))
+        db.audit(user["id"], "reevaluate", "assignment", assignment_id, runs=len(runs), verdicts_changed=changed)
+    return {"runs": len(runs), "changed": changed}
 
 
 def save_assignment(db, user, data, assignment_id=None):
@@ -545,7 +624,9 @@ def save_assignment(db, user, data, assignment_id=None):
                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (machine["id"], queue["id"], frequency, interval, weekdays, start, active, folder))
         db.audit(user["id"], "create", "assignment", assignment_id, machine=machine["name"], queue=queue["name"], frequency=frequency)
     else:
-        _get(db, "assignments", assignment_id)
+        target = _get(db, "assignments", assignment_id)
+        if json.loads(target.get("test_selection") or "{}").get("archived"):
+            raise PortalError("Restore this archived schedule before changing it.")
         db.run("UPDATE assignments SET frequency = ?, interval_days = ?, weekdays = ?, start_date = ?, active = ?, import_folder = ? WHERE id = ?",
                (frequency, interval, weekdays, start, active, folder, assignment_id))
         db.audit(user["id"], "update", "assignment", assignment_id, frequency=frequency, weekdays=weekdays, start=start, active=active,
@@ -613,7 +694,7 @@ def save_test_selection(db, user, assignment_id, data):
             raise PortalError("That test belongs to another QA list.")
         if tid in added and not test["active"]:
             raise PortalError("Choose an active test.")
-    selection = {"excluded": excluded, "added": [tid for tid in added if tid not in base]}
+    selection = {**json.loads(assignment.get("test_selection") or "{}"), "excluded": excluded, "added": [tid for tid in added if tid not in base]}
     with db.transaction():
         db.run("UPDATE assignments SET test_selection = ? WHERE id = ?", (json.dumps(selection), assignment_id))
         db.audit(user["id"], "update", "test_selection", assignment_id, **selection)
@@ -623,6 +704,8 @@ def save_test_selection(db, user, assignment_id, data):
 def run_template(db, user, assignment_id):
     """The queue as it applies to one machine: each test with its resolved limits."""
     assignment = _get(db, "assignments", assignment_id)
+    if json.loads(assignment.get("test_selection") or "{}").get("archived"):
+        assignment["active"] = 0
     machine = _get(db, "machines", assignment["machine_id"])
     queue = get_queue(db, user, assignment["queue_id"])
     overrides = {o["test_id"]: o for o in db.all("SELECT * FROM assignment_overrides WHERE assignment_id = ?", (assignment_id,))}

@@ -9,6 +9,9 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Simplify Machine Schedules: edit only the schedule with a pencil beside its description; shared tests are edited in QA Template Lists.
+- Scope inactive/tolerances/duplicate/re-evaluate/archive/delete actions to the selected machine schedule, preserve history, and add archived schedule restoration.
+
 - Setup QA: expose Add machine at the top and Manage machines below; new machines open directly to QA list scheduling.
 
 - Add Archive to template menus and a restorable Archived templates section; keep results and per-machine settings and prevent performing archived templates.

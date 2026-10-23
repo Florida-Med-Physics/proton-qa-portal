@@ -97,3 +97,7 @@ daily table (CT Sim tolerances), and the MRI daily items.
 - Setup uses QA Template Lists; row controls are pencil, vertical three-dot menu, name. No Actions column. Activation is per machine; display Active/Inactive beside the name, not repeated beside the toggle.
 - HDR Flexitron has Daily QA and Source Exchange QA on demand. The seed lists are empty until approved departmental checks are supplied; do not invent clinical tests or limits.
 - Additional regression checks: `node tests/test_autosave.cjs` and `node tests/test_report.cjs`.
+
+## Machine Schedules controls (2026-10-23)
+
+Machine schedule rows have a three-dot menu before a plain list name; no left pencil or shared-test Edit link. The schedule description has its own pencil on the right for frequency/import-folder editing. Menu actions are Active/Inactive, Set tolerances for this machine, Duplicate, Re-evaluate, Archive, Delete. All actions affect only that assignment. Duplicate snapshots the effective machine list and starts inactive; deleting a schedule with recorded results is refused. Archive is reversible and preserves prior activity, membership, values, and history. Shared tests are edited only from QA Template Lists.

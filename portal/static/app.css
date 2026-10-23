@@ -960,3 +960,16 @@ input.own-value { border-color: var(--uf-orange, #fa4616); background: rgba(250,
 
 .values-for .check { white-space: nowrap; }
 .values-for input[type="radio"] { width: auto; flex: none; }
+
+/* Setup: calm tables, clear grouping and one action menu per machine list. */
+.template-modality th, .template-modality td,
+.machine-schedules-table th, .machine-schedules-table td { border-left: 0 !important; border-right: 0 !important; }
+.template-modality tbody tr:nth-child(even) td,
+.machine-schedules-table tbody tr:not(.machine-row) td { background: var(--surface); }
+.template-modality tbody tr:hover td,
+.machine-schedules-table tbody tr:not(.machine-row):hover td { background: var(--surface-2); }
+.machine-schedules-table .machine-row td { padding-top: 18px; padding-bottom: 12px; }
+.machine-schedules-table .more-wrap { flex: none; }
+
+.schedule-with-edit { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.schedule-with-edit .icon-action { flex: none; }

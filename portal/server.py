@@ -165,6 +165,26 @@ def template(db, user, m, body, q):
     return service.run_template(db, user, int(m[1]))
 
 
+@route("POST", r"/api/assignments/(\d+)/archive")
+def archive_assignment(db, user, m, body, q):
+    return service.archive_assignment(db, user, int(m[1]), body)
+
+
+@route("POST", r"/api/assignments/(\d+)/delete")
+def delete_assignment(db, user, m, body, q):
+    return service.delete_assignment(db, user, int(m[1]))
+
+
+@route("POST", r"/api/assignments/(\d+)/duplicate")
+def duplicate_assignment(db, user, m, body, q):
+    return service.duplicate_assignment(db, user, int(m[1]), body)
+
+
+@route("POST", r"/api/assignments/(\d+)/reevaluate")
+def reevaluate_assignment(db, user, m, body, q):
+    return service.reevaluate_assignment(db, user, int(m[1]))
+
+
 @route("PUT", r"/api/assignments/(\d+)/tests")
 def test_selection(db, user, m, body, q):
     return service.save_test_selection(db, user, int(m[1]), body)

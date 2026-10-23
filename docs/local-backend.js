@@ -690,12 +690,62 @@
   function listAssignments(machineId, today) {
     today = today || new Date();
     return S.assignments.filter((a) => a.machine_id === Number(machineId) && byId("queues", a.queue_id).active).map((a) => ({
-      ...a, queue_name: byId("queues", a.queue_id).name, schedule: describeSchedule(a), ...dueState(a, lastDone(a.id), today),
+      ...a, archived: !!testSelection(a).archived, active: testSelection(a).archived ? 0 : a.active, queue_name: byId("queues", a.queue_id).name, schedule: describeSchedule(a), ...dueState(a, lastDone(a.id), today),
       override_count: S.overrides.filter((o) => o.assignment_id === a.id).length,
     })).sort((a, b) => (b.active - a.active) || a.queue_name.localeCompare(b.queue_name));
   }
+  function archiveAssignment(user, assignmentId, data) {
+    require(user, "configure");
+    const a = get("assignments", assignmentId, "Schedule"), selection = testSelection(a), archived = data.archived !== false;
+    if (!!selection.archived === archived) return { ok: true };
+    if (archived) { selection.active_before_archive = !!a.active; selection.archived = true; a.active = 0; }
+    else { a.active = selection.active_before_archive === false ? 0 : 1; delete selection.archived; delete selection.active_before_archive; }
+    a.test_selection = selection; save(); audit(user.id, archived ? "archive" : "restore", "assignment", a.id, {});
+    return { ok: true };
+  }
+  function deleteAssignment(user, assignmentId) {
+    require(user, "configure");
+    const a = get("assignments", assignmentId, "Schedule");
+    if (S.runs.some((r) => r.assignment_id === a.id)) throw new Error("This machine schedule has recorded results. Archive it to preserve its history.");
+    S.overrides = S.overrides.filter((o) => o.assignment_id !== a.id);
+    S.drafts = (S.drafts || []).filter((d) => d.assignment_id !== a.id);
+    S.assignments = S.assignments.filter((x) => x.id !== a.id);
+    save(); audit(user.id, "delete", "assignment", a.id, {}); return { ok: true };
+  }
+  function duplicateAssignment(user, assignmentId, data) {
+    require(user, "configure");
+    const t = runTemplate(assignmentId), name = required(data, "name");
+    if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase())) throw new Error("A QA list with that name already exists.");
+    const id = insert("queues", { name, description: t.queue.description, active: 1, is_template: 0, template_id: null });
+    t.items.forEach((item, position) => {
+      const testId = insert("tests", { name: item.name, category: item.category, type: item.type, unit: item.unit, description: item.description, ...item.limits, active: 1, owner_queue_id: id });
+      insert("queue_items", { queue_id: id, test_id: testId, position, expected: null, warn: null, fail: null, tol_mode: null });
+    });
+    const a = t.assignment;
+    const sid = saveAssignment(user, { machine_id: a.machine_id, queue_id: id, frequency: a.frequency, interval_days: a.interval_days,
+      weekdays: String(a.weekdays).split(',').filter(Boolean).map(Number), start_date: a.start_date, active: false, import_folder: a.import_folder || '' }).id;
+    save(); audit(user.id, "duplicate", "assignment", sid, { source: a.id, queue_id: id, name });
+    return { id, assignment_id: sid };
+  }
+  function reevaluateAssignment(user, assignmentId) {
+    require(user, "configure");
+    const a = get("assignments", assignmentId, "Schedule"), q = getQueue(a.queue_id), runs = new Set(); let changed = 0;
+    for (const r of S.results.filter((r) => (byId("runs", r.run_id) || {}).assignment_id === a.id)) {
+      const test = get("tests", r.test_id), item = q.items.find((i) => i.test_id === test.id) || {};
+      const own = S.overrides.find((o) => o.assignment_id === a.id && o.test_id === test.id), limits = resolveLimits(test, item, own);
+      const value = ["numeric", "boolean"].includes(test.type) ? r.value_num : r.value_text;
+      if (value === null || value === undefined) continue;
+      const status = evaluate(test.type, test.type === "boolean" ? (value ? "pass" : "fail") : value, limits);
+      if (status !== r.status) changed++;
+      Object.assign(r, { ...limits, status }); runs.add(r.run_id);
+    }
+    for (const id of runs) byId("runs", id).overall = S.results.filter((r) => r.run_id === id).reduce((w, r) => rank[r.status] > rank[w] ? r.status : w, "pass");
+    save(); audit(user.id, "reevaluate", "assignment", a.id, { runs: runs.size, verdicts_changed: changed });
+    return { runs: runs.size, changed };
+  }
   function saveAssignment(user, data, assignmentId) {
     require(user, "configure");
+    if (assignmentId && testSelection(get("assignments", assignmentId)).archived) throw new Error("Restore this archived schedule before changing it.");
     const frequency = data.frequency;
     if (!FREQUENCIES.includes(frequency)) throw new Error("Choose a frequency.");
     let interval = null;
@@ -735,12 +785,13 @@
       if (t.owner_queue_id && t.owner_queue_id !== a.queue_id) throw new Error("That test belongs to another QA list.");
       if (added.includes(tid) && !t.active) throw new Error("Choose an active test.");
     }
-    a.test_selection = { excluded, added: added.filter((tid) => !base.has(tid)) };
+    a.test_selection = { ...testSelection(a), excluded, added: added.filter((tid) => !base.has(tid)) };
     save(); audit(user.id, "update", "test_selection", a.id, a.test_selection);
     return { ok: true, ...a.test_selection };
   }
   function runTemplate(assignmentId) {
-    const a = get("assignments", assignmentId, "Schedule");
+    const a = { ...get("assignments", assignmentId, "Schedule") };
+    if (testSelection(a).archived) a.active = 0;
     const machine = get("machines", a.machine_id);
     const queue = getQueue(a.queue_id);
     const overrides = Object.fromEntries(S.overrides.filter((o) => o.assignment_id === a.id).map((o) => [o.test_id, o]));
@@ -1032,7 +1083,7 @@
     let n = 0;
     for (const a of S.assignments) {
       const q = byId("queues", a.queue_id);
-      if (q && /Monthly QA/.test(q.name) && a.frequency === "monthly" && !a.active) { a.active = 1; n++; }
+      if (q && /Monthly QA/.test(q.name) && a.frequency === "monthly" && !a.active && !testSelection(a).archived) { a.active = 1; n++; }
     }
     S.monthlyRestored = true;
     if (n) audit(null, "upgrade", "assignments", null, { monthly_reactivated: n });
@@ -1402,6 +1453,10 @@
   });
   route("POST", "/api/assignments/(\\d+)/draft/clear", (u, m) => { S.drafts = (S.drafts || []).filter((x) => !(x.assignment_id === Number(m[1]) && x.user_id === u.id)); save(); return { ok: true }; });
   route("GET", "/api/assignments/(\\d+)/template", (u, m) => runTemplate(Number(m[1])));
+  route("POST", "/api/assignments/(\\d+)/archive", (u, m, body) => archiveAssignment(u, Number(m[1]), body));
+  route("POST", "/api/assignments/(\\d+)/delete", (u, m, body) => deleteAssignment(u, Number(m[1])));
+  route("POST", "/api/assignments/(\\d+)/duplicate", (u, m, body) => duplicateAssignment(u, Number(m[1]), body));
+  route("POST", "/api/assignments/(\\d+)/reevaluate", (u, m, body) => reevaluateAssignment(u, Number(m[1])));
   route("PUT", "/api/assignments/(\\d+)/tests", (u, m, body) => saveTestSelection(u, Number(m[1]), body));
   route("PUT", "/api/assignments/(\\d+)/overrides", (u, m, body) => saveOverrides(u, Number(m[1]), body));
   route("POST", "/api/assignments/(\\d+)/runs", (u, m, body) => submitRun(u, Number(m[1]), body));
