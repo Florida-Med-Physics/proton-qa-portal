@@ -1104,7 +1104,7 @@ async function renderLimits(assignmentId) {
       el("td", {}, el("input", { name: "expected", type: "number", step: "any", value: o.expected ?? "", placeholder: fmt(q.expected) })),
       el("td", {}, el("input", { name: "warn", type: "number", step: "any", min: 0, value: o.warn ?? "", placeholder: fmt(q.warn) })),
       el("td", {}, el("input", { name: "fail", type: "number", step: "any", min: 0, value: o.fail ?? "", placeholder: fmt(q.fail) })),
-      el("td", {}, select("tol_mode", [["", `List (${q.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || "")));
+      el("td", {}, select("tol_mode", [["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || q.tol_mode || "absolute")));
   });
   app.append(table(["Test", "Expected", "Warning ±", "Action ±", "Limits are"], rows));
   const error = el("p", { class: "error" });
@@ -1872,7 +1872,7 @@ async function renderQueueEditor(id) {
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, "Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
-          select("", [["", `Default (${own ? item.tol_mode || t.tol_mode : t.tol_mode})`], ["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || "",
+          select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
             { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
         el("td", { class: "small" }, m.modified_at ? el("span", {}, m.modified_at.slice(0, 16).replace("T", " "), el("br"), m.modified_by || "") : el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },

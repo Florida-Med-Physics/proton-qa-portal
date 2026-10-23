@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Warning/action level mode: offer only Absolute or Percent, showing the effective mode for inherited values.
+
 - Remove Active from QA Template Lists; activation is controlled per machine in Machine Schedules.
 
 - Keep menus beside edit pencils opening toward the table contents.
