@@ -49,7 +49,7 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
 
 - **Wording:** PASS / WARNING / ACTION; limits "Warning ±" / "Action ±" (never Tolerance/Action or Warn/Fail).
   "Δ", never "delta". Title case in chart text; statistics "Mean … ± … · 95% CI … · N … · Range … · Biggest
-  Outlier … on <date>". Templates are "Instantiate on a Machine"d, machine lists "Duplicate"d.
+  Outlier … on <date>". A list is "Schedule"d on machines; "Duplicate" makes a separate list under a new name.
 - **Look:** calm — no vertical rules, no zebra, no orange direction blocks, no boxes or colour on axis letters
   (X/Y/Z, Pitch/Roll/Rotation are plain text; only chart lines are coloured). Directions are one quiet line under
   the test (full text on hover). Large fonts (base 16 px). Nothing scrolls sideways. Never show "null",
@@ -66,8 +66,14 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   the warning band; calendar x-axis with a line per month; HTML key under the chart; biggest outlier ringed; click a
   dot to show date, value, Δ. Pass-rate rings: thick, green/red only, small number inside; per test ("30 days"
   column) and beside each machine's last result on the Dashboard; never a row of rings at the top.
-- **Lists and actions:** Setup QA rows have three icons (✎ edit, ＋ instantiate/duplicate, 🗑 delete) plus a ⋯ menu
-  for Set Active, Make Template, Re-evaluate, Archive. "Generated from" shows "No changes" / "Changed (n tests)".
+- **One QA list object (Brook, 2026-10-22, emphatic):** Setup QA, Perform QA and Machine Trends all read the same
+  list row; a list is scheduled on machines directly (never copied per machine). Default baseline / Warning / Action
+  live on the list; a machine's own values are overrides on its schedule, edited with "Values for" in the list
+  editor. Never reintroduce per-machine copies, templates-vs-instances, or auto-sync. Numbering is `blockNumbers`
+  everywhere (editor, Perform, Trends).
+- **Lists and actions:** Setup QA has a QA Lists table (✎ left of the name; ＋ schedule on machines, 🗑 delete,
+  ⋯ Duplicate / Re-evaluate / Archive; Scheduled On chips) and a Machine Schedules table grouped by machine
+  (Machine Values count; ⋯ Set Active/Inactive, Values for this machine, Schedule and import folder).
   Perform QA: green ▶ before every list (no Start column), due lists first, Save (draft) button, frozen title row.
   Tabs: ⌂ (Dashboard, icon only) · Perform QA · Review QA · Setup QA · Machine Trends · Data Administration — no
   Machines tab (machine pages open from Setup QA names).

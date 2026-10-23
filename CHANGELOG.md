@@ -12,6 +12,7 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 
 ### Added
+- GitHub page: script and stylesheet links carry a content fingerprint, so browsers load the new version right after a push.
 - Browser build: the Sphinx assignment step no longer switches off monthly lists; monthly schedules it had switched off are switched back on once.
 - Setup QA and the list editor: the edit pencil sits to the left of each list or test name.
 - **[Physics review]** One QA list object: a list is scheduled on machines directly and Setup QA, Perform QA and Machine Trends all read it; per-machine copies were merged into their lists (history moved intact; differing limits became that machine's own values); Auto-sync removed.

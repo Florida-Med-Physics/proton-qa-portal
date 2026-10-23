@@ -5,7 +5,9 @@ it next to docs/local-backend.js, which answers the same /api requests from the 
 The starting data (portal/seed.json, also used by `run_portal.py seed-defaults`) becomes docs/seed-data.js.
 """
 
+import hashlib
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -23,3 +25,14 @@ seed = json.loads((ROOT / "portal" / "seed.json").read_text(encoding="utf-8"))
     "window.PORTAL_SEED = " + json.dumps(seed, indent=1, ensure_ascii=False) + ";\n", encoding="utf-8")
 print("wrote seed-data.js")
 (DOCS / ".nojekyll").touch()
+
+# Every script and stylesheet link carries a fingerprint of the file's contents, so a browser never runs a cached
+# copy of an older version after a push (GitHub Pages lets browsers cache files for several minutes).
+index = DOCS / "index.html"
+html = index.read_text(encoding="utf-8")
+for name in ("theme.js", "app.css", "seed-data.js", "local-backend.js", "app.js"):
+    tag = hashlib.sha256((DOCS / name).read_bytes()).hexdigest()[:10]
+    html, n = re.subn(r'((?:src|href)=")' + re.escape(name) + r'(\?v=[^"]*)?"', lambda m: f'{m[1]}{name}?v={tag}"', html)
+    assert n == 1, name
+index.write_text(html, encoding="utf-8", newline="\n")
+print("fingerprinted script and stylesheet links")
