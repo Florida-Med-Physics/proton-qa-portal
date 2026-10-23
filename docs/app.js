@@ -2463,7 +2463,7 @@ function drawSeries(series, unit, { small = false, delta = false, yLabel = "Valu
     const cls = multi ? `axis-${k}` : "single";
     plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }),
       svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
-        svg("title", {}, `Projected ${fmt(f.end, 2)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (straight-line fit)`)));
+        svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (straight-line fit)`)));
   });
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
   kids.push(plotGroup);
@@ -2478,13 +2478,13 @@ function drawSeries(series, unit, { small = false, delta = false, yLabel = "Valu
     const oDate = o ? new Date(o.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
     // The biggest outlier gets a ring on the chart.
     if (o && st.n > 2) plotGroup.append(svg("circle", { class: `outlier ${multi ? `axis-${k}` : "single"}`, cx: x(o.qa_date), cy: y(val(o)), r: small ? 6 : 9 },
-      svg("title", {}, `Biggest outlier: ${fmt(val(o), 2)}${u} on ${oDate}`)));
+      svg("title", {}, `Biggest outlier: ${sig(val(o))}${u} on ${oDate}`)));
     const f = fits[k];
-    const trend = f ? ` · Trend ${signed(f.slope * 7, 2)}${u}/Week · In ${FORECAST_DAYS / 7} Weeks ${fmt(f.end, 2)}${u}` : "";
+    const trend = f ? ` · Trend ${sigSigned(f.slope * 7)}${u}/Week · In ${FORECAST_DAYS / 7} Weeks ${sig(f.end)}${u}` : "";
     if (small) return [
-      svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 1) * lineH }, `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Outlier ${fmt(val(o), 2)}${u} (${oDate})`),
+      svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 1) * lineH }, `${name}Mean ${sig(st.mean)} ± ${sig(st.sd)}${u} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)}${u} · N ${st.n} · Outlier ${sig(val(o))}${u} (${oDate})`),
       svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 2) * lineH }, trend.replace(/^ · /, ""))];
-    const text = `${name}Mean ${fmt(st.mean, 2)} ± ${fmt(st.sd, 2)}${u} · 95% CI ${fmt(st.ciLow, 2)} to ${fmt(st.ciHigh, 2)}${u} · N ${st.n} · Range ${fmt(st.min, 2)} to ${fmt(st.max, 2)}${u} · Biggest Outlier ${fmt(val(o), 2)}${u} on ${oDate}${trend}`;
+    const text = `${name}Mean ${sig(st.mean)} ± ${sig(st.sd)}${u} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)}${u} · N ${st.n} · Range ${sig(st.min)} to ${sig(st.max)}${u} · Biggest Outlier ${sig(val(o))}${u} on ${oDate}${trend}`;
     return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, text)];
   });
   kids.push(...statLines);
@@ -2498,6 +2498,9 @@ function axisLegend(group) {
 }
 
 const signed = (v, d = 2) => `${v >= 0 ? "+" : "−"}${fmt(Math.abs(v), d)}`;
+// Three significant figures for chart statistics (77.7, 0.06, 157), trailing zeros dropped.
+const sig = (v, n = 3) => (v === null || v === undefined || Number.isNaN(v) ? "—" : v === 0 ? "0" : String(Number(Number(v).toPrecision(n))));
+const sigSigned = (v, n = 3) => `${v >= 0 ? "+" : "−"}${sig(Math.abs(v), n)}`;
 
 // Trend points judged by the QA list's current limits (the same reference / warning / action the Perform page shows),
 // not by whatever limits were stored with each result. Points keep their recorded verdict in `recorded_status`.
