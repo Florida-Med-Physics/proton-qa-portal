@@ -714,7 +714,6 @@ async function renderSetup() {
             [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active)],
             ["Values for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
             ["Schedule and import folder", () => (location.hash = `#/machines/${m.id}`)],
-            ["Schedule on machines", () => scheduleDialog(q, machines, schedules)],
             ["Duplicate", () => copyDialog(q)],
             ["Re-evaluate", reevaluate(q)],
             ["Delete", () => deleteList(q), "Delete the shared list only if it has no results"],
