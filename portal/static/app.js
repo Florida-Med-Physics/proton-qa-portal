@@ -1820,15 +1820,27 @@ async function renderQueueEditor(id) {
   let saveBtn = null;
   const machineValues = {};
   const machineName = (aid) => ((q.schedules || []).find((x) => String(x.id) === String(aid)) || {}).machine || "";
-  const valuesPick = (q.schedules || []).length ? select("values_for", [["", "All machines (default)"], ...q.schedules.map((x) => [x.id, `${x.machine} only`])], "",
-    { "aria-label": "Values for", onchange: async (e) => {
-      valuesFor = e.target.value;
-      if (valuesFor && !machineValues[valuesFor]) {
-        const t = await api("GET", `/api/assignments/${valuesFor}/template`);
-        machineValues[valuesFor] = Object.fromEntries(t.items.map((i) => [i.test_id, { ...(i.override || {}) }]));
-      }
-      draw();
-    } }) : null;
+  const valuesPick = (q.schedules || []).length ? el("div", { class: "row", role: "radiogroup", "aria-label": "Limits for" },
+    [["", "Default limits"], ...q.schedules.map((x) => [String(x.id), x.machine])].map(([value, label]) =>
+      el("label", { class: "check" }, el("input", { type: "radio", name: "values_for", value, checked: value === "",
+        onchange: async (e) => {
+          const controls = [...valuesPick.querySelectorAll("input")];
+          controls.forEach((control) => { control.disabled = true; });
+          try {
+            if (value && !machineValues[value]) {
+              const template = await api("GET", `/api/assignments/${value}/template`);
+              machineValues[value] = Object.fromEntries(template.items.map((i) => [i.test_id, { ...(i.override || {}) }]));
+            }
+            valuesFor = value;
+            draw();
+          } catch (err) {
+            controls.forEach((control) => { control.checked = control.value === valuesFor; });
+            toast(err.message, true);
+          } finally {
+            controls.forEach((control) => { control.disabled = false; });
+          }
+        },
+      }), label))) : null;
   const changed = Object.fromEntries(q.items.map((i) => [i.test_id, i]));
   const body = el("tbody");
   const holder = el("div");
@@ -1899,8 +1911,8 @@ async function renderQueueEditor(id) {
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
-          el("label", { class: "inline small" }, "Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
-          el("label", { class: "inline small" }, "Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
+          el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
             { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap" },
@@ -1948,7 +1960,7 @@ async function renderQueueEditor(id) {
     };
   }
   app.append(el("div", { class: "row values-for" }, el("h2", {}, "Tests"),
-    valuesPick ? el("label", { class: "inline", title: "Default values apply on every machine; a machine's own value replaces the default on that machine only" }, "Values for ", valuesPick) : null), holder);
+    valuesPick ? el("div", { title: "Default limits apply to all machines. Select a machine to specify its limits." }, valuesPick) : null), holder);
   if (editable) {
     const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => modal("New test for this list", testForm(), async (data) => {
       const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });

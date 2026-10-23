@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Template limits: label Default Warning and Default Action and use radio buttons to select per-machine limits.
+
 - Show test modification details only in the individual test editor, not as a list column.
 
 - QA list editor: automatically group related X/Y/Z measurements under one heading and show shared directions once.
