@@ -121,3 +121,21 @@ Open a QA template and select the machine under **Tests and limits for**. Use **
 New Sphinx tests added from a machine's export belong only to that machine's schedule; explicitly excluded tests are ignored. Promote a machine-only test to the shared list by selecting Default template and adding it there.
 
 HDR Flexitron starts with **Daily QA** and **Source Exchange QA**, both **as needed**. These are empty list shells: add the department's approved checks and limits before use.
+
+### Trends dashboard and file defaults
+
+Machine Trends opens with GTR1, GTR2, and GTR5 selected when available. The machine picker can select one or more machines. Shared test identities are compared together; differently identified tests are not guessed to be equivalent. Summary cards and chart panels use the selected period. Trend insights are calculated locally (documented straight-line fit, minimum five distinct dates), not an external AI or clinical assessment.
+
+Use **Import**, **Export CSV**, and the folder-settings gear. In comparison mode, **Files for** identifies the machine being imported/exported. Import reuses that machine's QA-list folder and supports Sphinx `.xls` history. Export uses the current list/period/test selection and includes both recorded and current limits/verdicts. Export directories are remembered per machine/user in this browser; Downloads is the fallback. Directory permissions may need reconnecting after a browser restart.
+
+### New QA Template List
+
+Choose an existing departmental starter (including TG-142/TG-224 and CT simulation references), a blank template, or an Excel/MyQA checklist export. Spreadsheet import supports `.xlsx`, `.xls`, and `.csv`, with worksheet choice, adjustable column mapping and a test preview before creation. Numeric limits are read only from explicit mapped cells; unsupported text criteria remain instructions. Review every imported test and limit before use. Native MyQA `.pld` parsing is not implemented; export the checklist to Excel first. Creation is unscheduled and atomic, so an invalid import does not leave a partial template.
+
+Client regression checks: `node tests/test_trend_tools.cjs`, `node tests/test_autosave.cjs`, and `node tests/test_report.cjs`.
+
+### Responsive home and machine management
+
+The home dashboard uses four modality cards (Proton, Photon, Brachy and Simulation), two columns on desktop and one on phones. Each machine lists its active Daily, Monthly and on-demand QA with a separate due/start control. Setup and Review use available desktop width and labeled rows on phones; base text is enlarged.
+
+Manage machines from Setup QA. Unused machines can be deleted along with their schedules, preserving shared templates. Machines with recorded QA cannot be deleted; retire them to remove them from active views while preserving results. Linac 1 is retired from existing browser setups and removed from new starting data at the user's request. Deleted seeded machines are not automatically recreated.

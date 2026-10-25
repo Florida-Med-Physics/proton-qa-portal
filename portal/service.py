@@ -130,6 +130,20 @@ def list_machines(db, user):
     return db.all("SELECT * FROM machines ORDER BY active DESC, name")
 
 
+def delete_machine(db, user, machine_id):
+    require(user, "configure")
+    machine = _get(db, "machines", machine_id)
+    if db.one("SELECT id FROM runs WHERE machine_id = ? LIMIT 1", (machine_id,)):
+        raise PortalError("This machine has recorded QA results. Retire it to remove it from active lists and preserve its history.")
+    with db.transaction():
+        db.run("DELETE FROM drafts WHERE assignment_id IN (SELECT id FROM assignments WHERE machine_id = ?)", (machine_id,))
+        db.run("DELETE FROM assignment_overrides WHERE assignment_id IN (SELECT id FROM assignments WHERE machine_id = ?)", (machine_id,))
+        db.run("DELETE FROM assignments WHERE machine_id = ?", (machine_id,))
+        db.run("DELETE FROM machines WHERE id = ?", (machine_id,))
+        db.audit(user["id"], "delete", "machine", machine_id, name=machine["name"])
+    return {"ok": True}
+
+
 def save_machine(db, user, data, machine_id=None):
     require(user, "configure")
     fields = (_text(data, "name", required=True), _text(data, "kind"), _text(data, "location"), _text(data, "notes"), _flag(data, "active"))
@@ -443,6 +457,41 @@ def duplicate_queue(db, user, source_id, data):
 # ---- starting data ------------------------------------------------------------------
 
 SEED_FILE = Path(__file__).with_name("seed.json")
+
+
+def template_starters(db, user):
+    require(user, "configure")
+    seed = json.loads(SEED_FILE.read_text(encoding="utf-8"))
+    return seed.get("templates", [])
+
+
+def create_template(db, user, data):
+    """Create a reviewed starter/import atomically, with list-owned checks and no schedules."""
+    require(user, "configure")
+    name = _text(data, "name", required=True)
+    if db.one("SELECT id FROM queues WHERE name = ? COLLATE NOCASE", (name,)):
+        raise PortalError("A QA template list with that name already exists.")
+    description = _text(data, "description")
+    source = _text(data, "starter")
+    if source:
+        starter = next((s for s in template_starters(db, user) if s["name"] == source), None)
+        if not starter:
+            raise PortalError("Choose an available starter template.")
+        checks = starter.get("checks", [])
+        description = starter.get("setup", "")
+    else:
+        checks = data.get("tests", [])
+    if not isinstance(checks, list) or len(checks) > 500:
+        raise PortalError("Import up to 500 tests at a time.")
+    with db.transaction():
+        qid = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, 1, 1)", (name, description))
+        for position, check in enumerate(checks):
+            if not isinstance(check, dict):
+                raise PortalError("Each imported test must have a name and type.")
+            tid = save_test(db, user, {**check, "owner_queue_id": qid})["id"]
+            db.run("INSERT INTO queue_items (queue_id, test_id, position) VALUES (?, ?, ?)", (qid, tid, position))
+        db.audit(user["id"], "create_template", "queue", qid, name=name, source=source or _text(data, "source") or "blank", tests=len(checks))
+    return {"id": qid, "tests": len(checks)}
 
 
 def seed_defaults(db, user, seed=None):
@@ -1060,7 +1109,7 @@ def review_run(db, user, run_id, data):
 def trend(db, user, machine_id, test_id):
     test = _get(db, "tests", test_id)
     points = db.all(
-        "SELECT r.id AS run_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
+        "SELECT r.id AS run_id, r.assignment_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
         "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.test_id = ? AND res.value_num IS NOT NULL "
         "ORDER BY r.qa_date, r.id", (machine_id, test_id))
     return {"test": test, "points": points}
@@ -1069,7 +1118,7 @@ def trend(db, user, machine_id, test_id):
 def machine_trends(db, user, machine_id):
     """Every numeric result on one machine, grouped by test, in one query (the Trends overview)."""
     rows = db.all(
-        "SELECT res.test_id, r.id AS run_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
+        "SELECT res.test_id, r.id AS run_id, r.assignment_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
         "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.value_num IS NOT NULL "
         "ORDER BY r.qa_date, r.id", (machine_id,))
     out = {}

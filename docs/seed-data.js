@@ -3911,10 +3911,6 @@ window.PORTAL_SEED = {
    "kind": "Linac"
   },
   {
-   "name": "Linac 1",
-   "kind": "Elekta Synergy"
-  },
-  {
    "name": "Ethos",
    "kind": "Varian Ethos"
   },

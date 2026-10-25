@@ -1,0 +1,1 @@
+SheetJS Community Edition 0.18.5 is bundled as portal/static/xlsx.full.min.js and docs/xlsx.full.min.js. Copyright SheetJS. Licensed under Apache License 2.0; see vendor/SheetJS-LICENSE.txt. Source: https://github.com/SheetJS/sheetjs/tree/v0.18.5

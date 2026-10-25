@@ -365,7 +365,7 @@
   }
   function readRows(bytes) {
     if (!bytes.length) throw new Error("The file is empty.");
-    if (!window.XLSX) throw new Error("The spreadsheet reader did not load. Check the internet connection and reload.");
+    if (!window.XLSX) throw new Error("The spreadsheet reader did not load. Reload the portal.");
     let wb;
     try {
       wb = XLSX.read(bytes, { type: "array" });
@@ -645,6 +645,25 @@
     audit(user.id, "delete", "queue", q.id, { name: q.name });
     return { ok: true };
   }
+  function createTemplate(user, data) {
+    require(user, "configure");
+    const name = required(data, "name");
+    if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase())) throw new Error("A QA template list with that name already exists.");
+    const starter = data.starter ? ((window.PORTAL_SEED || {}).templates || []).find((t) => t.name === data.starter) : null;
+    if (data.starter && !starter) throw new Error("Choose an available starter template.");
+    const checks = starter ? starter.checks : data.tests || [];
+    if (!Array.isArray(checks) || checks.length > 500) throw new Error("Import up to 500 tests at a time.");
+    const before = JSON.parse(JSON.stringify(S));
+    try {
+      const id = insert("queues", { name, description: starter ? starter.setup || "" : data.description || "", active: 1, is_template: 1, template_id: null });
+      checks.forEach((check, position) => {
+        const tid = saveTest(user, { ...check, owner_queue_id: id }).id;
+        insert("queue_items", { queue_id: id, test_id: tid, position, expected: null, warn: null, fail: null, tol_mode: null });
+      });
+      save(); audit(user.id, "create_template", "queue", id, { name, source: data.starter || data.source || "blank", tests: checks.length });
+      return { id, tests: checks.length };
+    } catch (err) { S = before; save(); throw err; }
+  }
   function duplicateQueue(user, sourceId, data) {
     require(user, "configure");
     const source = getQueue(sourceId);
@@ -667,6 +686,16 @@
 
   // ---- machines / assignments -------------------------------------------------
 
+  function deleteMachine(user, machineId) {
+    require(user, "configure");
+    const m=get("machines",machineId,"Machine");
+    if(S.runs.some((r)=>r.machine_id===m.id))throw new Error("This machine has recorded QA results. Retire it to remove it from active lists and preserve its history.");
+    const ids=new Set(S.assignments.filter((a)=>a.machine_id===m.id).map((a)=>a.id));
+    S.overrides=S.overrides.filter((o)=>!ids.has(o.assignment_id));S.drafts=(S.drafts||[]).filter((d)=>!ids.has(d.assignment_id));
+    S.assignments=S.assignments.filter((a)=>a.machine_id!==m.id);S.machines=S.machines.filter((x)=>x.id!==m.id);
+    S.deletedSeedMachines=[...new Set([...(S.deletedSeedMachines||[]),m.name])];
+    save();audit(user.id,"delete","machine",m.id,{name:m.name});return {ok:true};
+  }
   function saveMachine(user, data, machineId) {
     require(user, "configure");
     const name = required(data, "name");
@@ -916,7 +945,7 @@
     const test = get("tests", testId, "Check");
     const runs = Object.fromEntries(S.runs.filter((r) => r.machine_id === Number(machineId)).map((r) => [r.id, r]));
     const points = S.results.filter((x) => x.test_id === test.id && runs[x.run_id] && x.value_num !== null)
-      .map((x) => ({ run_id: x.run_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected, warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status }))
+      .map((x) => ({ run_id: x.run_id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected, warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status }))
       .sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);
     return { test, points };
   }
@@ -926,7 +955,7 @@
     const out = {};
     for (const x of S.results) {
       if (!runs[x.run_id] || x.value_num === null) continue;
-      (out[x.test_id] = out[x.test_id] || []).push({ run_id: x.run_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected,
+      (out[x.test_id] = out[x.test_id] || []).push({ run_id: x.run_id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected,
         warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status });
     }
     for (const k in out) out[k].sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);
@@ -1068,6 +1097,11 @@
     renameSphinxTests();
     refreshTemplates();
     addSeedMachines();
+    if (!S.retiredLinac1) {
+      const old=S.machines.find((m)=>m.name==="Linac 1" || m.name==="Linac 1 Synergy");
+      if(old){old.active=0;audit(null,"retire","machine",old.id,{name:old.name,reason:"Removed from active list at user request"});}
+      S.retiredLinac1=true;save();
+    }
     spellOutNames();
     reassignSphinx();
     retireSplitEyelineLists();
@@ -1267,6 +1301,7 @@
     const renamed = S.machines.find((x) => x.name === "Linac 1 Synergy");
     if (renamed) { renamed.name = "Linac 1"; added++; }
     for (const m of (window.PORTAL_SEED || {}).machines || []) {
+      if ((S.deletedSeedMachines || []).includes(m.name)) continue;
       if (S.machines.some((x) => x.name === m.name)) continue;
       if (m.name === "Big Bore CT (7064)" && S.machines.some((x) => x.name === "CT Sim")) continue;
       insert("machines", { name: m.name, kind: m.kind || "", location: m.location || "", notes: m.notes || "", active: 1, created_at: now() });
@@ -1423,6 +1458,7 @@
   });
   route("GET", "/api/machines", () => S.machines.slice().sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name)));
   route("POST", "/api/machines", (u, m, body) => saveMachine(u, body));
+  route("POST", "/api/machines/(\\d+)/delete", (u,m)=>deleteMachine(u,Number(m[1])));
   route("PUT", "/api/machines/(\\d+)", (u, m, body) => saveMachine(u, body, Number(m[1])));
   route("GET", "/api/machines/(\\d+)/assignments", (u, m) => listAssignments(Number(m[1])));
   route("GET", "/api/tests", () => S.tests.map((t) => ({ ...t, owner_name: t.owner_queue_id ? (byId("queues", t.owner_queue_id) || {}).name || null : null,
@@ -1432,6 +1468,8 @@
   route("POST", "/api/tests", (u, m, body) => saveTest(u, body));
   route("PUT", "/api/tests/(\\d+)", (u, m, body) => saveTest(u, body, Number(m[1])));
   route("GET", "/api/queues", () => listQueues());
+  route("GET", "/api/template-starters", (u) => { require(u, "configure"); return (window.PORTAL_SEED || {}).templates || []; });
+  route("POST", "/api/templates", (u, m, body) => createTemplate(u, body));
   route("GET", "/api/queues/(\\d+)", (u, m) => getQueue(Number(m[1])));
   route("POST", "/api/queues", (u, m, body) => saveQueue(u, body));
   route("PUT", "/api/queues/(\\d+)", (u, m, body) => saveQueue(u, body, Number(m[1])));

@@ -65,6 +65,11 @@ def new_machine(db, user, m, body, q):
     return service.save_machine(db, user, body)
 
 
+@route("POST", r"/api/machines/(\d+)/delete")
+def delete_machine(db, user, m, body, q):
+    return service.delete_machine(db, user, int(m[1]))
+
+
 @route("PUT", r"/api/machines/(\d+)")
 def edit_machine(db, user, m, body, q):
     return service.save_machine(db, user, body, int(m[1]))
@@ -93,6 +98,16 @@ def edit_test(db, user, m, body, q):
 @route("GET", "/api/queues")
 def queues(db, user, m, body, q):
     return service.list_queues(db, user)
+
+
+@route("GET", "/api/template-starters")
+def template_starters(db, user, m, body, q):
+    return service.template_starters(db, user)
+
+
+@route("POST", "/api/templates")
+def create_template(db, user, m, body, q):
+    return service.create_template(db, user, body)
 
 
 @route("GET", r"/api/queues/(\d+)")

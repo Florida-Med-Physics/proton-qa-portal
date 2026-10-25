@@ -198,6 +198,7 @@ function modal(title, body, onSave, saveLabel) {
 }
 
 function page(title, subtitle, actions) {
+  app.dataset.page = location.hash.split("?")[0].replace(/^#\//, "") || "home";
   app.replaceChildren(el("div", { class: "page-head" },
     el("div", {}, el("h1", {}, title), subtitle ? el("div", { class: "muted" }, subtitle) : null),
     el("div", { class: "row" }, actions || [])));
@@ -345,53 +346,38 @@ function homeIcon() {
 const FREQ_ORDER = { daily: 0, weekly: 1, monthly: 2, quarterly: 3, semiannual: 4, annual: 5, custom: 6, asneeded: 7 };
 
 async function renderHome() {
-  const data = await api("GET", "/api/dashboard");
-  page("Dashboard", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
-  // Pass / warning / action counts of each machine's most recent run, for the ring beside its last result.
-  const lastCounts = {};
-  await Promise.all(data.machines.map(async (m) => {
-    const lasts = m.queues.filter((q) => q.last_run).sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""));
-    if (!lasts.length) return;
-    try {
-      const run = await api("GET", `/api/runs/${lasts[0].last_run.id}`);
-      const c = { pass: 0, warn: 0, fail: 0 };
-      for (const r of run.results || []) if (r.status in c) c[r.status]++;
-      lastCounts[m.id] = c;
-    } catch (err) { console.error(err); }
-  }));
-  const queues = data.machines.flatMap((m) => m.queues);
-  const todo = queues.filter((q) => q.state === "due" || q.state === "overdue");
-  const overdue = queues.filter((q) => q.state === "overdue").length;
-  const failing = data.machines.filter((m) => m.queues.some((q) => q.last_run && q.last_run.overall === "fail"));
-  const toReview = data.machines.reduce((n, m) => n + m.pending_review, 0);
-  const stat = (label, value, cls, href) => el("a", { class: `home-stat ${cls || ""}`, href }, el("div", { class: "home-stat-value" }, String(value)), el("div", { class: "home-stat-label" }, label));
-  app.append(el("div", { class: "home-stats" },
-    stat("QA lists to do today", todo.length, todo.length ? "due" : "pass", "#/perform-qa"),
-    stat("Overdue", overdue, overdue ? "fail" : "pass", "#/perform-qa"),
-    stat("Machines whose last result reached Action", failing.length, failing.length ? "fail" : "pass", "#/trends"),
-    can("review") ? stat("Waiting for review", toReview, toReview ? "due" : "pass", "#/runs?review_status=pending") : null));
-  for (const modality of MODALITIES) {
-    const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
-    if (!machines.length) continue;
-    const rows = machines.map((m) => {
-      // The one list people start every day: the most frequent (Daily); other lists stay on Perform QA.
-      const main = [...m.queues].sort((p, q) => (FREQ_ORDER[p.frequency] ?? 9) - (FREQ_ORDER[q.frequency] ?? 9) || p.queue_name.localeCompare(q.queue_name))[0];
-      const worst = main ? (main.state === "overdue" ? "overdue" : main.state === "due" ? "due" : "done") : "done";
-      const lasts = m.queues.filter((q) => q.last_run);
-      const lastRun = lasts.sort((a, b) => (b.last_run.qa_date || "").localeCompare(a.last_run.qa_date || ""))[0];
-      return el("tr", { class: "clickable", onclick: () => (location.hash = `#/trends?machine_id=${m.id}`) },
-        el("td", {}, el("strong", {}, m.name)),
-        el("td", {}, main ? el("div", { class: "small list-line" },
-          can("perform") ? el("a", { class: "start-dot", href: `#/perform/${main.id}`, title: `Start ${main.queue_name}`, "aria-label": `Start ${main.queue_name}`, onclick: (e) => e.stopPropagation() }, "▶") : null,
-          main.queue_name) : el("span", { class: "muted small" }, "None")),
-        el("td", {}, main ? chip(worst === "done" ? "pass" : worst, worst === "overdue" ? "Overdue" : dueIn(main.next_due, main.frequency)) : el("span", { class: "muted small" }, "Nothing scheduled")),
-        el("td", {}, lastRun ? el("div", { class: "last-result-row" }, lastCounts[m.id] ? miniRing(lastCounts[m.id]) : null, el("span", { class: "last-result-text" }, chip(lastRun.last_run.overall), " ", el("span", { class: "small" }, `${lastRun.queue_name} · ${shortDate(lastRun.last_run.qa_date)}`))) : el("span", { class: "muted small" }, "No runs yet")),
-        el("td", { class: "num" }, m.pending_review ? el("a", { href: `#/runs?machine_id=${m.id}&review_status=pending` }, String(m.pending_review)) : el("span", { class: "muted" }, "0")),
-        el("td", { class: "center" }, el("a", { class: "icon-link", href: `#/trends?machine_id=${m.id}`, title: `${m.name} trends`, "aria-label": `${m.name} trends`, onclick: (e) => e.stopPropagation() }, trendIcon(22))));
-    });
-    app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["Machine", "13%"], ["Daily QA", "22%"], ["Due Date", "22%"], ["Last result", "25%"], ["#To review", "9%"], ["Trends", "9%"]], rows));
+  const data = await api('GET', '/api/dashboard');
+  page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
+  const pending = data.machines.reduce((n,m) => n + m.pending_review,0);
+  const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
+  app.append(el('div',{class:'row home-brief'},el('a',{href:'#/perform-qa',class:'small'},`${due} QA ${due===1?'list':'lists'} to do`),
+    can('review') && pending ? el('a',{href:'#/runs?review_status=pending',class:'small'},`${pending} waiting for review`) : null));
+  const grid=el('div',{class:'home-modality-grid'});
+  for(const modality of MODALITIES){
+    const machines=data.machines.filter((m)=>modalityOf(m.kind)===modality).sort((a,b)=>kindRank(a.kind)-kindRank(b.kind)||a.name.localeCompare(b.name));
+    const title=modality==='Brachytherapy'?'Brachy':modality;
+    const body=el('div',{class:'home-card-machines'});
+    for(const m of machines){
+      const schedules=[...m.queues].sort((a,b)=>(FREQ_ORDER[a.frequency]??9)-(FREQ_ORDER[b.frequency]??9)||a.queue_name.localeCompare(b.queue_name));
+      const last=m.queues.filter((q)=>q.last_run).sort((a,b)=>b.last_run.qa_date.localeCompare(a.last_run.qa_date))[0]?.last_run;
+      const scheduleRows=schedules.map((a)=>{
+        const status=a.state==='overdue'?'Overdue':a.state==='ready'?'On demand':a.state==='done'?'Done today':dueIn(a.next_due,a.frequency);
+        const label=a.frequency==='daily'?'Daily QA':a.frequency==='monthly'?'Monthly QA':a.frequency==='asneeded'?a.queue_name.replace(/\s*[–-]\s*HDR Flexitron$/i,''):(FREQ_LABEL[a.frequency]||a.queue_name);
+        return el('div',{class:'home-qa-line'},
+          can('perform')?el('a',{class:'start-dot home-go',href:`#/perform/${a.id}`,title:`Start ${label} for ${m.name}`,'aria-label':`Start ${label} for ${m.name}`},'▶'):null,
+          el('div',{class:'home-qa-info'},el('span',{class:'home-qa-label',title:a.queue_name},label),el('span',{class:`small ${status==='Overdue'?'home-overdue':'muted'}`},status)));
+      });
+      body.append(el('div',{class:'home-machine-block'},
+        el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
+          el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
+            el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
+        scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
+    }
+    if(!machines.length)body.append(el('p',{class:'muted small'},'No active machines.'));
+    grid.append(el('section',{class:`card home-modality-card ${modality.toLowerCase()}`,'aria-label':`${title} machines`},
+      el('div',{class:'home-card-heading'},el('h2',{},title),el('span',{class:'muted small'},`${machines.length} ${machines.length===1?'machine':'machines'}`)),body));
   }
+  app.append(grid);
 }
 
 // Dark mode on/off, remembered on this computer (same control as the TrueBeam Service Log).
@@ -526,6 +512,9 @@ const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RA
 
 // A table with fixed column widths, so the Proton and Photon tables line up at the same width.
 function fixedTable(columns, rows, emptyText) {
+  for (const row of rows) {
+    if (row.children.length === columns.length) [...row.children].forEach((cell, i) => { cell.dataset.label = columns[i][0].replace(/^#/, ""); });
+  }
   if (!rows.length) return el("div", { class: "card empty" }, emptyText || "Nothing here yet.");
   return el("div", { class: "table-wrap fixed-wrap" }, sortable(el("table", { class: "fixed-table" },
     el("colgroup", {}, columns.map(([, width]) => { const col = el("col"); if (width) col.style.width = width; return col; })),
@@ -641,7 +630,7 @@ This cannot be undone. Lists with recorded results cannot be deleted; archive th
 async function renderSetup() {
   const editable = can("configure");
   page("Setup QA", "The QA lists and the tests in them. Open a list to edit its tests, order and limits.",
-    editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list"),
+    editable ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA Template List"),
       el("button", { onclick: () => modal("Add machine", machineForm(), async (data) => {
         const machine = await api("POST", "/api/machines", data);
         toast("Machine added. Choose the QA lists it runs.");
@@ -893,6 +882,16 @@ async function databaseBanner() {
 // Machines and their scheduled queues
 // ---------------------------------------------------------------------------
 
+async function deleteMachine(machine) {
+  if (!confirm(`Delete ${machine.name} and its schedules? Shared QA templates stay. Machines with recorded results must be retired instead.`)) return;
+  try { await api("POST", `/api/machines/${machine.id}/delete`, {}); toast("Machine deleted"); location.hash = "#/machines"; route(); }
+  catch (err) { toast(err.message, true); }
+}
+async function retireMachine(machine) {
+  try { await api("PUT", `/api/machines/${machine.id}`, { ...machine, active: !machine.active }); toast(machine.active ? "Machine retired; history preserved" : "Machine restored"); route(); }
+  catch (err) { toast(err.message, true); }
+}
+
 function machineForm(machine) {
   machine = machine || { active: 1 };
   return el("div", { class: "form-grid" },
@@ -953,7 +952,9 @@ async function renderMachines() {
             await api("PUT", `/api/machines/${machine.id}`, data);
             toast("Machine saved");
             route();
-          }) }, "Edit machine")) : null));
+          }) }, "Edit machine"),
+          el("button", { class: "small", onclick: () => retireMachine(machine) }, machine.active ? "Retire" : "Restore"),
+          el("button", { class: "small danger", onclick: () => deleteMachine(machine) }, "Delete")) : null));
       const lines = mine.length ? mine.map((a) => {
         const q = queues[a.queue_id] || {};
         return el("tr", { class: a.active ? "" : "muted" },
@@ -1113,6 +1114,8 @@ async function renderMachine(id) {
       toast("Machine saved");
       route();
     }) }, "Edit"));
+    actions.push(el("button", { onclick: () => retireMachine(machine) }, machine.active ? "Retire machine" : "Restore machine"),
+      el("button", { class: "danger", onclick: () => deleteMachine(machine) }, "Delete machine"));
     actions.push(el("button", { class: "primary", onclick: async () => {
       const all = await api("GET", "/api/queues");
       const offered = all.filter((q) => q.active && !assignments.some((a) => a.queue_id === q.id));
@@ -1889,7 +1892,7 @@ function stickyHead() {
 async function renderQueues() {
   const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
   page("QA lists", "A template is the master copy. Instantiate it on each machine; each instance owns its tests and limits.",
-    can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA list")] : []);
+    can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA Template List")] : []);
   const templates = queues.filter((q) => q.is_template);
   const lists = queues.filter((q) => !q.is_template);
   const row = (q) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/queues/${q.id}`) },
@@ -1905,13 +1908,163 @@ async function renderQueues() {
   app.append(table(["QA list", "#Tests", "Scheduled on", "", ""], lists.map(row), "No machine lists yet. Duplicate a template to make one."));
 }
 
+const TEMPLATE_IMPORT_COLUMNS = {
+  name: ['test', 'test name', 'qa test', 'qa check', 'check', 'parameter', 'name', 'metric'],
+  category: ['category', 'section', 'group'], unit: ['unit', 'units'],
+  expected: ['baseline', 'expected', 'expected/ref', 'reference', 'reference value', 'nominal'],
+  warn: ['warning', 'warn', 'warning limit', 'default warning'],
+  fail: ['action', 'fail', 'error', 'action limit', 'default action'],
+  description: ['instructions', 'directions', 'description', 'procedure'],
+  type: ['type', 'test type', 'result type'], tol_mode: ['mode', 'limit mode', 'limits are'],
+};
+function templateImportNumber(value) {
+  if (value === '' || value == null) return null;
+  const text = String(value).trim().replace(/^(?:±|\+\/-)\s*/, '').replace(/%$/, '').trim();
+  return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[-+]?\d+)?$/i.test(text) && Number.isFinite(Number(text)) ? Number(text) : null;
+}
+function templateImportMapping(rows) {
+  let best = { row: 0, map: {}, score: -1 };
+  rows.slice(0, 50).forEach((row, index) => {
+    const map = {};
+    row.forEach((cell, col) => {
+      const text = String(cell || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      for (const [key, names] of Object.entries(TEMPLATE_IMPORT_COLUMNS)) if (names.includes(text) && map[key] === undefined) map[key] = col;
+    });
+    const score = (map.name !== undefined ? 10 : 0) + Object.keys(map).length;
+    if (score > best.score) best = { row: index, map, score };
+  });
+  return best;
+}
+function templateTestsFromRows(rows, headerRow, map) {
+  if (map.name === undefined || map.name === '') return [];
+  const tests = [];
+  for (const row of rows.slice(headerRow + 1)) {
+    const get = (key) => map[key] === undefined || map[key] === '' ? '' : String(row[Number(map[key])] ?? '').trim();
+    const name = get('name'); if (!name) continue;
+    const limits = { expected: templateImportNumber(get('expected')), warn: templateImportNumber(get('warn')), fail: templateImportNumber(get('fail')) };
+    const rawType = get('type').toLowerCase();
+    const types = { numeric: 'numeric', number: 'numeric', boolean: 'boolean', 'pass/fail': 'boolean', 'yes/no': 'boolean', status: 'status', 'pass/warning/action': 'status', text: 'text' };
+    const type = types[rawType] || (Object.values(limits).some((n) => n !== null) ? 'numeric' : 'text');
+    let description = get('description');
+    for (const key of ['expected','warn','fail']) if (get(key) && limits[key] === null) description += `\nSource ${key}: ${get(key)}`;
+    const unit = get('unit'), mode = get('tol_mode').toLowerCase();
+    const tol_mode = mode === 'percent' || mode === '%' || (!mode && unit !== '%' && /%/.test(get('warn') + get('fail'))) ? 'percent' : 'absolute';
+    tests.push({ name, category: get('category'), type, unit, description: description.trim(), ...limits, tol_mode, included: true });
+  }
+  return tests;
+}
+function templateTestsFromNumberedRows(rows) {
+  const out = []; let current = null, header = null;
+  const finish = () => {
+    if (!current || current.section === 0) return;
+    if (!current.tests.length) out.push({ name: current.name, category: current.category, type: current.functional ? 'boolean' : 'text', description: current.notes.join('\n'), included: true });
+    else out.push(...current.tests);
+  };
+  for (const row of rows) {
+    const first = String(row[0] || '').trim(), title = /^(\d+)\.(\d{2})[:.]?\s+(.+)$/.exec(first);
+    if (title) { finish(); current = { section: Number(title[1]), name: title[3], category: '', notes: [`Template ${title[1]}.${title[2]}.`], tests: [], functional: false }; header = null; continue; }
+    if (!current || !first) continue;
+    const found = templateImportMapping([row]);
+    if (found.map.name !== undefined && (found.map.expected !== undefined || found.map.warn !== undefined || found.map.fail !== undefined)) { header = found.map; continue; }
+    if (header) {
+      const parsed = templateTestsFromRows([[], row], 0, header)[0];
+      if (parsed) current.tests.push({ ...parsed, name: `${current.name} – ${parsed.name}`, category: current.category, description: current.notes.join('\n') });
+    } else if (/^(functional|pass\s*\/\s*fail|yes\s*\/\s*no)$/i.test(first)) current.functional = true;
+    else if (/acceptance criteria/i.test(first)) continue;
+    else if (!current.category) current.category = first;
+    else current.notes.push(first);
+  }
+  finish(); return out;
+}
+async function renderNewTemplate() {
+  if (!can('configure')) throw new Error('Only a physicist or admin can create templates.');
+  const starters = await api('GET', '/api/template-starters');
+  page('New QA Template List', 'Start with a departmental template, import a checklist, or build your own.');
+  let checks = [], workbook = null, fileName = '', mapping = {}, headerRow = 0, busy = false;
+  const name = el('input', { name: 'template_name', required: true, placeholder: 'e.g. Monthly QA – Proton gantry', 'aria-label': 'Template name' });
+  const error = el('p', { class: 'error', role: 'alert' });
+  const preview = el('div'), importedControls = el('div'), sourceInfo = el('p', { class: 'muted small' });
+  const createButton = el('button', { class: 'primary', type: 'button', disabled: true, onclick: async () => {
+    if (busy) return;
+    busy = true; createButton.disabled = true; error.textContent = '';
+    try {
+      if (!name.value.trim()) throw new Error('Give the template a name.');
+      const selected = checks.filter((t) => t.included);
+      if (source.value === 'import' && !selected.length) throw new Error('Choose a workbook and include at least one test.');
+      const data = { name: name.value.trim(), source: fileName || 'blank', tests: selected.map(({ included, ...test }) => test) };
+      if (source.value.startsWith('starter:')) data.starter = starters[Number(source.value.slice(8))].name;
+      const result = await api('POST', '/api/templates', data);
+      toast(`Template created with ${result.tests} tests`); location.hash = `#/queues/${result.id}`;
+    } catch (err) { error.textContent = err.message; }
+    finally { busy = false; createButton.disabled = !source.value; }
+  } }, 'Create template');
+  const drawPreview = () => {
+    if (!checks.length) { preview.replaceChildren(el('p', { class: 'muted small' }, source.value === 'blank' ? 'Create the template, then add your tests.' : 'No tests detected. Choose another sheet or adjust the Test column.')); return; }
+    const count = el('p', { class: 'muted small', role: 'status' }, `${checks.filter((t) => t.included).length} of ${checks.length} tests included. Review before creating; limits are never filled by guesswork.`);
+    const rows = checks.map((t) => el('tr', {},
+      el('td', {}, el('input', { type: 'checkbox', checked: t.included, disabled: source.value !== 'import', 'aria-label': `Include ${t.name}`, onchange: (e) => { t.included = e.target.checked; count.textContent = `${checks.filter((x) => x.included).length} of ${checks.length} tests included.`; } })),
+      el('td', {}, t.name, t.category ? el('div', { class: 'muted small' }, t.category) : null),
+      el('td', {}, source.value === 'import' ? select('', [['numeric','Numeric'],['boolean','Yes / No'],['status','Pass / Warning / Action'],['text','Text']], t.type, { 'aria-label': `Type for ${t.name}`, onchange: (e) => { t.type = e.target.value; } }) : TYPE_LABELS[t.type]),
+      el('td', {}, t.unit || '—'), el('td', {}, t.expected ?? '—'), el('td', {}, t.warn ?? '—'), el('td', {}, t.fail ?? '—')));
+    preview.replaceChildren(count, table(['Include', 'Test', 'Type', 'Unit', 'Baseline', 'Default Warning', 'Default Action'], rows));
+  };
+  let sheetRows = [];
+  const refreshImport = () => { checks = templateTestsFromRows(sheetRows, headerRow, mapping).slice(0, 500); drawPreview(); };
+  const sheet = el('select', { 'aria-label': 'Worksheet', onchange: () => loadSheet() });
+  const loadSheet = () => {
+    sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheet.value], { header: 1, raw: false, defval: '' });
+    const detected = templateImportMapping(sheetRows);
+    headerRow = detected.row; mapping = detected.map;
+    const numbered = sheetRows.some((r) => /^\d+\.\d{2}[:.]?\s+/.test(String(r[0] || ''))) ? templateTestsFromNumberedRows(sheetRows) : [];
+    const columns = Math.max(0, ...sheetRows.slice(0, 50).map((r) => r.length));
+    const mapArea = el('details', {}, el('summary', {}, 'Adjust columns'));
+    const updateMapping = () => {
+      const labels = sheetRows[headerRow] || [];
+      const fields = Object.keys(TEMPLATE_IMPORT_COLUMNS).map((key) => field(key === 'name' ? 'Test column' : key === 'fail' ? 'Action column' : key === 'warn' ? 'Warning column' : key,
+        select('', [['','Not used'], ...Array.from({ length: columns }, (_, i) => [String(i), String(labels[i] || XLSX.utils.encode_col(i))])], mapping[key] === undefined ? '' : String(mapping[key]), { 'aria-label': `Import ${key} column`, onchange: (e) => { if (e.target.value === '') delete mapping[key]; else mapping[key] = Number(e.target.value); refreshImport(); } })));
+      mapArea.replaceChildren(el('summary', {}, 'Adjust columns'), field('Header row', el('input', { type: 'number', min: 1, max: sheetRows.length, value: headerRow + 1, 'aria-label': 'Header row', onchange: (e) => { headerRow = Math.max(0, Number(e.target.value) - 1); mapping = templateImportMapping([sheetRows[headerRow] || []]).map; updateMapping(); refreshImport(); } })), el('div', { class: 'form-grid' }, fields));
+    };
+    updateMapping(); importedControls.replaceChildren(field('Worksheet', sheet), mapArea);
+    checks = numbered.length ? numbered.slice(0, 500) : templateTestsFromRows(sheetRows, headerRow, mapping).slice(0, 500);
+    sourceInfo.textContent = 'Review detected tests below. Text criteria are kept as instructions; a number is used as a limit only when its column explicitly identifies it.';
+    drawPreview();
+  };
+  const file = el('input', { type: 'file', accept: '.xlsx,.xls,.csv', 'aria-label': 'Excel or MyQA checklist', onchange: async () => {
+    if (!file.files.length) return;
+    error.textContent = '';
+    try {
+      if (file.files[0].size > 15 * 1024 * 1024) throw new Error('Choose a workbook smaller than 15 MB.');
+      if (!window.XLSX) throw new Error('Spreadsheet reader is unavailable. Reload the page.');
+      fileName = file.files[0].name; workbook = XLSX.read(await file.files[0].arrayBuffer(), { type: 'array' });
+      sheet.replaceChildren(...workbook.SheetNames.map((s) => el('option', { value: s }, s)));
+      sheet.value = workbook.SheetNames.includes('WithFullDetails') ? 'WithFullDetails' : workbook.SheetNames[0];
+      if (!name.value.trim()) name.value = fileName.replace(/\.[^.]+$/, '');
+      loadSheet();
+    } catch (err) { workbook = null; checks = []; preview.replaceChildren(); error.textContent = `Could not read this checklist: ${err.message}`; }
+  } });
+  const upload = el('div', { hidden: true }, field('Excel / MyQA checklist', file), el('p', { class: 'muted small' }, 'Supports .xlsx, .xls and .csv. For MyQA PLD templates, use an Excel checklist export.'), importedControls);
+  const source = select('template_source', [['','Choose a starting point…'],['blank','Blank template'], ...starters.map((t,i) => [`starter:${i}`, /big.?bore|ct sim/i.test(t.name) ? `CT simulation / TG-66 — ${t.name}` : t.name]), ['import','Import Excel / MyQA checklist…']], '', { 'aria-label': 'Template starting point', onchange: () => {
+    error.textContent = ''; checks = []; upload.hidden = source.value !== 'import'; createButton.disabled = !source.value;
+    if (source.value.startsWith('starter:')) {
+      const starter = starters[Number(source.value.slice(8))];
+      checks = starter.checks.map((t) => ({ ...t, included: true }));
+      if (!name.value.trim()) name.value = `${starter.name} (new)`;
+      sourceInfo.textContent = 'Existing departmental starter: review its tests and limits for your procedure before use.';
+    } else sourceInfo.textContent = source.value === 'blank' ? 'A blank shared template. Add tests after creating it.' : '';
+    preview.replaceChildren(); if (source.value !== 'import') drawPreview(); else if (workbook) loadSheet();
+  } });
+  app.append(el('div', { class: 'card form-grid' }, field('Template name', name, 'wide'), field('Start from', source, 'wide')), upload, sourceInfo, preview, error,
+    el('div', { class: 'row template-save-bar' }, el('a', { class: 'button', href: '#/setup' }, 'Cancel'), createButton));
+}
+
 async function renderQueueEditor(id) {
   const isNew = id === "new";
+  if (isNew) return renderNewTemplate();
   const [tests, queue, machines] = await Promise.all([api("GET", "/api/tests"), isNew ? null : api("GET", `/api/queues/${id}`), api("GET", "/api/machines")]);
   const q = queue || { name: "", description: "", active: 1, is_template: 0, items: [] };
   const editable = can("configure");
   const where = (q.schedules || []).map((s) => `${s.machine}${s.active ? "" : " (inactive)"}`).join(", ");
-  page(isNew ? "New QA list" : q.name, isNew ? "" : where ? `Scheduled on ${where}. This is the list each of them performs and trends; an edit here applies to all of them.`
+  page(isNew ? "New QA Template List" : q.name, isNew ? "" : where ? `Scheduled on ${where}. This is the list each of them performs and trends; an edit here applies to all of them.`
     : "Not scheduled on a machine yet.",
     !isNew && editable ? [el("button", { onclick: () => scheduleDialog(q, machines, null) }, "Schedule on machines"), el("button", { onclick: () => copyDialog(q) }, "Duplicate")] : []);
   stickyHead();
@@ -2834,16 +2987,17 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
   app.append(loading);
   const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
   const templates = await Promise.all(assignments.filter((a) => a.active && (!listId || String(a.id) === String(listId))).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
-  const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric"));
+  const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric").map((i) => ({ ...i, assignment_id: t.assignment.id })));
   const all = numeric.length ? await api("GET", `/api/machines/${machineId}/trends`) : {};
   loading.remove();
-  const withData = numeric.map((i) => ({ ...i, points: judgedByList(i, filterRange(all[i.test_id] || [], range)) })).filter((i) => i.points.length);
+  const pointsFor = (item, period) => filterRange(all[item.test_id] || [], period).filter((p) => String(p.assignment_id) === String(item.assignment_id));
+  const withData = numeric.map((i) => ({ ...i, points: judgedByList(i, pointsFor(i, range)) })).filter((i) => i.points.length);
   if (!withData.length) {
     app.append(el("div", { class: "card empty" }, numeric.length ? "No results in this period." : `${machine.name} has no measured tests scheduled.`));
     return;
   }
-  const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of judgedByList(it, filterRange(all[it.test_id] || [], "30"))) if (pt.status in c) c[pt.status]++; return c; };
-  const avg30 = (it) => { const v = filterRange(all[it.test_id] || [], "30").map((pt) => pt.value); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of judgedByList(it, pointsFor(it, "30"))) if (pt.status in c) c[pt.status]++; return c; };
+  const avg30 = (it) => { const v = pointsFor(it, "30").map((pt) => pt.value); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const groups = axisGroups(withData);
   const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
   const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
@@ -2851,9 +3005,21 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
   const statusChip = (status, label) => el("button", { type: "button", class: `chip ${status} chip-filter`, title: `Show only the tests ${status === "fail" ? "at action level" : "outside tolerance"}`,
     onclick: () => { onlyStatus = onlyStatus === status ? null : status; app.querySelectorAll(".chip-filter").forEach((c) => c.classList.toggle("on", c.dataset.status === onlyStatus)); applyFilters(); },
     "data-status": status }, label);
-  app.append(el("p", { class: "lead" }, `${withData.length} tests on ${groups.length} charts. `,
-    failing ? statusChip("fail", `${failing} at action level`) : "", " ", warning ? statusChip("warn", `${warning} outside tolerance`) : "",
-    !failing && !warning ? el("span", { class: "chip pass" }, "All passing") : ""));
+  const latestDate = withData.flatMap((i) => i.points).reduce((date, p) => p.qa_date > date ? p.qa_date : date, "");
+  const metric = (label, value) => el("div", { class: "trend-metric" }, el("span", { class: "muted small" }, label), value);
+  app.append(el("div", { class: "trend-dashboard-summary", "aria-label": "Machine trends summary" },
+    metric("Tracked tests", el("strong", {}, String(withData.length))),
+    metric("Charts at action", failing ? statusChip("fail", `${failing} at action level`) : el("strong", {}, "0")),
+    metric("Charts at warning", warning ? statusChip("warn", `${warning} at warning level`) : el("strong", {}, "0")),
+    metric("Latest QA", el("strong", {}, latestDate ? shortDate(latestDate) : "—"))));
+  app.append(trendInsightsCard(withData.map((i) => ({ ...i, machine_name: machine.name }))));
+  const highlights = groups.slice().sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]).slice(0, 3);
+  app.append(el("h2", { class: "section-head" }, "Recent trends"), el("div", { class: "trend-highlight-grid" }, highlights.map((g) => {
+    const unit = g.members[0].unit === "unitless" ? "" : g.members[0].unit || "";
+    const href = `#/trends?machine_id=${machineId}${listId ? `&list=${listId}` : ""}&test_id=${g.members.map((m) => m.test_id).join(",")}&range=${range}`;
+    return el("article", { class: "card trend-highlight" }, el("div", { class: "row" }, el("h3", {}, g.base), el("a", { class: "small", href }, "Open chart")),
+      seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true, yLabel: yAxisLabel(g.members.map((m) => m.name)) }));
+  })), el("h2", { class: "section-head" }, "All measurements"));
   const search = el("input", { type: "search", class: "filter-box", placeholder: "Search tests (e.g. spot 3 sigma)", "aria-label": "Search tests" });
   const applyFilters = () => {
     const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
@@ -3082,9 +3248,269 @@ async function renderSearch() {
   if (!app.querySelector("h2")) app.append(el("p", { class: "muted" }, "Nothing matches."));
 }
 
+// Folder handles stay in this browser; they are never put in shared QA backups.
+const trendExportFolders = {
+  async database() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('qa-trend-export-folders', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('folders');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+  key(machineId) { return `${state.user.id}:${machineId}`; },
+  async get(machineId) {
+    const db = await this.database();
+    try { return await new Promise((resolve, reject) => { const request = db.transaction('folders').objectStore('folders').get(this.key(machineId)); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.error); }); }
+    finally { db.close(); }
+  },
+  async set(machineId, handle) {
+    const db = await this.database();
+    try { await new Promise((resolve, reject) => { const tx = db.transaction('folders', 'readwrite'); const store = tx.objectStore('folders'); if (handle) store.put(handle, this.key(machineId)); else store.delete(this.key(machineId)); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('Folder could not be remembered')); }); }
+    finally { db.close(); }
+  },
+  async choose(machineId) {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'qa-trends-export' });
+    await this.set(machineId, handle); return handle;
+  },
+};
+function trendCsvCell(value) {
+  let text = String(value ?? '');
+  // Spreadsheet formula protection for names, comments and units in downloaded CSVs.
+  if (/^[=+@\t\r]/.test(text) || /^-(?!\d)/.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+function trendCsvRows(machine, templates, histories, range, testIds = []) {
+  const rows = [['Machine', 'QA list', 'Test', 'Unit', 'QA date', 'Run ID', 'Value', 'Recorded baseline', 'Recorded warning', 'Recorded action', 'Recorded mode', 'Recorded result', 'Current baseline', 'Current warning', 'Current action', 'Current mode', 'Current result']];
+  const seen = new Set();
+  for (const t of templates) for (const item of t.items) {
+    if (item.type !== 'numeric' || (testIds.length && !testIds.includes(String(item.test_id)))) continue;
+    const points = filterRange(histories[item.test_id] || [], range).filter((p) => String(p.assignment_id) === String(t.assignment.id));
+    const judged = judgedByList(item, points);
+    points.forEach((point, i) => {
+      const key = `${point.run_id}:${item.test_id}`; if (seen.has(key)) return; seen.add(key);
+      const l = item.limits;
+      const word = (s) => ({ pass: 'PASS', warn: 'WARNING', fail: 'ACTION' }[s] || s || 'Recorded');
+      rows.push([machine.name, t.queue.name, item.name, item.unit === 'unitless' ? '' : item.unit, point.qa_date, point.run_id, point.value,
+        point.expected, point.warn, point.fail, point.tol_mode, word(point.status), l.expected, l.warn, l.fail, l.tol_mode, word(judged[i].status)]);
+    });
+  }
+  return rows;
+}
+async function saveTrendCsv(machineId, filename, text, handle) {
+  const blob = new Blob(['\ufeff', text], { type: 'text/csv;charset=utf-8' });
+  if (handle) {
+    let permission = await handle.queryPermission({ mode: 'readwrite' });
+    if (permission !== 'granted') permission = await handle.requestPermission({ mode: 'readwrite' });
+    if (permission !== 'granted') throw new Error('Allow the export folder or choose Browser downloads in Folder settings.');
+    const file = await handle.getFileHandle(filename, { create: true });
+    const writer = await file.createWritable();
+    try { await writer.write(blob); await writer.close(); } catch (err) { await writer.abort().catch(() => {}); throw err; }
+    return handle.name;
+  }
+  const url = URL.createObjectURL(blob), link = document.createElement('a');
+  link.href = url; link.download = filename; document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return 'Downloads';
+}
+function trendFileTools(machine, lists, listId, range, testIds) {
+  const storageKey = `qa-trends-import:${state.user.id}:${machine.id}`;
+  const preferred = localStorage.getItem(storageKey);
+  let selectedId = String(listId || (lists.find((a) => String(a.id) === preferred) || lists.find((a) => a.import_folder) || lists[0] || {}).id || '');
+  let exportHandle = null;
+  const status = el('span', { class: 'muted small', role: 'status' });
+  const selected = () => lists.find((a) => String(a.id) === selectedId);
+  const remember = () => { if (selectedId) localStorage.setItem(storageKey, selectedId); };
+  const refreshStatus = () => { const a = selected(); status.textContent = `Import: ${a?.import_folder || 'Choose a folder'} · Export: ${exportHandle?.name || 'Downloads'}`; };
+  trendExportFolders.get(machine.id).then((handle) => { exportHandle = handle; refreshStatus(); }).catch(() => { refreshStatus(); });
+  const folderSettings = () => {
+    const importStatus = el('span', { class: 'muted small' });
+    const exportStatus = el('span', { class: 'muted small' }, exportHandle?.name || 'Browser downloads');
+    const path = el('input', { placeholder: 'Folder on the portal host', 'aria-label': 'Default import folder' });
+    const updateImport = () => { importStatus.textContent = selected()?.import_folder || 'No import folder chosen'; path.value = selected()?.import_folder || ''; };
+    const picker = select('import_list', lists.map((a) => [a.id, a.queue_name]), selectedId, { 'aria-label': 'Default import QA list', onchange: (e) => { selectedId = e.target.value; remember(); updateImport(); refreshStatus(); } });
+    const chooseImport = el('button', { type: 'button', onclick: async () => {
+      try { const name = await window.localFolders.choose(selectedId); selected().import_folder = name; remember(); updateImport(); refreshStatus(); }
+      catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
+    } }, 'Choose import folder');
+    const clearImport = el('button', { type: 'button', class: 'small link', onclick: async () => {
+      try { await window.localFolders.clear(selectedId); selected().import_folder = ''; updateImport(); refreshStatus(); }
+      catch (err) { toast(err.message, true); }
+    } }, 'Clear');
+    const chooseExport = el('button', { type: 'button', onclick: async () => {
+      try { exportHandle = await trendExportFolders.choose(machine.id); exportStatus.textContent = exportHandle.name; refreshStatus(); }
+      catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
+    } }, 'Choose export folder');
+    const clearExport = el('button', { type: 'button', class: 'small link', onclick: async () => {
+      try { await trendExportFolders.set(machine.id, null); exportHandle = null; exportStatus.textContent = 'Browser downloads'; refreshStatus(); }
+      catch (err) { toast(err.message, true); }
+    } }, 'Use Downloads');
+    updateImport();
+    modal(`${machine.name} folders`, el('div', { class: 'trend-folder-settings' },
+      can('configure') && lists.length ? el('div', {}, el('h3', {}, 'Default import'), picker,
+        window.localApi ? el('div', { class: 'row' }, 'showDirectoryPicker' in window ? chooseImport : el('span', { class: 'muted small' }, 'Choose a saved Sphinx file with Import.'), clearImport, importStatus) : path) : null,
+      el('div', {}, el('h3', {}, 'Default export'), el('div', { class: 'row' }, 'showDirectoryPicker' in window ? chooseExport : null, clearExport, exportStatus)),
+      el('p', { class: 'muted small' }, 'Import folders belong to the selected QA list. Export folders are remembered for this machine on this browser and computer.')),
+    async () => {
+      if (!window.localApi && can('configure') && selected()) {
+        const a = selected();
+        await api('PUT', `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(',').filter(Boolean).map(Number), start_date: a.start_date, active: !!a.active, import_folder: path.value.trim() });
+        a.import_folder = path.value.trim();
+      }
+      remember(); refreshStatus();
+    }, 'Done');
+  };
+  const importFromFolder = async () => {
+    const a = selected();
+    if (!a) return toast('Schedule a QA list on this machine first.', true);
+    const content = el('div'), message = el('p', { class: 'muted small' });
+    const checks = [], filePicker = el('input', { type: 'file', accept: '.xls', multiple: true, 'aria-label': 'Sphinx files to import' });
+    let chosenFiles = [], currentId = String(a.id);
+    filePicker.addEventListener('change', () => { chosenFiles = [...filePicker.files]; checks.forEach((c) => { c.checked = false; }); message.textContent = `${chosenFiles.length} selected files`; });
+    const load = async () => {
+      chosenFiles = []; filePicker.value = ''; checks.length = 0; content.replaceChildren(el('span', { class: 'muted small' }, 'Checking the import folder…'));
+      try {
+        const found = await api('GET', `/api/assignments/${currentId}/files`);
+        if (found.permission && found.permission !== 'granted') {
+          content.replaceChildren(el('span', { class: 'muted small' }, 'Choose or reconnect the default import folder in Folder settings.'),
+            found.permission !== 'none' ? el('button', { type: 'button', onclick: async () => { try { await window.localFolders.request(currentId); await load(); } catch (err) { toast(err.message, true); } } }, 'Reconnect folder') : null);
+          return;
+        }
+        const files = found.files.filter((f) => !f.run_id);
+        content.replaceChildren(...files.map((f) => {
+          const check = el('input', { type: 'checkbox', checked: true }); check.filePath = f.path; checks.push(check);
+          return el('label', { class: 'check' }, check, f.name);
+        }));
+        if (!files.length) content.append(el('span', { class: 'muted small' }, found.folder ? 'No new files in the default folder.' : 'Choose files below, or set a default import folder.'));
+        message.textContent = files.length ? `${files.length} new files. Already imported files are skipped.` : '';
+      } catch (err) { content.replaceChildren(el('span', { class: 'error' }, err.message)); }
+    };
+    const listPicker = select('import_list', lists.map((x) => [x.id, x.queue_name]), currentId, { 'aria-label': 'Import into QA list', onchange: async (e) => { currentId = e.target.value; selectedId = currentId; remember(); refreshStatus(); await load(); } });
+    modal(`Import ${machine.name} QA`, el('div', {}, listPicker, message, el('div', { class: 'trend-import-files' }, content),
+      el('p', { class: 'muted small' }, 'Import Sphinx history into this QA list. New measurements are added only for this machine.'), filePicker), async () => {
+      let files;
+      if (chosenFiles.length) files = await Promise.all(chosenFiles.map(readFileBase64));
+      else files = await Promise.all(checks.filter((c) => c.checked).map((c) => api('GET', `/api/assignments/${currentId}/file?path=${encodeURIComponent(c.filePath)}`)));
+      if (!files.length) throw new Error('Select at least one file.');
+      let imported = 0, skipped = 0;
+      for (let i = 0; i < files.length; i += 25) {
+        const result = await api('POST', `/api/assignments/${currentId}/sphinx/import`, { files: files.slice(i, i + 25), historical: true });
+        imported += result.imported.length; skipped += result.skipped.length;
+      }
+      toast(`${imported} imported · ${skipped} skipped`); route();
+    }, 'Import selected');
+    await load();
+  };
+  const exportButton = el('button', { type: 'button', onclick: async () => {
+    exportButton.disabled = true;
+    try {
+      // Read permissions while the export button still has browser user activation.
+      if (exportHandle && await exportHandle.queryPermission({ mode: 'readwrite' }) !== 'granted' && await exportHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Allow the export folder or select Use Downloads in Folder settings.');
+      const targets = lists.filter((a) => !listId || String(a.id) === String(listId));
+      const [templates, histories] = await Promise.all([Promise.all(targets.map((a) => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machine.id}/trends`)]);
+      const rows = trendCsvRows(machine, templates, histories, range, testIds);
+      if (rows.length < 2) return toast('No numeric results in the selected list and period.');
+      const csv = rows.map((row) => row.map(trendCsvCell).join(',')).join('\r\n');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `${machine.name}-trends-${range}-${stamp}.csv`.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const where = await saveTrendCsv(machine.id, filename, csv, exportHandle);
+      toast(`Exported ${rows.length - 1} results to ${where}`);
+    } catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
+    finally { exportButton.disabled = false; }
+  } }, 'Export CSV');
+  refreshStatus();
+  return el('div', { class: 'row trend-file-tools' },
+    can('configure') ? el('button', { type: 'button', disabled: !lists.length, onclick: () => importFromFolder().catch((err) => toast(err.message, true)) }, 'Import') : null,
+    exportButton, el('button', { type: 'button', class: 'icon-action', title: 'Folder settings', 'aria-label': 'Import and export folder settings', onclick: folderSettings }, '⚙'), status);
+}
+
+function trendPattern(points) {
+  const data = points.slice(-20).filter((p) => Number.isFinite(p.value));
+  if (data.length < 5 || new Set(data.map((p) => p.qa_date)).size < 5) return null;
+  const start = new Date(data[0].qa_date + 'T12:00:00').getTime();
+  const x = data.map((p) => (new Date(p.qa_date + 'T12:00:00').getTime() - start) / 86400000);
+  const y = data.map((p) => p.value - (p.expected ?? 0));
+  const meanX = x.reduce((a,b) => a+b,0) / x.length, meanY = y.reduce((a,b) => a+b,0) / y.length;
+  const xx = x.reduce((s,v) => s + (v-meanX)**2,0), yy = y.reduce((s,v) => s + (v-meanY)**2,0);
+  if (!xx || !yy) return null;
+  const xy = x.reduce((s,v,i) => s + (v-meanX)*(y[i]-meanY),0), slope = xy/xx;
+  const r2 = Math.min(1, Math.max(0, xy*xy/(xx*yy))), change = slope*(x.at(-1)-x[0]);
+  const last = data.at(-1), warning = last.warn == null ? null : last.tol_mode === 'percent' ? Math.abs(last.expected || 0)*last.warn/100 : last.warn;
+  if (r2 < 0.6 || Math.abs(change) < 1e-10 || (warning && Math.abs(change) < warning/2)) return null;
+  return { direction: slope > 0 ? 'Rising' : 'Falling', change, slope, r2, n: data.length };
+}
+function trendInsightsCard(series) {
+  const messages = [];
+  for (const item of series) {
+    const last = item.points.at(-1); if (!last) continue;
+    const who = item.machine_name ? `${item.machine_name} · ` : '';
+    if (last.status === 'fail' || last.status === 'warn') messages.push({ priority: last.status === 'fail' ? 3 : 2,
+      text: `${who}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
+    const pattern = trendPattern(item.points);
+    if (pattern) messages.push({ priority: 1, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${fmt(pattern.change, 3)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${pattern.r2.toFixed(2)}).` });
+  }
+  messages.sort((a,b) => b.priority-a.priority);
+  return el('section', { class: 'card trend-insights', 'aria-label': 'Automatic trend insights' },
+    el('h3', {}, 'Trend insights'),
+    messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.text))) : el('p', { class: 'muted small' }, 'No warning/action results or clear directional patterns were identified in the displayed data. At least five results on different dates are needed to assess a directional pattern.'),
+    el('details', {}, el('summary', { class: 'small' }, 'How these insights work'),
+      el('p', { class: 'muted small' }, 'Calculated locally from the selected period. Patterns use a straight-line fit to the last 20 results relative to the current baseline: at least 5 results, R² ≥ 0.60, and fitted change of at least half the warning band when one is configured. These are descriptive signals for review, not clinical conclusions or an external AI assessment.')));
+}
+function trendMachinePicker(machines, selectedIds, range, onApply) {
+  const chosen = new Set(selectedIds.map(String));
+  const label = selectedIds.map((id) => machines.find((m) => String(m.id) === String(id))?.name).filter(Boolean).join(', ');
+  return el('details', { class: 'trend-machine-picker' }, el('summary', { class: 'button', 'aria-label': 'Select machines' }, label || 'Select machines'),
+    el('div', { class: 'trend-machine-options' }, machines.map((m) => el('label', { class: 'check' },
+      el('input', { type: 'checkbox', checked: chosen.has(String(m.id)), 'aria-label': `Compare ${m.name}`, onchange: (e) => { if (e.target.checked) chosen.add(String(m.id)); else chosen.delete(String(m.id)); } }), m.name)),
+    el('button', { class: 'primary', type: 'button', onclick: () => { if (!chosen.size) return toast('Select at least one machine.', true); onApply([...chosen]); } }, 'Apply')));
+}
+async function renderMultiMachineTrends(machines, selectedIds, range) {
+  const selected = machines.filter((m) => selectedIds.includes(String(m.id)));
+  const go = (ids, nextRange = range) => { location.hash = ids.length === 1 ? `#/trends?machine_id=${ids[0]}&range=${nextRange}` : `#/trends?machine_ids=${ids.join(',')}&range=${nextRange}`; };
+  page('Machine Trends', 'Compare shared measurements across machines. Machine-only tests stay visible as their own charts.', [
+    trendMachinePicker(machines, selectedIds, range, (ids) => go(ids)),
+    select('range', [['30','Last 30 days'],['90','Last 3 months'],['365','Last year'],['all','All history']], range, { 'aria-label': 'Period', onchange: (e) => go(selectedIds,e.target.value) })]);
+  app.querySelector('.page-head').classList.add('sticky-head', 'trends-head');
+  const loading = el('p', { class: 'muted' }, 'Loading machine comparisons…'); app.append(loading);
+  const machineData = await Promise.all(selected.map(async (machine) => {
+    const assignments = (await api('GET', `/api/machines/${machine.id}/assignments`)).filter((a) => a.active && !a.archived);
+    const [templates, histories] = await Promise.all([Promise.all(assignments.map((a) => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machine.id}/trends`)]);
+    const items = templates.flatMap((t) => t.items.filter((i) => i.type === 'numeric').map((i) => ({ ...i, machine_name: machine.name, machine_id: machine.id, queue_id: t.queue.id, points: judgedByList(i, filterRange(histories[i.test_id] || [],range).filter((p) => String(p.assignment_id) === String(t.assignment.id))) }))).filter((i) => i.points.length);
+    return { machine, assignments, items };
+  }));
+  loading.remove();
+  const filesHolder = el('div');
+  let filesMachineId = selectedIds[0];
+  const drawFiles = () => { const data = machineData.find((d) => String(d.machine.id) === filesMachineId); filesHolder.replaceChildren(trendFileTools(data.machine,data.assignments,'',range,[])); };
+  app.append(el('div', { class: 'row trend-files-machine' }, el('span', { class: 'muted small' }, 'Files for'),
+    select('files_machine',selected.map((m) => [m.id,m.name]),filesMachineId,{ 'aria-label': 'Machine for import and export', onchange: (e) => { filesMachineId=e.target.value;drawFiles(); } })), filesHolder); drawFiles();
+  const all = machineData.flatMap((d) => d.items);
+  const failures=all.filter((i) => i.points.at(-1).status==='fail').length, warnings=all.filter((i) => i.points.at(-1).status==='warn').length;
+  const metric=(label,value)=>el('div',{class:'trend-metric'},el('span',{class:'muted small'},label),el('strong',{},String(value)));
+  app.append(el('div',{class:'trend-dashboard-summary','aria-label':'Machine comparison summary'},metric('Selected machines',selected.length),metric('Tracked measurements',all.length),metric('At action level',failures),metric('At warning level',warnings)),trendInsightsCard(all));
+  if (!all.length) { app.append(el('div',{class:'card empty'},'No measurements in this period. Import results or choose a longer period.')); return; }
+  const groups=new Map();
+  for(const item of all){const key=`${item.queue_id}:${item.test_id}:${item.unit || ''}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
+  const ranked=[...groups.values()].sort((a,b)=>Math.max(...b.map((i)=>STATUS_RANK[i.points.at(-1).status]))-Math.max(...a.map((i)=>STATUS_RANK[i.points.at(-1).status]))||a[0].name.localeCompare(b[0].name));
+  const grid=el('div',{class:'trend-comparison-grid'});
+  ranked.forEach((items,index)=>{
+    const area=el('div'),unit=items[0].unit==='unitless'?'':items[0].unit||'';
+    const chart=el('details',{class:'card trend-comparison',open:index<3},el('summary',{},el('strong',{},items[0].name),el('span',{class:'muted small'},' · ',items.map((i)=>i.machine_name).join(', '))),area);
+    let drawn=false;const draw=()=>{if(drawn||!chart.open)return;drawn=true;area.append(seriesChart(items.map((i)=>({label:i.machine_name,points:i.points})),unit,{small:true,delta:items.length>1,yLabel:yAxisLabel([items[0].name])}),el('div',{class:'row'},items.map((i)=>el('a',{class:'small',href:`#/trends?machine_id=${i.machine_id}&test_id=${i.test_id}&range=${range}`},`${i.machine_name} details`))));};
+    chart.addEventListener('toggle',draw);draw();chart.dataset.search=`${items[0].name} ${items[0].category} ${items.map((i)=>i.machine_name).join(' ')}`.toLowerCase();grid.append(chart);
+  });
+  const search=el('input',{type:'search',class:'filter-box',placeholder:'Find a measurement or machine…','aria-label':'Find comparison charts',oninput:(e)=>{const words=e.target.value.toLowerCase().split(/\s+/).filter(Boolean);for(const chart of grid.children)chart.hidden=!words.every((w)=>chart.dataset.search.includes(w));}});
+  app.append(el('h2',{class:'section-head'},'Measurement comparisons'),el('div',{class:'filter-row'},search),grid);
+}
+
 async function renderTrends() {
   const params = queryParams();
   const machines = (await api("GET", "/api/machines")).filter((m) => m.active);
+  const explicit = (params.get("machine_ids") || params.get("machine_id") || "").split(",").filter((id) => machines.some((m) => String(m.id) === id));
+  const gantries = machines.filter((m) => /^GTR[125]$/i.test(m.name));
+  const defaultIds = gantries.length ? gantries.map((m) => String(m.id)) : machines.slice(0,1).map((m) => String(m.id));
+  const selectedIds = explicit.length ? [...new Set(explicit)] : defaultIds;
+  if (selectedIds.length > 1 && !params.get("test_id")) return renderMultiMachineTrends(machines, selectedIds, params.get("range") || "90");
   const fallback = machines.find((m) => m.kind === "Proton gantry") || machines[0];
   const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (fallback && fallback.id);
   const range = params.get("range") || "90";
@@ -3094,12 +3520,13 @@ async function renderTrends() {
   const listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
-    select("machine_id", machines.map((m) => [m.id, m.name]), machineId, { "aria-label": "Machine", onchange: (e) => go({ machine_id: e.target.value, range }) }),
+    trendMachinePicker(machines, [String(machineId)], range, (ids) => { location.hash = ids.length === 1 ? `#/trends?machine_id=${ids[0]}&range=${range}` : `#/trends?machine_ids=${ids.join(",")}&range=${range}`; }),
     select("list", [["", "All QA lists"], ...lists.map((a) => [a.id, a.queue_name])], listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }),
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
     testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
+  app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds));
   if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
   const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
@@ -3108,7 +3535,7 @@ async function renderTrends() {
   const items = data.map((d) => {
     const li = listItems.get(String(d.test.id));
     const limits = li ? li.limits : { expected: d.test.expected, warn: d.test.warn, fail: d.test.fail, tol_mode: d.test.tol_mode };
-    return { ...d.test, test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)) };
+    return { ...d.test, test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range).filter((p) => !listId || String(p.assignment_id) === String(listId))) };
   }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = axisGroups(items)[0];

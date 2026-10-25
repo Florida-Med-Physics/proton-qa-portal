@@ -9,6 +9,15 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Home dashboard: responsive 2×2 Proton/Photon/Brachy/Simulation cards, including active daily/monthly/on-demand lists with individual due/start controls.
+- Remove Linac 1 from active defaults; expose machine deletion for unused machines and retirement for machines with history.
+- Increase typography and use fluid lateral scaling; Setup/Review adapt into labeled rows on small screens.
+
+- Machine Trends dashboard: default GTR1/GTR2/GTR5 comparisons, multi-machine picker, summary metrics, chart cards, and explainable local pattern insights.
+- New QA Template List: add departmental starters, blank templates, and worksheet/column-reviewed Excel or MyQA checklist import with atomic creation; bundle the spreadsheet reader for offline use.
+
+- Machine Trends: add compact Import, Export CSV and folder settings; remember import list and per-machine export folders, reuse existing import folders, and export only the selected list/period/tests with recorded and current limits.
+
 - Simplify Machine Schedules: edit only the schedule with a pencil beside its description; shared tests are edited in QA Template Lists.
 - Scope inactive/tolerances/duplicate/re-evaluate/archive/delete actions to the selected machine schedule, preserve history, and add archived schedule restoration.
 

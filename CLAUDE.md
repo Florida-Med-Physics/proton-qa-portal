@@ -101,3 +101,15 @@ daily table (CT Sim tolerances), and the MRI daily items.
 ## Machine Schedules controls (2026-10-23)
 
 Machine schedule rows have a three-dot menu before a plain list name; no left pencil or shared-test Edit link. The schedule description has its own pencil on the right for frequency/import-folder editing. Menu actions are Active/Inactive, Set tolerances for this machine, Duplicate, Re-evaluate, Archive, Delete. All actions affect only that assignment. Duplicate snapshots the effective machine list and starts inactive; deleting a schedule with recorded results is refused. Archive is reversible and preserves prior activity, membership, values, and history. Shared tests are edited only from QA Template Lists.
+
+## Dashboard and template creation (2026-10-23)
+
+- Default Machine Trends to GTR1/GTR2/GTR5, with a compact multi-machine picker and locally calculated, explained pattern insights. Do not label these as external AI or clinical conclusions.
+- Keep file settings behind a gear; reuse existing per-list import folders and remember per-machine export folders on this browser/computer. Multi-machine mode labels the machine used for file operations.
+- New QA Template List is the creation label. Offer existing departmental starters, blank lists and reviewed Excel/MyQA checklist exports. Native PLD parsing awaits a representative file; do not claim it is implemented. Never infer clinical limits from ambiguous text.
+
+## Responsive home and machines (2026-10-23)
+
+- Home is a 2×2 Proton/Photon/Brachy/Simulation card layout on desktop, stacked on phones. Show each machine's active Daily/Monthly/on-demand QA, not only its daily list.
+- Use fluid screen width on Setup and Review and larger readable fonts. Verify desktop, tablet and phone widths without horizontal overflow.
+- Linac 1 is removed from active defaults. Machines without runs may be deleted; machines with history must be retired. Preserve shared templates and history. Never re-add a deleted seeded machine automatically.
