@@ -2810,9 +2810,9 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
     // each on its own scale with its own reference line and bands.
     if (multi && !delta) {
       box.replaceChildren(controls, el('div', { class: `energy-plot-grid plots-${series.length}` }, ...series.map((x, k) => el('div', { class: 'subplot' },
-        el('div', { class: 'subplot-title' }, el('span', { class: `key-swatch line axis-${k}`, 'aria-hidden': 'true' }), ' ', x.label),
+        el('div', { class: 'subplot-title' }, x.label),
         drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k }),
-        trendExclusionNote([x], false),
+        ...(trendExclusionNote([x], false) ? [trendExclusionNote([x], false)] : []),
         trendStatistics([x], unit, false, k)
       ))), el('div', { class: 'chart-key energy-shared-key' },
         el('span', { class: 'key-item' }, el('span', { class: 'key-swatch ref' }), 'Reference'),
@@ -2822,12 +2822,11 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
     }
     const drawRef = hasRef && !(multi && !delta);
     const key = el("div", { class: "chart-key" },
-      series.map((x, k) => el("span", { class: "key-item" }, el("span", { class: `key-swatch line ${multi ? `axis-${k}` : "single"}` }), `${x.label}${delta ? " (Δ)" : ""}`)),
       drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
       drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
       ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
-    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), trendExclusionNote(series, delta), trendStatistics(series, unit, delta), key);
+    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), ...(trendExclusionNote(series, delta) ? [trendExclusionNote(series, delta)] : []), trendStatistics(series, unit, delta), key);
   };
   draw();
   return box;

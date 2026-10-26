@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Remove duplicate energy entries from the chart legend and prevent absent exclusion notices from rendering as “null”.
+
 - Group isocenter coincidence axis measurements into one side-by-side subplot panel.
 
 - Separate spot Position X/Y energy families; exclude >5-SD extreme values from plotting, scaling and least-squares fits using each point’s other-series results (minimum five), with a visible exclusion note and raw values preserved.
