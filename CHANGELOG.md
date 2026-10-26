@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Restrict trend statistics to marker, energy, reference, trend average ± SD, and maximum outlier/date.
+
+- Replace latest-status chart badges with selected-period pass-percentage rings and per-energy breakdowns on expansion; include warning/action segments and all measurements, including plot-excluded extremes.
+
 - Remove duplicate energy entries from the chart legend and prevent absent exclusion notices from rendering as “null”.
 
 - Group isocenter coincidence axis measurements into one side-by-side subplot panel.

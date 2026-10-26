@@ -1,0 +1,10 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('portal/static/app.js','utf8'),context={};vm.createContext(context);
+vm.runInContext(source.slice(source.indexOf('function trendPassCounts('),source.indexOf('function trendPassRing(')),context);
+const points=['pass','pass','warn','fail'].map(status=>({status}));
+const c=context.trendPassCounts(points);assert.equal(c.percent,50);assert.equal(c.pass,2);assert.equal(c.warn,1);assert.equal(c.fail,1);assert.equal(c.total,4);
+assert.equal(context.trendPassCounts([]).percent,0);
+assert.equal(context.trendPassCounts([{status:'pass'}]).percent,100);
+assert.equal(context.trendPassCounts([{status:'recorded'}]).other,1);
+assert.equal(context.trendPassCounts([...Array(999).fill({status:'pass'}),{status:'fail'}]).percent,99);
+console.log('Pass rates count all measurements, separate warnings/actions and never show 100% with failures.');

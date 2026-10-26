@@ -2780,13 +2780,35 @@ function trendExclusionNote(series, delta) {
     'Values more than 5 standard deviations from the other results in the same energy/axis are excluded from plotted lines, Y-axis bounds and least-squares fits. At least 5 results are required. Statistics and saved values retain all results; open Values and details to inspect them.') : null;
 }
 
+function trendPassCounts(points) {
+  const counts = { pass: 0, warn: 0, fail: 0, other: 0, total: points.length };
+  for (const point of points) counts[['pass','warn','fail'].includes(point.status) ? point.status : 'other']++;
+  const raw = counts.total ? counts.pass / counts.total * 100 : 0;
+  const percent = counts.total && counts.pass === counts.total ? 100 : Math.min(99, Number(raw.toPrecision(2)));
+  return { ...counts, percent };
+}
+
+function trendPassRing(points, label = 'Selected period') {
+  const c = trendPassCounts(points), scale = c.total ? 100 / c.total : 0;
+  const passEnd = c.pass * scale, warningEnd = passEnd + c.warn * scale, actionEnd = warningEnd + c.fail * scale;
+  const description = `${label}: ${c.percent}% passed. ${c.pass} pass, ${c.warn} warning, ${c.fail} action${c.other ? `, ${c.other} unclassified` : ''}; ${c.total} measurements in selected period. Uses current limits; includes extreme values.`;
+  return el('span', { class: 'trend-pass-rate', title: description, role: 'img', 'aria-label': description },
+    el('span', { class: 'trend-pass-donut', style: `background: conic-gradient(var(--pass) 0% ${passEnd}%, var(--warn) ${passEnd}% ${warningEnd}%, var(--fail) ${warningEnd}% ${actionEnd}%, var(--border) ${actionEnd}% 100%)` },
+      el('span', { class: 'trend-pass-value' }, c.total ? `${c.percent}%` : '—')),
+    el('span', { class: 'trend-pass-label' }, 'passed'));
+}
+
+function trendPassBreakdown(series) {
+  return el('div', { class: 'trend-pass-breakdown', 'aria-label': 'Pass rate by energy' }, series.map(item => el('div', { class: 'trend-energy-rate' }, el('strong', {}, item.label), trendPassRing(item.points, item.label))));
+}
+
 function trendStatistics(series, unit, delta = false, colorIndex = null) {
   return el('div', { class: 'trend-statistics' }, series.map((item, index) => {
     const values = item.points.map(p => delta ? asDeviation(p).dev : p.value);
     const st = seriesStats(values), outlier = item.points[st.outlier];
     const color = colorIndex !== null ? `axis-${colorIndex}` : series.length > 1 ? `axis-${index}` : 'single';
     return el('div', { class: 'trend-statistics-line' }, el('span', { class: `key-swatch line ${color}`, 'aria-hidden': 'true' }),
-      ` ${item.label}: Avg: ${sig(st.mean)} ± ${sig(st.sd)}${unit ? ` ${unit}` : ''}, Max Outlier: ${sig(values[st.outlier])} on ${shortDate(outlier.qa_date)}`);
+      ` ${item.label}: Ref: ${sig(item.points.at(-1)?.expected)}: Trend Avg: ${sig(st.mean)} ± ${sig(st.sd)}${unit ? ` ${unit}` : ''}, Max Outlier: ${sig(values[st.outlier])} on ${shortDate(outlier.qa_date)}`);
   }));
 }
 
@@ -2810,7 +2832,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
     // each on its own scale with its own reference line and bands.
     if (multi && !delta) {
       box.replaceChildren(controls, el('div', { class: `energy-plot-grid plots-${series.length}` }, ...series.map((x, k) => el('div', { class: 'subplot' },
-        el('div', { class: 'subplot-title' }, x.label),
+        el('div', { class: 'subplot-title' }, el('span', {}, x.label), trendPassRing(x.points, x.label)),
         drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k }),
         ...(trendExclusionNote([x], false) ? [trendExclusionNote([x], false)] : []),
         trendStatistics([x], unit, false, k)
@@ -2826,7 +2848,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
       drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
       ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
-    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), ...(trendExclusionNote(series, delta) ? [trendExclusionNote(series, delta)] : []), trendStatistics(series, unit, delta), key);
+    box.replaceChildren(controls, ...(multi ? [trendPassBreakdown(series)] : []), drawSeries(series, unit, { small, delta, yLabel, prediction }), ...(trendExclusionNote(series, delta) ? [trendExclusionNote(series, delta)] : []), trendStatistics(series, unit, delta), key);
   };
   draw();
   return box;
@@ -3046,14 +3068,13 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
       const href = `#/trends?machine_id=${machineId}&list=${template.assignment.id}&test_id=${group.members.map(m => m.test_id).join(',')}&range=${range}`;
       insights.push(...group.members.map(m => ({ ...m, href })));
       const body = el('div', { class: 'trend-chart-body' });
-      const latestStatus = group.members.map(m => latest(m.points).status).sort((a,b) => STATUS_RANK[b]-STATUS_RANK[a])[0];
-      const chart = el('details', { class: 'trend-chart-row' }, el('summary', {}, el('strong', {}, group.base), chip(latestStatus)), body);
+      const chart = el('details', { class: 'trend-chart-row' }, el('summary', {}, el('strong', {}, group.base), trendPassRing(group.members.flatMap(m => m.points), group.base)), body);
       chart.dataset.search = `${group.base} ${category} ${template.queue.name}`.toLowerCase();
       let drawn = false;
       chart.addEventListener('toggle', () => {
         if (!chart.open || drawn) return;
         drawn = true;
-        body.append(seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)) }), el('a', { href, class: 'button small' }, 'View values and details'));
+        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Amber: warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)) }), el('a', { href, class: 'button small' }, 'View values and details'));
       });
       categories.get(category).push(chart);
     }
