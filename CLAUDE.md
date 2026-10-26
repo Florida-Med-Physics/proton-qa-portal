@@ -104,7 +104,7 @@ Machine schedule rows have a three-dot menu before a plain list name; no left pe
 
 ## Dashboard and template creation (2026-10-23)
 
-- Default Machine Trends to GTR1/GTR2/GTR5, with a compact multi-machine picker and locally calculated, explained pattern insights. Do not label these as external AI or clinical conclusions.
+- Show one machine at a time in Machine Trends, defaulting to GTR1. Use organized expandable measurement rows, omit spot numbers in display labels, group same-energy X/Y on one graph, and link insights to their graphs. Keep locally calculated, explained pattern insights. Do not label these as external AI or clinical conclusions.
 - Keep file settings behind a gear; reuse existing per-list import folders and remember per-machine export folders on this browser/computer. Multi-machine mode labels the machine used for file operations.
 - New QA Template List is the creation label. Offer existing departmental starters, blank lists and reviewed Excel/MyQA checklist exports. Native PLD parsing awaits a representative file; do not claim it is implemented. Never infer clinical limits from ambiguous text.
 

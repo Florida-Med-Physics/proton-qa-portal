@@ -1144,3 +1144,14 @@ td, .measure-table td { font-size: 21px; }
   .home-qa-label { font-size: 21px; }
   #nav a { font-size: 16px; }
 }
+
+/* Single-machine trends: scan a list, expand only the graphs you need. */
+.trend-organized-list { margin-top: 24px; }
+.trend-organized-list h3 { margin: 24px 0 8px; }
+.trend-chart-row { border-bottom: 1px solid var(--border); background: var(--surface); }
+.trend-chart-row > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; cursor: pointer; }
+.trend-chart-row > summary strong::before { content: '▸ '; color: var(--muted); }
+.trend-chart-row[open] > summary strong::before { content: '▾ '; }
+.trend-chart-body { padding: 0 18px 20px; }
+.trend-insight-link { display: inline-block; padding: 8px 0; }
+.trend-chart-row[hidden], .trend-organized-list[hidden] { display: none; }

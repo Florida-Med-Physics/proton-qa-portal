@@ -2982,204 +2982,52 @@ function judgedByList(item, points) {
     recorded_status: p.status, status: evaluate("numeric", p.value, L) }));
 }
 
-async function renderTrendOverview(machines, machineId, range, listId = "") {
-  const machine = machines.find((m) => String(m.id) === String(machineId));
-  const loading = el("div", { class: "card empty" }, `Loading ${machine.name} trends…`);
-  app.append(loading);
-  const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
-  const templates = await Promise.all(assignments.filter((a) => a.active && (!listId || String(a.id) === String(listId))).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
-  const numeric = templates.flatMap((t) => t.items.filter((i) => i.type === "numeric").map((i) => ({ ...i, assignment_id: t.assignment.id })));
-  const all = numeric.length ? await api("GET", `/api/machines/${machineId}/trends`) : {};
-  loading.remove();
-  const pointsFor = (item, period) => filterRange(all[item.test_id] || [], period).filter((p) => String(p.assignment_id) === String(item.assignment_id));
-  const withData = numeric.map((i) => ({ ...i, points: judgedByList(i, pointsFor(i, range)) })).filter((i) => i.points.length);
-  if (!withData.length) {
-    app.append(el("div", { class: "card empty" }, numeric.length ? "No results in this period." : `${machine.name} has no measured tests scheduled.`));
-    return;
-  }
-  const tally30 = (it) => { const c = { pass: 0, warn: 0, fail: 0 }; for (const pt of judgedByList(it, pointsFor(it, "30"))) if (pt.status in c) c[pt.status]++; return c; };
-  const avg30 = (it) => { const v = pointsFor(it, "30").map((pt) => pt.value); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
-  const groups = axisGroups(withData);
-  const worstOf = (g) => g.members.reduce((w, m) => (STATUS_RANK[latest(m.points).status] > STATUS_RANK[w] ? latest(m.points).status : w), "pass");
-  const failing = groups.filter((g) => worstOf(g) === "fail").length, warning = groups.filter((g) => worstOf(g) === "warn").length;
-  let onlyStatus = null;                                     // "fail" / "warn" when a chip is active
-  const statusChip = (status, label) => el("button", { type: "button", class: `chip ${status} chip-filter`, title: `Show only the tests ${status === "fail" ? "at action level" : "outside tolerance"}`,
-    onclick: () => { onlyStatus = onlyStatus === status ? null : status; app.querySelectorAll(".chip-filter").forEach((c) => c.classList.toggle("on", c.dataset.status === onlyStatus)); applyFilters(); },
-    "data-status": status }, label);
-  const latestDate = withData.flatMap((i) => i.points).reduce((date, p) => p.qa_date > date ? p.qa_date : date, "");
-  const metric = (label, value) => el("div", { class: "trend-metric" }, el("span", { class: "muted small" }, label), value);
-  app.append(el("div", { class: "trend-dashboard-summary", "aria-label": "Machine trends summary" },
-    metric("Tracked tests", el("strong", {}, String(withData.length))),
-    metric("Charts at action", failing ? statusChip("fail", `${failing} at action level`) : el("strong", {}, "0")),
-    metric("Charts at warning", warning ? statusChip("warn", `${warning} at warning level`) : el("strong", {}, "0")),
-    metric("Latest QA", el("strong", {}, latestDate ? shortDate(latestDate) : "—"))));
-  app.append(trendInsightsCard(withData.map((i) => ({ ...i, machine_name: machine.name }))));
-  const highlights = groups.slice().sort((a, b) => STATUS_RANK[worstOf(b)] - STATUS_RANK[worstOf(a)]).slice(0, 3);
-  app.append(el("h2", { class: "section-head" }, "Recent trends"), el("div", { class: "trend-highlight-grid" }, highlights.map((g) => {
-    const unit = g.members[0].unit === "unitless" ? "" : g.members[0].unit || "";
-    const href = `#/trends?machine_id=${machineId}${listId ? `&list=${listId}` : ""}&test_id=${g.members.map((m) => m.test_id).join(",")}&range=${range}`;
-    return el("article", { class: "card trend-highlight" }, el("div", { class: "row" }, el("h3", {}, g.base), el("a", { class: "small", href }, "Open chart")),
-      seriesChart(g.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { small: true, yLabel: yAxisLabel(g.members.map((m) => m.name)) }));
-  })), el("h2", { class: "section-head" }, "All measurements"));
-  const search = el("input", { type: "search", class: "filter-box", placeholder: "Search tests (e.g. spot 3 sigma)", "aria-label": "Search tests" });
-  const applyFilters = () => {
-    const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
-    for (const block of app.querySelectorAll(".trend-group")) {
-      let shown = 0;
-      for (const table of block.querySelectorAll(".measure-block")) {
-        let inTable = 0;
-        const title = (table.querySelector(".measure-title") || {}).textContent || "";
-        for (const row of table.querySelectorAll("tr.trend-row")) {
-          const text = `${title} ${row.querySelector(".qa-label").textContent}`.toLowerCase();
-          row.hidden = !words.every((w) => text.includes(w)) || (onlyStatus !== null && row.dataset.status !== onlyStatus);
-          if (row.hidden && row.nextElementSibling && row.nextElementSibling.classList.contains("quick-trend")) row.nextElementSibling.hidden = true;
-          if (!row.hidden) inTable++;
-        }
-        table.hidden = !inTable;
-        shown += inTable;
-      }
-      block.hidden = !shown;
-    }
-    for (const head of app.querySelectorAll("h2.section-head")) {
-      let sib = head.nextElementSibling, any = false;
-      while (sib && !sib.classList.contains("section-head")) { if (sib.classList.contains("trend-group") && !sib.hidden) any = true; sib = sib.nextElementSibling; }
-      head.hidden = !any;
-    }
-  };
-  search.addEventListener("input", applyFilters);
-  app.append(el("div", { class: "filter-row" }, search));
+function trendDisplayName(name) {
+  return String(name || '').replace(/\bSpot\s+\d+\s*(?=\[|\d+(?:\.\d+)?\s*MeV)/gi, '').trim();
+}
 
-  // The same shape as Perform QA: a heading per section, a box per category, and inside it the single tests as one
-  // table, each repeated measurement (per energy / spot) as a titled table, and each X / Y / Z offset as an axis table.
-  const named = withData.some((i) => sectionNameOf(i));
-  const numbers = new Map();
-  for (const tpl of templates) for (const [id, n] of blockNumbers(tpl.items)) numbers.set(id, n);
-  const boxes = new Map();
-  for (const item of withData) {
-    const key = `${sectionNumber(item)}|${named ? sectionNameOf(item) || "" : item.category || "General"}`;
-    if (!boxes.has(key)) boxes.set(key, []);
-    boxes.get(key).push(item);
+async function renderTrendOverview(machines, machineId, range, listId = "") {
+  const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (!listId || String(a.id) === String(listId)));
+  const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
+  const sections = [], insights = [];
+  for (const template of templates) {
+    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range).filter(p => String(p.assignment_id) === String(template.assignment.id))) })).filter(i => i.points.length);
+    const groups = axisGroups(items);
+    const categories = new Map();
+    for (const group of groups) {
+      const category = categoryLabel(group.category) || 'Other measurements';
+      if (!categories.has(category)) categories.set(category, []);
+      const href = `#/trends?machine_id=${machineId}&list=${template.assignment.id}&test_id=${group.members.map(m => m.test_id).join(',')}&range=${range}`;
+      insights.push(...group.members.map(m => ({ ...m, href })));
+      const body = el('div', { class: 'trend-chart-body' });
+      const latestStatus = group.members.map(m => latest(m.points).status).sort((a,b) => STATUS_RANK[b]-STATUS_RANK[a])[0];
+      const chart = el('details', { class: 'trend-chart-row' }, el('summary', {}, el('strong', {}, group.base), chip(latestStatus)), body);
+      chart.dataset.search = `${group.base} ${category} ${template.queue.name}`.toLowerCase();
+      let drawn = false;
+      chart.addEventListener('toggle', () => {
+        if (!chart.open || drawn) return;
+        drawn = true;
+        body.append(seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)) }), el('a', { href, class: 'button small' }, 'View values and details'));
+      });
+      categories.get(category).push(chart);
+    }
+    if (groups.length) {
+      const section = el('section', { class: 'trend-organized-list' }, el('h2', { class: 'section-head' }, template.queue.name));
+      for (const [category, charts] of categories) section.append(el('h3', {}, category), ...charts.sort((a,b) => a.dataset.search.localeCompare(b.dataset.search, undefined, { numeric: true })));
+      sections.push(section);
+    }
   }
-  const sectionCats = new Map();
-  for (const key of boxes.keys()) { const [n, c] = key.split("|"); if (!sectionCats.has(n)) sectionCats.set(n, []); sectionCats.get(n).push(c); }
-  const hrefFor = (ids) => `#/trends?machine_id=${machineId}${listId ? `&list=${listId}` : ""}&test_id=${ids.join(",")}&range=${range}`;
-  const limitsLine = (it, unit) => {
-    const l = it.limits || {};
-    const suf = l.tol_mode === "percent" ? "%" : unit;
-    const parts = [];
-    if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
-    if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
-    return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
-  };
-  // One read-only table: # · Test · Unit · Baseline · Latest · Deviation · Result · History · Trends.
-  const trendTable = (members, { firstHeader, title, firstCell, chartTogether, familyChart }) => {
-    const dates = latestDates(members.map((it) => it.points));
-    const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
-    const dp = decimalsOf(members.flatMap((it) => [...it.points.slice(-5).map((h) => h.value), latest(it.points).expected ?? (it.limits || {}).expected]));
-    const rows = members.flatMap((it, k) => {
-      const unit = unitOf(it), p = latest(it.points);
-      const baseline = p.expected ?? (it.limits || {}).expected;
-      const href = hrefFor(chartTogether ? members.map((m) => m.test_id) : [it.test_id]);
-      // Trends: the dot icon opens the chart under the row (the whole X / Y / Z set at once for an axis table).
-      const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 11 }));
-      const series = chartTogether ? members.map((m) => ({ label: m.axisLabel || m.name, points: m.points })) : [{ label: (measureParts(it.name) || {}).rowLabel || yAxisLabel([it.name]), points: it.points }];
-      const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: (e) => {
-        e.stopPropagation();
-        if (chart.hidden) chart.firstChild.replaceChildren(el("div", { class: "row" }, el("span", { class: "spacer" }), el("a", { class: "small", href }, "Full trend")), seriesChart(series, unit, { small: true, yLabel: yAxisLabel(chartTogether ? members.map((m) => m.name) : [it.name]) }));
-        chart.hidden = !chart.hidden;
-      } }, trendIcon(16));
-      const cells = [
-        firstHeader !== "Test" ? (k === 0 ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null) : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""),
-        el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine({ limits: { warn: p.warn, fail: p.fail, tol_mode: p.tol_mode } }, unit) : null),
-        el("td", { class: "qa-unit" }, unit),
-        el("td", { class: "num" }, baseline === null || baseline === undefined ? el("span", { class: "muted" }, "—") : `${fmt(baseline, dp)} ${unit}`.trim()),
-        el("td", { class: "num" }, `${fmt(p.value, dp)} ${unit}`.trim()),
-        el("td", { class: "qa-dev" }, deltaBadge(p.value, p, unit, p.status)),
-        el("td", {}, chip(p.status)),
-        el("td", { class: "history-cell" }, dates.length ? histChips(it.points, dates, unit, dp) : el("span", { class: "muted small" }, "—")),
-        el("td", { class: "num avg-cell" }, avg30(it) === null ? el("span", { class: "muted" }, "—")
-          : el("span", {}, `${fmt(avg30(it), dp)} ${unit}`.trim(), el("br"), deltaBadge(avg30(it), it.limits, unit))),
-        el("td", { class: "ring-cell" }, miniRing(tally30(it))),
-        chartTogether ? (k === 0 ? el("td", { rowspan: members.length * 2 }, trend) : null) : el("td", {}, trend),
-      ];
-      return [el("tr", { class: "clickable trend-row", "data-status": p.status, onclick: () => (location.hash = href) }, ...present(cells)), chart];
-    });
-    const widths = firstHeader === "Test" ? ["3%", "24%", "4%", "8%", "9%", "9%", "8%", "16%", "8%", "6%", "5%"] : ["3%", "17%", "4%", "8%", "9%", "9%", "8%", "23%", "8%", "6%", "5%"];
-    const tableEl = sortable(el("table", { class: `measure-table trend-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
-      el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-      el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Latest", "Deviation", "Result", "History", "30-Day Avg", "30 days", "Trends"].map((h) => el("th", { class: h === "History" ? "history-cell" : h === "30 days" ? "ring-cell" : "" }, h))),
-        dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})), el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(histDateSlot))), el("th", {}), el("th", {}), el("th", {})) : null),
-      el("tbody", {}, rows)));
-    if (title && firstHeader !== "Test") {
-      const p0 = latest(members[0].points);
-      const line = limitsLine({ limits: { warn: p0.warn, fail: p0.fail, tol_mode: p0.tol_mode } }, unitOf(members[0]));
-      if (line) title.append(line);
+  app.append(trendInsightsCard(insights));
+  if (!sections.length) return app.append(el('div', { class: 'card empty' }, 'No measurements in this period. Import reports or choose a longer period.'));
+  const search = el('input', { type: 'search', class: 'filter-box', placeholder: 'Find an energy or measurement…', 'aria-label': 'Find measurements', oninput: e => {
+    const words = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
+    for (const section of sections) {
+      const rows = [...section.querySelectorAll('.trend-chart-row')];
+      rows.forEach(row => row.hidden = !words.every(w => row.dataset.search.includes(w)));
+      section.hidden = rows.every(row => row.hidden);
     }
-    fitHistoryRows(tableEl, dates.length);
-    // Energy / spot tables: every row on one chart below the table (Δ from Reference puts them on one scale).
-    const together = familyChart && members.length > 1
-      ? el("details", { class: "family-chart", open: true }, el("summary", {}, "Chart"),
-        seriesChart(members.map((m) => ({ label: (measureParts(m.name) || {}).rowLabel || m.name, points: m.points })), unitOf(members[0]),
-          { delta: true, yLabel: yAxisLabel(members.map((m) => m.name)) }))
-      : null;
-    return el("div", { class: "measure-block" }, title, el("div", { class: "table-wrap measure-wrap" }, tableEl), together);
-  };
-  const foldAxes = (list) => {
-    const out = [];
-    for (let i = 0; i < list.length; i++) {
-      const a = axisParts(list[i].name), b = axisParts((list[i + 1] || {}).name), c = axisParts((list[i + 2] || {}).name);
-      if (a && b && c && a.axis === "X" && b.axis === "Y" && c.axis === "Z" && a.base === b.base && b.base === c.base) {
-        const next = list[i + 3];
-        const calc = next && /\[calc: 3d-offset\]/.test(next.description || "") ? next : null;
-        out.push({ axes: [list[i], list[i + 1], list[i + 2]].map((it, k) => ({ ...it, axisLabel: "XYZ"[k] })), calc: calc ? { ...calc, axisLabel: "3D" } : null, base: a.base, unitTag: a.unitTag });
-        i += calc ? 3 : 2;
-      } else out.push(list[i]);
-    }
-    return out;
-  };
-  let lastSection = null;
-  for (const [key, items] of [...boxes].sort(([a], [b]) => Number(a.split("|")[0]) - Number(b.split("|")[0]))) {
-    const [n, category] = key.split("|");
-    const section = sectionTitle(Number(n), sectionCats.get(n), named ? category : null);
-    if (section !== lastSection) app.append(el("h2", { class: "section-head" }, section));
-    lastSection = section;
-    const blocks = [];
-    const families = new Map();
-    for (const it of items) { const mp = measureParts(it.name); if (!mp) continue; const k = `${mp.metric}|${it.unit || ""}`; if (!families.has(k)) families.set(k, []); families.get(k).push(it); }
-    const grouped = new Set([...families.values()].filter((f) => f.length > 1).flatMap((f) => f.map((x) => x.test_id)));
-    const drawn = new Set();
-    const shortName = (it) => (it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : it.name);
-    let pending = [];
-    const flush = () => {
-      if (!pending.length) return;
-      let plain = [];
-      const emitPlain = () => {
-        if (plain.length) blocks.push(trendTable(plain, { firstHeader: "Test", title: null, firstCell: (it) => el("strong", {}, shortName(it)) }));
-        plain = [];
-      };
-      for (const m of foldAxes(pending)) {
-        if (!m.axes) { plain.push(m); continue; }
-        emitPlain();
-        blocks.push(trendTable([...m.axes, ...(m.calc ? [m.calc] : [])], { firstHeader: "Axis", chartTogether: true,
-          title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : "")),
-          firstCell: (it) => el("strong", {}, it.axisLabel) }));
-      }
-      emitPlain();
-      pending = [];
-    };
-    for (const it of items) {
-      if (drawn.has(it.test_id)) continue;
-      if (!grouped.has(it.test_id)) { pending.push(it); continue; }
-      flush();
-      const mp0 = measureParts(it.name);
-      const family = families.get(`${mp0.metric}|${it.unit || ""}`).slice().sort((a, b) => measureParts(a.name).sortKey - measureParts(b.name).sortKey);
-      family.forEach((f) => drawn.add(f.test_id));
-      blocks.push(trendTable(family, { firstHeader: "Energy", familyChart: true, title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel)),
-        firstCell: (f) => el("strong", {}, measureParts(f.name).rowLabel) }));
-    }
-    flush();
-    app.append(el("details", { class: "card section trend-group", open: true }, el("summary", {}, el("strong", {}, categoryLabel(named ? category : category))), ...blocks));
-  }
+  }});
+  app.append(el('h2', { class: 'section-head' }, 'Measurements'), el('p', { class: 'muted small' }, 'Organized by QA list and measurement type. Select a row to open its graph. Matching X and Y measurements share a graph.'), search, ...sections);
 }
 
 function renderTrendDetail(group, range) {
@@ -3446,74 +3294,23 @@ function trendInsightsCard(series) {
     const last = item.points.at(-1); if (!last) continue;
     const who = item.machine_name ? `${item.machine_name} · ` : '';
     if (last.status === 'fail' || last.status === 'warn') messages.push({ priority: last.status === 'fail' ? 3 : 2,
-      text: `${who}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
+      href: item.href, text: `${who}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
     const pattern = trendPattern(item.points);
-    if (pattern) messages.push({ priority: 1, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${fmt(pattern.change, 3)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${pattern.r2.toFixed(2)}).` });
+    if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${fmt(pattern.change, 3)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${pattern.r2.toFixed(2)}).` });
   }
   messages.sort((a,b) => b.priority-a.priority);
   return el('section', { class: 'card trend-insights', 'aria-label': 'Automatic trend insights' },
     el('h3', {}, 'Trend insights'),
-    messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.text))) : el('p', { class: 'muted small' }, 'No warning/action results or clear directional patterns were identified in the displayed data. At least five results on different dates are needed to assess a directional pattern.'),
+    messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.href ? el('a', { href: m.href, class: 'trend-insight-link' }, m.text, ' → View graph') : m.text))) : el('p', { class: 'muted small' }, 'No warning/action results or clear directional patterns were identified in the displayed data. At least five results on different dates are needed to assess a directional pattern.'),
     el('details', {}, el('summary', { class: 'small' }, 'How these insights work'),
       el('p', { class: 'muted small' }, 'Calculated locally from the selected period. Patterns use a straight-line fit to the last 20 results relative to the current baseline: at least 5 results, R² ≥ 0.60, and fitted change of at least half the warning band when one is configured. These are descriptive signals for review, not clinical conclusions or an external AI assessment.')));
 }
-function trendMachinePicker(machines, selectedIds, range, onApply) {
-  const chosen = new Set(selectedIds.map(String));
-  const label = selectedIds.map((id) => machines.find((m) => String(m.id) === String(id))?.name).filter(Boolean).join(', ');
-  return el('details', { class: 'trend-machine-picker' }, el('summary', { class: 'button', 'aria-label': 'Select machines' }, label || 'Select machines'),
-    el('div', { class: 'trend-machine-options' }, machines.map((m) => el('label', { class: 'check' },
-      el('input', { type: 'checkbox', checked: chosen.has(String(m.id)), 'aria-label': `Compare ${m.name}`, onchange: (e) => { if (e.target.checked) chosen.add(String(m.id)); else chosen.delete(String(m.id)); } }), m.name)),
-    el('button', { class: 'primary', type: 'button', onclick: () => { if (!chosen.size) return toast('Select at least one machine.', true); onApply([...chosen]); } }, 'Apply')));
-}
-async function renderMultiMachineTrends(machines, selectedIds, range) {
-  const selected = machines.filter((m) => selectedIds.includes(String(m.id)));
-  const go = (ids, nextRange = range) => { location.hash = ids.length === 1 ? `#/trends?machine_id=${ids[0]}&range=${nextRange}` : `#/trends?machine_ids=${ids.join(',')}&range=${nextRange}`; };
-  page('Machine Trends', 'Compare shared measurements across machines. Machine-only tests stay visible as their own charts.', [
-    trendMachinePicker(machines, selectedIds, range, (ids) => go(ids)),
-    select('range', [['30','Last 30 days'],['90','Last 3 months'],['365','Last year'],['all','All history']], range, { 'aria-label': 'Period', onchange: (e) => go(selectedIds,e.target.value) })]);
-  app.querySelector('.page-head').classList.add('sticky-head', 'trends-head');
-  const loading = el('p', { class: 'muted' }, 'Loading machine comparisons…'); app.append(loading);
-  const machineData = await Promise.all(selected.map(async (machine) => {
-    const assignments = (await api('GET', `/api/machines/${machine.id}/assignments`)).filter((a) => a.active && !a.archived);
-    const [templates, histories] = await Promise.all([Promise.all(assignments.map((a) => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machine.id}/trends`)]);
-    const items = templates.flatMap((t) => t.items.filter((i) => i.type === 'numeric').map((i) => ({ ...i, machine_name: machine.name, machine_id: machine.id, queue_id: t.queue.id, points: judgedByList(i, filterRange(histories[i.test_id] || [],range).filter((p) => String(p.assignment_id) === String(t.assignment.id))) }))).filter((i) => i.points.length);
-    return { machine, assignments, items };
-  }));
-  loading.remove();
-  const filesHolder = el('div');
-  let filesMachineId = selectedIds[0];
-  const drawFiles = () => { const data = machineData.find((d) => String(d.machine.id) === filesMachineId); filesHolder.replaceChildren(trendFileTools(data.machine,data.assignments,'',range,[])); };
-  app.append(el('div', { class: 'row trend-files-machine' }, el('span', { class: 'muted small' }, 'Files for'),
-    select('files_machine',selected.map((m) => [m.id,m.name]),filesMachineId,{ 'aria-label': 'Machine for import and export', onchange: (e) => { filesMachineId=e.target.value;drawFiles(); } })), filesHolder); drawFiles();
-  const all = machineData.flatMap((d) => d.items);
-  const failures=all.filter((i) => i.points.at(-1).status==='fail').length, warnings=all.filter((i) => i.points.at(-1).status==='warn').length;
-  const metric=(label,value)=>el('div',{class:'trend-metric'},el('span',{class:'muted small'},label),el('strong',{},String(value)));
-  app.append(el('div',{class:'trend-dashboard-summary','aria-label':'Machine comparison summary'},metric('Selected machines',selected.length),metric('Tracked measurements',all.length),metric('At action level',failures),metric('At warning level',warnings)),trendInsightsCard(all));
-  if (!all.length) { app.append(el('div',{class:'card empty'},'No measurements in this period. Import results or choose a longer period.')); return; }
-  const groups=new Map();
-  for(const item of all){const key=`${item.queue_id}:${item.test_id}:${item.unit || ''}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
-  const ranked=[...groups.values()].sort((a,b)=>Math.max(...b.map((i)=>STATUS_RANK[i.points.at(-1).status]))-Math.max(...a.map((i)=>STATUS_RANK[i.points.at(-1).status]))||a[0].name.localeCompare(b[0].name));
-  const grid=el('div',{class:'trend-comparison-grid'});
-  ranked.forEach((items,index)=>{
-    const area=el('div'),unit=items[0].unit==='unitless'?'':items[0].unit||'';
-    const chart=el('details',{class:'card trend-comparison',open:index<3},el('summary',{},el('strong',{},items[0].name),el('span',{class:'muted small'},' · ',items.map((i)=>i.machine_name).join(', '))),area);
-    let drawn=false;const draw=()=>{if(drawn||!chart.open)return;drawn=true;area.append(seriesChart(items.map((i)=>({label:i.machine_name,points:i.points})),unit,{small:true,delta:items.length>1,yLabel:yAxisLabel([items[0].name])}),el('div',{class:'row'},items.map((i)=>el('a',{class:'small',href:`#/trends?machine_id=${i.machine_id}&test_id=${i.test_id}&range=${range}`},`${i.machine_name} details`))));};
-    chart.addEventListener('toggle',draw);draw();chart.dataset.search=`${items[0].name} ${items[0].category} ${items.map((i)=>i.machine_name).join(' ')}`.toLowerCase();grid.append(chart);
-  });
-  const search=el('input',{type:'search',class:'filter-box',placeholder:'Find a measurement or machine…','aria-label':'Find comparison charts',oninput:(e)=>{const words=e.target.value.toLowerCase().split(/\s+/).filter(Boolean);for(const chart of grid.children)chart.hidden=!words.every((w)=>chart.dataset.search.includes(w));}});
-  app.append(el('h2',{class:'section-head'},'Measurement comparisons'),el('div',{class:'filter-row'},search),grid);
-}
-
 async function renderTrends() {
   const params = queryParams();
   const machines = (await api("GET", "/api/machines")).filter((m) => m.active);
-  const explicit = (params.get("machine_ids") || params.get("machine_id") || "").split(",").filter((id) => machines.some((m) => String(m.id) === id));
-  const gantries = machines.filter((m) => /^GTR[125]$/i.test(m.name));
-  const defaultIds = gantries.length ? gantries.map((m) => String(m.id)) : machines.slice(0,1).map((m) => String(m.id));
-  const selectedIds = explicit.length ? [...new Set(explicit)] : defaultIds;
-  if (selectedIds.length > 1 && !params.get("test_id")) return renderMultiMachineTrends(machines, selectedIds, params.get("range") || "90");
-  const fallback = machines.find((m) => m.kind === "Proton gantry") || machines[0];
-  const machineId = machines.some((m) => String(m.id) === params.get("machine_id")) ? params.get("machine_id") : (fallback && fallback.id);
+  const requested = (params.get('machine_id') || params.get('machine_ids') || '').split(',')[0];
+  const fallback = machines.find(m => m.name === 'GTR1') || machines[0];
+  const machineId = machines.some(m => String(m.id) === requested) ? requested : fallback?.id;
   const range = params.get("range") || "90";
   const testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
@@ -3521,7 +3318,7 @@ async function renderTrends() {
   const listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
-    trendMachinePicker(machines, [String(machineId)], range, (ids) => { location.hash = ids.length === 1 ? `#/trends?machine_id=${ids[0]}&range=${range}` : `#/trends?machine_ids=${ids.join(",")}&range=${range}`; }),
+    select('machine_id', machines.map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
     select("list", [["", "All QA lists"], ...lists.map((a) => [a.id, a.queue_name])], listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }),
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
     testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
@@ -3536,11 +3333,11 @@ async function renderTrends() {
   const items = data.map((d) => {
     const li = listItems.get(String(d.test.id));
     const limits = li ? li.limits : { expected: d.test.expected, warn: d.test.warn, fail: d.test.fail, tol_mode: d.test.tol_mode };
-    return { ...d.test, test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range).filter((p) => !listId || String(p.assignment_id) === String(listId))) };
+    return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range).filter((p) => !listId || String(p.assignment_id) === String(listId))) };
   }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = axisGroups(items)[0];
-  app.append(el("h2", {}, group ? group.base : head.name, group ? axisLegend(group) : null),
+  app.append(el("h2", {}, group ? group.base : trendDisplayName(head.name), group ? axisLegend(group) : null),
     el("p", { class: "muted small" }, [sectionOf(head), categoryLabel(head.category)].join(" · ")));
   if (!group) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
   renderTrendDetail(group, range);
