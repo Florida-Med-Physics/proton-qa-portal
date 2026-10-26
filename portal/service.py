@@ -888,6 +888,12 @@ def _check_not_imported(db, source_ref):
             raise PortalError(f"This Sphinx file was already recorded as run #{existing['id']} ({existing['qa_date']}).")
 
 
+def needs_therapist_approval(template):
+    import re
+    return any(re.search(r'therapist', item.get('name', ''), re.I) and re.search(r'review|approv', item.get('name', ''), re.I)
+               or '[approval: therapist]' in item.get('description', '').lower() for item in template['items'])
+
+
 def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, review_status):
     result_overall = qa.overall(r["status"] for r in rows) if rows else "recorded"
     with db.transaction():
@@ -896,6 +902,8 @@ def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, 
             "source_ref, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (template["assignment"]["id"], template["machine"]["id"], template["queue"]["id"], user["id"], now(), qa_date,
              result_overall, comment, source, source_ref, review_status))
+        if review_status == 'pending' and needs_therapist_approval(template):
+            db.run('UPDATE runs SET therapist_approval_required=1 WHERE id=?', (run_id,))
         for r in rows:
             limits = r["limits"]
             db.run("INSERT INTO results (run_id, test_id, value_num, value_text, expected, warn, fail, tol_mode, status, comment) "
@@ -1097,29 +1105,49 @@ def get_run(db, user, run_id):
     run = db.one(_RUN_SELECT + "WHERE r.id = ?", (run_id,))
     if not run:
         raise PortalError("Run not found.", 404)
+    signer = db.one('SELECT username, full_name FROM users WHERE id=?', (run['therapist_approved_by'],)) if run['therapist_approved_by'] else None
+    run['therapist_approver_name'] = (signer['full_name'] or signer['username']) if signer else None
     run["results"] = db.all("SELECT res.*, t.name, t.category, t.type, t.unit FROM results res JOIN tests t ON t.id = res.test_id "
                             "WHERE res.run_id = ? ORDER BY res.id", (run_id,))
     return run
 
 
-def review_run(db, user, run_id, data):
-    require(user, "review")
-    run = _get(db, "runs", run_id)
-    decision = data.get("decision")
-    if decision not in ("approved", "rejected"):
-        raise PortalError("Decision must be approve or reject.")
-    if run["review_status"] != "pending":
-        raise PortalError("This run has already been reviewed.")
-    if run["performed_by"] == user["id"]:
-        raise PortalError("Runs must be reviewed by someone other than the person who performed them.")
-    comment = _text(data, "comment")
-    if decision == "rejected" and not comment:
-        raise PortalError("Add a comment explaining the rejection.")
-    db.run("UPDATE runs SET review_status = ?, reviewed_by = ?, reviewed_at = ?, review_comment = ? WHERE id = ?",
-           (decision, user["id"], now(), comment, run_id))
-    db.audit(user["id"], decision, "run", run_id, comment=comment)
-    return {"ok": True}
+def therapist_approve_run(db, user, run_id):
+    require(user, 'therapist_approve')
+    with db.transaction():
+        run = _get(db, 'runs', run_id)
+        if run['review_status'] != 'pending' or not run['therapist_approval_required']:
+            raise PortalError('This run is not waiting for therapist approval.')
+        if run['therapist_approved_by']:
+            raise PortalError('Therapist approval is already recorded.')
+        db.run('UPDATE runs SET therapist_approved_by=?, therapist_approved_at=? WHERE id=?', (user['id'],now(),run_id))
+        db.audit(user['id'],'therapist_approved','run',run_id)
+    return {'ok': True}
 
+
+def review_run(db, user, run_id, data):
+    with db.transaction():
+        require(user, "review")
+        run = _get(db, "runs", run_id)
+        if run['therapist_approval_required']:
+            if not run['therapist_approved_by']:
+                raise PortalError('Therapist approval is required before medical physicist review.')
+            if user['role'] != 'physicist':
+                raise PortalError('This run requires review by a medical physicist.')
+        decision = data.get("decision")
+        if decision not in ("approved", "rejected"):
+            raise PortalError("Decision must be approve or reject.")
+        if run["review_status"] != "pending":
+            raise PortalError("This run has already been reviewed.")
+        if run["performed_by"] == user["id"]:
+            raise PortalError("Runs must be reviewed by someone other than the person who performed them.")
+        comment = _text(data, "comment")
+        if decision == "rejected" and not comment:
+            raise PortalError("Add a comment explaining the rejection.")
+        db.run("UPDATE runs SET review_status = ?, reviewed_by = ?, reviewed_at = ?, review_comment = ? WHERE id = ?",
+               (decision, user["id"], now(), comment, run_id))
+        db.audit(user["id"], decision, "run", run_id, comment=comment)
+        return {"ok": True}
 
 def trend(db, user, machine_id, test_id):
     test = _get(db, "tests", test_id)

@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 
 from .db import now
 
-ROLES = ("admin", "physicist", "therapist")
+ROLES = ("admin", "physicist", "therapist", "mpa")
 # What each role may do; admins can do everything.
 PERMISSIONS = {
-    "perform": {"admin", "physicist", "therapist"},
+    "perform": {"admin", "physicist", "therapist", "mpa"},
+    "therapist_approve": {"therapist"},
     "review": {"admin", "physicist"},
     "configure": {"admin", "physicist"},
     "manage_users": {"admin"},

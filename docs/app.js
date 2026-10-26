@@ -20,7 +20,7 @@ for (const method of ["append", "prepend", "replaceChildren"]) {
   const native = app[method].bind(app);
   app[method] = (...kids) => native(...present(kids));
 }
-const ROLE_LABEL = { admin: "Admin", physicist: "Physicist", therapist: "Therapist" };
+const ROLE_LABEL = { admin: "Admin", physicist: "Physicist", therapist: "Therapist", mpa: "MPA" };
 const STATE_LABEL = { overdue: "Overdue", due: "Due", done: "Done today", upcoming: "Upcoming" };
 const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", semiannual: "Semiannual", annual: "Annual", custom: "Custom interval",
   asneeded: "As needed (e.g. SRS days)" };
@@ -129,7 +129,7 @@ function personName(name, username) {
 
 function can(permission) {
   const role = state.user && state.user.role;
-  const rules = { perform: ["admin", "physicist", "therapist"], review: ["admin", "physicist"], configure: ["admin", "physicist"], manage_users: ["admin"] };
+  const rules = { perform: ["admin", "physicist", "therapist", "mpa"], therapist_approve: ["therapist"], review: ["admin", "physicist"], configure: ["admin", "physicist"], manage_users: ["admin"] };
   return !!role && rules[permission].includes(role);
 }
 
@@ -433,15 +433,11 @@ function renderLogin() {
     el("img", { class: "brand-logo", src: "uf-proton-logo.png", alt: "UF Health Proton Therapy Institute" }),
     el("h1", { class: "login-title" }, el("img", { class: "login-mark", src: "gatorqa-logo.svg", alt: "" }), "GatorQA"),
     el("p", { class: "muted login-sub" }, "UFHPTI Machine QA"),
-    window.localApi
-      ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
-        field("Your name", el("input", { name: "username", autocomplete: "name", required: true, autofocus: true })),
-        field("Role", select("role", Object.entries(ROLE_LABEL), "physicist"))]
-      : [el("p", { class: "muted" }, "Sign in with your portal account."),
-        field("Username", el("input", { name: "username", autocomplete: "username", required: true, autofocus: true })),
-        field("Password", el("input", { name: "password", type: "password", autocomplete: "current-password", required: true }))],
+    el("p", { class: "muted" }, window.localApi ? "Temporary demo sign-in. Data stays in this browser. Shared-server deployment provides real access protection." : "Sign in with your portal account."),
+    field("Username", el("input", { name: "username", autocomplete: "username", required: true, autofocus: true })),
+    field("Password", el("input", { name: "password", type: "password", autocomplete: "current-password", required: true })),
     error,
-    el("button", { class: "primary", type: "submit" }, window.localApi ? "Continue" : "Sign in"));
+    el("button", { class: "primary", type: "submit" }, "Sign in"));
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
@@ -2467,7 +2463,7 @@ async function renderReview() {
     el("td", {}, r.queue_name),
     el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
     el("td", {}, chip(r.overall)),
-    el("td", {}, r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)),
+    el("td", {}, r.review_status === "pending" && r.therapist_approval_required && !r.therapist_approved_by ? chip("due", "Therapist sign-off needed") : r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)),
     el("td", { class: "center" }, r.review_status === "pending" && can("review")
       ? el("a", { class: "button primary small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Review")
       : el("a", { class: "button small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Open")));
@@ -2498,7 +2494,7 @@ async function renderRuns() {
       el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
       el("td", {}, r.machine_name), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)),
-      el("td", {}, r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)))), "No runs match."));
+      el("td", {}, r.review_status === "pending" && r.therapist_approval_required && !r.therapist_approved_by ? chip("due", "Therapist sign-off needed") : r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)))), "No runs match."));
 }
 
 // A self-contained PDF exporter shared by the server and browser builds.
@@ -2513,6 +2509,7 @@ function qaReportPdf(run) {
   const lines = [run.queue_name, `Machine: ${run.machine_name} | QA date: ${run.qa_date} | Run: ${run.id}`,
     `Performed by: ${run.performer_name || run.performer || ''} | Recorded: ${run.performed_at || ''}`,
     `Overall: ${verdict(run.overall)} | Review: ${run.review_status || 'pending'}`];
+  if (run.therapist_approval_required) lines.push(`Therapist approval: ${run.therapist_approved_by ? `${run.therapist_approver_name || run.therapist_approved_by} | ${run.therapist_approved_at}` : 'Awaiting therapist sign-off'}`);
   if (run.reviewed_at) lines.push(`Reviewed by: ${run.reviewer_name || run.reviewer || ''} | ${run.reviewed_at}`);
   if (run.comment) lines.push(`Notes: ${run.comment}`);
   if (run.review_comment) lines.push(`Review note: ${run.review_comment}`);
@@ -2577,7 +2574,16 @@ async function renderRun(id) {
     run.review_comment ? [el("dt", {}, "Review note"), el("dd", {}, run.review_comment)] : null);
   app.append(facts);
 
-  if (run.review_status === "pending" && can("review")) {
+  if (run.therapist_approval_required) {
+    app.append(el('section', { class: 'card therapist-signoff' }, el('h3', {}, '1. Therapist approval'),
+      run.therapist_approved_by ? el('p', {}, `${run.therapist_approver_name || 'Therapist'} · ${run.therapist_approved_at.replace('T',' ')}`)
+        : el('p', {}, 'Waiting for a signed-in therapist. A Yes checkbox does not count as approval.'),
+      !run.therapist_approved_by && run.review_status === 'pending' && can('therapist_approve') ? el('button', { class: 'primary', onclick: async () => {
+        try { await api('POST', `/api/runs/${id}/therapist-approve`, {}); toast('Therapist approval recorded'); route(); } catch(err) { toast(err.message,true); }
+      } }, 'Sign therapist approval') : null,
+      el('h3', {}, '2. Medical physicist review'), el('p', {}, run.therapist_approved_by ? 'Ready for medical physicist review.' : 'Available after therapist approval.')));
+  }
+  if (run.review_status === "pending" && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && state.user.role === 'physicist'))) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
@@ -3461,20 +3467,29 @@ function userForm(user) {
     field("Role", select("role", Object.entries(ROLE_LABEL), u.role)),
     field(user ? "New password (leave blank to keep)" : "Temporary password", el("input", { name: "password", type: "password", autocomplete: "new-password", minlength: 10, required: !user })),
     user ? el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!u.active }), "Active") : null,
-    el("p", { class: "muted small wide" }, "Admins manage users. Physicists configure machines, queues and limits, and review runs. Therapists perform QA."));
+    el("p", { class: "muted small wide" }, "Admins manage users. Physicists configure machines, queues and limits, and review runs. Therapists perform QA and sign required therapist approvals. MPA users perform QA; approval and setup access are restricted."));
 }
 
 // Admin: who can sign in and what they may do, and the folders each QA list reads its export files from.
 const RIGHTS = [
   ["perform", "Perform QA"],
   ["review", "Review and approve"],
+  ["therapist_approve", "Therapist sign-off"],
   ["configure", "Set up QA lists, machines, limits and folders"],
   ["manage_users", "Manage users"],
 ];
-const ROLE_RIGHTS = { admin: ["perform", "review", "configure", "manage_users"], physicist: ["perform", "review", "configure"], therapist: ["perform"] };
+const ROLE_RIGHTS = { admin: ["perform", "review", "configure", "manage_users"], physicist: ["perform", "review", "configure"], therapist: ["perform", "therapist_approve"], mpa: ["perform"] };
 
 async function renderAdmin() {
-  page("Data Administration", "Users and their rights, the folders export files are read from, and the database.");
+  const addUser = () => modal('Add user', userForm(), async data => {
+    await api('POST','/api/users',data);toast('User added');route();
+  });
+  page("Data Administration", "Users and their rights, the folders export files are read from, and the database.", [
+    el('button', { class: 'primary', disabled: !can('manage_users'), onclick: addUser }, 'Add user')]);
+  app.append(el('p', { class: 'admin-role-notice' }, `Signed in as ${ROLE_LABEL[state.user.role]}. `,
+    can('manage_users') ? 'Use Add user above to create Admin, Physicist, Therapist or MPA accounts.'
+      : ['Adding users requires an Admin account. ', el('button', { class: 'small', onclick: logout }, 'Sign in as Admin'),
+        window.localApi ? ' This browser demo requires the Admin test account and password. The shared server requires an existing Admin account and password.' : ' Ask the portal administrator if you need Admin access.']));
   const [users, machines] = await Promise.all([can("manage_users") ? api("GET", "/api/users") : null, api("GET", "/api/machines")]);
 
   // 1. Users and rights (admins only; others see what each role may do).
@@ -3486,13 +3501,7 @@ async function renderAdmin() {
       table(["Role", ...RIGHTS.map(([, label]) => label)], Object.entries(ROLE_RIGHTS).map(([role, rights]) => el("tr", {},
         el("td", {}, el("strong", {}, ROLE_LABEL[role])), RIGHTS.map(([key]) => el("td", { class: "center" }, rights.includes(key) ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—")))))));
   }
-  if (users) app.append(
-    el("p", { class: "row" }, el("span", { class: "muted" }, "Rights come from each person's role."), el("span", { class: "spacer" }),
-      el("button", { class: "primary", onclick: () => modal("Add user", userForm(), async (data) => {
-        await api("POST", "/api/users", data);
-        toast("User added");
-        route();
-      }) }, "Add user")));
+  if (users) app.append(el('p', { class: 'muted' }, 'Rights come from each person’s role. Use Add user at the top to create an account.'));
   const tick = (on) => el("td", { class: "center" }, on ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—"));
   if (users) app.append(table(["Username", "Name", "Role", ...RIGHTS.map(([, label]) => label), "Status", ""], users.map((u) => el("tr", {},
     el("td", {}, el("strong", {}, u.username)),
@@ -3579,7 +3588,7 @@ async function renderAdmin() {
       app.append(el("h2", { class: "section-head" }, "Database"), el("div", { class: "card" },
         el("p", {}, el("strong", {}, info.path), el("span", { class: "muted small" }, ` · ${(info.size / 1048576).toFixed(1)} MB`)),
         el("p", { class: "muted small" }, "All results are in this one file on the host PC. Back it up by copying it while the portal is stopped."),
-        can("manage_users") ? dbSwitchForm(info.path) : null));
+        can("manage_users") && !info.managed ? dbSwitchForm(info.path) : null));
     }
   }
   // Browser build: where this browser keeps the database, and backups.

@@ -9,6 +9,12 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Replace browser role selection with temporary password accounts (Physicist, Therapy, Admin), reject incorrect passwords, and support Admin-created accounts and password resets.
+
+- Add MPA role with provisional QA-entry access; record therapist sign-off before required Physicist final approval.
+- Prepare shared-server deployment, HTTPS proxy configuration and verified shared-drive snapshots; the UFHPTI host installation remains pending.
+- Make Add user prominent in Data Administration with an explicit Admin sign-in explanation for other roles.
+
 - Show the most recently edited template first within each modality, including test edits and same-second changes.
 
 - Edit test names, categories and result types directly in template rows; Save template commits definitions and defaults together with rollback on validation errors.

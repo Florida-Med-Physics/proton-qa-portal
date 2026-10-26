@@ -9,9 +9,9 @@
   const DB_NAME = "proton-qa-portal";
   const STORE = "kv";
   const TABLES = ["users", "machines", "tests", "queues", "queue_items", "assignments", "overrides", "runs", "results", "audit"];
-  const ROLES = ["admin", "physicist", "therapist"];
+  const ROLES = ["admin", "physicist", "therapist", "mpa"];
   const PERMISSIONS = {
-    perform: ["admin", "physicist", "therapist"], review: ["admin", "physicist"], configure: ["admin", "physicist"], manage_users: ["admin"],
+    perform: ["admin", "physicist", "therapist", "mpa"], therapist_approve: ["therapist"], review: ["admin", "physicist"], configure: ["admin", "physicist"], manage_users: ["admin"],
   };
   const FREQUENCIES = ["daily", "weekly", "monthly", "quarterly", "semiannual", "annual", "custom", "asneeded"];
   const MONTH_STEPS = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12 };
@@ -478,9 +478,36 @@
 
   // ---- users / session --------------------------------------------------------
 
+  async function passwordHash(password, salt) {
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({name:'PBKDF2', salt:new TextEncoder().encode(salt), iterations:100000, hash:'SHA-256'}, key, 256);
+    return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2,'0')).join('');
+  }
+  async function setPassword(user, password) {
+    user.password_salt = crypto.randomUUID();
+    user.password_hash = await passwordHash(password, user.password_salt);
+  }
+  async function checkPassword(user, password) {
+    return !!(user && user.password_salt && user.password_hash === await passwordHash(password, user.password_salt));
+  }
+  async function setupDemoAccounts() {
+    if (S.demoPasswordAccountsV1) return;
+    for (const [name, role] of [['Physicist','physicist'],['Therapy','therapist'],['Admin','admin']]) {
+      let user = S.users.find(u => u.username.toLowerCase() === name.toLowerCase());
+      if (!user) user = byId('users', insert('users', {username:name, full_name:name, role, active:1, created_at:now()}));
+      user.role = role;
+      user.active = 1;
+      await setPassword(user, name);
+    }
+    localStorage.removeItem('qa_portal_user');
+    sessionStorage.removeItem('qa_portal_password_user');
+    S.demoPasswordAccountsV1 = true;
+    save();
+  }
+
   const publicUser = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, role: u.role });
   function currentUser() {
-    const id = Number(localStorage.getItem("qa_portal_user") || 0);
+    const id = Number(sessionStorage.getItem("qa_portal_password_user") || 0);
     const u = id && byId("users", id);
     return u && u.active ? publicUser(u) : null;
   }
@@ -881,7 +908,7 @@
   function insertRun(user, t, qaDate, rows, comment, source, sourceRef, reviewStatus) {
     const result = rows.length ? overall(rows.map((r) => r.status)) : "recorded";
     const id = insert("runs", { assignment_id: t.assignment.id, machine_id: t.machine.id, queue_id: t.queue.id, performed_by: user.id,
-      performed_at: now(), qa_date: qaDate, overall: result, comment, source, source_ref: sourceRef, review_status: reviewStatus,
+      performed_at: now(), qa_date: qaDate, overall: result, comment, source, source_ref: sourceRef, review_status: reviewStatus, therapist_approval_required: reviewStatus === 'pending' && t.items.some(item => /therapist/i.test(item.name) && /review|approv/i.test(item.name) || /\[approval: therapist\]/i.test(item.description || '')), therapist_approved_by: null, therapist_approved_at: null,
       reviewed_by: null, reviewed_at: null, review_comment: "" });
     for (const r of rows) insert("results", { run_id: id, test_id: r.test_id, value_num: r.value_num, value_text: r.value_text, ...r.limits, status: r.status, comment: r.comment });
     audit(user.id, reviewStatus === "imported" ? "import" : "submit", "run", id, { machine: t.machine.name, queue: t.queue.name, overall: result, source });
@@ -926,7 +953,7 @@
   }
   function runRow(r) {
     const m = byId("machines", r.machine_id), q = byId("queues", r.queue_id), p = byId("users", r.performed_by) || {}, rv = r.reviewed_by ? byId("users", r.reviewed_by) : null;
-    return { ...r, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
+    return { ...r, therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
       reviewer_name: rv ? rv.full_name : null, reviewer: rv ? rv.username : null };
   }
   function listRuns(q) {
@@ -942,9 +969,20 @@
     const results = S.results.filter((x) => x.run_id === r.id).map((x) => { const t = byId("tests", x.test_id); return { ...x, name: t.name, category: t.category, type: t.type, unit: t.unit }; });
     return { ...runRow(r), results };
   }
+  function therapistApproveRun(user,id) {
+    require(user,'therapist_approve');
+    const run=get('runs',id,'Run');
+    if(run.review_status!=='pending'||!run.therapist_approval_required||run.therapist_approved_by) throw new Error('This run is not waiting for therapist approval.');
+    Object.assign(run,{therapist_approved_by:user.id,therapist_approved_at:now()});
+    audit(user.id,'therapist_approved','run',id);save();return {ok:true};
+  }
   function reviewRun(user, id, data) {
     require(user, "review");
     const r = get("runs", id);
+    if(r.therapist_approval_required) {
+      if(!r.therapist_approved_by) throw new Error('Therapist approval is required before medical physicist review.');
+      if(user.role!=='physicist') throw new Error('This run requires review by a medical physicist.');
+    }
     if (!["approved", "rejected"].includes(data.decision)) throw new Error("Decision must be approve or reject.");
     if (r.review_status !== "pending") throw new Error("This run has already been reviewed.");
     if (r.performed_by === user.id) throw new Error("Runs must be reviewed by someone other than the person who performed them.");
@@ -1105,6 +1143,7 @@
     if (fromFile) S = fromFile;
     else if (stored) S = stored;
     else { seed(); save(); }
+    await setupDemoAccounts();
     upgradeCtList();
     upgradeBbUnits();
     dropSphinxCouch();
@@ -1123,6 +1162,7 @@
     mergeCopies();
     restoreMonthlySchedules();
     generalizePbsTemplates();
+    for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
   })();
 
   function generalizePbsTemplates() {
@@ -1464,36 +1504,45 @@
   const route = (method, pattern, handler, pub) => routes.push({ method, pattern: new RegExp(`^${pattern}$`), handler, pub });
 
   route("GET", "/api/me", () => ({ user: currentUser() }), true);
-  route("POST", "/api/login", (u, m, body) => {
+  route("POST", "/api/login", async (u, m, body) => {
     const name = required(body, "username");
-    const role = ROLES.includes(body.role) ? body.role : "physicist";
-    let user = S.users.find((x) => x.username.toLowerCase() === name.toLowerCase());
-    if (!user) { const id = insert("users", { username: name, full_name: name, role, password_hash: "", active: 1, created_at: now() }); user = byId("users", id); }
-    else if (user.role !== role) { user.role = role; save(); }
-    localStorage.setItem("qa_portal_user", String(user.id));
-    audit(user.id, "login", "user", user.id, {});
-    return { user: publicUser(user) };
+    const user = S.users.find(x => x.username.toLowerCase() === name.toLowerCase());
+    if (!user || !user.active || !await checkPassword(user, body.password || '')) throw new Error('Incorrect username or password.');
+    sessionStorage.setItem('qa_portal_password_user', String(user.id));
+    audit(user.id, 'login', 'user', user.id, {});
+    return {user:publicUser(user)};
   }, true);
-  route("POST", "/api/logout", () => { localStorage.removeItem("qa_portal_user"); return { ok: true }; }, true);
-  route("POST", "/api/password", () => { throw new Error("This build has no passwords: everyone on this computer shares it."); });
+  route("POST", "/api/logout", () => { sessionStorage.removeItem('qa_portal_password_user'); localStorage.removeItem('qa_portal_user'); return {ok:true}; }, true);
+  route("POST", "/api/password", async (u, m, body) => {
+    const user = get('users', u.id);
+    if (!await checkPassword(user, body.current || '')) throw new Error('Incorrect current password.');
+    if ((body.new || '').length < 10) throw new Error('Use at least 10 characters.');
+    await setPassword(user, body.new); save(); return {ok:true};
+  });
   route("GET", "/api/dashboard", () => dashboard());
   route("GET", "/api/users", (u) => { require(u, "manage_users"); return S.users.map((x) => ({ ...publicUser(x), active: x.active, created_at: x.created_at })); });
-  route("POST", "/api/users", (u, m, body) => {
+  route("POST", "/api/users", async (u, m, body) => {
     require(u, "manage_users");
     const name = required(body, "username");
     if (!ROLES.includes(body.role)) throw new Error("Choose a role.");
     if (S.users.some((x) => x.username.toLowerCase() === name.toLowerCase())) throw new Error(`User '${name}' already exists.`);
+    if ((body.password || "").length < 10) throw new Error("Use at least 10 characters.");
     const id = insert("users", { username: name, full_name: text(body, "full_name"), role: body.role, password_hash: "", active: 1, created_at: now() });
+    await setPassword(byId("users",id), body.password); save();
     audit(u.id, "create", "user", id, { username: name, role: body.role });
     return { id };
   });
-  route("PUT", "/api/users/(\\d+)", (u, m, body) => {
+  route("PUT", "/api/users/(\\d+)", async (u, m, body) => {
     require(u, "manage_users");
     const target = get("users", m[1]);
     const role = body.role || target.role;
     if (!ROLES.includes(role)) throw new Error("Unknown role.");
     const active = flag(body, "active", !!target.active);
     if (target.id === u.id && (role !== "admin" || !active)) throw new Error("You cannot remove your own admin access.");
+    if (body.password) {
+      if (body.password.length < 10) throw new Error("Use at least 10 characters.");
+      await setPassword(target, body.password);
+    }
     Object.assign(target, { full_name: text(body, "full_name", target.full_name), role, active });
     save();
     audit(u.id, "update", "user", target.id, { role, active });
@@ -1549,6 +1598,7 @@
   route("POST", "/api/assignments/(\\d+)/sphinx/import", (u, m, body) => importSphinx(u, Number(m[1]), body));
   route("GET", "/api/runs", (u, m, body, q) => listRuns(q));
   route("GET", "/api/runs/(\\d+)", (u, m) => getRun(Number(m[1])));
+  route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
   route("GET", "/api/machines/(\\d+)/trends", (u, m) => machineTrends(Number(m[1])));
   route("GET", "/api/trend", (u, m, body, q) => {

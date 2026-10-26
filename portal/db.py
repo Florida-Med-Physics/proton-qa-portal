@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY,
     username TEXT NOT NULL UNIQUE COLLATE NOCASE,
     full_name TEXT NOT NULL DEFAULT '',
-    role TEXT NOT NULL CHECK (role IN ('admin', 'physicist', 'therapist')),
+    role TEXT NOT NULL CHECK (role IN ('admin', 'physicist', 'therapist', 'mpa')),
     password_hash TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL
@@ -160,7 +160,32 @@ class Database:
                                "Delete it and start again (for the demo, rerun seed_demo.py).")
         self._migrate()
         self.conn.executescript(SCHEMA)
+        self._approval_migrations()
         self._generalize_pbs_templates()
+
+    def _approval_migrations(self):
+        users_schema = self.one("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")["sql"]
+        if "'mpa'" not in users_schema:
+            self.conn.executescript("""
+                PRAGMA foreign_keys=OFF;
+                BEGIN;
+                CREATE TABLE users_new (
+                  id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                  full_name TEXT NOT NULL DEFAULT '', role TEXT NOT NULL CHECK(role IN ('admin','physicist','therapist','mpa')),
+                  password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+                INSERT INTO users_new SELECT id,username,full_name,role,password_hash,active,created_at FROM users;
+                DROP TABLE users;
+                ALTER TABLE users_new RENAME TO users;
+                COMMIT;
+                PRAGMA foreign_keys=ON;
+            """)
+        columns = {r[1] for r in self.conn.execute('PRAGMA table_info(runs)')}
+        for name, definition in [('therapist_approval_required','INTEGER NOT NULL DEFAULT 0'),
+                                 ('therapist_approved_by','INTEGER REFERENCES users(id)'),
+                                 ('therapist_approved_at','TEXT')]:
+            if name not in columns:
+                self.conn.execute(f'ALTER TABLE runs ADD COLUMN {name} {definition}')
+        self.run("UPDATE runs SET therapist_approval_required=1 WHERE review_status='pending' AND EXISTS (SELECT 1 FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=runs.id AND lower(t.name) LIKE '%therapist%' AND (lower(t.name) LIKE '%review%' OR lower(t.name) LIKE '%approv%'))")
 
     def _generalize_pbs_templates(self):
         from .sphinx import canonical_key

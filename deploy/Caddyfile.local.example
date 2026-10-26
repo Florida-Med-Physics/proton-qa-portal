@@ -1,0 +1,5 @@
+# Supply the assigned internal hostname and IT-issued TLS certificate/key paths.
+{$PORTAL_DOMAIN} {
+    tls {$PORTAL_CERT_FILE} {$PORTAL_KEY_FILE}
+    reverse_proxy 127.0.0.1:8790
+}
