@@ -3,6 +3,7 @@ const source = fs.readFileSync('portal/static/app.js', 'utf8');
 const context = {}; vm.createContext(context);
 vm.runInContext(source.slice(source.indexOf('const AXIS_NAME ='), source.indexOf('// Deviation from expected')), context);
 vm.runInContext(source.slice(source.indexOf('function trendDisplayName('), source.indexOf('async function renderTrendOverview(')), context);
+vm.runInContext(source.slice(source.indexOf('function trendGroups('), source.indexOf('async function renderTrendOverview(')), context);
 const items = [
   {test_id: 1, name: 'Spot 3 [100 MeV] – Position X', category: 'Spot', unit: 'mm'},
   {test_id: 2, name: 'Spot 4 [100 MeV] – Position Y', category: 'Spot', unit: 'mm'},
@@ -17,3 +18,12 @@ assert.equal(groups[0].base, '[100 MeV] – Position');
 assert.equal(items[0].name, 'Spot 3 [100 MeV] – Position X');
 assert.equal(context.trendDisplayName('Spot 140 MeV – Position X'), 'Spot 140 MeV – Position X');
 console.log('Energy labels and shared X/Y grouping preserve saved names and separate energies.');
+
+const depths = context.trendGroups([
+ {test_id: 10, name: 'Energy [100 MeV] – Distal Depth', unit: 'mm'},
+ {test_id: 11, name: 'Energy [200 MeV] – Distal Depth', unit: 'mm'}
+]);
+assert.equal(depths.length, 1);
+assert.equal(depths[0].base, 'Distal Depths');
+assert.equal(depths[0].members.length, 2);
+assert.equal(depths[0].members[0].axis, '100 MeV');

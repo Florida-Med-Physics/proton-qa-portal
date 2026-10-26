@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Group all Distal Depth energies together on one machine trend chart, including the linked values/detail view.
+
 - Simplify Machine Trends to one machine, grouped expandable measurements, clickable insights, energy-only spot labels, and shared X/Y graphs.
 
 - Scan all default-folder Sphinx XLS/CSV exports, automatically import new files for review, skip duplicates, and explain unreadable files. Recheck every minute while Data Administration is open.

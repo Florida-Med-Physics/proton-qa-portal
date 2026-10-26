@@ -2986,13 +2986,27 @@ function trendDisplayName(name) {
   return String(name || '').replace(/\bSpot\s+\d+(?:\s*(?=\[)|\s+(?=\d+(?:\.\d+)?\s*MeV))/gi, '').trim();
 }
 
+function trendGroups(items) {
+  const distal = items.filter(item => /distal\s+depth/i.test(item.name));
+  const groups = axisGroups(items.filter(item => !distal.includes(item)));
+  const byUnit = new Map();
+  for (const item of distal) {
+    const key = item.unit || '';
+    if (!byUnit.has(key)) byUnit.set(key, []);
+    const energy = /\d+(?:\.\d+)?\s*MeV/i.exec(item.name)?.[0];
+    byUnit.get(key).push({ ...item, axis: energy || item.name });
+  }
+  for (const members of byUnit.values()) groups.push({ base: 'Distal Depths', category: 'Energy', members: members.sort((a,b) => a.axis.localeCompare(b.axis, undefined, { numeric: true })) });
+  return groups;
+}
+
 async function renderTrendOverview(machines, machineId, range, listId = "") {
   const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (!listId || String(a.id) === String(listId)));
   const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
   const sections = [], insights = [];
   for (const template of templates) {
     const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range).filter(p => String(p.assignment_id) === String(template.assignment.id))) })).filter(i => i.points.length);
-    const groups = axisGroups(items);
+    const groups = trendGroups(items);
     const categories = new Map();
     for (const group of groups) {
       const category = categoryLabel(group.category) || 'Other measurements';
@@ -3336,7 +3350,7 @@ async function renderTrends() {
     return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range).filter((p) => !listId || String(p.assignment_id) === String(listId))) };
   }).filter((i) => i.points.length);
   const head = data[0].test;
-  const group = axisGroups(items)[0];
+  const group = trendGroups(items)[0];
   app.append(el("h2", {}, group ? group.base : trendDisplayName(head.name), group ? axisLegend(group) : null),
     el("p", { class: "muted small" }, [sectionOf(head), categoryLabel(head.category)].join(" · ")));
   if (!group) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
