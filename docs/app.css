@@ -1169,3 +1169,6 @@ td, .measure-table td { font-size: 21px; }
 
 .chart-controls { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .prediction-toggle { margin: 4px 0 10px; font-size: 17px; }
+
+.trend-statistics { margin: 6px 0 10px; }
+.trend-statistics-line { font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }

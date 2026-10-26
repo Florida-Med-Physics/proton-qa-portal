@@ -2761,12 +2761,22 @@ const trendKey = (show, multi = false, prediction = true) => (show ? [
   el("span", { class: "key-item" }, el("span", { class: `key-swatch fit${multi ? " multi" : ""}` }), multi ? "Trend (Least-Squares Fit, Each Series)" : "Trend (Least-Squares Fit)"),
   el("span", { class: "key-item" }, el("span", { class: `key-swatch fit forecast${multi ? " multi" : ""}` }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)].filter((_, i) => prediction || i === 0) : []);
 
+function trendStatistics(series, unit, delta = false, colorIndex = null) {
+  return el('div', { class: 'trend-statistics' }, series.map((item, index) => {
+    const values = item.points.map(p => delta ? asDeviation(p).dev : p.value);
+    const st = seriesStats(values), outlier = item.points[st.outlier];
+    const color = colorIndex !== null ? `axis-${colorIndex}` : series.length > 1 ? `axis-${index}` : 'single';
+    return el('div', { class: 'trend-statistics-line' }, el('span', { class: `key-swatch line ${color}`, 'aria-hidden': 'true' }),
+      ` ${item.label}: Avg: ${sig(st.mean)} ± ${sig(st.sd)}${unit ? ` ${unit}` : ''}, Max Outlier: ${sig(values[st.outlier])} on ${shortDate(outlier.qa_date)}`);
+  }));
+}
+
 function seriesChart(series, unit, { small = false, delta = null, yLabel = null } = {}) {
   yLabel = yLabel || yAxisLabel(series.map((x) => x.label));
-  // Absolute values by default for one series; several series (X/Y/Z) start on Δ from reference so they share one scale.
-  let mode = delta === null ? (series.length > 1 ? "delta" : "absolute") : (delta ? "delta" : "absolute");
+  // Open every trend in Absolute mode; prediction is opt-in.
+  let mode = "absolute";
   const hasRef = series.some((x) => x.points.some((pt) => pt.expected !== null && pt.expected !== undefined));
-  let prediction = true;
+  let prediction = false;
   const box = el("div", { class: `chart-box${small ? " small" : ""}${series.length > 1 ? " multi" : ""}` });
   const draw = () => {
     const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
@@ -2783,8 +2793,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
       box.replaceChildren(controls, el('div', { class: 'energy-plot-grid' }, ...series.map((x, k) => el('div', { class: 'subplot' },
         el('div', { class: 'subplot-title' }, el('span', { class: `key-swatch line axis-${k}`, 'aria-hidden': 'true' }), ' ', x.label),
         drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k }),
-        el('details', { class: 'subplot-statistics' }, el('summary', {}, 'Statistics'),
-          (() => { const st = seriesStats(x.points.map(p => p.value)); return el('div', {}, `Mean ${sig(st.mean)} ± ${sig(st.sd)} ${unit || ''} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)} · Range ${sig(st.min)} to ${sig(st.max)} · N ${st.n}`); })())
+        trendStatistics([x], unit, false, k)
       ))), el('div', { class: 'chart-key energy-shared-key' },
         el('span', { class: 'key-item' }, el('span', { class: 'key-swatch ref' }), 'Reference'),
         el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-warn' }), 'Within Warning'),
@@ -2798,7 +2807,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
       drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
       ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
-    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), key);
+    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), trendStatistics(series, unit, delta), key);
   };
   draw();
   return box;
@@ -2808,7 +2817,7 @@ const FORECAST_DAYS = 28;                                   // the straight-line
 
 function drawSeries(series, unit, { small = false, compact = false, delta = false, prediction = true, colorIndex = null, yLabel = "Value" } = {}) {
   const multi = series.length > 1;
-  const W = compact ? 480 : 900, H = compact ? 215 : small ? 200 : 360;
+  const W = compact ? 480 : 900, H = compact ? 185 : small ? 200 : 360;
   const L = small ? 78 : 70, R = 40, T = small ? 10 : 20, B = small ? 40 : 52;
   const lineH = small ? 17 : 16;
   const keyH = 0;                                            // the key is HTML under the chart (see seriesChart)
@@ -2942,24 +2951,8 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
   kids.push(plotGroup);
 
-  // Statistics block under the key, one line per series.
-  const u = unit && unit !== "unitless" ? ` ${unit}` : "";
-  const statLines = series.flatMap((s, k) => {
-    const st = seriesStats(s.points.map(val));
-    const name = multi ? `${s.label}${delta ? " (Δ)" : ""}: ` : delta ? "Δ: " : "";
-    const cls = `stats-line ${multi ? `axis-${k}` : ""}`;
-    const o = s.points[st.outlier];
-    const oDate = o ? new Date(o.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-    const f = fits[k];
-    const trend = f ? ` · Trend ${sigSigned(f.slope * 7)}${u}/Week${prediction ? ` · In ${FORECAST_DAYS / 7} Weeks ${sig(f.end)}${u}` : ""}` : "";
-    if (small) return [
-      svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 1) * lineH }, `${name}Mean ${sig(st.mean)} ± ${sig(st.sd)}${u} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)}${u} · N ${st.n} · Outlier ${sig(val(o))}${u} (${oDate})`),
-      svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 2) * lineH }, trend.replace(/^ · /, ""))];
-    const text = `${name}Mean ${sig(st.mean)} ± ${sig(st.sd)}${u} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)}${u} · N ${st.n} · Range ${sig(st.min)} to ${sig(st.max)}${u} · Biggest Outlier ${sig(val(o))}${u} on ${oDate}${trend}`;
-    return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, text)];
-  });
-  if (!compact) kids.push(...statLines);
-  return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H + statH}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
+
+  return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
 }
 
 function axisLegend(group) {
@@ -3056,17 +3049,6 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
 function renderTrendDetail(group, range) {
   const unit = group.members[0].unit;
   const multi = group.members.length > 1;
-  app.append(el("div", { class: "card stat-row" }, group.members.map((m) => {
-    const s = stats(m.points), d = asDeviation(s.last);
-    return stat(multi ? `${m.axis} latest` : "Latest", `${sig(s.last.value)} ${unit}`.trim(),
-      [chip(s.last.status), " ", s.last.expected !== null ? `${sigSigned(d.dev)} ${unit} from ${sig(s.last.expected)} ${unit}`.replace(/ +/g, " ") : "", el("br"),
-        `${sig(s.inTol)}% within action level · mean ${sig(s.mean)} ± ${sig(s.sd)} ${unit}`.trim()]);
-  }), (() => {
-    const p = latest(group.members[0].points);
-    const u = p.tol_mode === "percent" ? " %" : unit ? ` ${unit}` : "";
-    return p.warn !== null ? stat("Limits", `Warning ±${sig(p.warn)}${u}`, `Action ±${sig(p.fail)}${u}`) : null;
-  })()));
-
   app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)) }));
   // One row per date, one column per axis.
   const byDate = new Map();

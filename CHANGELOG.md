@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Default charts to Absolute with prediction off; restrict statistics to colored marker, energy, average ± standard deviation, and maximum outlier/date.
+
 - Limit displayed trend measurements, statistics, fits, insights, and axis values to two significant figures; preserve saved/exported precision and exact energy/date labels.
 
 - Preserve template/CSV measurement and energy order in Machine Trends instead of sorting graphs alphabetically or energies numerically.
