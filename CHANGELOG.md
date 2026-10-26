@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Add the temporary MPA / MPA demo login without resetting existing account passwords.
+
 - Replace browser role selection with temporary password accounts (Physicist, Therapy, Admin), reject incorrect passwords, and support Admin-created accounts and password resets.
 
 - Add MPA role with provisional QA-entry access; record therapist sign-off before required Physicist final approval.

@@ -1144,6 +1144,13 @@
     else if (stored) S = stored;
     else { seed(); save(); }
     await setupDemoAccounts();
+    if (!S.demoMpaAccountV1) {
+      let user = S.users.find(u => u.username.toLowerCase() === 'mpa');
+      if (!user) user = byId('users', insert('users', {username:'MPA', full_name:'MPA', role:'mpa', active:1, created_at:now()}));
+      if (!user.password_salt) { user.role = 'mpa'; user.active = 1; await setPassword(user, 'MPA'); }
+      S.demoMpaAccountV1 = true;
+      save();
+    }
     upgradeCtList();
     upgradeBbUnits();
     dropSphinxCouch();
