@@ -1366,3 +1366,6 @@ td, .measure-table td { font-size: 21px; }
 .therapist-decision-options button { min-height:44px; }
 .review-close-bar { z-index:10; }
 @media(max-width:760px) { .review-close-bar { display:flex; flex-wrap:wrap; gap:10px; } .review-close-bar .button { width:100%; text-align:center; } .review-close-message { font-size:16px; } .review-workflow { gap:10px; } }
+
+.qa-review-actions { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
+.qa-trash-icon { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px; flex:none; }

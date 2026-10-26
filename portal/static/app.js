@@ -2547,14 +2547,14 @@ async function renderTests() {
 function canTrashQa(run) {return can('review') || can('perform') && run.performed_by===state.user.id && run.review_status==='pending';}
 function qaTrashButton(run) {
   if(!canTrashQa(run))return null;
-  return el('button',{type:'button',class:run.trashed_at?'button small':'button danger small','aria-label':run.trashed_at?'Restore QA':'Move QA to trash',onclick:e=>{
+  return el('button',{type:'button',class:run.trashed_at?'button small':'button danger small qa-trash-icon',title:run.trashed_at?'Restore QA':'Move QA to trash','aria-label':run.trashed_at?'Restore QA':'Move QA to trash',onclick:e=>{
     e.stopPropagation();
     if(run.trashed_at){api('POST',`/api/runs/${run.id}/trash`,{trashed:false}).then(()=>{toast('QA restored');route();}).catch(err=>toast(err.message,true));return;}
     const reason=el('input',{placeholder:'Created in error','aria-label':'Reason for trashing QA'});
     modal('Move QA to trash',el('div',{},el('p',{},`${run.machine_name} · ${run.queue_name} · ${run.qa_date}`),el('p',{class:'muted small'},'Removes this submission from review, history charts and completion counts. You can restore it from Trash.'),field('Reason (optional)',reason)),async()=>{await api('POST',`/api/runs/${run.id}/trash`,{trashed:true,reason:reason.value});toast('QA moved to trash');if(location.hash.startsWith('#/runs/'))location.hash='#/review';else route();},'Move to trash');
-  }},run.trashed_at?'Restore':'Trash');
+  }},run.trashed_at?'Restore':svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},svg('path',{d:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7'})));
 }
-function reviewRowActions(run) {return el('div',{class:'row'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at||can('therapist_approve')&&!can('review')?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
+function reviewRowActions(run) {return el('div',{class:'row qa-review-actions'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at||can('therapist_approve')&&!can('review')?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
 
 async function renderReview() {
   const runs = await api("GET", "/api/runs?limit=400");
