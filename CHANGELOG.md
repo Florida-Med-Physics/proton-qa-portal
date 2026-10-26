@@ -277,3 +277,5 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Plot dots show date, measured value and delta on hover, focus or tap. Dashboard pass-rate rings are per QA set. Status text on Perform QA matches the description size.
 
 - Apply the requested TrueBeam Monthly monthly schedule and display HDR Flexitron Daily/Source Exchange QA as needed on the dashboard, once per installation.
+
+- Therapist reviews can be changed to Pass, Fail or cleared until physicist review; changes keep the prior signature and decision in the audit history. Added a compact two-stage workflow, a Done/back action, and separate therapy queues for unfinished and sent reviews.

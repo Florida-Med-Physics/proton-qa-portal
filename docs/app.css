@@ -1356,3 +1356,13 @@ td, .measure-table td { font-size: 21px; }
 .home-last-result .chip { font-size:22px; line-height:1.35; }
 
 @media(max-width:760px) { .home-last-result .chip { font-size:21px; } }
+
+.review-workflow { display:flex; gap:20px; align-items:center; flex-wrap:wrap; }
+.review-workflow > div { display:flex; flex-direction:column; gap:5px; }
+.workflow-arrow { color:var(--muted); font-size:26px; }
+.therapist-change { text-align:left; }
+.therapist-change > summary { cursor:pointer; color:var(--accent); font-size:18px; padding:8px; }
+.therapist-decision-options { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0; }
+.therapist-decision-options button { min-height:44px; }
+.review-close-bar { z-index:10; }
+@media(max-width:760px) { .review-close-bar { display:flex; flex-wrap:wrap; gap:10px; } .review-close-bar .button { width:100%; text-align:center; } .review-close-message { font-size:16px; } .review-workflow { gap:10px; } }

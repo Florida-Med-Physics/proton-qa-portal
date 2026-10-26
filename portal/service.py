@@ -1221,6 +1221,27 @@ def therapist_approve_run(db, user, run_id):
     return {'ok': True}
 
 
+def set_therapist_review(db,user,run_id,data):
+    require(user,'therapist_approve')
+    decision=data.get('decision')
+    if decision not in ('pass','fail','clear'):raise PortalError('Choose Pass, Fail or Clear.')
+    with db.transaction():
+        run=_get(db,'runs',run_id)
+        if run.get('trashed_at') or run['review_status']!='pending' or not run['therapist_approval_required']:
+            raise PortalError('Therapist review can be changed only before physicist review.')
+        checks=_pbs_therapist_results(db,run)
+        if checks is None:checks=db.all("SELECT res.* FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=? AND lower(trim(t.name))='qa reviewed by therapist?'",(run_id,))
+        if not checks:raise PortalError('This QA has no therapist review test to change.')
+        previous={'approved_by':run['therapist_approved_by'],'approved_at':run['therapist_approved_at'],'results':[{'test_id':r['test_id'],'status':r['status'],'value':r['value_num']} for r in checks]}
+        value=1 if decision=='pass' else 0 if decision=='fail' else None
+        status='recorded' if decision=='clear' else decision
+        for row in checks:db.run('UPDATE results SET value_num=?,value_text=NULL,status=? WHERE id=?',(value,status,row['id']))
+        rows=db.all('SELECT status,value_num,value_text FROM results WHERE run_id=?',(run_id,))
+        db.run('UPDATE runs SET therapist_approved_by=?,therapist_approved_at=?,overall=? WHERE id=?',(user['id'] if decision=='pass' else None,now() if decision=='pass' else None,_results_overall(rows),run_id))
+        db.audit(user['id'],'change_therapist_review','run',run_id,previous=previous,decision=decision)
+    return {'ok':True}
+
+
 def review_run(db, user, run_id, data):
     with db.transaction():
         require(user, "review")

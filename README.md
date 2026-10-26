@@ -158,3 +158,5 @@ GitHub Pages and the local static server serve the same `docs/` build. Their bro
 Review QA opens the full numbered results immediately. A signed-in therapist can use **Pass & sign** at the therapist-review test; the system records their identity and then enables the separate physicist stage. Review and Perform share the machine's matching historical measurements and inline graphs. Graph tooltips show the QA date, measurement and difference from its reference.
 
 Use **Trash** for an erroneous run. It is excluded from review, charts and schedule completion, while its original results and audit record are retained. Expand **Trash** on Review QA to restore it. Reviewers may manage any run; performers may manage their own pending submissions.
+
+Therapists can use **Change** beside their signed decision to select Pass, Fail, or Clear until physicist review is finalized. Changing away from Pass removes the signature and takes the run out of the physicist queue. Changes are audited. **Done — back to Review QA** closes the detail; therapist queues separate **Needs your review** from **Sent for physicist review**.

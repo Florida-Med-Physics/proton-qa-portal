@@ -49,3 +49,27 @@ class ApprovalTests(unittest.TestCase):
         self.assertEqual(service.dashboard(db,admin)['machines'][0]['pending_review'],2)
         service.review_run(db,users['physicist'],ids[0],{'decision':'approved'})
         db.close()
+
+    def test_therapist_can_change_pending_decision_and_clear_signature(self):
+        db=Database(':memory:');users=make_users(db);admin=users['admin']
+        m=service.save_machine(db,admin,{'name':'Synthetic editable review'})['id']
+        q=service.save_queue(db,admin,{'name':'PBS DailyQA Template - Sphinx'})['id']
+        t=service.save_test(db,admin,{'name':'QA reviewed by therapist?','type':'boolean','description':'Template 4.06.','owner_queue_id':q})['id']
+        service.save_queue(db,admin,{'name':'PBS DailyQA Template - Sphinx','items':[{'test_id':t}]},q)
+        a=service.save_assignment(db,admin,{'machine_id':m,'queue_id':q,'frequency':'asneeded'})['id']
+        rid=service.submit_run(db,users['mpa'],a,{'results':[]})['id']
+        for role in ('mpa','admin','physicist'):
+            with self.assertRaises(service.PortalError):service.set_therapist_review(db,users[role],rid,{'decision':'pass'})
+        service.set_therapist_review(db,users['therapist'],rid,{'decision':'pass'})
+        self.assertTrue(service.get_run(db,admin,rid)['therapist_approved_by'])
+        service.set_therapist_review(db,users['therapist'],rid,{'decision':'fail'})
+        run=service.get_run(db,admin,rid)
+        self.assertIsNone(run['therapist_approved_by']);self.assertFalse(run['review_ready']);self.assertEqual(run['results'][0]['status'],'fail')
+        service.set_therapist_review(db,users['therapist'],rid,{'decision':'clear'})
+        self.assertIsNone(service.get_run(db,admin,rid)['results'][0]['value_num'])
+        service.set_therapist_review(db,users['therapist'],rid,{'decision':'pass'})
+        service.review_run(db,users['physicist'],rid,{'decision':'approved'})
+        with self.assertRaises(service.PortalError):service.set_therapist_review(db,users['therapist'],rid,{'decision':'clear'})
+        audit=db.all("SELECT detail FROM audit WHERE action='change_therapist_review'")
+        self.assertEqual(len(audit),4);self.assertIn('previous',audit[1]['detail'])
+        db.close()

@@ -1008,6 +1008,18 @@
     const checks=pbsTherapistResults(run);if(checks?.length){checks.forEach(row=>Object.assign(row,{value_num:1,value_text:null,status:'pass'}));run.overall=resultOverall(S.results.filter(r=>r.run_id===run.id));}
     audit(user.id,'therapist_approved','run',id);save();return {ok:true};
   }
+  function setTherapistReview(user,id,data) {
+    require(user,'therapist_approve');const decision=data.decision;
+    if(!['pass','fail','clear'].includes(decision))throw Error('Choose Pass, Fail or Clear.');
+    const run=get('runs',id);
+    if(run.trashed_at||run.review_status!=='pending'||!run.therapist_approval_required)throw Error('Therapist review can be changed only before physicist review.');
+    const checks=pbsTherapistResults(run)??S.results.filter(r=>r.run_id===id&&byId('tests',r.test_id)?.name.trim().toLowerCase()==='qa reviewed by therapist?');
+    if(!checks.length)throw Error('This QA has no therapist review test to change.');
+    const previous={approved_by:run.therapist_approved_by,approved_at:run.therapist_approved_at,results:checks.map(r=>({test_id:r.test_id,status:r.status,value:r.value_num}))};
+    checks.forEach(r=>Object.assign(r,{value_num:decision==='pass'?1:decision==='fail'?0:null,value_text:null,status:decision==='clear'?'recorded':decision}));
+    Object.assign(run,{therapist_approved_by:decision==='pass'?user.id:null,therapist_approved_at:decision==='pass'?now():null,overall:resultOverall(S.results.filter(r=>r.run_id===id))});
+    audit(user.id,'change_therapist_review','run',id,{previous,decision});save();return {ok:true};
+  }
   function reviewRun(user, id, data) {
     require(user, "review");
     const r = get("runs", id);
@@ -1719,6 +1731,7 @@
   route("GET", "/api/runs", (u, m, body, q) => listRuns(q));
   route("GET", "/api/runs/(\\d+)", (u, m) => getRun(Number(m[1])));
   route("POST", "/api/runs/(\\d+)/trash", (u,m,body)=>trashRun(u,Number(m[1]),body));
+  route("POST", "/api/runs/(\\d+)/therapist-review",(u,m,body)=>setTherapistReview(u,Number(m[1]),body));
   route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
   route("GET", "/api/machines/(\\d+)/trends", (u, m) => machineTrends(Number(m[1])));
