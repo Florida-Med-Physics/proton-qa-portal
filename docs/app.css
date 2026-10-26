@@ -1155,3 +1155,14 @@ td, .measure-table td { font-size: 21px; }
 .trend-chart-body { padding: 0 18px 20px; }
 .trend-insight-link { display: inline-block; padding: 8px 0; }
 .trend-chart-row[hidden], .trend-organized-list[hidden] { display: none; }
+
+.energy-plot-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px 18px; }
+.energy-plot-grid .subplot { min-width: 0; margin: 0; }
+.energy-plot-grid .subplot-title { font-size: 20px; margin: 2px 0 4px; }
+.energy-plot-grid svg { border: 0; }
+.subplot-statistics { font-size: 16px; margin: 0 0 4px; }
+.subplot-statistics summary { cursor: pointer; color: var(--muted); }
+.energy-shared-key { font-size: 16px; margin-top: 10px; }
+.chart-box .date-tick { font-size: 14px; }
+@media(max-width:1100px){ .energy-plot-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:600px){ .energy-plot-grid { grid-template-columns: minmax(0,1fr); } }

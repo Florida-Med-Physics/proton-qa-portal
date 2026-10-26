@@ -2777,15 +2777,15 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
     // Absolute view of several series (X and Y sit around different references): one subplot per series, stacked,
     // each on its own scale with its own reference line and bands.
     if (multi && !delta) {
-      box.replaceChildren(buttons, ...series.map((x) => el("div", { class: "subplot" },
-        el("div", { class: "subplot-title" }, x.label),
-        drawSeries([x], unit, { small, delta: false, yLabel }),
-        el("div", { class: "chart-key" },
-          el("span", { class: "key-item" }, el("span", { class: "key-swatch line single" }), x.label),
-          x.points.some((pt) => pt.expected !== null && pt.expected !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), "Reference") : null,
-          x.points.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
-          x.points.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
-          ...trendKey(x.points.length >= 3)))));
+      box.replaceChildren(buttons, el('div', { class: 'energy-plot-grid' }, ...series.map(x => el('div', { class: 'subplot' },
+        el('div', { class: 'subplot-title' }, x.label),
+        drawSeries([x], unit, { compact: true, delta: false, yLabel }),
+        el('details', { class: 'subplot-statistics' }, el('summary', {}, 'Statistics'),
+          (() => { const st = seriesStats(x.points.map(p => p.value)); return el('div', {}, `Mean ${sig(st.mean)} ± ${sig(st.sd)} ${unit || ''} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)} · Range ${sig(st.min)} to ${sig(st.max)} · N ${st.n}`); })())
+      ))), el('div', { class: 'chart-key energy-shared-key' },
+        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch ref' }), 'Reference'),
+        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-warn' }), 'Within Warning'),
+        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-fail' }), 'Warning to Action'), ...trendKey(true)));
       return;
     }
     const drawRef = hasRef && !(multi && !delta);
@@ -2803,13 +2803,13 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
 
 const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
 
-function drawSeries(series, unit, { small = false, delta = false, yLabel = "Value" } = {}) {
+function drawSeries(series, unit, { small = false, compact = false, delta = false, yLabel = "Value" } = {}) {
   const multi = series.length > 1;
-  const W = 900, H = small ? 200 : 360;
+  const W = compact ? 480 : 900, H = compact ? 215 : small ? 200 : 360;
   const L = small ? 78 : 70, R = 40, T = small ? 10 : 20, B = small ? 40 : 52;
   const lineH = small ? 17 : 16;
   const keyH = 0;                                            // the key is HTML under the chart (see seriesChart)
-  const statH = keyH + lineH * series.length * (small ? 2 : 1) + 6;   // small charts: statistics on one line, the trend on the next
+  const statH = compact ? 0 : keyH + lineH * series.length * (small ? 2 : 1) + 6;   // small charts: statistics on one line, the trend on the next
   const plotBottom = H - B;
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
   const timeOf = (d) => new Date(d + "T00:00").getTime();
@@ -2883,20 +2883,15 @@ function drawSeries(series, unit, { small = false, delta = false, yLabel = "Valu
 
   // X axis: dates, and the axis title.
   kids.push(svg("line", { class: "axis-base", x1: L, x2: W - R, y1: plotBottom, y2: plotBottom }));
-  // A vertical line at the start of every month; a label on every n-th so they never collide.
-  const first = new Date(dates[0] + "T00:00"), last = new Date(tEnd);
-  const months = [];
-  for (let m = new Date(first.getFullYear(), first.getMonth() + 1, 1); m <= last; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) months.push(m);
-  const maxLabels = small ? 6 : 8;
-  const step = Math.max(1, Math.ceil((months.length + 1) / maxLabels));
-  const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-  const monthLabel = (dt) => dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
-  months.forEach((m, i) => {
-    const xm = x(iso(m));
-    kids.push(svg("line", { class: "month-line", x1: xm, x2: xm, y1: T, y2: plotBottom }));
-    if (i % step === 0) kids.push(svg("text", { class: "month-label", x: xm, y: plotBottom + 14, "text-anchor": "middle" }, monthLabel(m)));
-  });
-  if (!months.length) kids.push(svg("text", { x: (L + W - R) / 2, y: plotBottom + 14, "text-anchor": "middle" }, monthLabel(first)));
+  // Label the whole displayed date range, even when all measurements are within one month.
+  const tickCount = compact ? 4 : small ? 5 : 7;
+  for (let i = 0; i < tickCount; i++) {
+    const time = t0 + (tEnd - t0) * i / (tickCount - 1);
+    const label = new Date(time).toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...((tEnd-t0)>365*86400000 ? { year: '2-digit' } : {}) });
+    const tx = xt(time);
+    kids.push(svg('line', { class: 'month-line', x1: tx, x2: tx, y1: T, y2: plotBottom }),
+      svg('text', { class: 'date-tick', x: tx, y: plotBottom + 19, 'text-anchor': i === 0 ? 'start' : i === tickCount-1 ? 'end' : 'middle' }, label));
+  }
   kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, "Date QA performed"));
 
   plot.push(svg("line", { class: "forecast-line", x1: xt(t1), x2: xt(t1), y1: T, y2: plotBottom }));
@@ -2958,7 +2953,7 @@ function drawSeries(series, unit, { small = false, delta = false, yLabel = "Valu
     const text = `${name}Mean ${sig(st.mean)} ± ${sig(st.sd)}${u} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)}${u} · N ${st.n} · Range ${sig(st.min)} to ${sig(st.max)}${u} · Biggest Outlier ${sig(val(o))}${u} on ${oDate}${trend}`;
     return [svg("text", { class: cls, x: L, y: H + keyH + (k + 1) * lineH }, text)];
   });
-  kids.push(...statLines);
+  if (!compact) kids.push(...statLines);
   return svg("svg", { class: small ? "spark" : "chart", viewBox: `0 0 ${W} ${H + statH}`, role: "img", "aria-label": series.map((s) => s.label).join(", ") }, kids);
 }
 

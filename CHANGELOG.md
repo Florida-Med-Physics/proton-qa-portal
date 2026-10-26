@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Show absolute energy plots in a compact responsive 3×2 grid with a shared legend and explicit date ticks on every chart.
+
 - Explicitly label chart trend lines as least-squares fits; each series uses its own measurements from the selected period.
 
 - Group every measurement repeated across energies on one trend chart, including fall off, proximal depth, width, and shared X/Y series.
