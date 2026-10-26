@@ -1329,27 +1329,33 @@
      "name": "[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]",
      "type": "numeric",
      "unit": "cm",
-     "expected": null,
+     "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.02. [Section: Mechanical and Imaging]"
+     "description": "Template 2.02. [Section: Mechanical and Imaging]",
+     "warn": 0.15,
+     "fail": 0.2
     },
     {
      "category": "Mechanical and Safety",
      "name": "[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]",
      "type": "numeric",
      "unit": "cm",
-     "expected": null,
+     "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.03. [Section: Mechanical and Imaging]"
+     "description": "Template 2.03. [Section: Mechanical and Imaging]",
+     "warn": 0.15,
+     "fail": 0.2
     },
     {
      "category": "Mechanical and Safety",
      "name": "[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]",
      "type": "numeric",
      "unit": "cm",
-     "expected": null,
+     "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.04. [Section: Mechanical and Imaging]"
+     "description": "Template 2.04. [Section: Mechanical and Imaging]",
+     "warn": 0.15,
+     "fail": 0.2
     },
     {
      "category": "Mechanical and Safety",
@@ -4389,6 +4395,35 @@
    "fail": 3.0,
    "tol_mode": "percent",
    "source_row": 305
+  }
+ ],
+ "pbs_imaging_defaults": [
+  {
+   "name": "[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]",
+   "unit": "cm",
+   "expected": 0,
+   "warn": 0.15,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 109
+  },
+  {
+   "name": "[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]",
+   "unit": "cm",
+   "expected": 0,
+   "warn": 0.15,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 110
+  },
+  {
+   "name": "[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]",
+   "unit": "cm",
+   "expected": 0,
+   "warn": 0.15,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 111
   }
  ]
 }

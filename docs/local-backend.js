@@ -1171,8 +1171,24 @@
     mergeCopies();
     restoreMonthlySchedules();
     generalizePbsTemplates();
+    applyImagingDefaults();
     for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
   })();
+
+  function applyImagingDefaults() {
+    S.pbsImagingDefaultsV1 = S.pbsImagingDefaultsV1 || {};
+    const ids = new Set(S.queues.filter(q => /PBS\s*DailyQA/i.test(q.name)).map(q=>q.id));
+    for (const t of S.tests) {
+      if (S.pbsImagingDefaultsV1[t.id] || !(ids.has(t.owner_queue_id) || S.queue_items.some(i=>i.test_id===t.id && ids.has(i.queue_id)))) continue;
+      const rule = (window.PORTAL_SEED.pbs_imaging_defaults || []).find(r=>r.name===t.name && r.unit===t.unit && t.type==='numeric' && (t.tol_mode || 'absolute')==='absolute');
+      if (!rule) continue;
+      const changed = {};
+      for (const key of ['expected','warn','fail']) if (t[key] == null) { t[key]=rule[key]; changed[key]=rule[key]; }
+      S.pbsImagingDefaultsV1[t.id] = true;
+      audit(null,'apply_imaging_defaults','test',t.id,{source:window.PORTAL_SEED.pbs_tolerance_source,row:rule.source_row,changed});
+      save();
+    }
+  }
 
   function generalizePbsTemplates() {
     const clean = value => String(value || '').replace(/\bGTR\s*\d+[ _-]*/gi, '').trim();

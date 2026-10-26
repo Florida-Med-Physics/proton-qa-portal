@@ -162,6 +162,7 @@ class Database:
         self.conn.executescript(SCHEMA)
         self._approval_migrations()
         self._generalize_pbs_templates()
+        self._apply_imaging_defaults()
 
     def _approval_migrations(self):
         users_schema = self.one("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")["sql"]
@@ -186,6 +187,22 @@ class Database:
             if name not in columns:
                 self.conn.execute(f'ALTER TABLE runs ADD COLUMN {name} {definition}')
         self.run("UPDATE runs SET therapist_approval_required=1 WHERE review_status='pending' AND EXISTS (SELECT 1 FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=runs.id AND lower(t.name) LIKE '%therapist%' AND (lower(t.name) LIKE '%review%' OR lower(t.name) LIKE '%approv%'))")
+
+    def _apply_imaging_defaults(self):
+        seed = json.loads((Path(__file__).parent / "seed.json").read_text())
+        with self.transaction():
+            for q in self.all("SELECT id,name FROM queues"):
+                if not re.search(r"PBS\s*DailyQA", q["name"], re.I):
+                    continue
+                for t in self.all("SELECT DISTINCT t.* FROM tests t LEFT JOIN queue_items i ON i.test_id=t.id WHERE t.owner_queue_id=? OR i.queue_id=?", (q["id"],q["id"])):
+                    if self.one("SELECT id FROM audit WHERE action='apply_imaging_defaults' AND entity='test' AND entity_id=?", (t["id"],)):
+                        continue
+                    rule = next((r for r in seed.get('pbs_imaging_defaults',[]) if r['name']==t['name'] and r['unit']==t['unit'] and t['type']=='numeric' and (t['tol_mode'] or 'absolute')=='absolute'), None)
+                    if not rule:
+                        continue
+                    changed = {k:rule[k] for k in ('expected','warn','fail') if t[k] is None}
+                    self.run("UPDATE tests SET expected=COALESCE(expected,?),warn=COALESCE(warn,?),fail=COALESCE(fail,?) WHERE id=?", (rule['expected'],rule['warn'],rule['fail'],t['id']))
+                    self.audit(None,'apply_imaging_defaults','test',t['id'],source=seed.get('pbs_tolerance_source'),source_row=rule['source_row'],changed=changed)
 
     def _generalize_pbs_templates(self):
         from .sphinx import canonical_key

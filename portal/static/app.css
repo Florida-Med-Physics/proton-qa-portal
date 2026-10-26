@@ -1213,3 +1213,11 @@ td, .measure-table td { font-size: 21px; }
 .inline-test-name textarea { width: 100%; resize: vertical; min-height: 66px; font: inherit; }
 .list-editor td > input, .list-editor td > select { width: 100%; min-width: 135px; }
 .list-editor td.item-cell { min-width: 340px; }
+
+/* Reserve room for readable numbers and headers; narrow screens scroll only the table. */
+.measure-wrap { overflow-x: auto; }
+.measure-wrap .measure-table { min-width: 1480px; max-width: none; }
+.measure-table td.qa-n { padding-left: 12px; padding-right: 18px; }
+.measure-table th { overflow-wrap: normal; word-break: normal; white-space: normal; }
+.measure-table td.num { white-space: nowrap; }
+.measure-table .note-btn { opacity: 1; min-width: 44px; min-height: 44px; font-weight: 600; }

@@ -1530,7 +1530,7 @@ async function renderPerform(assignmentId) {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
         const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
-        noteToggle.textContent = "✎"; noteToggle.title = "Add a note"; noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
+        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
           const pts = (history[it.test_id] || []).slice(-60);
@@ -1548,7 +1548,7 @@ async function renderPerform(assignmentId) {
           numberCell(it),
           el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           el("td", { class: "qa-unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
-          el("td", { class: "num" }, it.type === "numeric" ? refCell(it, unit) : el("span", { class: "muted" }, "—")),
+          el("td", { class: "num" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
           el("td", { class: "qa-dev" }, dlt),
           el("td", {}, statusCell),
@@ -1557,7 +1557,7 @@ async function renderPerform(assignmentId) {
           el("td", {}, trend));
         return [row, chart];
       });
-      const widths = firstHeader !== "Test" ? ["3%", "27%", "5%", "8%", "12%", "8%", "8%", "5%", "20%", "4%"] : ["3%", "36%", "5%", "7%", "12%", "8%", "8%", "5%", "12%", "4%"];
+      const widths = ["100px", "auto", "100px", "150px", "190px", "150px", "130px", "130px", "160px", "100px"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
@@ -2246,7 +2246,7 @@ async function renderQueueEditor(id) {
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? select('', Object.entries(TYPE_LABELS), t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { editDefinition('type', e.target.value); draw(); } }) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
-          : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
+          : el("span", { class: "muted" }, t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),

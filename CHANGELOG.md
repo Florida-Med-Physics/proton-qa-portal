@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Use plus icons for comments, reserve space for test numbers and headers, show Pass as the boolean baseline, and fill missing matched Ortho axis defaults from the supplied workbook (cm conversion); preserve existing values and machine overrides.
+
 - Allow blank or partial QA lists to be submitted for review; preserve unanswered tests in review/PDF and never count them as passes.
 
 - Refresh the browser backend cache fingerprint so the four demo accounts load into Users and rights.
