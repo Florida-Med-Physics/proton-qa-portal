@@ -1118,7 +1118,7 @@ def trend(db, user, machine_id, test_id):
 def machine_trends(db, user, machine_id):
     """Every numeric result on one machine, grouped by test, in one query (the Trends overview)."""
     rows = db.all(
-        "SELECT res.test_id, r.id AS run_id, r.assignment_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
+        "SELECT res.test_id, res.id AS source_order, r.source, r.id AS run_id, r.assignment_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
         "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.value_num IS NOT NULL "
         "ORDER BY r.qa_date, r.id", (machine_id,))
     out = {}

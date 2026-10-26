@@ -37,3 +37,12 @@ const positions = context.trendGroups([100,200].flatMap((energy,index) => ['X','
 assert.equal(positions.length, 1);
 assert.equal(positions[0].members.length, 4);
 assert.equal(positions[0].members[0].axis, '100 MeV · X');
+
+const csvOrder = context.trendGroups([
+ {test_id: 80, name: 'Energy [225 MeV] – Width', category: 'Energy', unit: 'mm'},
+ {test_id: 81, name: 'Energy [100 MeV] – Width', category: 'Energy', unit: 'mm'},
+ {test_id: 82, name: 'Energy [225 MeV] – Distal Depth', category: 'Energy', unit: 'mm'}
+]);
+assert.equal(csvOrder[0].base, 'Width');
+assert.equal(csvOrder[0].members[0].axis, '225 MeV');
+assert.equal(csvOrder[0].members[1].axis, '100 MeV');

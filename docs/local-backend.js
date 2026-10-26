@@ -945,7 +945,7 @@
     const test = get("tests", testId, "Check");
     const runs = Object.fromEntries(S.runs.filter((r) => r.machine_id === Number(machineId)).map((r) => [r.id, r]));
     const points = S.results.filter((x) => x.test_id === test.id && runs[x.run_id] && x.value_num !== null)
-      .map((x) => ({ run_id: x.run_id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected, warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status }))
+      .map((x) => ({ run_id: x.run_id, source: runs[x.run_id].source, source_order: x.id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected, warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status }))
       .sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);
     return { test, points };
   }
@@ -955,7 +955,7 @@
     const out = {};
     for (const x of S.results) {
       if (!runs[x.run_id] || x.value_num === null) continue;
-      (out[x.test_id] = out[x.test_id] || []).push({ run_id: x.run_id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected,
+      (out[x.test_id] = out[x.test_id] || []).push({ run_id: x.run_id, source: runs[x.run_id].source, source_order: x.id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected,
         warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status });
     }
     for (const k in out) out[k].sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);

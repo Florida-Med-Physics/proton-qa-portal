@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Preserve template/CSV measurement and energy order in Machine Trends instead of sorting graphs alphabetically or energies numerically.
+
+- Preserve energy colors in absolute subplots, add a four-week prediction toggle, and remove outlier rings around measured points.
+
 - Show absolute energy plots in a compact responsive 3×2 grid with a shared legend and explicit date ticks on every chart.
 
 - Explicitly label chart trend lines as least-squares fits; each series uses its own measurements from the selected period.

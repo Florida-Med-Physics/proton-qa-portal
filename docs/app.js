@@ -2757,35 +2757,38 @@ function yAxisLabel(names) {
   return t.split(" ").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
 
-const trendKey = (show, multi = false) => (show ? [
+const trendKey = (show, multi = false, prediction = true) => (show ? [
   el("span", { class: "key-item" }, el("span", { class: `key-swatch fit${multi ? " multi" : ""}` }), multi ? "Trend (Least-Squares Fit, Each Series)" : "Trend (Least-Squares Fit)"),
-  el("span", { class: "key-item" }, el("span", { class: `key-swatch fit forecast${multi ? " multi" : ""}` }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)] : []);
+  el("span", { class: "key-item" }, el("span", { class: `key-swatch fit forecast${multi ? " multi" : ""}` }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)].filter((_, i) => prediction || i === 0) : []);
 
 function seriesChart(series, unit, { small = false, delta = null, yLabel = null } = {}) {
   yLabel = yLabel || yAxisLabel(series.map((x) => x.label));
   // Absolute values by default for one series; several series (X/Y/Z) start on Δ from reference so they share one scale.
   let mode = delta === null ? (series.length > 1 ? "delta" : "absolute") : (delta ? "delta" : "absolute");
   const hasRef = series.some((x) => x.points.some((pt) => pt.expected !== null && pt.expected !== undefined));
+  let prediction = true;
   const box = el("div", { class: `chart-box${small ? " small" : ""}${series.length > 1 ? " multi" : ""}` });
   const draw = () => {
     const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
         onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? `Absolute${unit ? ` ${unit}` : ""}` : "Δ from Reference"))) : null;
+    const predictionControl = el('label', { class: 'check prediction-toggle' }, el('input', { type: 'checkbox', checked: prediction, 'aria-label': 'Show 4-week prediction', onchange: e => { prediction = e.target.checked; draw(); } }), '4-week prediction');
+    const controls = el('div', { class: 'chart-controls' }, buttons, predictionControl);
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);
     // Absolute view of several series (X and Y sit around different references): one subplot per series, stacked,
     // each on its own scale with its own reference line and bands.
     if (multi && !delta) {
-      box.replaceChildren(buttons, el('div', { class: 'energy-plot-grid' }, ...series.map(x => el('div', { class: 'subplot' },
-        el('div', { class: 'subplot-title' }, x.label),
-        drawSeries([x], unit, { compact: true, delta: false, yLabel }),
+      box.replaceChildren(controls, el('div', { class: 'energy-plot-grid' }, ...series.map((x, k) => el('div', { class: 'subplot' },
+        el('div', { class: 'subplot-title' }, el('span', { class: `key-swatch line axis-${k}`, 'aria-hidden': 'true' }), ' ', x.label),
+        drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k }),
         el('details', { class: 'subplot-statistics' }, el('summary', {}, 'Statistics'),
           (() => { const st = seriesStats(x.points.map(p => p.value)); return el('div', {}, `Mean ${sig(st.mean)} ± ${sig(st.sd)} ${unit || ''} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)} · Range ${sig(st.min)} to ${sig(st.max)} · N ${st.n}`); })())
       ))), el('div', { class: 'chart-key energy-shared-key' },
         el('span', { class: 'key-item' }, el('span', { class: 'key-swatch ref' }), 'Reference'),
         el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-warn' }), 'Within Warning'),
-        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-fail' }), 'Warning to Action'), ...trendKey(true)));
+        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-fail' }), 'Warning to Action'), ...trendKey(true, false, prediction)));
       return;
     }
     const drawRef = hasRef && !(multi && !delta);
@@ -2794,8 +2797,8 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
       drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
       drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
-      ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1));
-    box.replaceChildren(buttons, drawSeries(series, unit, { small, delta, yLabel }), key);
+      ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
+    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), key);
   };
   draw();
   return box;
@@ -2803,7 +2806,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
 
 const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
 
-function drawSeries(series, unit, { small = false, compact = false, delta = false, yLabel = "Value" } = {}) {
+function drawSeries(series, unit, { small = false, compact = false, delta = false, prediction = true, colorIndex = null, yLabel = "Value" } = {}) {
   const multi = series.length > 1;
   const W = compact ? 480 : 900, H = compact ? 215 : small ? 200 : 360;
   const L = small ? 78 : 70, R = 40, T = small ? 10 : 20, B = small ? 40 : 52;
@@ -2814,7 +2817,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   const dates = [...new Set(series.flatMap((s) => s.points.map((p) => p.qa_date)))].sort();
   const timeOf = (d) => new Date(d + "T00:00").getTime();
   const t0 = timeOf(dates[0]), t1 = timeOf(dates[dates.length - 1]);
-  const tEnd = t1 + FORECAST_DAYS * 86400000;                 // room on the right for the projection
+  const tEnd = prediction ? t1 + FORECAST_DAYS * 86400000 : Math.max(t1, t0 + 86400000);                 // room on the right for the projection
   const xt = (t) => L + ((t - t0) * (W - L - R)) / (tEnd - t0);
   const x = (d) => xt(timeOf(d));
   const val = (p) => (delta ? asDeviation(p).dev : p.value);
@@ -2838,7 +2841,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
 
   // Auto-scale to the data only, with a little headroom.
   const values = series.flatMap((s) => s.points.map(val));
-  for (const f of fits) if (f) values.push(f.end);
+  for (const f of fits) if (f && prediction) values.push(f.end);
   for (const b of ref) if (b.w !== null && b.w !== undefined) values.push(b.c + b.w, b.c - b.w);
   let lo = Math.min(...values), hi = Math.max(...values);
   if (lo === hi) {
@@ -2894,14 +2897,14 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   }
   kids.push(svg("text", { class: "axis-title", x: (L + W - R) / 2, y: H - 4, "text-anchor": "middle" }, "Date QA performed"));
 
-  plot.push(svg("line", { class: "forecast-line", x1: xt(t1), x2: xt(t1), y1: T, y2: plotBottom }));
+  if (prediction) plot.push(svg("line", { class: "forecast-line", x1: xt(t1), x2: xt(t1), y1: T, y2: plotBottom }));
   series.forEach((s, k) => {
-    const cls = multi ? `axis-${k}` : "";
+    const cls = colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "";
     const r = small ? (dates.length > 120 ? 2.2 : 3) : (dates.length > 150 ? 2.6 : 3.6);
     // A line from each result to the next, then the dots on top.
-    if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${multi ? cls : "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
+    if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${cls || "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
-      const dot = svg("circle", { class: `dot ${multi ? cls : "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
+      const dot = svg("circle", { class: `dot ${cls || "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
         svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`));
       dot.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2926,10 +2929,11 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   series.forEach((s, k) => {
     const f = fits[k];
     if (!f) return;
-    const cls = multi ? `axis-${k}` : "single";
-    plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }),
-      svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
-        svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (least-squares fit)`)));
+    const cls = colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "single";
+    plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }));
+    if (prediction) plot.push(svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
+      svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (least-squares fit)`)));
+
   });
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
   kids.push(plotGroup);
@@ -2942,11 +2946,8 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     const cls = `stats-line ${multi ? `axis-${k}` : ""}`;
     const o = s.points[st.outlier];
     const oDate = o ? new Date(o.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
-    // The biggest outlier gets a ring on the chart.
-    if (o && st.n > 2) plotGroup.append(svg("circle", { class: `outlier ${multi ? `axis-${k}` : "single"}`, cx: x(o.qa_date), cy: y(val(o)), r: small ? 6 : 9 },
-      svg("title", {}, `Biggest outlier: ${sig(val(o))}${u} on ${oDate}`)));
     const f = fits[k];
-    const trend = f ? ` · Trend ${sigSigned(f.slope * 7)}${u}/Week · In ${FORECAST_DAYS / 7} Weeks ${sig(f.end)}${u}` : "";
+    const trend = f ? ` · Trend ${sigSigned(f.slope * 7)}${u}/Week${prediction ? ` · In ${FORECAST_DAYS / 7} Weeks ${sig(f.end)}${u}` : ""}` : "";
     if (small) return [
       svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 1) * lineH }, `${name}Mean ${sig(st.mean)} ± ${sig(st.sd)}${u} · 95% CI ${sig(st.ciLow)} to ${sig(st.ciHigh)}${u} · N ${st.n} · Outlier ${sig(val(o))}${u} (${oDate})`),
       svg("text", { class: cls, x: L, y: H + keyH + (2 * k + 2) * lineH }, trend.replace(/^ · /, ""))];
@@ -2995,7 +2996,8 @@ function trendGroups(items) {
     if (!families.has(key)) families.set(key, { base: metric, category: item.category, members: [] });
     families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis ? ` · ${axis.axis}` : ''}` });
   }
-  return [...axisGroups(plain), ...[...families.values()].map(group => ({ ...group, members: group.members.sort((a,b) => a.axis.localeCompare(b.axis, undefined, { numeric: true })) }))];
+  const order = new Map(items.map((item, index) => [item.test_id, index]));
+  return [...axisGroups(plain), ...families.values()].sort((a,b) => Math.min(...a.members.map(m => order.get(m.test_id))) - Math.min(...b.members.map(m => order.get(m.test_id))));
 }
 
 async function renderTrendOverview(machines, machineId, range, listId = "") {
@@ -3004,6 +3006,11 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
   const sections = [], insights = [];
   for (const template of templates) {
     const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range).filter(p => String(p.assignment_id) === String(template.assignment.id))) })).filter(i => i.points.length);
+    // Result insertion order preserves the CSV analysis order, including for existing templates.
+    const imported = Object.entries(histories).flatMap(([testId, points]) => points.filter(p => p.source === 'sphinx' && String(p.assignment_id) === String(template.assignment.id)).map(p => ({ ...p, testId })));
+    const newest = imported.reduce((id, p) => Math.max(id, p.run_id), 0);
+    const order = new Map(imported.filter(p => p.run_id === newest).map(p => [String(p.testId), p.source_order]));
+    if (order.size) items.sort((a,b) => (order.get(String(a.test_id)) ?? Infinity) - (order.get(String(b.test_id)) ?? Infinity));
     const groups = trendGroups(items);
     const categories = new Map();
     for (const group of groups) {
@@ -3025,7 +3032,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
     }
     if (groups.length) {
       const section = el('section', { class: 'trend-organized-list' }, el('h2', { class: 'section-head' }, template.queue.name));
-      for (const [category, charts] of categories) section.append(el('h3', {}, category), ...charts.sort((a,b) => a.dataset.search.localeCompare(b.dataset.search, undefined, { numeric: true })));
+      for (const [category, charts] of categories) section.append(el('h3', {}, category), ...charts);
       sections.push(section);
     }
   }
