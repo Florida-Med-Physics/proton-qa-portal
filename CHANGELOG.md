@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Place pass-percentage circles beside their measurement/energy labels instead of at the far edge.
+
+- Show Skewness as two side-by-side axis subplots, all energies in X and all energies in Y, with matching energy colors.
+
 - Restrict trend statistics to marker, energy, reference, trend average ± SD, and maximum outlier/date.
 
 - Replace latest-status chart badges with selected-period pass-percentage rings and per-energy breakdowns on expansion; include warning/action segments and all measurements, including plot-excluded extremes.

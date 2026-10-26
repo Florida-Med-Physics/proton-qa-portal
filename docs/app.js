@@ -2806,13 +2806,13 @@ function trendStatistics(series, unit, delta = false, colorIndex = null) {
   return el('div', { class: 'trend-statistics' }, series.map((item, index) => {
     const values = item.points.map(p => delta ? asDeviation(p).dev : p.value);
     const st = seriesStats(values), outlier = item.points[st.outlier];
-    const color = colorIndex !== null ? `axis-${colorIndex}` : series.length > 1 ? `axis-${index}` : 'single';
+    const color = item.colorIndex !== undefined ? `axis-${item.colorIndex}` : colorIndex !== null ? `axis-${colorIndex}` : series.length > 1 ? `axis-${index}` : 'single';
     return el('div', { class: 'trend-statistics-line' }, el('span', { class: `key-swatch line ${color}`, 'aria-hidden': 'true' }),
       ` ${item.label}: Ref: ${sig(item.points.at(-1)?.expected)}: Trend Avg: ${sig(st.mean)} ± ${sig(st.sd)}${unit ? ` ${unit}` : ''}, Max Outlier: ${sig(values[st.outlier])} on ${shortDate(outlier.qa_date)}`);
   }));
 }
 
-function seriesChart(series, unit, { small = false, delta = null, yLabel = null } = {}) {
+function seriesChart(series, unit, { small = false, delta = null, yLabel = null, axisPanels = false } = {}) {
   yLabel = yLabel || yAxisLabel(series.map((x) => x.label));
   // Open every trend in Absolute mode; prediction is opt-in.
   let mode = "absolute";
@@ -2828,6 +2828,28 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);
+    if (axisPanels) {
+      const energies = new Map();
+      for (const item of series) {
+        const energy = item.label.replace(/\s*·\s*[XYZ]$/, '');
+        if (!energies.has(energy)) energies.set(energy, energies.size);
+      }
+      const panels = ['X', 'Y'].map(axis => {
+        const members = series.filter(item => item.label.endsWith(`· ${axis}`)).map(item => {
+          const label = item.label.replace(/\s*·\s*[XYZ]$/, '');
+          return { ...item, label, colorIndex: energies.get(label) };
+        });
+        if (!members.length) return null;
+        return el('section', { class: 'subplot skewness-axis-panel' }, el('div', { class: 'subplot-title' }, `${yLabel} ${axis}`, trendPassRing(members.flatMap(item => item.points), `${yLabel} ${axis}`)),
+          drawSeries(members, unit, { compact: true, delta, yLabel: `${yLabel} ${axis}`, prediction }),
+          ...(trendExclusionNote(members, delta) ? [trendExclusionNote(members, delta)] : []),
+          trendStatistics(members, unit, delta),
+          el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), trendPassBreakdown(members)));
+      }).filter(Boolean);
+      box.replaceChildren(controls, el('div', { class: 'energy-plot-grid plots-2 skewness-axis-grid' }, ...panels),
+        el('div', { class: 'chart-key' }, ...trendKey(true, true, prediction)));
+      return;
+    }
     // Absolute view of several series (X and Y sit around different references): one subplot per series, stacked,
     // each on its own scale with its own reference line and bands.
     if (multi && !delta) {
@@ -2954,7 +2976,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
 
   if (prediction) plot.push(svg("line", { class: "forecast-line", x1: xt(t1), x2: xt(t1), y1: T, y2: plotBottom }));
   series.forEach((s, k) => {
-    const cls = colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "";
+    const cls = s.colorIndex !== undefined ? `axis-${s.colorIndex}` : colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "";
     const r = small ? (dates.length > 120 ? 2.2 : 3) : (dates.length > 150 ? 2.6 : 3.6);
     // A line from each result to the next, then the dots on top.
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${cls || "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
@@ -2984,7 +3006,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   series.forEach((s, k) => {
     const f = fits[k];
     if (!f) return;
-    const cls = colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "single";
+    const cls = s.colorIndex !== undefined ? `axis-${s.colorIndex}` : colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "single";
     plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }));
     if (prediction) plot.push(svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
       svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (least-squares fit)`)));
@@ -3074,7 +3096,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
       chart.addEventListener('toggle', () => {
         if (!chart.open || drawn) return;
         drawn = true;
-        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Amber: warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)) }), el('a', { href, class: 'button small' }, 'View values and details'));
+        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Amber: warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }), el('a', { href, class: 'button small' }, 'View values and details'));
       });
       categories.get(category).push(chart);
     }
@@ -3100,7 +3122,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
 function renderTrendDetail(group, range) {
   const unit = group.members[0].unit;
   const multi = group.members.length > 1;
-  app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)) }));
+  app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }));
   // One row per date, one column per axis.
   const byDate = new Map();
   group.members.forEach((m, k) => m.points.forEach((p) => {

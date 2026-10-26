@@ -1188,3 +1188,14 @@ td, .measure-table td { font-size: 21px; }
 .trend-pass-breakdown { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 6px 0 12px; }
 .trend-energy-rate { display: flex; align-items: center; gap: 10px; font-size: 17px; }
 @media(max-width:600px){ .trend-chart-row > summary { padding: 12px; } .trend-pass-label { display: none; } }
+
+.skewness-axis-grid .trend-statistics-line { font-size: 15px; }
+.chart .series.axis-6 { stroke: #c44569; } .dot.axis-6 { fill: #c44569; }
+.chart .series.axis-7 { stroke: #6c5ce7; } .dot.axis-7 { fill: #6c5ce7; }
+.chart .series.axis-8 { stroke: #2d8659; } .dot.axis-8 { fill: #2d8659; }
+.key-swatch.line.axis-6, .key-swatch.line.axis-6::after { border-color: #c44569; background-color: #c44569; }
+.key-swatch.line.axis-7, .key-swatch.line.axis-7::after { border-color: #6c5ce7; background-color: #6c5ce7; }
+.key-swatch.line.axis-8, .key-swatch.line.axis-8::after { border-color: #2d8659; background-color: #2d8659; }
+/* Keep each rate visibly attached to its measurement or energy label. */
+.trend-chart-row > summary { justify-content: flex-start; gap: 16px; }
+.subplot-title { justify-content: flex-start; gap: 14px; }
