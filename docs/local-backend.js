@@ -1207,8 +1207,25 @@
     applyImagingDefaults();
     installDepartmentTemplates();
     installSrsWinstonLutz();
+    installRequestedDashboardSchedules();
     for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
   })();
+
+  function installRequestedDashboardSchedules() {
+    if(S.requestedDashboardSchedules20261026)return;
+    for(const machine of S.machines){
+      const hdr=/HDR.*Flex/i.test(machine.name),tb=/^TrueBeam$/i.test(machine.name);
+      if(!hdr&&!tb)continue;
+      for(const queue of S.queues.filter(q=>q.active && (tb ? /monthly/i.test(q.name)&&/truebeam/i.test(q.name) : /HDR.*Flex/i.test(q.name)&&/Daily QA|Source Exchange/i.test(q.name)))){
+        let a=S.assignments.find(a=>a.machine_id===machine.id&&a.queue_id===queue.id);
+        if(a&&testSelection(a).archived)continue;
+        const frequency=tb?'monthly':'asneeded';
+        if(!a){const result=saveAssignment({id:null,role:'admin'},{machine_id:machine.id,queue_id:queue.id,frequency,weekdays:[0,1,2,3,4],active:1});a=byId('assignments',result.id);}
+        if(a){Object.assign(a,{frequency,active:1,interval_days:null});machine.active=1;audit(null,'requested_dashboard_schedule','assignment',a.id,{frequency,source:'2026-10-26 user request'});}
+      }
+    }
+    S.requestedDashboardSchedules20261026=true;save();
+  }
 
   function installSrsWinstonLutz() {
     const tpl=window.PORTAL_SEED.templates.find(t=>t.name==='SRS QA template – TrueBeam (Dose Pro)');

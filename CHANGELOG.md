@@ -275,3 +275,5 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Matching measurements on one machine share history across list copies; distinct units, energies and machines remain separate.
 - Machine Trends toolbar is exactly Import Folder and Export CSV; guidance distinguishes insufficient data from no detected pattern.
 - Plot dots show date, measured value and delta on hover, focus or tap. Dashboard pass-rate rings are per QA set. Status text on Perform QA matches the description size.
+
+- Apply the requested TrueBeam Monthly monthly schedule and display HDR Flexitron Daily/Source Exchange QA as needed on the dashboard, once per installation.

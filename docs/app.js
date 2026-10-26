@@ -369,7 +369,7 @@ async function renderHome() {
       const schedules=[...m.queues].sort((a,b)=>(FREQ_ORDER[a.frequency]??9)-(FREQ_ORDER[b.frequency]??9)||a.queue_name.localeCompare(b.queue_name));
       const last=m.queues.filter((q)=>q.last_run).sort((a,b)=>b.last_run.qa_date.localeCompare(a.last_run.qa_date))[0]?.last_run;
       const scheduleRows=schedules.map((a)=>{
-        const status=a.state==='overdue'?'Overdue':a.state==='ready'?'On demand':a.state==='done'?'Done today':dueIn(a.next_due,a.frequency);
+        const status=a.state==='overdue'?'Overdue':a.state==='ready'?'As needed':a.state==='done'?'Done today':dueIn(a.next_due,a.frequency);
         const label=a.frequency==='daily'?'Daily QA':a.frequency==='monthly'?'Monthly QA':a.frequency==='asneeded'?a.queue_name.replace(/\s*[–-]\s*HDR Flexitron$/i,''):(FREQ_LABEL[a.frequency]||a.queue_name);
         return el('div',{class:'home-qa-line'},
           can('perform')?el('a',{class:'start-dot home-go',href:`#/perform/${a.id}`,title:`Start ${label} for ${m.name}`,'aria-label':`Start ${label} for ${m.name}`},'▶'):null,

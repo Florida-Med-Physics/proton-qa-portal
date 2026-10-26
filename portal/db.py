@@ -168,6 +168,7 @@ class Database:
         self._apply_imaging_defaults()
         self._install_department_templates()
         self._install_srs_winston_lutz()
+        self._install_requested_dashboard_schedules()
 
     def _approval_migrations(self):
         users_schema = self.one("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")["sql"]
@@ -193,6 +194,26 @@ class Database:
                 self.conn.execute(f'ALTER TABLE runs ADD COLUMN {name} {definition}')
         self.run("UPDATE runs SET therapist_approval_required=1 WHERE review_status='pending' AND EXISTS (SELECT 1 FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=runs.id AND lower(t.name) LIKE '%therapist%' AND (lower(t.name) LIKE '%review%' OR lower(t.name) LIKE '%approv%'))")
 
+    def _install_requested_dashboard_schedules(self):
+        with self.transaction():
+            for machine in self.all('SELECT * FROM machines'):
+                hdr=bool(re.search(r'HDR.*Flex',machine['name'],re.I));tb=machine['name'].lower()=='truebeam'
+                if not (hdr or tb):continue
+                for queue in self.all('SELECT * FROM queues WHERE active=1'):
+                    matches=(re.search('monthly',queue['name'],re.I) and re.search('truebeam',queue['name'],re.I)) if tb else (re.search(r'HDR.*Flex',queue['name'],re.I) and re.search(r'Daily QA|Source Exchange',queue['name'],re.I))
+                    if not matches:continue
+                    key=f"20261026:{machine['id']}:{queue['id']}"
+                    if self.one("SELECT id FROM audit WHERE action='requested_dashboard_schedule' AND detail LIKE ?",('%'+key+'"%',)):continue
+                    a=self.one('SELECT * FROM assignments WHERE machine_id=? AND queue_id=?',(machine['id'],queue['id']))
+                    if a and json.loads(a.get('test_selection') or '{}').get('archived'):continue
+                    frequency='monthly' if tb else 'asneeded'
+                    if a:
+                        aid=a['id'];self.run('UPDATE assignments SET frequency=?,active=1,interval_days=NULL WHERE id=?',(frequency,aid))
+                    else:
+                        aid=self.run('INSERT INTO assignments(machine_id,queue_id,frequency,start_date,active) VALUES(?,?,?,?,1)',(machine['id'],queue['id'],frequency,now()[:10]))
+                    self.run('UPDATE machines SET active=1 WHERE id=?',(machine['id'],))
+                    self.audit(None,'requested_dashboard_schedule','assignment',aid,key=key,frequency=frequency)
+
     def _install_srs_winston_lutz(self):
         seed=json.loads((Path(__file__).parent/'seed.json').read_text())
         tpl=next(t for t in seed['templates'] if t['name']=='SRS QA template – TrueBeam (Dose Pro)')
@@ -215,7 +236,7 @@ class Database:
         with self.transaction():
             for tpl in seed['templates']:
                 key=tpl.get('departmental_id')
-                if not key or self.one("SELECT id FROM audit WHERE action='install_department_template' AND detail LIKE ?", ('%'+key+'%',)):
+                if not key or self.one("SELECT id FROM audit WHERE action='install_department_template' AND detail LIKE ?", ('%'+key+'"%',)):
                     continue
                 if not self.one('SELECT id FROM machines WHERE name=?',(tpl['install_machine'],)):
                     continue
