@@ -1369,3 +1369,9 @@ td, .measure-table td { font-size: 21px; }
 
 .qa-review-actions { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
 .qa-trash-icon { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px; flex:none; }
+
+.dashboard-review-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; align-items:start; }
+.dashboard-review-grid .dashboard-review { min-width:0; }
+.dashboard-review-grid .dashboard-review .row { flex-wrap:wrap; padding:8px 0; }
+.dashboard-review-grid .dashboard-review .row > a:first-child { overflow-wrap:anywhere; flex:1 1 220px; }
+@media(max-width:760px) { .dashboard-review-grid { grid-template-columns:1fr; gap:0; } }

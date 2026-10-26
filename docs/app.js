@@ -367,11 +367,13 @@ async function renderHome() {
   const runs=await api('GET','/api/runs?limit=400');
   const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
   app.append(el('div',{class:'row home-brief'},el('a',{href:'#/perform-qa',class:'small'},`${due} QA ${due===1?'list':'lists'} to do`)));
+  const reviewGrid=el('div',{class:'dashboard-review-grid'});
   for(const therapy of [true,false]) {
     const reviews=runs.filter(r=>r.review_status==='pending'&&(therapy?r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false):r.review_ready!==false));
-    app.append(el('section',{class:'card dashboard-review'},el('h2',{},`${therapy?'Awaiting Therapy Review':'Awaiting Physics Review'} (${reviews.length})`),
+    reviewGrid.append(el('section',{class:'card dashboard-review'},el('h2',{},`${therapy?'Awaiting Therapy Review':'Awaiting Physics Review'} (${reviews.length})`),
       reviews.length?el('div',{},...reviews.map(r=>el('div',{class:'row'},el('a',{href:`#/runs/${r.id}`},`${r.machine_name} · ${r.queue_name}`),el('span',{class:'muted small'},shortDate(r.qa_date)),el('span',{class:'spacer'}),el('a',{class:'button small',href:`#/runs/${r.id}`},'Open')))):el('p',{class:'muted'},'No QA is waiting for this review.')));
   }
+  app.append(reviewGrid);
   const grid=el('div',{class:'home-modality-grid'});
   for(const modality of MODALITIES){
     const machines=data.machines.filter((m)=>modalityOf(m.kind)===modality).sort((a,b)=>kindRank(a.kind)-kindRank(b.kind)||a.name.localeCompare(b.name));
