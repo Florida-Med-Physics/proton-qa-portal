@@ -1,3 +1,6 @@
 # The portal itself uses only the standard library.
 # xlrd reads the legacy .xls Sphinx exports (Sphinx import only).
 xlrd==2.0.1
+
+# Extract DoseLab Winston-Lutz PDF measurements.
+pypdf==6.10.0

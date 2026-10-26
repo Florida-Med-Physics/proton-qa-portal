@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const XLSX=require('../portal/static/xlsx.full.min.js');
+const context={window:{},XLSX,TextEncoder,TextDecoder,Blob,Map,Set,Number,Object,Array,Error,Math,Date,JSON};vm.createContext(context);
+vm.runInContext(fs.readFileSync('portal/static/monthly-workbook-data.js','utf8'),context);
+vm.runInContext(fs.readFileSync('portal/static/monthly-workbooks.js','utf8'),context);
+const excel=context.window.QAExcel;
+assert.equal(excel.evaluate({}).cell('B. Mechanical','G31'),null,'Blank inputs must not become measured zero');
+assert.equal(excel.evaluate({'B. Mechanical!F8':180}).cell('B. Mechanical','F9'),'Pass');
+assert.equal(excel.evaluate({'B. Mechanical!F8':183}).cell('B. Mechanical','F9'),'Fail');
+const engine=excel.evaluate({'C. Dosimetry!E18':22.8,'C. Dosimetry!E19':1025.7});
+assert.ok(Math.abs(engine.cell('C. Dosimetry','E20')-.9905879598914932)<1e-12);
+const workbook=XLSX.read(fs.readFileSync('portal/static/templates/truebeam-monthly.xlsx'),{type:'buffer'});
+assert.equal(workbook.SheetNames.length,8);
+assert.equal(workbook.Sheets['F. Image Quality'].F49?.v,undefined,'Old October measurements must be cleared');
+assert.equal(workbook.Sheets['D. MLC'].F29?.v,undefined);
+assert.ok(workbook.Sheets['B. Mechanical'].F9.f.includes('IF('));
+console.log('Monthly workbook formulas, missing-input handling, source sheets and blank current values pass.');

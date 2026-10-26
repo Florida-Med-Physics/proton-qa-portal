@@ -4,13 +4,15 @@ import base64
 import binascii
 import hashlib
 import json
+import re
+from urllib.parse import unquote, quote
 from datetime import date, datetime
 from pathlib import Path
 
-from . import auth, checklist, qa, sphinx
+from . import auth, checklist, qa, sphinx, winston_lutz
 from .db import now
 
-TEST_TYPES = ("numeric", "boolean", "status", "text")
+TEST_TYPES = ("numeric", "boolean", "status", "text", "choice")
 # Accepted spellings for a status check: Pass / Warning / Fail.
 STATUS_WORDS = {"pass": "pass", "passed": "pass", "warn": "warn", "warning": "warn", "fail": "fail", "failed": "fail"}
 
@@ -87,6 +89,27 @@ def create_user(db, user, data):
         return {"id": auth.create_user(db, data.get("username"), data.get("full_name"), data.get("role"), data.get("password") or "", user["id"])}
     except ValueError as exc:
         raise PortalError(str(exc))
+
+
+def import_users(db,user,data):
+    require(user,'manage_users')
+    rows=data.get('users')
+    if not isinstance(rows,list) or not 1<=len(rows)<=500:
+        raise PortalError('Upload 1–500 users at a time.')
+    names=set()
+    for i,row in enumerate(rows,2):
+        username=str(row.get('username') or '').strip()
+        if not username or username.lower() in names or db.one('SELECT id FROM users WHERE username=? COLLATE NOCASE',(username,)):
+            raise PortalError(f'Row {i}: username is missing or already exists. No users were imported.')
+        names.add(username.lower())
+        if row.get('role') not in auth.ROLES:
+            raise PortalError(f'Row {i}: choose Admin, Physicist, Therapist or MPA.')
+        try: auth.validate_password(row.get('password') or '')
+        except ValueError:
+            raise PortalError(f'Row {i}: temporary password needs at least 10 characters. No users were imported.')
+    with db.transaction():
+        ids=[auth.create_user(db,str(row['username']).strip(),row.get('full_name'),row['role'],row['password'],user['id']) for row in rows]
+    return {'created':len(ids)}
 
 
 def update_user(db, user, user_id, data):
@@ -177,11 +200,29 @@ def _owner(db, data, current=None):
     return _get(db, "queues", int(raw))["id"]
 
 
+def choice_options(description):
+    match=re.search(r'\[choices: ([^\]]+)\]', description or '')
+    try:
+        choices=json.loads(unquote(match[1])) if match else []
+    except (ValueError,TypeError):
+        choices=[]
+    return choices if isinstance(choices,list) and all(isinstance(c,str) for c in choices) else []
+
+
 def save_test(db, user, data, test_id=None):
     require(user, "configure")
     test_type = data.get("type") or "numeric"
     if test_type not in TEST_TYPES:
         raise PortalError("Test type must be numeric, boolean, status, or text.")
+    data=dict(data)
+    if test_type == 'choice':
+        choices=data.get('choices')
+        if isinstance(choices,str): choices=[c.strip() for c in choices.splitlines() if c.strip()]
+        if choices is None: choices=choice_options(data.get('description'))
+        if not isinstance(choices,list) or not 2<=len(choices)<=100 or len(set(choices))!=len(choices) or any(not isinstance(c,str) or not c.strip() or len(c)>200 for c in choices):
+            raise PortalError('Multiple choice needs 2–100 unique, nonempty choices (up to 200 characters each).')
+        clean=re.sub(r'\s*\[choices: [^\]]+\]','',data.get('description') or '')
+        data['description']=clean+' [choices: '+quote(json.dumps(choices),safe='')+']'
     limits = _limits(data, allow_blank_mode=False) if test_type == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": "absolute"}
     name, category = _text(data, "name", required=True), _text(data, "category")
     existing = _get(db, "tests", test_id) if test_id is not None else None
@@ -328,7 +369,7 @@ def save_queue(db, user, data, queue_id=None, _within_transaction=False):
                 existing = _get(db, "tests", tid)
                 if tid not in member_ids or (existing["owner_queue_id"] is not None and existing["owner_queue_id"] != queue_id):
                     raise PortalError("Only this template's tests can be edited here.")
-                fields = {key: update[key] for key in ("name", "category", "type") if key in update}
+                fields = {key: update[key] for key in ("name", "category", "type", "choices") if key in update}
                 save_test(db, user, {**existing, **fields}, tid)
             return save_queue(db, user, {**data, "test_updates": []}, queue_id, _within_transaction=True)
     name = _text(data, "name", required=True)
@@ -700,7 +741,7 @@ def save_assignment(db, user, data, assignment_id=None):
 
 # ---- default import folder (where each scheduled list's export files appear) ----------------
 
-IMPORT_EXTENSIONS = (".xls", ".csv")  # Sphinx exports today; DQA3 exports once that importer exists.
+IMPORT_EXTENSIONS = (".xls", ".csv", ".pdf")  # Sphinx exports today; DQA3 exports once that importer exists.
 
 
 def _import_root(assignment):
@@ -822,7 +863,9 @@ def dashboard(db, user, today=None):
         for a in queues:
             last = db.one("SELECT id, overall, review_status, qa_date FROM runs WHERE assignment_id = ? ORDER BY qa_date DESC, id DESC LIMIT 1", (a["id"],))
             a["last_run"] = last
+            a['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.assignment_id=? GROUP BY res.status',(a['id'],))}
         machine["queues"] = queues
+        machine['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.machine_id=? GROUP BY res.status',(machine['id'],))}
         machine["pending_review"] = db.one("SELECT COUNT(*) AS n FROM runs WHERE machine_id = ? AND review_status = 'pending'", (machine["id"],))["n"]
         machines.append(machine)
     return {"today": today.isoformat(), "machines": machines}
@@ -857,6 +900,10 @@ def submit_run(db, user, assignment_id, data):
                 raise PortalError(f"{item['name']}: enter a number.")
         elif item["type"] == "boolean":
             value = value in (True, 1, "1", "true", "pass", "yes")
+        elif item["type"] == "choice":
+            value=str(value)
+            if value not in choice_options(item.get('description')):
+                raise PortalError(f"{item['name']}: choose an available answer.")
         elif item["type"] == "status":
             value = STATUS_WORDS.get(str(value).strip().lower())
             if value is None:
@@ -871,7 +918,7 @@ def submit_run(db, user, assignment_id, data):
     source_ref = _text(data, "source_ref") or None
     _check_not_imported(db, source_ref)
     rows = [{"test_id": item["test_id"], "value_num": float(value) if value is not None and item["type"] in ("numeric", "boolean") else None,
-             "value_text": value if item["type"] in ("text", "status") else None, "limits": item["limits"], "status": status, "comment": comment}
+             "value_text": value if item["type"] in ("text", "status", "choice") else None, "limits": item["limits"], "status": status, "comment": comment}
             for item, value, status, comment in results]
     return _insert_run(db, user, template, qa_date.isoformat(), rows, _text(data, "comment"),
                        "sphinx" if source_ref else "manual", source_ref, "pending")
@@ -926,8 +973,10 @@ SPHINX_STATUS = {"Passed": "pass", "Warning": "warn", "Failed": "fail"}
 
 def _parse_sphinx(name, data):
     try:
-        return sphinx.parse_file(data, name)
-    except sphinx.SphinxError as exc:
+        parsed = winston_lutz.parse_file(data, name) if name.lower().endswith(".pdf") else sphinx.parse_file(data, name)
+        parsed["sha256"] = hashlib.sha256(data).hexdigest()
+        return parsed
+    except (sphinx.SphinxError, ValueError, ImportError) as exc:
         raise PortalError(f"{name}: {exc}")
 
 
@@ -939,7 +988,7 @@ def _decode_upload(upload):
 
 
 def _file_limits(m):
-    return {"expected": m["expected"], "warn": m["warn"], "fail": m["fail"], "tol_mode": m["tol_mode"]}
+    return {"expected": m["expected"], "warn": m["warn"], "fail": m["fail"], "tol_mode": m["tol_mode"], **({"criterion":m["criterion"]} if m.get("criterion") else {})}
 
 
 def _sphinx_test_ids(db, user, template, measurements, create):
@@ -985,6 +1034,10 @@ def sphinx_preview(db, user, assignment_id, upload):
     name, data = _decode_upload(upload)
     parsed = _parse_sphinx(name, data)
     template = run_template(db, user, assignment_id)
+    if name.lower().endswith(".pdf") and not any("[rule: wl-max-delta]" in (i.get("description") or "") for i in template["items"]):
+        raise PortalError("Choose the SRS Winston-Lutz QA list for this PDF.")
+    if re.search("truebeam", name, re.I) and "truebeam" not in template["machine"]["name"].lower():
+        raise PortalError("The filename identifies TrueBeam. Choose the TrueBeam machine.")
     items = {(i["category"], i["name"]): i for i in template["items"]}
     by_meaning = {sphinx.canonical_key(i["name"]): i for i in template["items"] if sphinx.canonical_key(i["name"])}
     excluded = [i for i in template.get("all_items", []) if i.get("excluded")]
@@ -999,12 +1052,12 @@ def sphinx_preview(db, user, assignment_id, upload):
             unmatched.append(m)
             continue
         file_limits = _file_limits(m)
-        differs = any(item["limits"][k] != file_limits[k] for k in file_limits)
+        differs = any(item["limits"].get(k) != file_limits[k] for k in file_limits)
         matched.append({"test_id": item["test_id"], "value": m["result"], "sphinx_status": m["sphinx_status"],
                         "file_limits": file_limits, "limits_differ": differs})
     duplicate = db.one("SELECT id FROM runs WHERE source_ref = ?", (parsed["sha256"],))
     return {"filename": name, "qa_date": parsed["qa_date"], "finished": parsed["finished"], "sphinx_user": parsed["sphinx_user"],
-            "source_ref": parsed["sha256"], "duplicate_run": duplicate["id"] if duplicate else None,
+            "report_machine": parsed.get("report_machine", ""), "source_ref": parsed["sha256"], "duplicate_run": duplicate["id"] if duplicate else None,
             "matched": matched, "unmatched": [{"category": m["category"], "name": m["name"], "unit": m["unit"]} for m in unmatched]}
 
 
@@ -1028,6 +1081,11 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
         try:
             parsed = _parse_sphinx(name, data)
             _check_not_imported(db, parsed["sha256"])
+            if name.lower().endswith('.pdf'):
+                if not any('[rule: wl-max-delta]' in (i.get('description') or '') for i in template['items']):
+                    raise PortalError('Choose the SRS Winston-Lutz QA list for this PDF.')
+                if re.search('truebeam',name,re.I) and 'truebeam' not in template['machine']['name'].lower():
+                    raise PortalError('The filename identifies TrueBeam. Choose the TrueBeam machine.')
             ids, added = _sphinx_test_ids(db, user, template, parsed["measurements"], create=True)
         except PortalError as exc:
             skipped.append({"file": name, "reason": str(exc).removeprefix(f"{name}: ")})
@@ -1111,7 +1169,7 @@ def get_run(db, user, run_id):
         raise PortalError("Run not found.", 404)
     signer = db.one('SELECT username, full_name FROM users WHERE id=?', (run['therapist_approved_by'],)) if run['therapist_approved_by'] else None
     run['therapist_approver_name'] = (signer['full_name'] or signer['username']) if signer else None
-    run["results"] = db.all("SELECT res.*, t.name, t.category, t.type, t.unit FROM results res JOIN tests t ON t.id = res.test_id "
+    run["results"] = db.all("SELECT res.*, t.name, t.category, t.type, t.unit, t.description FROM results res JOIN tests t ON t.id = res.test_id "
                             "WHERE res.run_id = ? ORDER BY res.id", (run_id,))
     return run
 

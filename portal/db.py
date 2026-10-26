@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS tests (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT '',
-    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'status', 'text')),
+    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'status', 'text', 'choice')),
     unit TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     expected REAL,
@@ -163,6 +163,8 @@ class Database:
         self._approval_migrations()
         self._generalize_pbs_templates()
         self._apply_imaging_defaults()
+        self._install_department_templates()
+        self._install_srs_winston_lutz()
 
     def _approval_migrations(self):
         users_schema = self.one("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")["sql"]
@@ -187,6 +189,45 @@ class Database:
             if name not in columns:
                 self.conn.execute(f'ALTER TABLE runs ADD COLUMN {name} {definition}')
         self.run("UPDATE runs SET therapist_approval_required=1 WHERE review_status='pending' AND EXISTS (SELECT 1 FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=runs.id AND lower(t.name) LIKE '%therapist%' AND (lower(t.name) LIKE '%review%' OR lower(t.name) LIKE '%approv%'))")
+
+    def _install_srs_winston_lutz(self):
+        seed=json.loads((Path(__file__).parent/'seed.json').read_text())
+        tpl=next(t for t in seed['templates'] if t['name']=='SRS QA template – TrueBeam (Dose Pro)')
+        for q in self.all('SELECT * FROM queues WHERE name=?',(tpl['name'],)):
+            items=self.all('SELECT t.name FROM queue_items i JOIN tests t ON t.id=i.test_id WHERE i.queue_id=?',(q['id'],))
+            if len(items)!=5 or not all(i['name'] in seed['srs_placeholder_names'] for i in items): continue
+            with self.transaction():
+                self.run('DELETE FROM queue_items WHERE queue_id=?',(q['id'],))
+                for position,c in enumerate(tpl['checks']):
+                    tid=self.run('INSERT INTO tests(name,category,type,unit,description,expected,warn,fail,tol_mode,active,owner_queue_id) VALUES(?,?,?,?,?,?,?,?,?,1,?)',(c['name'],c['category'],c['type'],c['unit'],c['description'],c['expected'],c['warn'],c['fail'],'absolute',q['id']))
+                    self.run('INSERT INTO queue_items(queue_id,test_id,position) VALUES(?,?,?)',(q['id'],tid,position))
+                self.run('UPDATE queues SET description=? WHERE id=?',(tpl['setup'],q['id']))
+                self.audit(None,'install_winston_lutz','queue',q['id'],rule='Maximum delta < 1 mm')
+
+    def _install_department_templates(self):
+        # Install only into existing departmental databases; empty databases use seed-defaults.
+        if not self.one("SELECT id FROM machines LIMIT 1"):
+            return
+        seed=json.loads((Path(__file__).parent/'seed.json').read_text())
+        with self.transaction():
+            for tpl in seed['templates']:
+                key=tpl.get('departmental_id')
+                if not key or self.one("SELECT id FROM audit WHERE action='install_department_template' AND detail LIKE ?", ('%'+key+'%',)):
+                    continue
+                if not self.one('SELECT id FROM machines WHERE name=?',(tpl['install_machine'],)):
+                    continue
+                q=self.one('SELECT * FROM queues WHERE name=? COLLATE NOCASE',(tpl['name'],))
+                if q and (self.one('SELECT id FROM queue_items WHERE queue_id=?',(q['id'],)) or self.one('SELECT id FROM tests WHERE owner_queue_id=?',(q['id'],))):
+                    continue
+                qid=q['id'] if q else self.run('INSERT INTO queues(name,description,active,is_template) VALUES(?,?,1,1)',(tpl['name'],tpl['setup']))
+                self.run('UPDATE queues SET description=? WHERE id=?',(tpl['setup'],qid))
+                for position,c in enumerate(tpl['checks']):
+                    tid=self.run('INSERT INTO tests(name,category,type,unit,description,expected,warn,fail,tol_mode,active,owner_queue_id) VALUES(?,?,?,?,?,?,?,?,?,1,?)',(c['name'],c['category'],c['type'],c.get('unit',''),c['description'],c.get('expected'),c.get('warn'),c.get('fail'),c.get('tol_mode','absolute'),qid))
+                    self.run('INSERT INTO queue_items(queue_id,test_id,position) VALUES(?,?,?)',(qid,tid,position))
+                m=self.one('SELECT id FROM machines WHERE name=?',(tpl['install_machine'],))
+                if m and not self.one('SELECT id FROM assignments WHERE machine_id=? AND queue_id=?',(m['id'],qid)):
+                    self.run("INSERT INTO assignments(machine_id,queue_id,frequency,start_date,active) VALUES(?,?,?,?,1)",(m['id'],qid,tpl['frequency'],now()[:10]))
+                self.audit(None,'install_department_template','queue',qid,source=key,tests=len(tpl['checks']))
 
     def _apply_imaging_defaults(self):
         seed = json.loads((Path(__file__).parent / "seed.json").read_text())
@@ -281,14 +322,14 @@ class Database:
                 PRAGMA foreign_keys = ON;
             """)
         tests_sql = self.conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tests'").fetchone()
-        if tests_sql and "'status'" not in tests_sql[0]:
+        if tests_sql and "'choice'" not in tests_sql[0]:
             # The 'status' check type (Pass / Warning / Fail) was added; SQLite cannot change a CHECK, so rebuild.
             self.conn.executescript("""
                 PRAGMA foreign_keys = OFF;
                 BEGIN;
                 CREATE TABLE tests_new (
                     id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '',
-                    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'status', 'text')), unit TEXT NOT NULL DEFAULT '',
+                    type TEXT NOT NULL CHECK (type IN ('numeric', 'boolean', 'status', 'text', 'choice')), unit TEXT NOT NULL DEFAULT '',
                     description TEXT NOT NULL DEFAULT '', expected REAL, warn REAL, fail REAL,
                     tol_mode TEXT NOT NULL DEFAULT 'absolute' CHECK (tol_mode IN ('absolute', 'percent')),
                     active INTEGER NOT NULL DEFAULT 1, owner_queue_id INTEGER REFERENCES queues(id),

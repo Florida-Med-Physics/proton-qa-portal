@@ -258,3 +258,12 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Machine Trends no longer fails because of a missing section helper, and a machine's trends now load in one request.
 
 [Unreleased]: https://github.com/Florida-Med-Physics/proton-qa-portal/commits/main
+
+## 2026-10-26 — QA entry, imports and departmental templates
+
+- Phone QA cards preserve original inputs and desktop layout; vivid PASS/ACTION results and uniform result labels.
+- Daily HDR and TrueBeam Monthly source-based starters; original monthly Excel upload and filled workbook export.
+- Multiple choice tests, bulk user spreadsheet import, password-change access, and dashboard history rings.
+- Recursive folder imports without a second file picker; Perform autofills only reports matching the selected QA date and keeps existing entries.
+- DoseLab Winston-Lutz PDF import: filename identifies TrueBeam; only Maximum delta < 1 mm passes (1 mm fails); total delta values are informational.
+- Template seed updates preserve local customization and historical results.

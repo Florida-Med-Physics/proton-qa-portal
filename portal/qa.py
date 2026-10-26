@@ -29,6 +29,8 @@ def resolve_limits(test, queue_item=None, override=None):
                 value = layer[key]
         limits[key] = value
     limits["tol_mode"] = limits["tol_mode"] or "absolute"
+    if "[rule: wl-max-delta]" in (test.get("description") or ""):
+        limits["criterion"] = "wl-max-delta"
     return limits
 
 
@@ -45,12 +47,14 @@ def deviation(value, expected, tol_mode):
 
 def evaluate(test_type, value, limits):
     """Return 'pass', 'warn', 'fail', or 'recorded' (no limits to judge against)."""
+    if limits.get("criterion") == "wl-max-delta":
+        return "pass" if 0 <= value < 1 else "fail"
     if test_type == "boolean":
         return "pass" if value else "fail"
     if test_type == "status":
         # The person performing QA picks Pass / Warning / Fail directly (as on a RadMachine checklist).
         return value if value in ("pass", "warn", "fail") else "fail"
-    if test_type == "text":
+    if test_type in ("text", "choice"):
         return "recorded"
     dev = deviation(value, limits.get("expected"), limits.get("tol_mode"))
     if dev is None:

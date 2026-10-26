@@ -120,7 +120,7 @@
   // ---- default import folders (one per scheduled list) -----------------------------------
   // The folder handle lives in this browser's storage; the list keeps only the folder's name.
   const FOLDER_PREFIX = "folder:";
-  const IMPORT_EXTENSIONS = [".xls", ".csv"];
+  const IMPORT_EXTENSIONS = [".xls", ".csv", ".pdf"];
   async function folderHandle(assignmentId) { return kvGet(FOLDER_PREFIX + assignmentId); }
   async function folderPermission(handle) {
     try { return await handle.queryPermission({ mode: "read" }); } catch { return "denied"; }
@@ -239,12 +239,14 @@
       out[k] = v;
     }
     out.tol_mode = out.tol_mode || "absolute";
+    if ((test.description || "").includes("[rule: wl-max-delta]")) out.criterion = "wl-max-delta";
     return out;
   }
   function evaluate(type, value, limits) {
+    if (limits.criterion === "wl-max-delta") return value >= 0 && value < 1 ? "pass" : "fail";
     if (type === "boolean") return value ? "pass" : "fail";
     if (type === "status") return ["pass", "warn", "fail"].includes(value) ? value : "fail";
-    if (type === "text") return "recorded";
+    if (type === "text" || type === "choice") return "recorded";
     if (limits.expected === null || limits.expected === undefined) return "recorded";
     let dev = value - limits.expected;
     if (limits.tol_mode === "percent") {
@@ -470,7 +472,7 @@
     const [name, bytes] = decodeUpload(upload);
     let parsed;
     try {
-      parsed = parseRows(readRows(bytes), name);
+      parsed = /\.pdf$/i.test(name) ? await window.QAWinstonLutz.parse(bytes, name) : parseRows(readRows(bytes), name);
     } catch (err) {
       throw new Error(`${name}: ${err.message}`);
     }
@@ -478,7 +480,7 @@
     parsed.sha256 = await sha256(bytes);
     return parsed;
   }
-  const fileLimits = (m) => ({ expected: m.expected, warn: m.warn, fail: m.fail, tol_mode: m.tol_mode });
+  const fileLimits = (m) => ({ expected: m.expected, warn: m.warn, fail: m.fail, tol_mode: m.tol_mode, ...(m.criterion ? {criterion:m.criterion} : {}) });
 
   // ---- users / session --------------------------------------------------------
 
@@ -518,10 +520,21 @@
 
   // ---- queues / tests ---------------------------------------------------------
 
+  function choiceOptions(description) {
+    const m=/\[choices: ([^\]]+)\]/.exec(description||'');
+    try {const choices=m?JSON.parse(decodeURIComponent(m[1])):[];return Array.isArray(choices)&&choices.every(c=>typeof c==='string')?choices:[];}catch{return [];}
+  }
+
   function saveTest(user, data, testId) {
     require(user, "configure");
     const type = data.type || "numeric";
-    if (!["numeric", "boolean", "status", "text"].includes(type)) throw new Error("Test type must be numeric, boolean, status, or text.");
+    if (!["numeric", "boolean", "status", "text", "choice"].includes(type)) throw new Error("Test type must be numeric, boolean, status, or text.");
+    data={...data};
+    if(type==='choice') {
+      const choices=typeof data.choices==='string'?data.choices.split(/\r?\n/).map(c=>c.trim()).filter(Boolean):data.choices||choiceOptions(data.description);
+      if(!Array.isArray(choices)||choices.length<2||choices.length>100||new Set(choices).size!==choices.length||choices.some(c=>typeof c!=='string'||!c.trim()||c.length>200))throw Error('Multiple choice needs 2–100 unique, nonempty choices (up to 200 characters each).');
+      data.description=(data.description||'').replace(/\s*\[choices: [^\]]+\]/g,'')+' [choices: '+encodeURIComponent(JSON.stringify(choices))+']';
+    }
     const limits = type === "numeric" ? limitsOf(data, false) : { expected: null, warn: null, fail: null, tol_mode: "absolute" };
     const name = required(data, "name"), category = text(data, "category");
     const existing = testId ? get("tests", testId, "Check") : null;
@@ -586,7 +599,7 @@
         for (const update of data.test_updates) {
           const test = get('tests', update.test_id, 'Check');
           if (!members.has(test.id) || (test.owner_queue_id && test.owner_queue_id !== queueId)) throw new Error("Only this template's tests can be edited here.");
-          const fields = Object.fromEntries(['name','category','type'].filter(key => key in update).map(key => [key,update[key]]));
+          const fields = Object.fromEntries(['name','category','type','choices'].filter(key => key in update).map(key => [key,update[key]]));
           saveTest(user, {...test,...fields}, test.id);
         }
         return saveQueue(user, {...data,test_updates:[]}, queueId);
@@ -900,9 +913,12 @@
     const machines = S.machines.filter((m) => m.active).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
       const queues = listAssignments(m.id, today).filter((a) => a.active).map((a) => {
         const runs = S.runs.filter((r) => r.assignment_id === a.id).sort((x, y) => (y.qa_date.localeCompare(x.qa_date)) || (y.id - x.id));
-        return { ...a, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status, qa_date: runs[0].qa_date } : null };
+        const ids=new Set(runs.map(r=>r.id)),history_counts={};
+        for(const res of S.results.filter(r=>ids.has(r.run_id)))history_counts[res.status]=(history_counts[res.status]||0)+1;
+        return { ...a, history_counts, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status, qa_date: runs[0].qa_date } : null };
       });
-      return { ...m, queues, pending_review: S.runs.filter((r) => r.machine_id === m.id && r.review_status === "pending").length };
+      const history_counts={};for(const q of queues)for(const [key,count]of Object.entries(q.history_counts))history_counts[key]=(history_counts[key]||0)+count;
+      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => r.machine_id === m.id && r.review_status === "pending").length };
     });
     return { today: localIso(today), machines };
   }
@@ -938,6 +954,7 @@
       if (value === null || value === undefined || String(value).trim() === "") { if (item.type !== "text") rows.push({test_id:item.test_id, value_num:null, value_text:null, limits:item.limits, status:"recorded", comment:text(raw,"comment")}); continue; }
       if (item.type === "numeric") { value = Number(value); if (!Number.isFinite(value)) throw new Error(`${item.name}: enter a number.`); }
       else if (item.type === "boolean") value = [true, 1, "1", "true", "pass", "yes"].includes(value);
+      else if (item.type === 'choice') {value=String(value);if(!choiceOptions(item.description).includes(value))throw Error(`${item.name}: choose an available answer.`);}
       else if (item.type === "status") {
         value = STATUS_WORDS[String(value).trim().toLowerCase()];
         if (!value) throw new Error(`${item.name}: choose Pass, Warning, or Fail.`);
@@ -945,7 +962,7 @@
       else value = String(value);
       let status;
       try { status = evaluate(item.type, value, item.limits); } catch (err) { throw new Error(`${item.name}: ${err.message}`); }
-      const textual = item.type === "text" || item.type === "status";
+      const textual = item.type === "text" || item.type === "status" || item.type === "choice";
       rows.push({ test_id: item.test_id, value_num: textual ? null : Number(value), value_text: textual ? value : null,
         limits: item.limits, status, comment: text(raw, "comment") });
     }
@@ -968,7 +985,7 @@
   }
   function getRun(id) {
     const r = get("runs", id);
-    const results = S.results.filter((x) => x.run_id === r.id).map((x) => { const t = byId("tests", x.test_id); return { ...x, name: t.name, category: t.category, type: t.type, unit: t.unit }; });
+    const results = S.results.filter((x) => x.run_id === r.id).map((x) => { const t = byId("tests", x.test_id); return { ...x, name: t.name, category: t.category, type: t.type, unit: t.unit, description:t.description }; });
     return { ...runRow(r), results };
   }
   function therapistApproveRun(user,id) {
@@ -1047,6 +1064,8 @@
     require(user, "perform");
     const parsed = await parseUpload(upload);
     const t = runTemplate(assignmentId);
+    if (/\.pdf$/i.test(parsed.filename) && !t.items.some(i=>(i.description||"").includes("[rule: wl-max-delta]"))) throw Error("Choose the SRS Winston-Lutz QA list for this PDF.");
+    if (/truebeam/i.test(parsed.filename) && !/truebeam/i.test(t.machine.name)) throw Error("The filename identifies TrueBeam. Choose the TrueBeam machine.");
     const items = Object.fromEntries(t.items.map((i) => [`${i.category}|${i.name}`, i]));
     const byMeaning = Object.fromEntries(t.items.filter((i) => canonicalKey(i.name)).map((i) => [canonicalKey(i.name), i]));
     const matched = [], unmatched = [];
@@ -1060,7 +1079,7 @@
         limits_differ: Object.keys(fl).some((k) => item.limits[k] !== fl[k]) });
     }
     const dup = S.runs.find((r) => r.source_ref === parsed.sha256);
-    return { filename: parsed.filename, qa_date: parsed.qa_date, finished: parsed.finished, sphinx_user: parsed.sphinx_user,
+    return { filename: parsed.filename, qa_date: parsed.qa_date, finished: parsed.finished, sphinx_user: parsed.sphinx_user, report_machine: parsed.report_machine || "",
       source_ref: parsed.sha256, duplicate_run: dup ? dup.id : null, matched, unmatched };
   }
   async function sphinxAddTests(user, assignmentId, upload) {
@@ -1081,6 +1100,8 @@
       try {
         parsed = await parseUpload(u);
         checkNotImported(parsed.sha256);
+        if (/\.pdf$/i.test(parsed.filename) && !t.items.some(i=>(i.description||'').includes('[rule: wl-max-delta]'))) throw Error('Choose the SRS Winston-Lutz QA list for this PDF.');
+        if (/truebeam/i.test(parsed.filename) && !/truebeam/i.test(t.machine.name)) throw Error('The filename identifies TrueBeam. Choose the TrueBeam machine.');
         [ids, added] = sphinxTestIds(user, t, parsed.measurements, true);
       } catch (err) {
         skipped.push({ file: u.name, reason: err.message.replace(`${u.name}: `, "") });
@@ -1172,8 +1193,40 @@
     restoreMonthlySchedules();
     generalizePbsTemplates();
     applyImagingDefaults();
+    installDepartmentTemplates();
+    installSrsWinstonLutz();
     for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
   })();
+
+  function installSrsWinstonLutz() {
+    const tpl=window.PORTAL_SEED.templates.find(t=>t.name==='SRS QA template – TrueBeam (Dose Pro)');
+    for (const q of S.queues.filter(q=>q.name===tpl.name)) {
+      const items=S.queue_items.filter(i=>i.queue_id===q.id);
+      if (items.length!==5 || !items.every(i=>window.PORTAL_SEED.srs_placeholder_names.includes(byId('tests',i.test_id)?.name))) continue;
+      S.queue_items=S.queue_items.filter(i=>i.queue_id!==q.id);
+      tpl.checks.forEach((c,position)=>{const id=insert('tests',{...c,tol_mode:'absolute',active:1,owner_queue_id:q.id});insert('queue_items',{queue_id:q.id,test_id:id,position,expected:null,warn:null,fail:null,tol_mode:null});});
+      q.description=tpl.setup;audit(null,'install_winston_lutz','queue',q.id,{rule:'Maximum delta < 1 mm'});save();
+    }
+  }
+
+  function installDepartmentTemplates() {
+    S.departmentTemplates = S.departmentTemplates || {};
+    for (const tpl of (window.PORTAL_SEED.templates || []).filter(t=>t.departmental_id)) {
+      if (S.departmentTemplates[tpl.departmental_id] || !S.machines.some(m=>m.name===tpl.install_machine)) continue;
+      let q=S.queues.find(q=>q.name.toLowerCase()===tpl.name.toLowerCase());
+      if (q && (S.queue_items.some(i=>i.queue_id===q.id) || S.tests.some(t=>t.owner_queue_id===q.id))) { S.departmentTemplates[tpl.departmental_id]=true; save(); continue; }
+      if (!q) q=byId('queues',insert('queues',{name:tpl.name,description:tpl.setup,active:1,is_template:1,template_id:null}));
+      q.description=tpl.setup;
+      tpl.checks.forEach((c,position)=>{
+        const id=insert('tests',{...c,unit:c.unit||'',expected:c.expected??null,warn:c.warn??null,fail:c.fail??null,tol_mode:c.tol_mode||'absolute',active:1,owner_queue_id:q.id});
+        insert('queue_items',{queue_id:q.id,test_id:id,position,expected:null,warn:null,fail:null,tol_mode:null});
+      });
+      const machine=S.machines.find(m=>m.name===tpl.install_machine);
+      if (machine && !S.assignments.some(a=>a.machine_id===machine.id&&a.queue_id===q.id)) saveAssignment({id:null,role:'admin'},{machine_id:machine.id,queue_id:q.id,frequency:tpl.frequency,weekdays:[0,1,2,3,4]});
+      S.departmentTemplates[tpl.departmental_id]=true;
+      audit(null,'install_department_template','queue',q.id,{source:tpl.departmental_id,tests:tpl.checks.length});save();
+    }
+  }
 
   function applyImagingDefaults() {
     S.pbsImagingDefaultsV1 = S.pbsImagingDefaultsV1 || {};
@@ -1438,6 +1491,11 @@
       S.seedApplied = S.seedApplied || {};
       if (S.seedApplied[t.name] === seedKey) continue;     // already applied: later edits to this shared list are kept
       const same = items.length === t.checks.length && items.every((x, k) => x && x.name === t.checks[k].name && (x.description || "") === (t.checks[k].description || "") && (x.unit || "") === (t.checks[k].unit || ""));
+      let previous=null;try{previous=JSON.parse(S.seedApplied[t.name]||'null')?.[1];}catch{}
+      const matches=(checks)=>Array.isArray(checks)&&items.length===checks.length&&items.every((x,k)=>x&&['name','category','type','unit','description','expected','warn','fail'].every(f=>(x[f]??(f==='unit'||f==='description'?'':null))===(checks[k][f]??(f==='unit'||f==='description'?'':null))));
+      const srsPlaceholder=t.name==='SRS QA template – TrueBeam (Dose Pro)'&&items.length===5&&items.every(x=>(window.PORTAL_SEED.srs_placeholder_names||[]).includes(x?.name));
+      // A seed revision must never replace a locally customized shared template.
+      if (!same && items.length && !matches(previous) && !srsPlaceholder) { S.seedApplied[t.name]=seedKey; continue; }
       S.seedApplied[t.name] = seedKey;
       if (same) continue;
       const old = new Set(items.map((x) => x && x.id));
@@ -1556,6 +1614,14 @@
     await setPassword(byId("users",id), body.password); save();
     audit(u.id, "create", "user", id, { username: name, role: body.role });
     return { id };
+  });
+  route('POST','/api/users/import',async (u,m,body)=>{
+    require(u,'manage_users');const rows=body.users;
+    if(!Array.isArray(rows)||!rows.length||rows.length>500)throw Error('Upload 1–500 users at a time.');
+    const names=new Set();
+    rows.forEach((r,i)=>{const name=String(r.username||'').trim();if(!name||names.has(name.toLowerCase())||S.users.some(u=>u.username.toLowerCase()===name.toLowerCase()))throw Error(`Row ${i+2}: username is missing or already exists. No users were imported.`);names.add(name.toLowerCase());if(!ROLES.includes(r.role))throw Error(`Row ${i+2}: choose Admin, Physicist, Therapist or MPA.`);if(typeof r.password!=='string'||r.password.length<10)throw Error(`Row ${i+2}: temporary password needs at least 10 characters. No users were imported.`);});
+    const prepared=[];for(const r of rows){const user={username:r.username.trim(),full_name:r.full_name||r.username.trim(),role:r.role,active:1,created_at:now()};await setPassword(user,r.password);prepared.push(user);}
+    for(const user of prepared){const id=insert('users',user);audit(u.id,'create','user',id,{username:user.username,role:user.role,source:'spreadsheet'});}save();return {created:prepared.length};
   });
   route("PUT", "/api/users/(\\d+)", async (u, m, body) => {
     require(u, "manage_users");

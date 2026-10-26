@@ -50,6 +50,11 @@ def new_user(db, user, m, body, q):
     return service.create_user(db, user, body)
 
 
+@route("POST", "/api/users/import")
+def import_users(db,user,m,body,q):
+    return service.import_users(db,user,body)
+
+
 @route("PUT", r"/api/users/(\d+)")
 def edit_user(db, user, m, body, q):
     return service.update_user(db, user, int(m[1]), body)

@@ -14,7 +14,7 @@ A RadMachine-style machine QA portal for every treatment and imaging machine (pr
 
 ## Running the server
 
-Requires Python 3.11 or newer. The portal itself uses only the standard library; reading Sphinx `.xls` exports needs `xlrd` (pinned in `requirements.txt`).
+Requires Python 3.11 or newer. Reading Sphinx `.xls` exports needs `xlrd`; reading DoseLab PDFs needs `pypdf` (pinned in `requirements.txt`).
 
 ```
 python -m venv .venv
@@ -144,3 +144,13 @@ Manage machines from Setup QA. Unused machines can be deleted along with their s
 ## Shared UFHPTI deployment
 
 The planned staff deployment runs on one always-on UFHPTI computer with a local central database and scheduled shared-drive snapshots. See [deployment steps](deploy/LOCAL_DEPLOYMENT.md). `requirements-deploy.txt` installs the Waitress server; the GitHub Pages build remains browser-only. Four roles are available: Admin, Physicist, Therapist and MPA. MPA currently has restricted QA-entry access pending policy confirmation. Required therapist sign-off is separate from medical physicist final approval.
+
+## Current import and mobile behavior
+
+On phones, QA entry uses stacked test cards and an expandable menu; desktop tables retain their layout. PASS is bright green and ACTION is bright red. Result labels match the measurement heading size.
+
+Choose an import folder once for the machine schedule. The Perform page searches its subfolders for supported CSV/XLS exports and DoseLab Winston-Lutz PDFs, using the **acquisition date inside the report** to match the selected QA date. While the page stays open, it checks every 30 seconds. Folder permission may need to be granted again after reopening a browser. Existing measurements are preserved. A filename containing TrueBeam routes to TrueBeam even when the PDF internal machine label differs. Missing/unsupported reports leave manual entry and optional upload available.
+
+The TrueBeam SRS starter uses **Maximum delta < 1 mm** as its only measurement verdict. Exactly 1 mm fails. Maximum total delta and Mean total delta are context only. Empty and partial lists can still be submitted for review. The importer never treats missing values as passes. The supplied Daily HDR and TrueBeam Monthly starters have no prefilled historical measurements or signatures. TrueBeam monthly workbook upload/export preserves the native workbook structure; printed limits govern where original Excel formulas conflict, with review notes retained.
+
+GitHub Pages and the local static server serve the same `docs/` build. Their browser data and folder permissions remain separate by origin; identical app files do not synchronize accounts or recorded results. Shared multi-user deployment is separate work on the AWS integration branch.

@@ -271,6 +271,7 @@ function filterBox(wrap, placeholder) {
 }
 
 function limitsText(limits, unit) {
+  if (limits?.criterion === "wl-max-delta") return "Pass: Maximum delta < 1 mm";
   if (!limits || limits.expected === null || limits.expected === undefined) {
     return limits && (limits.warn !== null || limits.fail !== null) ? "Limits need an expected value" : "No limits";
   }
@@ -281,7 +282,7 @@ function limitsText(limits, unit) {
   return parts.join(" · ");
 }
 
-const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text" };
+const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice" };
 const STATUS_WORDS = { pass: "PASS", warn: "WARNING", fail: "ACTION" };
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
@@ -295,6 +296,7 @@ function deltaBadge(value, limits, unit, status) {
 }
 
 function evaluate(type, value, limits) {
+  if (limits.criterion === "wl-max-delta") return Number(value) >= 0 && Number(value) < 1 ? "pass" : "fail";
   if (type === "boolean") return value === "pass" ? "pass" : "fail";
   if (type === "status") return ["pass", "warn", "fail"].includes(value) ? value : "fail";
   if (type === "text") return "recorded";
@@ -376,6 +378,7 @@ async function renderHome() {
       body.append(el('div',{class:'home-machine-block'},
         el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
           el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
+            historyRing(m.history_counts,`#/trends?machine_id=${m.id}`),
             el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
         scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
     }
@@ -404,10 +407,48 @@ document.addEventListener("keydown", (e) => {
   if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "f") { const box = document.querySelector(".topbar-search"); if (box) { e.preventDefault(); box.focus(); box.select(); } }
 });
 
+// Move the original controls into phone drawers, then restore their exact desktop slots.
+// No duplicate inputs: calculations, notes and autosave keep the same DOM nodes.
+function phoneDrawer(container, nodes, title) {
+  const details = el('details', {class:'phone-details'}, el('summary', {}, title));
+  const body = el('div', {class:'phone-details-body'});
+  details.append(body);
+  const slots = nodes.map(node => {
+    const slot = document.createComment('desktop control slot');
+    node.parentNode.insertBefore(slot, node);
+    return {node, slot};
+  });
+  container.append(details);
+  const media = matchMedia('(max-width: 760px)');
+  const update = () => {
+    if (!container.isConnected && slots.some(x=>!x.slot.isConnected)) return;
+    for (const {node,slot} of slots) {
+      if (media.matches) body.append(node);
+      else slot.parentNode.insertBefore(node,slot.nextSibling);
+    }
+  };
+  // The container is attached after construction; the initial move can run immediately.
+  for (const {node} of slots) if (media.matches) body.append(node);
+  media.addEventListener('change', update);
+  return details;
+}
+
 function renderShell() {
   const bar = document.getElementById("topbar");
   bar.hidden = !state.user;
   if (!state.user) return;
+  bar.classList.remove('phone-menu-open');
+  let menu = bar.querySelector('.phone-menu-toggle');
+  if (!menu) {
+    menu = el('button', {type:'button', class:'phone-menu-toggle', 'aria-controls':'nav who', onclick: () => {
+      const open = bar.classList.toggle('phone-menu-open');
+      menu.setAttribute('aria-expanded', String(open));
+      menu.textContent = open ? 'Close menu' : 'Menu ☰';
+    }}, 'Menu ☰');
+    bar.insertBefore(menu, document.getElementById('nav'));
+  }
+  menu.setAttribute('aria-expanded','false');
+  menu.textContent = 'Menu ☰';
   const current = location.hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
   document.getElementById("nav").replaceChildren(...NAV.filter(([, , p]) => !p || can(p)).map(([href, label, , owns, title]) =>
     el("a", { href, title: title || null, "aria-label": title || null, class: `${owns.includes(current) ? "active" : ""}${title ? " home-link" : ""}` },
@@ -419,6 +460,7 @@ function renderShell() {
     search,
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
+    el('a',{href:'#/account',class:'button small phone-password-link'},'Change password'),
     themeToggle());
 }
 
@@ -528,6 +570,15 @@ function modalityHead(name, count) {
   return el("h2", { class: `section-head modality-head ${name.toLowerCase()}` }, name, el("span", { class: "modality-count" }, count));
 }
 
+function historyRing(counts={}, href) {
+  const pass=counts.pass||0,warn=counts.warn||0,fail=counts.fail||0,total=pass+warn+fail;
+  const p=total?pass/total*100:0,w=total?(pass+warn)/total*100:0;
+  const percent=total&&pass===total?100:Math.min(99,Number(p.toPrecision(2)));
+  const description=`History, all dates: ${pass} pass, ${warn} warning, ${fail} fail. ${counts.recorded||0} unanswered or unjudged results excluded.`;
+  return el('a',{href,class:'history-rate',title:description,'aria-label':description},
+    el('span',{class:'trend-pass-donut',style:total?`background:conic-gradient(var(--pass) 0% ${p}%,var(--warn) ${p}% ${w}%,var(--fail) ${w}% 100%)`:'background:var(--border)'},el('span',{class:'trend-pass-value'},total?`${percent}%`:'—')));
+}
+
 async function renderDashboard() {
   const data = await api("GET", "/api/dashboard");
   const queues = data.machines.flatMap((m) => m.queues);
@@ -559,8 +610,8 @@ async function renderDashboard() {
     if (!machines.length) continue;
     // Grouped by machine, as on Setup QA: a header row per machine, then its lists (daily first, then monthly, …).
     const rows = machines.flatMap((machine) => {
-      const header = el("tr", { class: "machine-row" }, el("td", { colspan: 3 }, el("strong", {}, machine.name), machine.kind ? el("span", { class: "muted small" }, ` · ${machine.kind}`) : null));
-      if (!machine.queues.length) return [header, el("tr", {}, el("td", { class: "muted indent", colspan: 3 }, "Nothing scheduled."))];
+      const header = el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("strong", {}, machine.name), machine.kind ? el("span", { class: "muted small" }, ` · ${machine.kind}`) : null));
+      if (!machine.queues.length) return [header, el("tr", {}, el("td", { class: "muted indent", colspan: 4 }, "Nothing scheduled."))];
       const lists = [...machine.queues].sort((a, b) => (FREQ_ORDER[a.frequency] ?? 9) - (FREQ_ORDER[b.frequency] ?? 9) || a.queue_name.localeCompare(b.queue_name));
       return [header, ...lists.map((q) => {
         const last = q.last_run;
@@ -569,11 +620,12 @@ async function renderDashboard() {
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
           el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
           el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
-          el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")));
+          el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
+          el('td',{class:'center'},historyRing(q.history_counts,`#/trends?machine_id=${machine.id}&list=${q.id}`)));
       })];
     });
     app.append(modalityHead(modality, `${machines.length} ${machines.length === 1 ? "machine" : "machines"}`),
-      fixedTable([["QA list", "44%"], ["Status", "30%"], ["Last result", "26%"]], rows));
+      fixedTable([["QA list", "40%"], ["Status", "24%"], ["Last result", "24%"], ["History", "12%"]], rows));
   }
 }
 
@@ -1032,28 +1084,41 @@ function importFolderField(a) {
 
 // The files waiting in a list's default folder, newest first, each with a button that loads it into the form.
 // Perform: the newest export not yet recorded is read in from the list's folder on its own; this is the one line that says so.
-function autoReadLine(assignmentId, onPick) {
-  const line = el("div", { class: "muted small auto-read" }, "Checking the folder for a new export…");
-  (async () => {
+function autoReadLine(assignmentId, onPick, dateInput) {
+  const line=el('div',{class:'muted small auto-read'},'Checking the import folder…');
+  const loaded=new Set(), previews=new Map();let busy=false;
+  const scan=async()=>{
+    if(busy || !line.isConnected)return;busy=true;
+    const selectedDate=dateInput.value;
     try {
-      const r = await api("GET", `/api/assignments/${assignmentId}/files`);
-      if (r.permission && r.permission !== "granted") {
-        line.replaceChildren(el("span", {}, `The folder "${r.folder}" needs permission again. `),
-          el("button", { class: "link small", onclick: async () => { await window.localFolders.request(assignmentId); route(); } }, "Allow"));
-        return;
+      const r=await api('GET',`/api/assignments/${assignmentId}/files`);
+      if(r.permission && r.permission!=='granted') {
+        line.replaceChildren(el('span',{},r.permission==='none'?'Choose an import folder in the schedule.':'Folder access needs permission. '),r.permission==='none'?null:el('button',{onclick:async()=>{await window.localFolders.request(assignmentId);scan();}},'Allow access'));return;
       }
-      const newest = r.files.find((f) => !f.run_id);
-      if (!newest) {
-        const last = r.files[0];
-        line.replaceChildren(el("span", {}, "No new export in the folder.", last ? [` Newest, ${last.name}, is already recorded as `, el("a", { href: `#/runs/${last.run_id}` }, `run #${last.run_id}`), "."] : ""));
-        return;
+      let problems=[];
+      for(const file of r.files.filter(f=>!f.run_id)) {
+        const key=selectedDate+'|'+file.path+'|'+file.modified+'|'+file.size;
+        if(loaded.has(key))return;
+        try {
+          const cacheKey=file.path+'|'+file.modified+'|'+file.size;
+          let cached=previews.get(cacheKey);
+          if(!cached){const upload=await api('GET',`/api/assignments/${assignmentId}/file?path=${encodeURIComponent(file.path)}`);const preview=await api('POST',`/api/assignments/${assignmentId}/sphinx/preview`,{file:upload});cached={upload,preview};if(previews.size>=200)previews.clear();previews.set(cacheKey,cached);}
+          const {upload,preview}=cached;
+          if(dateInput.value!==selectedDate || !line.isConnected)return;
+          if(preview.qa_date!==selectedDate || !preview.matched.length || preview.duplicate_run)continue;
+          const applied=await onPick(upload,preview,true);
+          loaded.add(key);
+          line.textContent=applied ? `Filled from ${file.name} for ${selectedDate}. No upload needed.` : `Report ready: ${file.name}. Existing measurements were kept.`;
+          return;
+        } catch(err){problems.push(file.name+': '+err.message);}
       }
-      onPick(await api("GET", `/api/assignments/${assignmentId}/file?path=${encodeURIComponent(newest.path)}`));
-      line.replaceChildren(el("span", { class: "chip pass" }, "Read in"), ` ${newest.name} (${newest.modified.replace("T", " ")}) from the folder. Choose a different file below if that is not today's.`);
-    } catch (err) {
-      line.replaceChildren(el("span", { class: "error" }, err.message));
-    }
-  })();
+      line.textContent=`No matching unrecorded report for ${selectedDate}. This folder is checked automatically.`;
+      if(problems.length)line.append(el('details',{},el('summary',{},'Files that could not be read'),problems.map(t=>el('div',{},t))));
+    }catch(err){line.textContent=err.message;}finally{busy=false;}
+  };
+  dateInput.addEventListener('change',()=>{loaded.clear();scan();});
+  const timer=setInterval(()=>{if(!line.isConnected)clearInterval(timer);else scan();},30000);
+  setTimeout(scan,0);
   return line;
 }
 
@@ -1232,7 +1297,7 @@ const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function helpText(description, { inline = false } = {}) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
   if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
     const one = text.replace(/\s+/g, " ");
@@ -1416,7 +1481,7 @@ async function renderPerform(assignmentId) {
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions", open: true }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
+    app.append(el("details", { class: "card instructions", open: !matchMedia("(max-width: 760px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
   }
   const inputs = [];
   const sections = [];
@@ -1462,6 +1527,7 @@ async function renderPerform(assignmentId) {
         control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
           readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
       }
+      else if (item.type==='choice') control=input=select('', [['','Choose an answer…'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
       else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
       const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
       const noteToggle = el("button", { type: "button", class: "link small", onclick: () => { comment.hidden = false; noteToggle.hidden = true; comment.focus(); } }, "+ note");
@@ -1517,6 +1583,7 @@ async function renderPerform(assignmentId) {
       const limitsLine = (it, unit) => {
         if (it.type !== "numeric") return null;
         const l = it.limits || {};
+        if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
         const suf = l.tol_mode === "percent" ? "%" : unit;
         const parts = [];
         if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
@@ -1547,14 +1614,26 @@ async function renderPerform(assignmentId) {
         const row = el("tr", {},
           numberCell(it),
           el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
-          el("td", { class: "qa-unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
-          el("td", { class: "num" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
+          el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
+          el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
           el("td", { class: "qa-dev" }, dlt),
-          el("td", {}, statusCell),
+          el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, comment),
           el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
           el("td", {}, trend));
+        const extras = el('td', {class:'qa-phone-extras', colspan:10});
+        row.append(extras);
+        const secondary = [row.children[5], row.children[7], row.children[8], row.children[9]];
+        secondary.forEach((cell,index) => {
+          cell.classList.add('qa-secondary');
+          const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Deviation','Comment','History','Trends'][index]));
+          const content = el('div', {class:'qa-phone-field-content'});
+          while (cell.firstChild) content.append(cell.firstChild);
+          field.append(content);
+          cell.append(field);
+        });
+        phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
       const widths = ["100px", "auto", "100px", "150px", "190px", "150px", "130px", "130px", "160px", "100px"];
@@ -1657,14 +1736,16 @@ async function renderPerform(assignmentId) {
   }
 
   wireCalculations(inputs);
+  window.QAExcel?.wire(inputs);
   const qaDate = el("input", { type: "date", value: today(), max: today(), "aria-label": "QA date" });
   const runComment = el("textarea", { placeholder: "Anything the reviewer should know" });
   let sourceRef = null;
   const sphinxInfo = el("div", { class: "small" });
-  const applySphinx = async () => {
-    const p = await api("POST", `/api/assignments/${assignmentId}/sphinx/preview`, { file: state.sphinxFile });
+  const applySphinx = async (preview = null, automatic = false) => {
+    const p = preview || await api("POST", `/api/assignments/${assignmentId}/sphinx/preview`, { file: state.sphinxFile });
+    if (automatic && p.matched.some(m=>inputs.find(e=>e.item.test_id===m.test_id)?.input.value.trim())) return false;
     sourceRef = p.source_ref;
-    qaDate.value = p.qa_date;
+    if (!automatic) qaDate.value = p.qa_date;
     // Fields marked [auto: sphinx-finished] take the export's acquisition date and time.
     for (const e of inputs) {
       const mk = MARKER.exec(e.item.description || "");
@@ -1675,7 +1756,7 @@ async function renderPerform(assignmentId) {
       const entry = byTest[m.test_id];
       entry.input.value = m.value;
       entry.input.dispatchEvent(new Event("input"));
-      entry.note.replaceChildren(m.limits_differ ? `Sphinx file limits: ${limitsText(m.file_limits, entry.item.unit)}` : "");
+      entry.note.replaceChildren(m.limits_differ ? `File limits: ${limitsText(m.file_limits, entry.item.unit)}` : "");
     }
     // Fold away sections where everything passed so only what needs attention stays open.
     for (const s of sections) s.box.open = !s.settled();
@@ -1693,23 +1774,25 @@ async function renderPerform(assignmentId) {
             toast(err.message, true);
           }
         } }, "Add them") : "Ask a physicist to add them.") : null));
+    return true;
   };
-  const sphinxFile = el("input", { type: "file", accept: ".xls,.csv", "aria-label": "Sphinx export file" });
+  const sphinxFile = el("input", { type: "file", accept: ".xls,.csv,.pdf", "aria-label": "Measurement file" });
   sphinxFile.addEventListener("change", async () => {
     if (!sphinxFile.files[0]) return;
     await useUpload(await readFileBase64(sphinxFile.files[0]));
   });
-  const useUpload = async (upload) => {
+  const useUpload = async (upload, preview = null, automatic = false) => {
     try {
       state.sphinxFile = upload;
-      await applySphinx();
+      return await applySphinx(preview, automatic);
     } catch (err) {
       sphinxInfo.replaceChildren(el("span", { class: "error" }, err.message));
     }
   };
-  const autoLine = t.assignment.import_folder ? autoReadLine(assignmentId, useUpload) : null;
+  const autoLine = t.assignment.import_folder ? el("div") : null;
+  if (window.QAExcel?.supported(t)) app.append(monthlyWorkbookTools(t, inputs, qaDate));
   const fileCard = el("div", { class: "card step" }, el("strong", {}, "Measurement file"),
-    el("span", { class: "muted small" }, " A Sphinx export fills in every measured value. (DQA3 and MPC exports for the TrueBeam: importer not built yet.)"),
+    el("span", { class: "muted small" }, " Import a supported measurement file to fill in matching results."),
     autoLine, el("div", {}, sphinxFile), sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
@@ -1769,8 +1852,10 @@ async function renderPerform(assignmentId) {
     await persistDraft();
     saveDraft.disabled = false;
   } }, "Save draft");
-  app.append(el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
-    el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit));
+  const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
+    el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
+  app.append(footer);
+  phoneDrawer(footer, [footer.children[0], draftNote, footer.children[5], saveDraft], 'Date & draft options');
   refresh();
   try {
     const draft = await api("GET", `/api/assignments/${assignmentId}/draft`);
@@ -1795,6 +1880,7 @@ async function renderPerform(assignmentId) {
     control.addEventListener("input", queueAutosave);
     control.addEventListener("change", queueAutosave);
   }
+  if (autoLine) autoLine.append(autoReadLine(assignmentId, useUpload, qaDate));
   // Programmatic imports also persist their filled measurements.
   if (state.applySphinxOnLoad && state.sphinxFile) {
     state.applySphinxOnLoad = false;
@@ -2227,7 +2313,7 @@ async function renderQueueEditor(id) {
       const lastInFamily = family && family[family.length - 1].item === item;
       const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
       const directions = family
-        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
         : helpText(t.description);
       const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 6 }, directions)) : null;
       lastSection = n;
@@ -2244,7 +2330,7 @@ async function renderQueueEditor(id) {
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, editable && !valuesFor ? select('', Object.entries(TYPE_LABELS), t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { editDefinition('type', e.target.value); draw(); } }) : TYPE_LABELS[t.type]),
+        el("td", {}, editable && !valuesFor ? el('div', {}, select('', Object.entries(TYPE_LABELS), t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { editDefinition('type', e.target.value); draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -2361,6 +2447,10 @@ async function renderQueueEditor(id) {
   draw();
 }
 
+function choiceOptions(description) {
+  const m=/\[choices: ([^\]]+)\]/.exec(description||'');
+  try{return m?JSON.parse(decodeURIComponent(m[1])):[];}catch{return [];}
+}
 function testForm(test) {
   const t = test || { type: "numeric", tol_mode: "absolute", active: 1 };
   const type = select("type", Object.entries(TYPE_LABELS), t.type);
@@ -2370,7 +2460,8 @@ function testForm(test) {
     field("Default Warning ±", el("input", { name: "warn", type: "number", step: "any", min: 0, value: t.warn ?? "" })),
     field("Default Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
     field("Limits are", select("tol_mode", [["absolute", "Absolute (same units)"], ["percent", "Percent of expected"]], t.tol_mode)));
-  const sync = () => (limits.hidden = type.value !== "numeric");
+  const choices=field('Answer options (one per line)',el('textarea',{name:'choices',rows:5},choiceOptions(t.description).join('\n')),'wide');
+  const sync = () => {limits.hidden=type.value!=='numeric';choices.hidden=type.value!=='choice';};
   type.addEventListener("change", sync);
   sync();
   return el("div", { class: "form-grid" },
@@ -2378,7 +2469,7 @@ function testForm(test) {
     field("Category", el("input", { name: "category", value: t.category || "", placeholder: "e.g. Energy, Spot, Safety" })),
     field("Test name", el("input", { name: "name", value: t.name || "", required: true })),
     field("Type", type),
-    limits,
+    choices, limits,
     field("Instructions", el("textarea", { name: "description" }, t.description || ""), "wide"),
     el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!t.active }), "Active"));
 }
@@ -2551,6 +2642,33 @@ function qaReportPdf(run) {
   pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return new Blob([pdf], { type: 'application/pdf' });
 }
+function downloadWorkbookBlob(blob, date) {
+  const url=URL.createObjectURL(blob), a=el('a',{href:url,download:`TrueBeam-Monthly-QA-${date}.xlsx`});a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
+}
+function monthlyWorkbookTools(template, entries=null, qaDate=null) {
+  const dateInput=qaDate || el('input',{type:'date',value:localIso(new Date())});
+  const picker=el('input',{type:'file',accept:'.xlsx',hidden:true,'aria-label':'Upload completed monthly Excel workbook'});
+  picker.addEventListener('change',async()=>{
+    const file=picker.files[0];if(!file)return;
+    try {
+      const parsed=await QAExcel.readFile(file);
+      const matched=template.items.filter(t=>Object.hasOwn(parsed.values,QAExcel.keyOf(t)));
+      if(!matched.length)throw Error('No matching completed results were found in this workbook.');
+      const date=el('input',{type:'date',value:dateInput.value||localIso(new Date()),required:true});
+      const preview=el('div',{},el('p',{},`${matched.length} matching values in ${file.name}. Original baselines and portal limits stay unchanged.`),field('QA date',date),
+        el('details',{},el('summary',{},'Preview results'),table(['Test','Value'],matched.map(t=>el('tr',{},el('td',{},t.name),el('td',{},String(parsed.values[QAExcel.keyOf(t)])))))));
+      modal(entries?'Fill QA from Excel':'Import monthly QA for review',preview,async()=>{
+        if(entries){for(const e of entries){const key=QAExcel.keyOf(e.item);if(!Object.hasOwn(parsed.values,key))continue;const value=parsed.values[key];e.input.value=e.item.type==='boolean'?(value==='PASS'?'pass':'fail'):String(value);e.input.dispatchEvent(new Event('input'));}qaDate.value=date.value;qaDate.dispatchEvent(new Event('change'));toast('Excel values filled. Review, then submit.');}
+        else {const result=await api('POST',`/api/assignments/${template.assignment.id}/runs`,{qa_date:date.value,comment:`Imported from ${file.name}`,results:matched.map(t=>({test_id:t.test_id,value:t.type==='boolean'?parsed.values[QAExcel.keyOf(t)]==='PASS':parsed.values[QAExcel.keyOf(t)]}))});toast('Monthly Excel imported for review');location.hash=`#/runs/${result.id}`;}
+      },entries?'Fill results':'Import for review');
+    } catch(err){toast(err.message,true);}finally{picker.value='';}
+  });
+  return el('div',{class:'card row monthly-workbook-tools'},el('strong',{},'Monthly Excel'),picker,
+    el('button',{type:'button',onclick:()=>picker.click()},'Upload Excel'),
+    entries?el('button',{type:'button',onclick:async()=>{try{downloadWorkbookBlob(await QAExcel.exportFile(QAExcel.valuesFromEntries(entries),dateInput.value,state.user.full_name||state.user.username),dateInput.value);}catch(err){toast(err.message,true);}}},'Download Excel'):null,
+    el('span',{class:'small muted'},'Keeps the original workbook layout, sheets, formulas and images.'));
+}
+
 async function downloadQaReport(id) {
   const run = await api('GET', `/api/runs/${id}`);
   const url = URL.createObjectURL(qaReportPdf(run));
@@ -2563,7 +2681,8 @@ async function downloadQaReport(id) {
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(run.queue_name, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`, [el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report")]);
+  page(run.queue_name, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`, [el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+    window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
     el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),
@@ -2611,7 +2730,7 @@ async function renderRun(id) {
   const problems = run.results.filter((r) => r.status === "fail" || r.status === "warn");
   const rest = run.results.filter((r) => !problems.includes(r));
   const valueText = (r) => r.value_num == null && r.value_text == null ? "Unanswered" : r.type === "boolean" ? (r.value_num ? "Pass" : "Fail") : r.type === "status" ? STATUS_WORDS[r.value_text] || r.value_text
-    : r.type === "text" ? r.value_text : `${fmt(r.value_num)} ${r.unit}`.trim();
+    : ["text","choice"].includes(r.type) ? r.value_text : `${fmt(r.value_num)} ${r.unit}`.trim();
   const rows = (list) => list.map((r) => el("tr", {},
     el("td", {}, el("strong", {}, r.name), r.comment ? el("div", { class: "muted small" }, r.comment) : null),
     el("td", { class: "num" }, valueText(r)),
@@ -3313,44 +3432,34 @@ function trendFileTools(machine, lists, listId, range, testIds) {
   const importFromFolder = async (initialFiles = []) => {
     const a = selected();
     if (!a) return toast('Schedule a QA list on this machine first.', true);
-    const content = el('div'), message = el('p', { class: 'muted small' });
-    const checks = [], filePicker = el('input', { type: 'file', accept: '.xls,.csv', multiple: true, 'aria-label': 'Sphinx files to import' });
-    let chosenFiles = [], currentId = String(a.id);
-    filePicker.addEventListener('change', () => { chosenFiles = [...filePicker.files]; checks.forEach((c) => { c.checked = false; }); message.textContent = `${chosenFiles.length} selected files`; });
-    const load = async () => {
-      chosenFiles = []; filePicker.value = ''; checks.length = 0; content.replaceChildren(el('span', { class: 'muted small' }, 'Checking the import folder…'));
-      try {
-        const found = await api('GET', `/api/assignments/${currentId}/files`);
-        if (found.permission && found.permission !== 'granted') {
-          content.replaceChildren(el('span', { class: 'muted small' }, 'Choose or reconnect the default import folder in Folder settings.'),
-            found.permission !== 'none' ? el('button', { type: 'button', onclick: async () => { try { await window.localFolders.request(currentId); await load(); } catch (err) { toast(err.message, true); } } }, 'Reconnect folder') : null);
-          return;
-        }
-        const files = found.files.filter((f) => !f.run_id);
-        content.replaceChildren(...files.map((f) => {
-          const check = el('input', { type: 'checkbox', checked: true }); check.filePath = f.path; checks.push(check);
-          return el('label', { class: 'check' }, check, f.path);
-        }));
-        if (!files.length) content.append(el('span', { class: 'muted small' }, found.folder ? 'No new files in the default folder.' : 'Choose files below, or set a default import folder.'));
-        message.textContent = files.length ? `${files.length} new files. Already imported files are skipped.` : '';
-      } catch (err) { content.replaceChildren(el('span', { class: 'error' }, err.message)); }
-    };
-    const listPicker = select('import_list', lists.map((x) => [x.id, x.queue_name]), currentId, { 'aria-label': 'Import into QA list', onchange: async (e) => { currentId = e.target.value; selectedId = currentId; remember(); refreshStatus(); await load(); } });
-    modal(`Import ${machine.name} QA`, el('div', {}, listPicker, message, el('div', { class: 'trend-import-files' }, content),
-      el('p', { class: 'muted small' }, 'Import Sphinx history into this QA list. New measurements are added only for this machine.'), filePicker), async () => {
-      let files;
-      if (chosenFiles.length) files = await Promise.all(chosenFiles.map(readFileBase64));
-      else files = await Promise.all(checks.filter((c) => c.checked).map((c) => api('GET', `/api/assignments/${currentId}/file?path=${encodeURIComponent(c.filePath)}`)));
-      if (!files.length) throw new Error('Select at least one file.');
-      let imported = 0, skipped = 0;
-      for (let i = 0; i < files.length; i += 25) {
-        const result = await api('POST', `/api/assignments/${currentId}/sphinx/import`, { files: files.slice(i, i + 25), historical: true });
-        imported += result.imported.length; skipped += result.skipped.length;
+    const summary = {imported:[], skipped:[]};
+    let duplicates = 0;
+    status.textContent = 'Scanning folder and subfolders…';
+    try {
+      let pending = initialFiles;
+      if (!pending.length) {
+        const found = await api('GET', `/api/assignments/${a.id}/files`);
+        if (found.permission && found.permission !== 'granted') throw new Error('Allow access to the selected folder.');
+        duplicates = found.files.filter(f=>f.run_id).length;
+        pending = found.files.filter(f=>!f.run_id);
       }
-      toast(`${imported} imported · ${skipped} skipped`); route();
-    }, 'Import selected');
-    if (initialFiles.length) { chosenFiles = initialFiles; message.textContent = `${chosenFiles.length} files found, including subfolders`; content.replaceChildren(...initialFiles.map(file => el('div', { class: 'small' }, file.webkitRelativePath || file.name))); }
-    else await load();
+      for (let i=0; i<pending.length; i+=25) {
+        status.textContent = `Importing ${i+1}–${Math.min(i+25,pending.length)} of ${pending.length}…`;
+        const files=[];
+        for (const file of pending.slice(i,i+25)) {
+          try { files.push(initialFiles.length ? await readFileBase64(file) : await api('GET', `/api/assignments/${a.id}/file?path=${encodeURIComponent(file.path)}`)); }
+          catch (err) { summary.skipped.push({file:file.path || file.name,reason:err.message}); }
+        }
+        if (!files.length) continue;
+        const result = await api('POST', `/api/assignments/${a.id}/sphinx/import`, {files, historical:true});
+        summary.imported.push(...result.imported); summary.skipped.push(...result.skipped);
+      }
+      if (summary.imported.length) await route();
+      modal('Folder import complete', el('div', {},
+        el('p', {}, `${summary.imported.length} imported · ${duplicates} already recorded · ${summary.skipped.length} skipped`),
+        el('p', {class:'muted small'}, `${machine.name} · ${a.queue_name}. Subfolders were included.`),
+        summary.skipped.length ? el('details', {}, el('summary', {}, 'Skipped files'), el('ul', {class:'small'}, summary.skipped.map(x=>el('li',{},`${x.file}: ${x.reason}`)))) : null), async()=>{}, 'Done');
+    } finally { refreshStatus(); }
   };
   const exportButton = el('button', { type: 'button', onclick: async () => {
     exportButton.disabled = true;
@@ -3384,6 +3493,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
         }
       } catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
     } }, 'Select Import Folder') : null,
+    can('perform') ? el('button',{type:'button',onclick:async()=>{try{const a=selected();if(!a)throw Error('Select a QA list first.');const t=await api('GET',`/api/assignments/${a.id}/template`);if(!window.QAExcel?.supported(t))throw Error('Excel round-trip is available for the TrueBeam Monthly template. Use Setup QA to import another template.');modal('Monthly Excel',monthlyWorkbookTools(t),async()=>{},'Close');}catch(err){toast(err.message,true);}}},'Monthly Excel') : null,
     exportButton, el('button', { type: 'button', class: 'icon-action', title: 'Folder settings', 'aria-label': 'Import and export folder settings', onclick: folderSettings }, '⚙'), status);
 }
 
@@ -3482,12 +3592,28 @@ const RIGHTS = [
 ];
 const ROLE_RIGHTS = { admin: ["perform", "review", "configure", "manage_users"], physicist: ["perform", "review", "configure"], therapist: ["perform", "therapist_approve"], mpa: ["perform"] };
 
+function importUserSpreadsheet() {
+  const picker=el('input',{type:'file',accept:'.xlsx,.xls,.csv','aria-label':'User spreadsheet'}), preview=el('div'),error=el('p',{class:'error'});
+  let users=[];
+  picker.addEventListener('change',async()=>{users=[];preview.replaceChildren();error.textContent='';try{
+    const file=picker.files[0];if(!file)return;if(file.size>5*1024*1024)throw Error('Choose a spreadsheet smaller than 5 MB.');
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:'',raw:false});
+    const aliases={username:'username',user:'username',login:'username',name:'full_name',fullname:'full_name',password:'password',pw:'password',temporarypassword:'password',role:'role'};
+    users=rows.map(row=>{const user={};for(const [key,v]of Object.entries(row)){const field=aliases[key.toLowerCase().replace(/[^a-z]/g,'')];if(field)user[field]=String(v);}const roles={admin:'admin',physicist:'physicist',therapy:'therapist',therapist:'therapist',mpa:'mpa'};user.role=roles[(user.role||'').trim().toLowerCase()]||'';return user;});
+    if(!users.length||users.length>500)throw Error('Include 1–500 users with Username, Password (or PW), Role, and optional Name columns.');
+    const names=new Set();users.forEach((u,i)=>{u.username=(u.username||'').trim();if(!u.username||names.has(u.username.toLowerCase()))throw Error(`Row ${i+2}: username is missing or duplicated.`);names.add(u.username.toLowerCase());if(!u.role)throw Error(`Row ${i+2}: role must be Admin, Physicist, Therapist or MPA.`);if((u.password||'').length<10)throw Error(`Row ${i+2}: temporary password must have at least 10 characters.`);});
+    preview.replaceChildren(el('p',{},`${users.length} users ready. Passwords are hidden in this preview.`),table(['Username','Name','Role'],users.map(u=>el('tr',{},el('td',{},u.username),el('td',{},u.full_name||''),el('td',{},ROLE_LABEL[u.role])))));
+  }catch(err){users=[];error.textContent=err.message;}});
+  modal('Import users',el('div',{},el('p',{},'Upload Excel or CSV with Username, Password (or PW), Role, and optional Name columns. Existing usernames are preserved. Temporary passwords need 10+ characters.'),picker,preview,error),async()=>{if(!users.length)throw Error('Choose a valid user spreadsheet first.');try{const result=await api('POST','/api/users/import',{users});users=[];picker.value='';toast(`${result.created} users added`);route();}finally{users=[];}},'Add users');
+}
+
 async function renderAdmin() {
   const addUser = () => modal('Add user', userForm(), async data => {
     await api('POST','/api/users',data);toast('User added');route();
   });
   page("Data Administration", "Users and their rights, the folders export files are read from, and the database.", [
-    el('button', { class: 'primary', disabled: !can('manage_users'), onclick: addUser }, 'Add user')]);
+    el('button', { class: 'primary', disabled: !can('manage_users'), onclick: addUser }, 'Add user'),
+    can('manage_users')?el('button',{onclick:importUserSpreadsheet},'Import users'):null]);
   app.append(el('p', { class: 'admin-role-notice' }, `Signed in as ${ROLE_LABEL[state.user.role]}. `,
     can('manage_users') ? 'Use Add user above to create Admin, Physicist, Therapist or MPA accounts.'
       : ['Adding users requires an Admin account. ', el('button', { class: 'small', onclick: logout }, 'Sign in as Admin'),
@@ -3495,8 +3621,6 @@ async function renderAdmin() {
   const [users, machines] = await Promise.all([can("manage_users") ? api("GET", "/api/users") : null, api("GET", "/api/machines")]);
 
   // 1. Users and rights (admins only; others see what each role may do).
-  app.append(el("h2", { class: "section-head" }, "Machines"),
-    el("p", { class: "muted" }, "Add or edit machines and their schedules on the ", el("a", { href: "#/machines" }, "machines page"), ". Machine names in Setup QA open the same page."));
   app.append(el("h2", { class: "section-head" }, "Users and rights"));
   if (!users) {
     app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"),
