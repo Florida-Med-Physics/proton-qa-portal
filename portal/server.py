@@ -255,6 +255,11 @@ def run(db, user, m, body, q):
     return service.get_run(db, user, int(m[1]))
 
 
+@route("POST", r"/api/runs/(\d+)/trash")
+def trash_run(db,user,m,body,q):
+    return service.trash_run(db,user,int(m[1]),body)
+
+
 @route("POST", r"/api/runs/(\d+)/therapist-approve")
 def therapist_approve(db, user, m, body, q):
     return service.therapist_approve_run(db, user, int(m[1]))

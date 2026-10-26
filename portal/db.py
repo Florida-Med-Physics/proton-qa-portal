@@ -161,6 +161,9 @@ class Database:
         self._migrate()
         self.conn.executescript(SCHEMA)
         self._approval_migrations()
+        run_fields={r[1] for r in self.conn.execute('PRAGMA table_info(runs)')}
+        for name,kind in [('trashed_at','TEXT'),('trashed_by','INTEGER REFERENCES users(id)'),('trash_reason','TEXT')]:
+            if name not in run_fields:self.run(f'ALTER TABLE runs ADD COLUMN {name} {kind}')
         self._generalize_pbs_templates()
         self._apply_imaging_defaults()
         self._install_department_templates()

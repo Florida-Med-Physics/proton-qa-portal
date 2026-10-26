@@ -373,12 +373,11 @@ async function renderHome() {
         const label=a.frequency==='daily'?'Daily QA':a.frequency==='monthly'?'Monthly QA':a.frequency==='asneeded'?a.queue_name.replace(/\s*[–-]\s*HDR Flexitron$/i,''):(FREQ_LABEL[a.frequency]||a.queue_name);
         return el('div',{class:'home-qa-line'},
           can('perform')?el('a',{class:'start-dot home-go',href:`#/perform/${a.id}`,title:`Start ${label} for ${m.name}`,'aria-label':`Start ${label} for ${m.name}`},'▶'):null,
-          el('div',{class:'home-qa-info'},el('span',{class:'home-qa-label',title:a.queue_name},label),el('span',{class:`small ${status==='Overdue'?'home-overdue':'muted'}`},status)));
+          el('div',{class:'home-qa-info'},el('span',{class:'home-qa-label',title:a.queue_name},label),el('span',{class:`small ${status==='Overdue'?'home-overdue':'muted'}`},status)),historyRing(a.history_counts,`#/trends?machine_id=${m.id}&list=${a.id}`,`${m.name} · ${a.queue_name}`));
       });
       body.append(el('div',{class:'home-machine-block'},
         el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
           el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
-            historyRing(m.history_counts,`#/trends?machine_id=${m.id}`),
             el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
         scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
     }
@@ -570,11 +569,11 @@ function modalityHead(name, count) {
   return el("h2", { class: `section-head modality-head ${name.toLowerCase()}` }, name, el("span", { class: "modality-count" }, count));
 }
 
-function historyRing(counts={}, href) {
+function historyRing(counts={}, href, label="") {
   const pass=counts.pass||0,warn=counts.warn||0,fail=counts.fail||0,total=pass+warn+fail;
   const p=total?pass/total*100:0,w=total?(pass+warn)/total*100:0;
   const percent=total&&pass===total?100:Math.min(99,Number(p.toPrecision(2)));
-  const description=`History, all dates: ${pass} pass, ${warn} warning, ${fail} fail. ${counts.recorded||0} unanswered or unjudged results excluded.`;
+  const description=`${label?label+" · ":""}History, all dates: ${pass} pass, ${warn} warning, ${fail} fail. ${counts.recorded||0} unanswered or unjudged results excluded.`;
   return el('a',{href,class:'history-rate',title:description,'aria-label':description},
     el('span',{class:'trend-pass-donut',style:total?`background:conic-gradient(var(--pass) 0% ${p}%,var(--warn) ${p}% ${w}%,var(--fail) ${w}% 100%)`:'background:var(--border)'},el('span',{class:'trend-pass-value'},total?`${percent}%`:'—')));
 }
@@ -619,7 +618,7 @@ async function renderDashboard() {
         const go = can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}` }, "▶") : null;
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
           el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
-          el("td", {}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
+          el("td", {class:"qa-schedule-status"}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
           el('td',{class:'center'},historyRing(q.history_counts,`#/trends?machine_id=${machine.id}&list=${q.id}`)));
       })];
@@ -2545,6 +2544,18 @@ async function renderTests() {
 // ---------------------------------------------------------------------------
 
 // Review QA: what is waiting for a physicist's sign-off, then what was reviewed recently.
+function canTrashQa(run) {return can('review') || can('perform') && run.performed_by===state.user.id && run.review_status==='pending';}
+function qaTrashButton(run) {
+  if(!canTrashQa(run))return null;
+  return el('button',{type:'button',class:run.trashed_at?'button small':'button danger small','aria-label':run.trashed_at?'Restore QA':'Move QA to trash',onclick:e=>{
+    e.stopPropagation();
+    if(run.trashed_at){api('POST',`/api/runs/${run.id}/trash`,{trashed:false}).then(()=>{toast('QA restored');route();}).catch(err=>toast(err.message,true));return;}
+    const reason=el('input',{placeholder:'Created in error','aria-label':'Reason for trashing QA'});
+    modal('Move QA to trash',el('div',{},el('p',{},`${run.machine_name} · ${run.queue_name} · ${run.qa_date}`),el('p',{class:'muted small'},'Removes this submission from review, history charts and completion counts. You can restore it from Trash.'),field('Reason (optional)',reason)),async()=>{await api('POST',`/api/runs/${run.id}/trash`,{trashed:true,reason:reason.value});toast('QA moved to trash');if(location.hash.startsWith('#/runs/'))location.hash='#/review';else route();},'Move to trash');
+  }},run.trashed_at?'Restore':'Trash');
+}
+function reviewRowActions(run) {return el('div',{class:'row'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
+
 async function renderReview() {
   const runs = await api("GET", "/api/runs?limit=400");
   page("Review QA", "Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
@@ -2555,13 +2566,13 @@ async function renderReview() {
     el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
     el("td", {}, chip(r.overall)),
     el("td", {}, r.review_status === "pending" && r.therapist_approval_required && !r.therapist_approved_by ? chip("due", "Therapist sign-off needed") : r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)),
-    el("td", { class: "center" }, r.review_status === "pending" && can("review")
-      ? el("a", { class: "button primary small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Review")
-      : el("a", { class: "button small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Open")));
+    el('td',{class:'center'},reviewRowActions(r)));
   const cols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "9%"], ["Review", "13%"], ["", "10%"]];
   const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
   const waitingTherapist = runs.filter(r=>r.review_status==='pending' && r.review_ready===false);
   if (can('therapist_approve') && waitingTherapist.length) app.append(el('h2',{class:'section-head'},'Awaiting therapist review'),fixedTable(cols,waitingTherapist.map(row),'No submissions waiting.'));
+  const trashed=await api('GET','/api/runs?trashed=1&limit=200');
+  if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
   app.append(el("h2", { class: "section-head modality-head" }, "Awaiting review", el("span", { class: "modality-count" }, String(pending.length))),
     fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
@@ -2681,30 +2692,85 @@ async function downloadQaReport(id) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
+function therapistReviewCheck(test) {
+  return /^qa reviewed by therapist\?$/i.test((test.name||'').trim()) || /Template 4\.06\./.test(test.description||'');
+}
+async function renderReviewMeasurements(run) {
+  const [history,template]=await Promise.all([
+    api('GET',`/api/machines/${run.machine_id}/trends`).catch(()=>({})),
+    api('GET',`/api/assignments/${run.assignment_id}/template`).catch(()=>null)
+  ]);
+  const numbers=blockNumbers(template?.items||run.results), fallback=blockNumbers(run.results);
+  const numberFor=r=>numbers.get(r.test_id)||checkNumber(r.description)||fallback.get(r.test_id)||'';
+  const groups=new Map();
+  for(const r of run.results){const n=sectionNumber(r),named=sectionNameOf(r);const key=`${n}|${named||r.category||'General'}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+  let last=null;
+  for(const[key,results]of [...groups].sort(([a],[b])=>Number(a.split('|')[0])-Number(b.split('|')[0]))){
+    const [n,category]=key.split('|');
+    if(n!==last){app.append(el('h2',{class:'section-head'},sectionTitle(Number(n),[...groups.keys()].filter(k=>k.startsWith(n+'|')).map(k=>k.split('|')[1]),sectionNameOf(results[0]))));last=n;}
+    const tbody=el('tbody');
+    for(const r of results){
+      const unit=r.unit&&r.unit!=='unitless'?r.unit:'';
+      const prior=(history[r.test_id]||[]).filter(h=>h.run_id!==run.id&&h.qa_date<=run.qa_date);
+      const recent=[...prior].reverse().slice(0,3);
+      const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+' '+unit}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+(unit?' '+unit:''))))):el('span',{class:'muted small'},'—');
+      const missing=r.value_num==null&&r.value_text==null;
+      const value=missing?'Unanswered':r.type==='boolean'?(r.value_num?'Pass':'Fail'):r.type==='status'?STATUS_WORDS[r.value_text]||r.value_text:['text','choice'].includes(r.type)?r.value_text:`${fmt(r.value_num)} ${unit}`.trim();
+      const measured=el('div',{class:'review-measured'},value);
+      if(therapistReviewCheck(r)&&run.therapist_approval_required&&run.review_status==='pending'&&!run.therapist_approved_by&&can('therapist_approve')){
+        const sign=el('button',{class:'seg pass',type:'button','aria-label':`Mark ${numberFor(r)} Pass and sign as therapist`,onclick:async()=>{sign.disabled=true;try{await api('POST',`/api/runs/${run.id}/therapist-approve`,{});toast('Therapist review recorded: Pass');route();}catch(err){toast(err.message,true);sign.disabled=false;}}},'Pass & sign');measured.append(sign);
+      }
+      const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:10}));
+      const trend=el('button',{class:'icon-btn',type:'button',title:'Show the trend here','aria-label':`Show trend for ${r.name}`,onclick:()=>{
+        const pts=(history[r.test_id]||[]).slice(-60);
+        if(!pts.length)return toast('No numeric results yet for this test.',true);
+        if(chart.hidden)chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
+        chart.hidden=!chart.hidden;
+      }},trendIcon(16));
+      const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
+      const row=el('tr',{'data-test-id':r.test_id},
+        el('td',{class:'qa-n'},numberFor(r)),
+        el('td',{class:'qa-label'},el('strong',{},r.name),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null,helpText(r.description,{inline:true})),
+        el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?'Pass / Fail':unit),
+        el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'?'Pass':r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
+        el('td',{class:'qa-measured','data-label':'Measured'},measured),
+        el('td',{class:'qa-dev','data-label':'Deviation'},r.type==='numeric'&&!missing?deltaBadge(r.value_num,limits,unit,r.status):'—'),
+        el('td',{class:'qa-result','data-label':'Result'},el('div',{class:'status-cell'},chip(r.status))),
+        el('td',{class:'qa-comment','data-label':'Comment'},r.comment||'—'),
+        el('td',{class:'history-cell','data-label':'History'},hist),
+        el('td',{'data-label':'Trends'},r.type==='numeric'?trend:'—'));
+      tbody.append(row,chart);
+    }
+    const headers=['#','Test','Unit','Baseline','Measured','Deviation','Result','Comment','History','Trends'];
+    app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'},el('thead',{},el('tr',{},headers.map(h=>el('th',{},h)))),tbody))));
+  }
+}
+
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(run.queue_name, `${shortDate(run.qa_date)} ${run.qa_date.slice(0, 4)}`, [el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
-    window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null]);
+  page(run.queue_name, shortDate(run.qa_date), [el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+    window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
     el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),
-    el("dt", {}, "Performed by"), el("dd", {}, who, run.source === "sphinx" ? el("span", { class: "muted small" }, " · from Sphinx file") : ""),
+    el("dt", {}, "Performed by"), el("dd", {}, who, run.source === "sphinx" ? el("span", { class: "muted small" }, " · imported measurement file") : ""),
     el("dt", {}, "Review"), el("dd", {}, reviewChip(run.review_status),
       run.reviewed_by ? ` ${personName(run.reviewer_name, run.reviewer)}, ${run.reviewed_at.slice(0, 16).replace("T", " ")}` : ""),
     run.comment ? [el("dt", {}, "Notes"), el("dd", { class: "pre" }, run.comment)] : null,
     run.review_comment ? [el("dt", {}, "Review note"), el("dd", {}, run.review_comment)] : null);
   app.append(facts);
 
-  if (run.therapist_approval_required) {
+  if (run.trashed_at) app.append(el("p",{class:"card"},"This QA is in Trash. ",run.trash_reason||"Created in error"));
+  if (!run.trashed_at && run.therapist_approval_required) {
     app.append(el('section', { class: 'card therapist-signoff' }, el('h3', {}, '1. Therapist approval'),
       run.therapist_approved_by ? el('p', {}, `${run.therapist_approver_name || 'Therapist'} · ${run.therapist_approved_at.replace('T',' ')}`)
-        : el('p', {}, 'Waiting for a signed-in therapist. A Yes checkbox does not count as approval.'),
-      !run.therapist_approved_by && run.review_status === 'pending' && can('therapist_approve') ? el('button', { class: 'primary', onclick: async () => {
+        : el('p', {}, run.results.some(therapistReviewCheck) ? 'A therapist can mark the review test Pass and sign below.' : 'Waiting for a signed-in therapist to approve.'),
+      !run.therapist_approved_by && run.review_status === 'pending' && can('therapist_approve') && !run.results.some(therapistReviewCheck) ? el('button', { class: 'primary', onclick: async () => {
         try { await api('POST', `/api/runs/${id}/therapist-approve`, {}); toast('Therapist approval recorded'); route(); } catch(err) { toast(err.message,true); }
       } }, 'Sign therapist approval') : null,
       el('h3', {}, '2. Medical physicist review'), el('p', {}, run.therapist_approved_by ? 'Ready for medical physicist review.' : 'Available after therapist approval.')));
   }
-  if (run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && state.user.role === 'physicist'))) {
+  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && state.user.role === 'physicist'))) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
@@ -2728,28 +2794,8 @@ async function renderRun(id) {
 
   const unanswered = run.results.filter(r => r.value_num == null && r.value_text == null);
   if (unanswered.length) app.append(el('p', {class:'lead'}, `${unanswered.length} of ${run.results.length} tests unanswered. Submitted for review; missing results are not passes.`));
-  // Problems first; passes are there but folded away.
-  const problems = run.results.filter((r) => r.status === "fail" || r.status === "warn");
-  const rest = run.results.filter((r) => !problems.includes(r));
-  const valueText = (r) => r.value_num == null && r.value_text == null ? "Unanswered" : r.type === "boolean" ? (r.value_num ? "Pass" : "Fail") : r.type === "status" ? STATUS_WORDS[r.value_text] || r.value_text
-    : ["text","choice"].includes(r.type) ? r.value_text : `${fmt(r.value_num)} ${r.unit}`.trim();
-  const rows = (list) => list.map((r) => el("tr", {},
-    el("td", {}, el("strong", {}, r.name), r.comment ? el("div", { class: "muted small" }, r.comment) : null),
-    el("td", { class: "num" }, valueText(r)),
-    el("td", { class: "num" }, r.type === "numeric" && r.value_num != null ? deltaBadge(r.value_num, r, r.unit, r.status) : ""),
-    el("td", { class: "small muted" }, r.type === "numeric" ? limitsText(r, r.unit) : ""),
-    el("td", {}, chip(r.status))));
-  const headers = ["Test", "#Result", "#Δ", "Expected / limits", "Status"];
-  if (problems.length) {
-    app.append(el("h2", {}, `${problems.length} to look at`), table(headers, rows(problems)));
-  } else {
-    app.append(el("p", { class: "lead" }, unanswered.length ? "Entered results have no warning or action flags." : run.overall === "pass" ? "Everything passed." : "Results recorded for review."));
-  }
-  if (rest.length) {
-    app.append(el("details", { class: "card", open: !problems.length && rest.length <= 12 },
-      el("summary", {}, `${rest.length} ${problems.length ? "other" : ""} ${rest.length === 1 ? "test" : "tests"}`),
-      table(headers, rows(rest))));
-  }
+  await renderReviewMeasurements(run);
+
 }
 
 function bandValue(point, key, sign) {
@@ -3022,6 +3068,20 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
 
 const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
 
+let activePointTooltip=null;
+function pointTooltip(dot,point,label,unit,event) {
+  let tip=document.getElementById('qa-point-tooltip');
+  if(!tip){tip=el('div',{id:'qa-point-tooltip',class:'point-tooltip',role:'tooltip',hidden:true});document.body.append(tip);window.addEventListener('hashchange',hidePointTooltip);document.addEventListener('scroll',hidePointTooltip,true);document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.dot'))hidePointTooltip();});}
+  const ref=point.expected,change=ref==null?null:point.value-ref;
+  const deltaText=change==null?'Δ: — (no reference)':`Δ: ${sigSigned(change)}${unit?' '+unit:''}`;
+  tip.replaceChildren(el('strong',{},label),el('span',{},`Date: ${shortDate(point.qa_date)}`),el('span',{},`Measured: ${sig(point.value)}${unit?' '+unit:''}`),el('span',{},deltaText));
+  tip.hidden=false;activePointTooltip=dot;dot.setAttribute('aria-describedby',tip.id);
+  const rect=dot.getBoundingClientRect(),cx=event?.clientX||rect.left+rect.width/2,cy=event?.clientY||rect.top;
+  tip.style.left=Math.max(8,Math.min(innerWidth-tip.offsetWidth-8,cx+14))+'px';
+  tip.style.top=Math.max(8,Math.min(innerHeight-tip.offsetHeight-8,cy+14))+'px';
+}
+function hidePointTooltip(){const tip=document.getElementById('qa-point-tooltip');if(tip)tip.hidden=true;if(activePointTooltip)activePointTooltip.removeAttribute('aria-describedby');activePointTooltip=null;}
+
 function drawSeries(series, unit, { small = false, compact = false, delta = false, prediction = true, colorIndex = null, yLabel = "Value" } = {}) {
   const multi = series.length > 1;
   const W = compact ? 480 : 900, H = compact ? 185 : small ? 200 : 360;
@@ -3070,7 +3130,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   }
   const y = (v) => T + ((hi - v) * (plotBottom - T)) / (hi - lo);
   const clipId = `clip-${Math.random().toString(36).slice(2)}`;
-  const kids = [svg("defs", {}, svg("clipPath", { id: clipId }, svg("rect", { x: L, y: T, width: W - L - R, height: plotBottom - T })))];
+  const kids = [svg("defs", {}, svg("clipPath", { id: clipId }, svg("rect", { x: L-6, y: T-6, width: W-L-R+12, height: plotBottom-T+12 })))];
   const refX = ref.flatMap((b, i) => (i === ref.length - 1 ? [b, { ...b, d: null }] : [b]));   // the last limits carry on to the right edge
   const bx = (b) => (b.d === null ? xt(tEnd) : x(b.d));
   const band = (key) => {
@@ -3125,25 +3185,16 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     // A line from each result to the next, then the dots on top.
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${cls || "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
-      const dot = svg("circle", { class: `dot ${cls || "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
-        svg("title", {}, `${p.qa_date} ${s.label}: ${sig(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`));
-      dot.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const svgEl = dot.ownerSVGElement;
-        const was = dot.classList.contains("selected");
-        svgEl.querySelectorAll(".dot.selected").forEach((d) => d.classList.remove("selected"));
-        svgEl.querySelectorAll(".dot-label").forEach((g) => g.remove());
-        if (was) return;
-        dot.classList.add("selected");
-        const when = new Date(p.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-        const d = asDeviation(p);
-        const lines = [`${when}${multi ? ` · ${s.label}` : ""}`, `${sig(p.value)}${u}`, p.expected !== null && p.expected !== undefined ? `Δ ${sigSigned(d.dev)}${u}` : ""].filter(Boolean);
-        const cx = x(p.qa_date), cy = y(val(p));
-        const lineH2 = small ? 12 : 14, pad = 6, width = Math.max(...lines.map((t) => t.length)) * (small ? 6.2 : 7.2) + pad * 2, height = lines.length * lineH2 + pad * 2;
-        const bx = Math.min(Math.max(L, cx - width / 2), W - R - width), by = cy - height - 12 < T ? cy + 12 : cy - height - 12;
-        svgEl.append(svg("g", { class: "dot-label" }, svg("rect", { x: bx, y: by, width, height, rx: 4 }),
-          ...lines.map((t, i) => svg("text", { x: bx + pad, y: by + pad + (i + 1) * lineH2 - 3 }, t))));
-      });
+      const change=p.expected==null?null:p.value-p.expected;
+      const description=`${s.label} · Date: ${shortDate(p.qa_date)} · Measured: ${sig(p.value)}${unit?' '+unit:''} · Δ: ${change==null?'— (no reference)':sigSigned(change)+(unit?' '+unit:'')}`;
+      const dot=svg('circle',{class:`dot ${cls||'single'} st-${p.status}`,cx:x(p.qa_date),cy:y(val(p)),r,tabindex:0,'aria-label':description},svg('title',{},description));
+      dot.addEventListener('pointerenter',e=>pointTooltip(dot,p,s.label,unit,e));
+      dot.addEventListener('pointermove',e=>pointTooltip(dot,p,s.label,unit,e));
+      dot.addEventListener('pointerleave',hidePointTooltip);
+      dot.addEventListener('focus',()=>pointTooltip(dot,p,s.label,unit));
+      dot.addEventListener('blur',hidePointTooltip);
+      dot.addEventListener('keydown',e=>{if(e.key==='Escape')hidePointTooltip();});
+      dot.addEventListener('click',e=>{e.stopPropagation();pointTooltip(dot,p,s.label,unit,e);});
       plot.push(dot);
     }
   });
@@ -3220,7 +3271,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
   const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
   const sections = [], insights = [];
   for (const template of templates) {
-    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range).filter(p => String(p.assignment_id) === String(template.assignment.id))) })).filter(i => i.points.length);
+    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range)) })).filter(i => i.points.length);
     // Result insertion order preserves the CSV analysis order, including for existing templates.
     const imported = Object.entries(histories).flatMap(([testId, points]) => points.filter(p => p.source === 'sphinx' && String(p.assignment_id) === String(template.assignment.id)).map(p => ({ ...p, testId })));
     const newest = imported.reduce((id, p) => Math.max(id, p.run_id), 0);
@@ -3356,10 +3407,10 @@ function trendCsvRows(machine, templates, histories, range, testIds = []) {
   const seen = new Set();
   for (const t of templates) for (const item of t.items) {
     if (item.type !== 'numeric' || (testIds.length && !testIds.includes(String(item.test_id)))) continue;
-    const points = filterRange(histories[item.test_id] || [], range).filter((p) => String(p.assignment_id) === String(t.assignment.id));
+    const points = filterRange(histories[item.test_id] || [], range);
     const judged = judgedByList(item, points);
     points.forEach((point, i) => {
-      const key = `${point.run_id}:${item.test_id}`; if (seen.has(key)) return; seen.add(key);
+      const key = `${point.run_id}:${point.source_order??item.test_id}`; if (seen.has(key)) return; seen.add(key);
       const l = item.limits;
       const word = (s) => ({ pass: 'PASS', warn: 'WARNING', fail: 'ACTION' }[s] || s || 'Recorded');
       rows.push([machine.name, t.queue.name, item.name, item.unit === 'unitless' ? '' : item.unit, point.qa_date, point.run_id, point.value,
@@ -3453,8 +3504,11 @@ function trendFileTools(machine, lists, listId, range, testIds) {
           catch (err) { summary.skipped.push({file:file.path || file.name,reason:err.message}); }
         }
         if (!files.length) continue;
-        const result = await api('POST', `/api/assignments/${a.id}/sphinx/import`, {files, historical:true});
-        summary.imported.push(...result.imported); summary.skipped.push(...result.skipped);
+        if(can('configure')) {
+          const result=await api('POST',`/api/assignments/${a.id}/sphinx/import`,{files,historical:true});summary.imported.push(...result.imported);summary.skipped.push(...result.skipped);
+        } else for(const file of files) {
+          try {const preview=await api('POST',`/api/assignments/${a.id}/sphinx/preview`,{file});if(preview.duplicate_run){duplicates++;continue;}if(!preview.matched.length)throw Error('No measurements match this QA list.');const run=await api('POST',`/api/assignments/${a.id}/runs`,{qa_date:preview.qa_date,source_ref:preview.source_ref,comment:`Imported from ${file.name}`,results:preview.matched.map(m=>({test_id:m.test_id,value:m.value}))});summary.imported.push({run_id:run.id});}catch(err){summary.skipped.push({file:file.name,reason:err.message});}
+        }
       }
       if (summary.imported.length) await route();
       modal('Folder import complete', el('div', {},
@@ -3482,7 +3536,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
   } }, 'Export CSV');
   refreshStatus();
   return el('div', { class: 'row trend-file-tools' },
-    can('configure') ? el('button', { type: 'button', disabled: !lists.length, onclick: async () => {
+    can('perform') ? el('button', { type: 'button', disabled: !lists.length, onclick: async () => {
       try {
         if (window.localApi && 'showDirectoryPicker' in window) {
           const a = selected();
@@ -3494,9 +3548,8 @@ function trendFileTools(machine, lists, listId, range, testIds) {
           picker.click();
         }
       } catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
-    } }, 'Select Import Folder') : null,
-    can('perform') ? el('button',{type:'button',onclick:async()=>{try{const a=selected();if(!a)throw Error('Select a QA list first.');const t=await api('GET',`/api/assignments/${a.id}/template`);if(!window.QAExcel?.supported(t))throw Error('Excel round-trip is available for the TrueBeam Monthly template. Use Setup QA to import another template.');modal('Monthly Excel',monthlyWorkbookTools(t),async()=>{},'Close');}catch(err){toast(err.message,true);}}},'Monthly Excel') : null,
-    exportButton, el('button', { type: 'button', class: 'icon-action', title: 'Folder settings', 'aria-label': 'Import and export folder settings', onclick: folderSettings }, '⚙'), status);
+    } }, 'Import Folder') : null,
+    exportButton);
 }
 
 function trendPattern(points) {
@@ -3525,11 +3578,14 @@ function trendInsightsCard(series) {
     if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${sig(pattern.change)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${sig(pattern.r2)}).` });
   }
   messages.sort((a,b) => b.priority-a.priority);
+  const populated=series.filter(s=>s.points.length);
+  const enough=populated.some(s=>new Set(s.points.map(p=>p.qa_date)).size>=5);
+  const emptyText=!populated.length?'No measurements in this period. Choose another period or use Import Folder.':!enough?'More history is needed to check for a trend: at least 5 different QA dates per measurement.':'No warning, action, or steady drift found in the selected period.';
   return el('section', { class: 'card trend-insights', 'aria-label': 'Automatic trend insights' },
-    el('h3', {}, 'Trend insights'),
-    messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.href ? el('a', { href: m.href, class: 'trend-insight-link' }, m.text, ' → View graph') : m.text))) : el('p', { class: 'muted small' }, 'No warning/action results or clear directional patterns were identified in the displayed data. At least five results on different dates are needed to assess a directional pattern.'),
-    el('details', {}, el('summary', { class: 'small' }, 'How these insights work'),
-      el('p', { class: 'muted small' }, 'Calculated locally from the selected period. Patterns use an ordinary least-squares straight-line fit to the last 20 results relative to the current baseline: at least 5 results, R² ≥ 0.60, and fitted change of at least half the warning band when one is configured. These are descriptive signals for review, not clinical conclusions or an external AI assessment.')));
+    el('h3', {}, 'Trend summary'),
+    messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.href ? el('a', { href: m.href, class: 'trend-insight-link' }, m.text, ' → View graph') : m.text))) : el('p', { class: 'muted small' }, emptyText),
+    el('details', {}, el('summary', { class: 'small' }, 'How trends are checked'),
+      el('p', { class: 'muted small' }, 'Each measurement is checked separately against its current baseline and limits. A least-squares line checks for steady change using up to 20 results across at least 5 QA dates. Suggested patterns are prompts to inspect the graph.')));
 }
 async function renderTrends() {
   const params = queryParams();
@@ -3559,7 +3615,7 @@ async function renderTrends() {
   const items = data.map((d) => {
     const li = listItems.get(String(d.test.id));
     const limits = li ? li.limits : { expected: d.test.expected, warn: d.test.warn, fail: d.test.fail, tol_mode: d.test.tol_mode };
-    return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range).filter((p) => !listId || String(p.assignment_id) === String(listId))) };
+    return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)) };
   }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = trendGroups(items)[0];

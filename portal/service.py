@@ -606,7 +606,7 @@ def delete_draft(db, user, assignment_id):
 # ---- machine assignments (scheduled queues) ---------------------------------
 
 def _last_done(db, assignment_id):
-    row = db.one("SELECT MAX(qa_date) AS last FROM runs WHERE assignment_id = ?", (assignment_id,))
+    row = db.one("SELECT MAX(qa_date) AS last FROM runs WHERE trashed_at IS NULL AND assignment_id = ?", (assignment_id,))
     return date.fromisoformat(row["last"]) if row and row["last"] else None
 
 
@@ -828,7 +828,7 @@ def run_template(db, user, assignment_id):
             "limits": qa.resolve_limits(test, item, override),
             "queue_limits": qa.resolve_limits(test, item),
             "override": {k: override[k] for k in ("expected", "warn", "fail", "tol_mode")} if override else None,
-            "last_text": (db.one("SELECT res.value_text FROM results res JOIN runs r ON r.id = res.run_id WHERE res.test_id = ? AND r.machine_id = ? AND res.value_text <> '' "
+            "last_text": (db.one("SELECT res.value_text FROM results res JOIN runs r ON r.id = res.run_id WHERE r.trashed_at IS NULL AND res.test_id = ? AND r.machine_id = ? AND res.value_text <> '' "
                                  "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"], machine["id"])) or {}).get("value_text") if test["type"] == "text" else None,
         })
     assignment["schedule"] = qa.describe_schedule(assignment)
@@ -861,12 +861,12 @@ def dashboard(db, user, today=None):
     for machine in db.all("SELECT * FROM machines WHERE active = 1 ORDER BY name"):
         queues = [a for a in list_assignments(db, user, machine["id"], today) if a["active"]]
         for a in queues:
-            last = db.one("SELECT id, overall, review_status, qa_date FROM runs WHERE assignment_id = ? ORDER BY qa_date DESC, id DESC LIMIT 1", (a["id"],))
+            last = db.one("SELECT id, overall, review_status, qa_date FROM runs WHERE trashed_at IS NULL AND assignment_id = ? ORDER BY qa_date DESC, id DESC LIMIT 1", (a["id"],))
             a["last_run"] = last
-            a['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.assignment_id=? GROUP BY res.status',(a['id'],))}
+            a['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.assignment_id=? GROUP BY res.status',(a['id'],))}
         machine["queues"] = queues
-        machine['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.machine_id=? GROUP BY res.status',(machine['id'],))}
-        machine["pending_review"] = sum(_review_ready(db,r) for r in db.all("SELECT * FROM runs WHERE machine_id=? AND review_status='pending'",(machine["id"],)))
+        machine['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.machine_id=? GROUP BY res.status',(machine['id'],))}
+        machine["pending_review"] = sum(_review_ready(db,r) for r in db.all("SELECT * FROM runs WHERE trashed_at IS NULL AND machine_id=? AND review_status='pending'",(machine["id"],)))
         machines.append(machine)
     return {"today": today.isoformat(), "machines": machines}
 
@@ -1158,11 +1158,12 @@ def _pbs_therapist_results(db, run):
 
 def _review_ready(db, run):
     checks=_pbs_therapist_results(db,run)
+    if run.get('trashed_at'): return False
     return checks is None or bool(checks) and all(r['status']=='pass' for r in checks)
 
 
 def list_runs(db, user, filters):
-    clauses, params = [], []
+    clauses, params = ["r.trashed_at IS NOT NULL" if str(filters.get('trashed',''))=='1' else "r.trashed_at IS NULL"], []
     for key in ("machine_id", "queue_id"):
         if filters.get(key):
             clauses.append(f"r.{key} = ?")
@@ -1190,11 +1191,23 @@ def get_run(db, user, run_id):
     return run
 
 
+def trash_run(db, user, run_id, data):
+    run=_get(db,'runs',run_id)
+    if not (auth.can(user,'review') or auth.can(user,'perform') and run['performed_by']==user['id'] and run['review_status']=='pending'):
+        raise PortalError('Only a reviewer or the performer of an unreviewed submission can move this QA to trash.',403)
+    trashed=data.get('trashed',True) is not False
+    reason=_text(data,'reason') or 'Created in error'
+    with db.transaction():
+        db.run('UPDATE runs SET trashed_at=?,trashed_by=?,trash_reason=? WHERE id=?',(now() if trashed else None,user['id'] if trashed else None,reason if trashed else None,run_id))
+        db.audit(user['id'],'trash_run' if trashed else 'restore_run','run',run_id,reason=reason)
+    return {'ok':True}
+
+
 def therapist_approve_run(db, user, run_id):
     require(user, 'therapist_approve')
     with db.transaction():
         run = _get(db, 'runs', run_id)
-        if run['review_status'] != 'pending' or not run['therapist_approval_required']:
+        if run.get('trashed_at') or run['review_status'] != 'pending' or not run['therapist_approval_required']:
             raise PortalError('This run is not waiting for therapist approval.')
         if run['therapist_approved_by']:
             raise PortalError('Therapist approval is already recorded.')
@@ -1202,8 +1215,8 @@ def therapist_approve_run(db, user, run_id):
         checks=_pbs_therapist_results(db,run)
         if checks:
             for row in checks:db.run("UPDATE results SET value_num=1,value_text=NULL,status='pass' WHERE id=?",(row['id'],))
-            statuses=[r['status'] for r in db.all('SELECT status FROM results WHERE run_id=?',(run_id,))]
-            db.run('UPDATE runs SET overall=? WHERE id=?',(qa.overall(statuses),run_id))
+            rows=db.all('SELECT status,value_num,value_text FROM results WHERE run_id=?',(run_id,))
+            db.run('UPDATE runs SET overall=? WHERE id=?',(_results_overall(rows),run_id))
         db.audit(user['id'],'therapist_approved','run',run_id)
     return {'ok': True}
 
@@ -1234,25 +1247,25 @@ def review_run(db, user, run_id, data):
         db.audit(user["id"], decision, "run", run_id, comment=comment)
         return {"ok": True}
 
+def _history_key(test):
+    semantic=sphinx.canonical_key(test['name']) if test['type']=='numeric' else None
+    return (test['type'],test.get('unit') or '',semantic or (test.get('category') or '')+'|'+test['name'].lower().strip())
+
+
 def trend(db, user, machine_id, test_id):
-    test = _get(db, "tests", test_id)
-    points = db.all(
-        "SELECT r.id AS run_id, r.assignment_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
-        "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.test_id = ? AND res.value_num IS NOT NULL "
-        "ORDER BY r.qa_date, r.id", (machine_id, test_id))
-    return {"test": test, "points": points}
+    test=_get(db,'tests',test_id)
+    return {'test':test,'points':machine_trends(db,user,machine_id).get(str(test_id),[])}
 
 
 def machine_trends(db, user, machine_id):
-    """Every numeric result on one machine, grouped by test, in one query (the Trends overview)."""
-    rows = db.all(
-        "SELECT res.test_id, res.id AS source_order, r.source, r.id AS run_id, r.assignment_id, r.qa_date, res.value_num AS value, res.expected, res.warn, res.fail, res.tol_mode, res.status "
-        "FROM results res JOIN runs r ON r.id = res.run_id WHERE r.machine_id = ? AND res.value_num IS NOT NULL "
-        "ORDER BY r.qa_date, r.id", (machine_id,))
-    out = {}
+    """Same-machine measurements across list copies, matched by type, units and identity."""
+    tests=db.all('SELECT * FROM tests');by_id={t['id']:t for t in tests}
+    rows=db.all('SELECT res.test_id,res.id AS source_order,r.source,r.id AS run_id,r.assignment_id,r.qa_date,res.value_num AS value,res.expected,res.warn,res.fail,res.tol_mode,res.status FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.machine_id=? AND res.value_num IS NOT NULL ORDER BY r.qa_date,r.id,res.id',(machine_id,))
+    groups={}
     for row in rows:
-        out.setdefault(str(row.pop("test_id")), []).append(row)
-    return out
+        test=by_id.get(row.pop('test_id'))
+        if test:groups.setdefault(_history_key(test),[]).append(row)
+    return {str(t['id']):groups[_history_key(t)] for t in tests if _history_key(t) in groups}
 
 
 def list_audit(db, user, limit=300):

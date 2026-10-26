@@ -269,3 +269,9 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Template seed updates preserve local customization and historical results.
 
 - PBS Daily QA Sphinx enters the physicist review queue only after test 4.06 is Pass. Blank/failed checks remain saved; therapist sign-off records the passing check and preserves the separate physicist approval.
+
+- Review QA uses expanded numbered measurement tables with matching Perform QA numbers, machine history, inline graphs, and an inline therapist Pass & sign action.
+- Reversible, audited QA trash excludes erroneous runs from review, due/completion counts and charts; reviewers and the original performer of a pending submission can trash/restore.
+- Matching measurements on one machine share history across list copies; distinct units, energies and machines remain separate.
+- Machine Trends toolbar is exactly Import Folder and Export CSV; guidance distinguishes insufficient data from no detected pattern.
+- Plot dots show date, measured value and delta on hover, focus or tap. Dashboard pass-rate rings are per QA set. Status text on Perform QA matches the description size.

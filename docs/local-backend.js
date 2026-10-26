@@ -771,7 +771,7 @@
     return { id: m.id };
   }
   const lastDone = (assignmentId) => {
-    const dates = S.runs.filter((r) => r.assignment_id === assignmentId).map((r) => r.qa_date).sort();
+    const dates = S.runs.filter((r) => !r.trashed_at && r.assignment_id === assignmentId).map((r) => r.qa_date).sort();
     return dates.length ? fromIso(dates[dates.length - 1]) : null;
   };
   function listAssignments(machineId, today) {
@@ -891,7 +891,7 @@
         limits: resolveLimits(test, item, o), queue_limits: resolveLimits(test, item),
         override: o ? { expected: o.expected, warn: o.warn, fail: o.fail, tol_mode: o.tol_mode } : null,
         last_text: test.type === "text" ? (S.results.filter((r) => r.test_id === test.id && r.value_text).map((r) => ({ r, run: byId("runs", r.run_id) }))
-          .filter((x) => x.run && x.run.machine_id === a.machine_id)                      // this machine's last entry
+          .filter((x) => x.run && !x.run.trashed_at && x.run.machine_id === a.machine_id)                      // this machine's last entry
           .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
     });
     return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description, active: queue.active }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
@@ -912,13 +912,13 @@
     const today = new Date();
     const machines = S.machines.filter((m) => m.active).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
       const queues = listAssignments(m.id, today).filter((a) => a.active).map((a) => {
-        const runs = S.runs.filter((r) => r.assignment_id === a.id).sort((x, y) => (y.qa_date.localeCompare(x.qa_date)) || (y.id - x.id));
+        const runs = S.runs.filter((r) => !r.trashed_at && r.assignment_id === a.id).sort((x, y) => (y.qa_date.localeCompare(x.qa_date)) || (y.id - x.id));
         const ids=new Set(runs.map(r=>r.id)),history_counts={};
         for(const res of S.results.filter(r=>ids.has(r.run_id)))history_counts[res.status]=(history_counts[res.status]||0)+1;
         return { ...a, history_counts, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status, qa_date: runs[0].qa_date } : null };
       });
       const history_counts={};for(const q of queues)for(const [key,count]of Object.entries(q.history_counts))history_counts[key]=(history_counts[key]||0)+count;
-      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => r.machine_id === m.id && r.review_status === "pending" && reviewReady(r)).length };
+      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => !r.trashed_at && r.machine_id === m.id && r.review_status === "pending" && reviewReady(r)).length };
     });
     return { today: localIso(today), machines };
   }
@@ -974,14 +974,14 @@
     if(!/PBS\s*Daily\s*QA.*Sphinx/i.test(byId('queues',run.queue_id)?.name||''))return null;
     return S.results.filter(r=>{const t=byId('tests',r.test_id);return r.run_id===run.id && (t?.name?.trim().toLowerCase()==='qa reviewed by therapist?' || /Template 4\.06\./.test(t?.description||''));});
   }
-  function reviewReady(run) {const checks=pbsTherapistResults(run);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
+  function reviewReady(run) {if(run.trashed_at)return false;const checks=pbsTherapistResults(run);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
   function runRow(r) {
     const m = byId("machines", r.machine_id), q = byId("queues", r.queue_id), p = byId("users", r.performed_by) || {}, rv = r.reviewed_by ? byId("users", r.reviewed_by) : null;
     return { ...r, review_ready:reviewReady(r), therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
       reviewer_name: rv ? rv.full_name : null, reviewer: rv ? rv.username : null };
   }
   function listRuns(q) {
-    let runs = S.runs;
+    let runs = S.runs.filter(r=>String(q.trashed||'')==='1'?!!r.trashed_at:!r.trashed_at);
     if (q.machine_id) runs = runs.filter((r) => r.machine_id === Number(q.machine_id));
     if (q.queue_id) runs = runs.filter((r) => r.queue_id === Number(q.queue_id));
     if (q.review_status) runs = runs.filter((r) => r.review_status === q.review_status && (q.review_status!=="pending" || reviewReady(r)));
@@ -993,10 +993,17 @@
     const results = S.results.filter((x) => x.run_id === r.id).map((x) => { const t = byId("tests", x.test_id); return { ...x, name: t.name, category: t.category, type: t.type, unit: t.unit, description:t.description }; });
     return { ...runRow(r), results };
   }
+  function trashRun(user,id,data) {
+    const run=get('runs',id);
+    if(!(can(user,'review') || can(user,'perform')&&run.performed_by===user.id&&run.review_status==='pending'))throw Error('Only a reviewer or the performer of an unreviewed submission can move this QA to trash.');
+    const trashed=data.trashed!==false,reason=data.reason||'Created in error';
+    Object.assign(run,{trashed_at:trashed?now():null,trashed_by:trashed?user.id:null,trash_reason:trashed?reason:null});
+    audit(user.id,trashed?'trash_run':'restore_run','run',id,{reason});save();return {ok:true};
+  }
   function therapistApproveRun(user,id) {
     require(user,'therapist_approve');
     const run=get('runs',id,'Run');
-    if(run.review_status!=='pending'||!run.therapist_approval_required||run.therapist_approved_by) throw new Error('This run is not waiting for therapist approval.');
+    if(run.trashed_at||run.review_status!=='pending'||!run.therapist_approval_required||run.therapist_approved_by) throw new Error('This run is not waiting for therapist approval.');
     Object.assign(run,{therapist_approved_by:user.id,therapist_approved_at:now()});
     const checks=pbsTherapistResults(run);if(checks?.length){checks.forEach(row=>Object.assign(row,{value_num:1,value_text:null,status:'pass'}));run.overall=resultOverall(S.results.filter(r=>r.run_id===run.id));}
     audit(user.id,'therapist_approved','run',id);save();return {ok:true};
@@ -1019,24 +1026,22 @@
     audit(user.id, data.decision, "run", r.id, { comment });
     return { ok: true };
   }
-  function trend(machineId, testId) {
-    const test = get("tests", testId, "Check");
-    const runs = Object.fromEntries(S.runs.filter((r) => r.machine_id === Number(machineId)).map((r) => [r.id, r]));
-    const points = S.results.filter((x) => x.test_id === test.id && runs[x.run_id] && x.value_num !== null)
-      .map((x) => ({ run_id: x.run_id, source: runs[x.run_id].source, source_order: x.id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected, warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status }))
-      .sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);
-    return { test, points };
+  function historyKey(test) {
+    const semantic=test.type==='numeric'?canonicalKey(test.name):null;
+    return JSON.stringify([test.type,test.unit||'',semantic||`${test.category||''}|${test.name.toLowerCase().trim()}`]);
   }
-
+  function trend(machineId,testId) {const test=get('tests',testId,'Check');return {test,points:machineTrends(machineId)[testId]||[]};}
   function machineTrends(machineId) {
-    const runs = Object.fromEntries(S.runs.filter((r) => r.machine_id === Number(machineId)).map((r) => [r.id, r]));
-    const out = {};
-    for (const x of S.results) {
-      if (!runs[x.run_id] || x.value_num === null) continue;
-      (out[x.test_id] = out[x.test_id] || []).push({ run_id: x.run_id, source: runs[x.run_id].source, source_order: x.id, assignment_id: runs[x.run_id].assignment_id, qa_date: runs[x.run_id].qa_date, value: x.value_num, expected: x.expected,
-        warn: x.warn, fail: x.fail, tol_mode: x.tol_mode, status: x.status });
+    const runs=Object.fromEntries(S.runs.filter(r=>!r.trashed_at&&r.machine_id===Number(machineId)).map(r=>[r.id,r]));
+    const groups=new Map();
+    for(const x of S.results){
+      if(!runs[x.run_id] || x.value_num==null)continue;
+      const test=byId('tests',x.test_id);if(!test)continue;
+      const key=historyKey(test);if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push({run_id:x.run_id,source:runs[x.run_id].source,source_order:x.id,assignment_id:runs[x.run_id].assignment_id,qa_date:runs[x.run_id].qa_date,value:x.value_num,expected:x.expected,warn:x.warn,fail:x.fail,tol_mode:x.tol_mode,status:x.status});
     }
-    for (const k in out) out[k].sort((a, b) => a.qa_date.localeCompare(b.qa_date) || a.run_id - b.run_id);
+    for(const pts of groups.values())pts.sort((a,b)=>a.qa_date.localeCompare(b.qa_date)||a.run_id-b.run_id||a.source_order-b.source_order);
+    const out={};for(const test of S.tests){const pts=groups.get(historyKey(test));if(pts)out[test.id]=pts;}
     return out;
   }
 
@@ -1696,6 +1701,7 @@
   route("POST", "/api/assignments/(\\d+)/sphinx/import", (u, m, body) => importSphinx(u, Number(m[1]), body));
   route("GET", "/api/runs", (u, m, body, q) => listRuns(q));
   route("GET", "/api/runs/(\\d+)", (u, m) => getRun(Number(m[1])));
+  route("POST", "/api/runs/(\\d+)/trash", (u,m,body)=>trashRun(u,Number(m[1]),body));
   route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
   route("GET", "/api/machines/(\\d+)/trends", (u, m) => machineTrends(Number(m[1])));
