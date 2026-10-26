@@ -1199,3 +1199,12 @@ td, .measure-table td { font-size: 21px; }
 /* Keep each rate visibly attached to its measurement or energy label. */
 .trend-chart-row > summary { justify-content: flex-start; gap: 16px; }
 .subplot-title { justify-content: flex-start; gap: 14px; }
+
+/* Consistent Perform QA typography, with a slightly stronger test number. */
+#app[data-page^="perform/"] .measure-table td { font-family: inherit; font-size: 22px; }
+#app[data-page^="perform/"] .measure-table td.qa-n { font-size: 24px; font-weight: 750; }
+#app[data-page^="perform/"] .measure-table .qa-label strong,
+#app[data-page^="perform/"] .measure-table input,
+#app[data-page^="perform/"] .measure-table button { font-family: inherit; font-size: 22px; }
+#app[data-page^="perform/"] .directions,
+#app[data-page^="perform/"] .directions.in-cell { font-family: inherit; font-size: 20px; }

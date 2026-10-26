@@ -5,6 +5,12 @@
 // text cannot inject markup.
 // ---------------------------------------------------------------------------
 
+// Number fields must never step when a wheel/trackpad gesture scrolls the page.
+document.addEventListener('wheel', () => {
+  const input = document.activeElement;
+  if (input instanceof HTMLInputElement && input.type === 'number') input.blur();
+}, { capture: true, passive: true });
+
 const state = { user: null, cache: {} };
 const app = document.getElementById("app");
 // Nothing on the page may ever read "null" or "undefined": the main container drops empty children instead of
@@ -758,6 +764,10 @@ async function renderSetup() {
         el("strong", {}, m.name)), m.kind ? el("span", { class: "muted small" }, ` · ${m.kind}`) : null)),
       ...mine.map(({ a, q }) => el("tr", { class: a.active ? "" : "muted" },
         el("td", { class: "indent" }, el("div", { class: "name-with-edit" },
+          editable ? iconBtn("✎", `Edit schedule for ${q.name} on ${m.name}`, () => modal(`${m.name}: ${q.name} schedule`, scheduleForm(a), async (data, form) => {
+            await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
+            toast("Machine schedule saved"); route();
+          }, "Save schedule")) : null,
           editable ? moreMenu([
             [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active)],
             ["Set tolerances for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
@@ -768,11 +778,7 @@ async function renderSetup() {
           ]) : null,
           el("span", {}, el("strong", { title: "Shared tests are edited under QA Template Lists" }, q.name),
             a.active ? el("span", { class: "active-tag" }, " (Active)") : el("span", { class: "inactive-tag" }, " (Inactive)")))),
-        el("td", { class: "small" }, el("div", { class: "schedule-with-edit" }, el("span", {}, a.schedule),
-          editable ? iconBtn("✎", `Edit schedule for ${q.name} on ${m.name}`, () => modal(`${m.name}: ${q.name} schedule`, scheduleForm(a), async (data, form) => {
-            await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
-            toast("Machine schedule saved"); route();
-          }, "Save schedule")) : null)),
+        el("td", { class: "small" }, el("span", {}, a.schedule)),
         el("td", {}, el("label", { class: "check" },
           el("input", { type: "checkbox", role: "switch", checked: !!a.active, disabled: !editable,
             "aria-label": `Active: ${q.name} on ${m.name}`,
@@ -1710,9 +1716,8 @@ async function renderPerform(assignmentId) {
     el("span", { class: "muted small" }, " A Sphinx export fills in every measured value. (DQA3 and MPC exports for the TrueBeam: importer not built yet.)"),
     autoLine, el("div", {}, sphinxFile), sphinxInfo);
   if (!t.items.length) {
-    app.append(fileCard, el("div", { class: "card empty" }, "This list has no tests yet. ",
-      can("configure") ? [el("a", { href: `#/queues/${t.queue.id}` }, "Add tests"), ", or load a Sphinx file above."] : ""));
-    return;
+    app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
+      can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
   }
   // The file goes first in the Sphinx Measurements section (or at the top of a list that has no such section).
   const sphinxSection = sections.find((x) => /sphinx measurements/i.test(x.section)) || null;
@@ -3287,7 +3292,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
       remember(); refreshStatus();
     }, 'Done');
   };
-  const importFromFolder = async () => {
+  const importFromFolder = async (initialFiles = []) => {
     const a = selected();
     if (!a) return toast('Schedule a QA list on this machine first.', true);
     const content = el('div'), message = el('p', { class: 'muted small' });
@@ -3306,7 +3311,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
         const files = found.files.filter((f) => !f.run_id);
         content.replaceChildren(...files.map((f) => {
           const check = el('input', { type: 'checkbox', checked: true }); check.filePath = f.path; checks.push(check);
-          return el('label', { class: 'check' }, check, f.name);
+          return el('label', { class: 'check' }, check, f.path);
         }));
         if (!files.length) content.append(el('span', { class: 'muted small' }, found.folder ? 'No new files in the default folder.' : 'Choose files below, or set a default import folder.'));
         message.textContent = files.length ? `${files.length} new files. Already imported files are skipped.` : '';
@@ -3326,7 +3331,8 @@ function trendFileTools(machine, lists, listId, range, testIds) {
       }
       toast(`${imported} imported · ${skipped} skipped`); route();
     }, 'Import selected');
-    await load();
+    if (initialFiles.length) { chosenFiles = initialFiles; message.textContent = `${chosenFiles.length} files found, including subfolders`; content.replaceChildren(...initialFiles.map(file => el('div', { class: 'small' }, file.webkitRelativePath || file.name))); }
+    else await load();
   };
   const exportButton = el('button', { type: 'button', onclick: async () => {
     exportButton.disabled = true;
@@ -3347,7 +3353,19 @@ function trendFileTools(machine, lists, listId, range, testIds) {
   } }, 'Export CSV');
   refreshStatus();
   return el('div', { class: 'row trend-file-tools' },
-    can('configure') ? el('button', { type: 'button', disabled: !lists.length, onclick: () => importFromFolder().catch((err) => toast(err.message, true)) }, 'Import') : null,
+    can('configure') ? el('button', { type: 'button', disabled: !lists.length, onclick: async () => {
+      try {
+        if (window.localApi && 'showDirectoryPicker' in window) {
+          const a = selected();
+          a.import_folder = await window.localFolders.choose(a.id);
+          remember(); refreshStatus(); await importFromFolder();
+        } else {
+          const picker = el('input', { type: 'file', multiple: true, webkitdirectory: '', accept: '.csv,.xls' });
+          picker.addEventListener('change', () => { const files = [...picker.files].filter(file => /\.(csv|xls)$/i.test(file.name)); if (files.length) importFromFolder(files).catch(err => toast(err.message, true)); else toast('No CSV or XLS files found in that folder.', true); });
+          picker.click();
+        }
+      } catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
+    } }, 'Select Import Folder') : null,
     exportButton, el('button', { type: 'button', class: 'icon-action', title: 'Folder settings', 'aria-label': 'Import and export folder settings', onclick: folderSettings }, '⚙'), status);
 }
 

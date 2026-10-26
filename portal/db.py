@@ -1,4 +1,5 @@
 import json
+import re
 import sqlite3
 import threading
 from datetime import datetime
@@ -159,6 +160,27 @@ class Database:
                                "Delete it and start again (for the demo, rerun seed_demo.py).")
         self._migrate()
         self.conn.executescript(SCHEMA)
+        self._generalize_pbs_templates()
+
+    def _generalize_pbs_templates(self):
+        from .sphinx import canonical_key
+        clean = lambda text: re.sub(r"\bGTR\s*\d+[ _-]*", "", text or "", flags=re.I).strip()
+        seed = json.loads((Path(__file__).parent / "seed.json").read_text())
+        rules = seed.get("pbs_tolerances", [])
+        queues = [q for q in self.all("SELECT * FROM queues") if re.search(r"PBS\s*DailyQA", q["name"], re.I)]
+        with self.transaction():
+            for q in queues:
+                self.run("UPDATE queues SET name=?, description=? WHERE id=?", (clean(q["name"]), clean(q["description"]), q["id"]))
+                tests = self.all("SELECT DISTINCT t.* FROM tests t LEFT JOIN queue_items i ON i.test_id=t.id WHERE t.owner_queue_id=? OR i.queue_id=?", (q["id"], q["id"]))
+                for t in tests:
+                    name, description, category = clean(t["name"]), clean(t["description"]), clean(t["category"])
+                    self.run("UPDATE tests SET name=?, description=?, category=? WHERE id=?", (name, description, category, t["id"]))
+                    if self.one("SELECT id FROM audit WHERE action='apply_workbook_tolerances' AND entity='test' AND entity_id=?", (t["id"],)):
+                        continue
+                    rule = next((r for r in rules if r["key"] == canonical_key(name) and r["unit"] == t["unit"]), None)
+                    if rule:
+                        self.run("UPDATE tests SET warn=?, fail=?, tol_mode=? WHERE id=?", (rule["warn"],rule["fail"],rule["tol_mode"],t["id"]))
+                        self.audit(None, "apply_workbook_tolerances", "test", t["id"], source=seed.get("pbs_tolerance_source"), source_row=rule["source_row"], before={k:t[k] for k in ("warn","fail","tol_mode")})
 
     def _migrate(self):
         """Bring older databases up to date. Each step is skipped once applied."""

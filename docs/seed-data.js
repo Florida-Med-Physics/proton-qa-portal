@@ -1232,7 +1232,7 @@ window.PORTAL_SEED = {
    "kind": "Proton gantry",
    "list": "PBS Daily QA (Sphinx)",
    "frequency": "daily",
-   "setup": "Transcribed from the RadMachine list 'GTR5 (SBF-113) :: PBS DailyQA GTR5 - Sphinx' (October 2026). References are RadMachine's reference values; warning and fail tolerances were not shown, so values are recorded, not judged, until limits are entered.",
+   "setup": "Transcribed from the RadMachine list '(SBF-113) :: PBS DailyQA Sphinx' (October 2026). References are RadMachine's reference values; warning and fail tolerances were not shown, so values are recorded, not judged, until limits are entered.",
    "checks": [
     {
      "category": "Administrative",
@@ -1287,7 +1287,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Safety",
-     "name": "Please connect the power cord and the chamber cable to the GTR5 electrometer (DOSE-X) in the control room, then turn on the electrometer.",
+     "name": "Please connect the power cord and the chamber cable to the electrometer (DOSE-X) in the control room, then turn on the electrometer.",
      "type": "boolean",
      "unit": "Yes/No",
      "description": "Template 1.08. [Section: Setup and Safety]"
@@ -1329,7 +1329,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Mechanical and Safety",
-     "name": "[GTR5 Ortho - kV/kV] PPS 2 XRAY Offset X [cm]",
+     "name": "[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1338,7 +1338,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Mechanical and Safety",
-     "name": "[GTR5 Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]",
+     "name": "[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1347,7 +1347,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Mechanical and Safety",
-     "name": "[GTR5 Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]",
+     "name": "[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1356,7 +1356,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Mechanical and Safety",
-     "name": "[GTR5 Ortho - kV/kV] PPS 2 XRAY Offset [cm]",
+     "name": "[Ortho - kV/kV] PPS 2 XRAY Offset [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": 0,
@@ -1372,7 +1372,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_CBCT - Pelvis SFOV ND] Required Correction Vector - X [cm]",
+     "name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - X [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1381,7 +1381,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_CBCT - Pelvis SFOV ND] Required Correction Vector - Y [cm]",
+     "name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - Y [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1390,7 +1390,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_CBCT - Pelvis SFOV ND] Required Correction Vector - Z [cm]",
+     "name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - Z [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1399,7 +1399,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_CBCT - Pelvis SFOV ND] Required 3D Correction Vector Offset [cm]",
+     "name": "[CBCT - Pelvis SFOV ND] Required 3D Correction Vector Offset [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": 0,
@@ -1422,7 +1422,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_OBs] Required Correction Vector - X [cm]",
+     "name": "[OBs] Required Correction Vector - X [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1431,7 +1431,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_OBs] Required Correction Vector - Y [cm]",
+     "name": "[OBs] Required Correction Vector - Y [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1440,7 +1440,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_OBs] Required Correction Vector - Z [cm]",
+     "name": "[OBs] Required Correction Vector - Z [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": null,
@@ -1449,7 +1449,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "AI_PBS_Daily_Imaging",
-     "name": "[GTR5_OBs] Required 3D Correction Vector Offset [cm]",
+     "name": "[OBs] Required 3D Correction Vector Offset [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": 0,
@@ -1472,7 +1472,7 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Beam_Parameters",
-     "name": "[GTR5 MU] Delivered MU (Record in IC2)",
+     "name": "[MU] Delivered MU (Record in IC2)",
      "type": "numeric",
      "unit": "MU",
      "expected": 587.2,
@@ -3925,6 +3925,473 @@ window.PORTAL_SEED = {
   {
    "name": "HDR Flexitron",
    "kind": "HDR brachytherapy"
+  }
+ ],
+ "pbs_tolerance_source": "Daily QA-TG-224-Tests.xls",
+ "pbs_tolerances": [
+  {
+   "key": "distal|100|",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 172
+  },
+  {
+   "key": "dfo|100|",
+   "unit": "mm",
+   "warn": 0.1,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 173
+  },
+  {
+   "key": "proximal|100|",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 174
+  },
+  {
+   "key": "width|100|",
+   "unit": "mm",
+   "warn": 0.1,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 175
+  },
+  {
+   "key": "distal|150|",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 182
+  },
+  {
+   "key": "dfo|150|",
+   "unit": "mm",
+   "warn": 0.1,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 183
+  },
+  {
+   "key": "proximal|150|",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 184
+  },
+  {
+   "key": "width|150|",
+   "unit": "mm",
+   "warn": 0.1,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 185
+  },
+  {
+   "key": "distal|200|",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 192
+  },
+  {
+   "key": "dfo|200|",
+   "unit": "mm",
+   "warn": 0.1,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 193
+  },
+  {
+   "key": "proximal|200|",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 194
+  },
+  {
+   "key": "width|200|",
+   "unit": "mm",
+   "warn": 0.1,
+   "fail": 0.2,
+   "tol_mode": "absolute",
+   "source_row": 195
+  },
+  {
+   "key": "pos_x|225|1",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 204
+  },
+  {
+   "key": "pos_y|225|1",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 205
+  },
+  {
+   "key": "sigma_x|225|1",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.6,
+   "tol_mode": "absolute",
+   "source_row": 206
+  },
+  {
+   "key": "sigma_y|225|1",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.6,
+   "tol_mode": "absolute",
+   "source_row": 207
+  },
+  {
+   "key": "skew_x|225|1",
+   "unit": "",
+   "warn": 0.8,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 208
+  },
+  {
+   "key": "skew_y|225|1",
+   "unit": "",
+   "warn": 0.8,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 209
+  },
+  {
+   "key": "intensity|225|1",
+   "unit": "%",
+   "warn": 12.0,
+   "fail": 15.0,
+   "tol_mode": "absolute",
+   "source_row": 210
+  },
+  {
+   "key": "pos_x|200|2",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 217
+  },
+  {
+   "key": "pos_y|200|2",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 218
+  },
+  {
+   "key": "sigma_x|200|2",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 0.8,
+   "tol_mode": "absolute",
+   "source_row": 219
+  },
+  {
+   "key": "sigma_y|200|2",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 0.8,
+   "tol_mode": "absolute",
+   "source_row": 220
+  },
+  {
+   "key": "skew_x|200|2",
+   "unit": "",
+   "warn": 0.8,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 221
+  },
+  {
+   "key": "skew_y|200|2",
+   "unit": "",
+   "warn": 0.8,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 222
+  },
+  {
+   "key": "intensity|200|2",
+   "unit": "%",
+   "warn": 12.0,
+   "fail": 15.0,
+   "tol_mode": "absolute",
+   "source_row": 223
+  },
+  {
+   "key": "pos_x|180|3",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 230
+  },
+  {
+   "key": "pos_y|180|3",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 231
+  },
+  {
+   "key": "sigma_x|180|3",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 0.8,
+   "tol_mode": "absolute",
+   "source_row": 232
+  },
+  {
+   "key": "sigma_y|180|3",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 0.8,
+   "tol_mode": "absolute",
+   "source_row": 233
+  },
+  {
+   "key": "skew_x|180|3",
+   "unit": "",
+   "warn": 0.8,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 234
+  },
+  {
+   "key": "skew_y|180|3",
+   "unit": "",
+   "warn": 0.8,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 235
+  },
+  {
+   "key": "intensity|180|3",
+   "unit": "%",
+   "warn": 12.0,
+   "fail": 15.0,
+   "tol_mode": "absolute",
+   "source_row": 236
+  },
+  {
+   "key": "pos_x|160|4",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 243
+  },
+  {
+   "key": "pos_y|160|4",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 244
+  },
+  {
+   "key": "sigma_x|160|4",
+   "unit": "mm",
+   "warn": 0.4,
+   "fail": 0.5,
+   "tol_mode": "absolute",
+   "source_row": 245
+  },
+  {
+   "key": "sigma_y|160|4",
+   "unit": "mm",
+   "warn": 0.4,
+   "fail": 0.5,
+   "tol_mode": "absolute",
+   "source_row": 246
+  },
+  {
+   "key": "skew_x|160|4",
+   "unit": "",
+   "warn": 0.25,
+   "fail": 0.3,
+   "tol_mode": "absolute",
+   "source_row": 247
+  },
+  {
+   "key": "skew_y|160|4",
+   "unit": "",
+   "warn": 0.25,
+   "fail": 0.3,
+   "tol_mode": "absolute",
+   "source_row": 248
+  },
+  {
+   "key": "intensity|160|4",
+   "unit": "%",
+   "warn": 2.5,
+   "fail": 3.0,
+   "tol_mode": "absolute",
+   "source_row": 249
+  },
+  {
+   "key": "pos_x|140|5",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 256
+  },
+  {
+   "key": "pos_y|140|5",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 257
+  },
+  {
+   "key": "sigma_x|140|5",
+   "unit": "mm",
+   "warn": 0.4,
+   "fail": 0.5,
+   "tol_mode": "absolute",
+   "source_row": 258
+  },
+  {
+   "key": "sigma_y|140|5",
+   "unit": "mm",
+   "warn": 0.4,
+   "fail": 0.5,
+   "tol_mode": "absolute",
+   "source_row": 259
+  },
+  {
+   "key": "skew_x|140|5",
+   "unit": "",
+   "warn": 0.25,
+   "fail": 0.3,
+   "tol_mode": "absolute",
+   "source_row": 260
+  },
+  {
+   "key": "skew_y|140|5",
+   "unit": "",
+   "warn": 0.25,
+   "fail": 0.3,
+   "tol_mode": "absolute",
+   "source_row": 261
+  },
+  {
+   "key": "intensity|140|5",
+   "unit": "%",
+   "warn": 2.5,
+   "fail": 3.0,
+   "tol_mode": "absolute",
+   "source_row": 262
+  },
+  {
+   "key": "pos_x|120|6",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 269
+  },
+  {
+   "key": "pos_y|120|6",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 270
+  },
+  {
+   "key": "sigma_x|120|6",
+   "unit": "mm",
+   "warn": 0.4,
+   "fail": 0.5,
+   "tol_mode": "absolute",
+   "source_row": 271
+  },
+  {
+   "key": "sigma_y|120|6",
+   "unit": "mm",
+   "warn": 0.4,
+   "fail": 0.5,
+   "tol_mode": "absolute",
+   "source_row": 272
+  },
+  {
+   "key": "skew_x|120|6",
+   "unit": "",
+   "warn": 0.25,
+   "fail": 0.3,
+   "tol_mode": "absolute",
+   "source_row": 273
+  },
+  {
+   "key": "skew_y|120|6",
+   "unit": "",
+   "warn": 0.25,
+   "fail": 0.3,
+   "tol_mode": "absolute",
+   "source_row": 274
+  },
+  {
+   "key": "intensity|120|6",
+   "unit": "%",
+   "warn": 2.5,
+   "fail": 3.0,
+   "tol_mode": "absolute",
+   "source_row": 275
+  },
+  {
+   "key": "coin_x||",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 284
+  },
+  {
+   "key": "coin_y||",
+   "unit": "mm",
+   "warn": 0.5,
+   "fail": 1.0,
+   "tol_mode": "absolute",
+   "source_row": 285
+  },
+  {
+   "key": "flatness||",
+   "unit": "%",
+   "warn": 2.0,
+   "fail": 3.0,
+   "tol_mode": "absolute",
+   "source_row": 296
+  },
+  {
+   "key": "output||",
+   "unit": "cGy",
+   "warn": 2.0,
+   "fail": 3.0,
+   "tol_mode": "percent",
+   "source_row": 305
   }
  ]
 };

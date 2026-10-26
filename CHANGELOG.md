@@ -9,6 +9,11 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Use Select Import Folder in Machine Trends with recursive CSV/XLS discovery and visible subfolder paths.
+- Generalize PBS template labels, apply matching workbook warning/action bands without changing baselines/overrides, unify Perform typography, and prevent scroll-wheel changes to numbers.
+
+- Move machine-schedule editing beside the left menu and permit zero-test QA lists to be completed as recorded, pending review, with normal PDF generation.
+
 - Place pass-percentage circles beside their measurement/energy labels instead of at the far edge.
 
 - Show Skewness as two side-by-side axis subplots, all energies in X and all energies in Y, with matching energy colors.

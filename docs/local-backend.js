@@ -865,7 +865,7 @@
   // ---- runs -------------------------------------------------------------------
 
   function insertRun(user, t, qaDate, rows, comment, source, sourceRef, reviewStatus) {
-    const result = overall(rows.map((r) => r.status));
+    const result = rows.length ? overall(rows.map((r) => r.status)) : "recorded";
     const id = insert("runs", { assignment_id: t.assignment.id, machine_id: t.machine.id, queue_id: t.queue.id, performed_by: user.id,
       performed_at: now(), qa_date: qaDate, overall: result, comment, source, source_ref: sourceRef, review_status: reviewStatus,
       reviewed_by: null, reviewed_at: null, review_comment: "" });
@@ -905,7 +905,7 @@
         limits: item.limits, status, comment: text(raw, "comment") });
     }
     if (missing.length) throw new Error("Missing results for: " + missing.join(", "));
-    if (!rows.length) throw new Error("This queue has no tests.");
+    if (!rows.length && t.items.length) throw new Error("This queue has no recorded results.");
     const ref = text(data, "source_ref") || null;
     checkNotImported(ref);
     return insertRun(user, t, qaDate, rows, text(data, "comment"), ref ? "sphinx" : "manual", ref, "pending");
@@ -1108,7 +1108,36 @@
     instantiateSeedTemplates();
     mergeCopies();
     restoreMonthlySchedules();
+    generalizePbsTemplates();
   })();
+
+  function generalizePbsTemplates() {
+    const clean = value => String(value || '').replace(/\bGTR\s*\d+[ _-]*/gi, '').trim();
+    const queues = S.queues.filter(q => /PBS\s*DailyQA/i.test(q.name));
+    const queueIds = new Set(queues.map(q => q.id));
+    const testIds = new Set(S.queue_items.filter(i => queueIds.has(i.queue_id)).map(i => i.test_id));
+    const rules = (window.PORTAL_SEED.pbs_tolerances || []);
+    S.pbsWorkbookAppliedIds = S.pbsWorkbookAppliedIds || {};
+    let changed = false;
+    for (const q of queues) for (const field of ['name','description']) {
+      const text = clean(q[field]); if (text !== q[field]) { q[field] = text; changed = true; }
+    }
+    for (const t of S.tests.filter(t => testIds.has(t.id) || queueIds.has(t.owner_queue_id))) {
+      for (const field of ['name','description','category']) {
+        const text = clean(t[field]); if (text !== t[field]) { t[field] = text; changed = true; }
+      }
+      if (S.pbsWorkbookAppliedIds[t.id]) continue;
+      const rule = rules.find(r => r.key === canonicalKey(t.name) && (r.unit || '') === (t.unit || ''));
+      if (rule) {
+        const before = {warn:t.warn,fail:t.fail,tol_mode:t.tol_mode};
+        t.warn = rule.warn; t.fail = rule.fail; t.tol_mode = rule.tol_mode;
+        S.pbsWorkbookAppliedIds[t.id] = true;
+        audit(null, 'apply_workbook_tolerances', 'test', t.id, {source:window.PORTAL_SEED.pbs_tolerance_source,row:rule.source_row,before,after:{warn:t.warn,fail:t.fail,tol_mode:t.tol_mode}});
+        changed = true;
+      }
+    }
+    if (changed) { audit(null,'generalize','queue',null,{reason:'Shared PBS template labels and matching workbook tolerances'}); save(); }
+  }
 
   // An earlier Sphinx step switched off every other list on the proton gantries, monthly QA included; it now only
   // touches other daily lists. Switch those monthly schedules back on once.

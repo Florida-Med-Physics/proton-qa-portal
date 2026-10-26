@@ -855,8 +855,8 @@ def submit_run(db, user, assignment_id, data):
         results.append((item, value, status, _text(raw, "comment")))
     if missing:
         raise PortalError("Missing results for: " + ", ".join(missing))
-    if not results:
-        raise PortalError("This queue has no tests.")
+    if not results and template["items"]:
+        raise PortalError("This queue has no recorded results.")
     source_ref = _text(data, "source_ref") or None
     _check_not_imported(db, source_ref)
     rows = [{"test_id": item["test_id"], "value_num": float(value) if item["type"] in ("numeric", "boolean") else None,
@@ -874,7 +874,7 @@ def _check_not_imported(db, source_ref):
 
 
 def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, review_status):
-    result_overall = qa.overall(r["status"] for r in rows)
+    result_overall = qa.overall(r["status"] for r in rows) if rows else "recorded"
     with db.transaction():
         run_id = db.run(
             "INSERT INTO runs (assignment_id, machine_id, queue_id, performed_by, performed_at, qa_date, overall, comment, source, "
