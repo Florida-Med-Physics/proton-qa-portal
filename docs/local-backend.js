@@ -539,9 +539,9 @@
       machine_count: S.assignments.filter((a) => a.queue_id === q.id && a.active).length,
       template_name: q.template_id ? (byId("queues", q.template_id) || {}).name || null : null,
       ...(() => { const own = new Set(S.tests.filter((t) => t.owner_queue_id === q.id).map((t) => t.id));
-        const newest = S.audit.filter((a) => (a.entity === "queue" && a.entity_id === q.id) || (a.entity === "test" && own.has(a.entity_id))).reduce((m, a) => (!m || a.at > m.at ? a : m), null);
+        const newest = S.audit.filter((a) => (a.entity === "queue" && a.entity_id === q.id) || (a.entity === "test" && own.has(a.entity_id))).reduce((m, a) => (!m || a.at > m.at || (a.at === m.at && a.id > m.id) ? a : m), null);
         const u = newest && newest.user_id ? byId("users", newest.user_id) : null;
-        return { modified_at: newest ? newest.at : null, modified_by: u ? (u.full_name || u.username) : (newest ? "system" : null) }; })(),
+        return { modified_order: newest ? newest.id : 0, modified_at: newest ? newest.at : null, modified_by: u ? (u.full_name || u.username) : (newest ? "system" : null) }; })(),
       machines: S.assignments.filter((a) => a.queue_id === q.id && a.active).map((a) => byId("machines", a.machine_id).name).join(", ") || null,
     })).sort((a, b) => (b.is_template - a.is_template) || (b.active - a.active) || a.name.localeCompare(b.name));
   }

@@ -287,6 +287,7 @@ def _list_queues(db):
         "(SELECT name FROM queues t WHERE t.id = q.template_id) AS template_name, "
         "(SELECT MAX(a.at) FROM audit a WHERE (a.entity = 'queue' AND a.entity_id = q.id) "
         " OR (a.entity = 'test' AND a.entity_id IN (SELECT id FROM tests WHERE owner_queue_id = q.id))) AS modified_at, "
+        "(SELECT a.id FROM audit a WHERE (a.entity = 'queue' AND a.entity_id = q.id) OR (a.entity = 'test' AND a.entity_id IN (SELECT id FROM tests WHERE owner_queue_id = q.id)) ORDER BY a.at DESC,a.id DESC LIMIT 1) AS modified_order, "
         "(SELECT COALESCE(u.full_name, u.username, 'system') FROM audit a LEFT JOIN users u ON u.id = a.user_id WHERE ((a.entity = 'queue' AND a.entity_id = q.id) "
         " OR (a.entity = 'test' AND a.entity_id IN (SELECT id FROM tests WHERE owner_queue_id = q.id))) ORDER BY a.at DESC, a.id DESC LIMIT 1) AS modified_by, "
         "(SELECT GROUP_CONCAT(m.name, ', ') FROM assignments a JOIN machines m ON m.id = a.machine_id WHERE a.queue_id = q.id AND a.active = 1) AS machines "

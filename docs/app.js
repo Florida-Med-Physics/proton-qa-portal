@@ -721,7 +721,7 @@ async function renderSetup() {
     return ["Unassigned"];
   };
   const templateSections = el("div");
-  const sortedTemplates = lists.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sortedTemplates = lists.slice().sort((a, b) => String(b.modified_at || '').localeCompare(String(a.modified_at || '')) || (b.modified_order || 0) - (a.modified_order || 0) || a.name.localeCompare(b.name));
   for (const modality of [...MODALITIES, "Unassigned"]) {
     const group = sortedTemplates.filter((q) => templateModalities(q).includes(modality));
     if (!group.length) continue;

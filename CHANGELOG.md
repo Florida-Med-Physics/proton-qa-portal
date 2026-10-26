@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Show the most recently edited template first within each modality, including test edits and same-second changes.
+
 - Edit test names, categories and result types directly in template rows; Save template commits definitions and defaults together with rollback on validation errors.
 
 - Use Select Import Folder in Machine Trends with recursive CSV/XLS discovery and visible subfolder paths.
