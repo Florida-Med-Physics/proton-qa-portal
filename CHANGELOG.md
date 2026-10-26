@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Limit displayed trend measurements, statistics, fits, insights, and axis values to two significant figures; preserve saved/exported precision and exact energy/date labels.
+
 - Preserve template/CSV measurement and energy order in Machine Trends instead of sorting graphs alphabetically or energies numerically.
 
 - Preserve energy colors in absolute subplots, add a four-week prediction toggle, and remove outlier rings around measured points.

@@ -2876,9 +2876,13 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
 
   // Y axis: gridlines, labels, and the unit as the axis title.
   const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
+  const seenTickLabels = new Set();
   for (const v of ticks) {
+    const tickLabel = (delta && v > 0 ? "+" : "") + sig(v);
+    if (seenTickLabels.has(tickLabel)) continue;
+    seenTickLabels.add(tickLabel);
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
-      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v, decimals)));
+      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + sig(v)));
   }
   const shortLabel = small && yLabel.length > 30 ? `${yLabel.slice(0, 29)}…` : yLabel;
   const yTitle = `${delta ? "Δ " : ""}${shortLabel}${unit ? ` (${unit})` : ""}`;   // "Y Offset (mm)" / "Δ Y Offset (mm)": the unit never changes between the two views
@@ -2905,7 +2909,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${cls || "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
       const dot = svg("circle", { class: `dot ${cls || "single"} st-${p.status}`, cx: x(p.qa_date), cy: y(val(p)), r },
-        svg("title", {}, `${p.qa_date} ${s.label}: ${fmt(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`));
+        svg("title", {}, `${p.qa_date} ${s.label}: ${sig(p.value)} ${unit || ""} (${STATUS_LABEL[p.status] || p.status})`));
       dot.addEventListener("click", (e) => {
         e.stopPropagation();
         const svgEl = dot.ownerSVGElement;
@@ -2916,7 +2920,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
         dot.classList.add("selected");
         const when = new Date(p.qa_date + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
         const d = asDeviation(p);
-        const lines = [`${when}${multi ? ` · ${s.label}` : ""}`, `${fmt(p.value)}${u}`, p.expected !== null && p.expected !== undefined ? `Δ ${signed(d.dev)}${u}` : ""].filter(Boolean);
+        const lines = [`${when}${multi ? ` · ${s.label}` : ""}`, `${sig(p.value)}${u}`, p.expected !== null && p.expected !== undefined ? `Δ ${sigSigned(d.dev)}${u}` : ""].filter(Boolean);
         const cx = x(p.qa_date), cy = y(val(p));
         const lineH2 = small ? 12 : 14, pad = 6, width = Math.max(...lines.map((t) => t.length)) * (small ? 6.2 : 7.2) + pad * 2, height = lines.length * lineH2 + pad * 2;
         const bx = Math.min(Math.max(L, cx - width / 2), W - R - width), by = cy - height - 12 < T ? cy + 12 : cy - height - 12;
@@ -2965,9 +2969,9 @@ function axisLegend(group) {
 }
 
 const signed = (v, d = 2) => `${v >= 0 ? "+" : "−"}${fmt(Math.abs(v), d)}`;
-// Three significant figures for chart statistics (77.7, 0.06, 157), trailing zeros dropped.
-const sig = (v, n = 3) => (v === null || v === undefined || Number.isNaN(v) ? "—" : v === 0 ? "0" : String(Number(Number(v).toPrecision(n))));
-const sigSigned = (v, n = 3) => `${v >= 0 ? "+" : "−"}${sig(Math.abs(v), n)}`;
+// Two significant figures for displayed trend measurements and statistics (77.7, 0.06, 157), trailing zeros dropped.
+const sig = (v, n = 2) => (v === null || v === undefined || Number.isNaN(v) ? "—" : v === 0 ? "0" : String(Number(Number(v).toPrecision(n))));
+const sigSigned = (v, n = 2) => `${v >= 0 ? "+" : "−"}${sig(Math.abs(v), n)}`;
 
 // Trend points judged by the QA list's current limits (the same reference / warning / action the Perform page shows),
 // not by whatever limits were stored with each result. Points keep their recorded verdict in `recorded_status`.
@@ -3054,13 +3058,13 @@ function renderTrendDetail(group, range) {
   const multi = group.members.length > 1;
   app.append(el("div", { class: "card stat-row" }, group.members.map((m) => {
     const s = stats(m.points), d = asDeviation(s.last);
-    return stat(multi ? `${m.axis} latest` : "Latest", `${fmt(s.last.value)} ${unit}`.trim(),
-      [chip(s.last.status), " ", s.last.expected !== null ? `${signed(d.dev)} ${unit} from ${fmt(s.last.expected)} ${unit}`.replace(/ +/g, " ") : "", el("br"),
-        `${s.inTol}% within action level · mean ${fmt(s.mean, 2)} ± ${fmt(s.sd, 2)} ${unit}`.trim()]);
+    return stat(multi ? `${m.axis} latest` : "Latest", `${sig(s.last.value)} ${unit}`.trim(),
+      [chip(s.last.status), " ", s.last.expected !== null ? `${sigSigned(d.dev)} ${unit} from ${sig(s.last.expected)} ${unit}`.replace(/ +/g, " ") : "", el("br"),
+        `${sig(s.inTol)}% within action level · mean ${sig(s.mean)} ± ${sig(s.sd)} ${unit}`.trim()]);
   }), (() => {
     const p = latest(group.members[0].points);
     const u = p.tol_mode === "percent" ? " %" : unit ? ` ${unit}` : "";
-    return p.warn !== null ? stat("Limits", `Warning ±${fmt(p.warn)}${u}`, `Action ±${fmt(p.fail)}${u}`) : null;
+    return p.warn !== null ? stat("Limits", `Warning ±${sig(p.warn)}${u}`, `Action ±${sig(p.fail)}${u}`) : null;
   })()));
 
   app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)) }));
@@ -3077,7 +3081,7 @@ function renderTrendDetail(group, range) {
       return el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${row.run_id}`) },
         el("td", {}, d), group.members.map((m, k) => {
           const p = row.cells[k];
-          return el("td", { class: "num" }, p ? [`${fmt(p.value)} ${unit}`.trim(), " ", chip(p.status)] : "");
+          return el("td", { class: "num" }, p ? [`${sig(p.value)} ${unit}`.trim(), " ", chip(p.status)] : "");
         }));
     }))));
 }
@@ -3315,7 +3319,7 @@ function trendInsightsCard(series) {
     if (last.status === 'fail' || last.status === 'warn') messages.push({ priority: last.status === 'fail' ? 3 : 2,
       href: item.href, text: `${who}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
     const pattern = trendPattern(item.points);
-    if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${fmt(pattern.change, 3)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${pattern.r2.toFixed(2)}).` });
+    if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${sig(pattern.change)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${sig(pattern.r2)}).` });
   }
   messages.sort((a,b) => b.priority-a.priority);
   return el('section', { class: 'card trend-insights', 'aria-label': 'Automatic trend insights' },
