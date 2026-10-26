@@ -2080,6 +2080,7 @@ async function renderQueueEditor(id) {
     el("input", { type: "hidden", name: "active", value: q.active ? "1" : "0" })));
   app.append(info);
 
+  const testUpdates = new Map();
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));
   let items = q.items.map((i) => ({ test_id: i.test_id, expected: i.expected, warn: i.warn, fail: i.fail, tol_mode: i.tol_mode }));
   // "Values for": the list's default baseline / Warning / Action (every machine), or one machine's own values,
@@ -2208,6 +2209,11 @@ async function renderQueueEditor(id) {
       if (!valuesFor) index = items.indexOf(item);
       const t = byId[item.test_id];
       const numeric = t.type === "numeric";
+      const editDefinition = (field, value) => {
+        t[field] = value;
+        testUpdates.set(t.id, { ...(testUpdates.get(t.id) || {}), [field]: value });
+        markDirty();
+      };
       const own = valuesFor ? (machineValues[valuesFor][item.test_id] = machineValues[valuesFor][item.test_id] || {}) : null;
       const target = own || item;            // what the inputs edit: this machine's own values, or the list's default
       const fallback = (name) => (own ? (item[name] ?? t[name]) : t[name]);
@@ -2219,15 +2225,15 @@ async function renderQueueEditor(id) {
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = ((own && own.tol_mode) || item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       const n = sectionNumber(t);
-      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 5 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
+      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 6 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
       const family = familyOf.get(item.test_id);
       const firstInFamily = family && family[0].item === item;
       const lastInFamily = family && family[family.length - 1].item === item;
-      const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 5 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
+      const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
       const directions = family
         ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
         : helpText(t.description);
-      const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 5 }, directions)) : null;
+      const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 6 }, directions)) : null;
       lastSection = n;
       const number = numbers.get(item.test_id);
       return [head, groupHead, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
@@ -2238,8 +2244,11 @@ async function renderQueueEditor(id) {
             toast("Test saved");
             route();
           }) }, "✎") : null,
-          el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
-        el("td", {}, categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
+          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
+            el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
+            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
+        el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
+        el("td", {}, editable && !valuesFor ? select('', Object.entries(TYPE_LABELS), t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { editDefinition('type', e.target.value); draw(); } }) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -2252,12 +2261,12 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), dirRow];
     }).filter(Boolean));
-    if (!matches.length && items.length) body.append(el("tr", {}, el("td", { colspan: 5, class: "muted" }, "No matching tests. Clear the search to see all tests.")));
+    if (!matches.length && items.length) body.append(el("tr", {}, el("td", { colspan: 6, class: "muted" }, "No matching tests. Clear the search to see all tests.")));
     holder.replaceChildren(scopedItems.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
-      el("thead", {}, el("tr", {}, ["Test Name", "Category", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
+      el("thead", {}, el("tr", {}, ["Test Name", "Category", "Result Type", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
         valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Default Warning / Default Action", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, valuesFor ? "No tests included for this machine. Use Customize tests to include tests." : "No tests in this list yet."));
-    if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} limits` : "Save defaults";
+    if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} limits` : "Save template";
     holder.classList.toggle("machine-mode", !!valuesFor);
     // Only this list's own tests (or shared library tests) can be added here.
     picker.replaceChildren(el("option", { value: "" }, "Add an existing test…"),
@@ -2340,7 +2349,7 @@ async function renderQueueEditor(id) {
         unsaved.hidden = true;
         return;
       }
-      const payload = { ...formData(info), items };
+      const payload = { ...formData(info), items, test_updates: [...testUpdates].map(([test_id, fields]) => ({ test_id, ...fields })) };
       const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
       dirty = false;
       unsaved.hidden = true;
@@ -2352,6 +2361,7 @@ async function renderQueueEditor(id) {
     app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/queues" }, "Back"),
       saveBtn = el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
   }
+  app.append(el('datalist', { id: 'template-category-options' }, [...new Set(tests.map(t => t.category).filter(Boolean))].sort().map(category => el('option', { value: category }))));
   draw();
 }
 

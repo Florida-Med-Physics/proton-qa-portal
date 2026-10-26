@@ -1208,3 +1208,8 @@ td, .measure-table td { font-size: 21px; }
 #app[data-page^="perform/"] .measure-table button { font-family: inherit; font-size: 22px; }
 #app[data-page^="perform/"] .directions,
 #app[data-page^="perform/"] .directions.in-cell { font-family: inherit; font-size: 20px; }
+
+.inline-test-name { flex: 1; min-width: 180px; }
+.inline-test-name textarea { width: 100%; resize: vertical; min-height: 66px; font: inherit; }
+.list-editor td > input, .list-editor td > select { width: 100%; min-width: 135px; }
+.list-editor td.item-cell { min-width: 340px; }

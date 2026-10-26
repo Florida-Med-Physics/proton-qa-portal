@@ -547,6 +547,20 @@
   }
   function saveQueue(user, data, queueId) {
     require(user, "configure");
+    if (data.test_updates && data.test_updates.length) {
+      if (!queueId) throw new Error('Save the template before editing its tests.');
+      const snapshot = JSON.parse(JSON.stringify(S));
+      try {
+        const members = new Set((data.items || []).map(item => Number(item.test_id)));
+        for (const update of data.test_updates) {
+          const test = get('tests', update.test_id, 'Check');
+          if (!members.has(test.id) || (test.owner_queue_id && test.owner_queue_id !== queueId)) throw new Error("Only this template's tests can be edited here.");
+          const fields = Object.fromEntries(['name','category','type'].filter(key => key in update).map(key => [key,update[key]]));
+          saveTest(user, {...test,...fields}, test.id);
+        }
+        return saveQueue(user, {...data,test_updates:[]}, queueId);
+      } catch (err) { S = snapshot; save(); throw err; }
+    }
     const name = required(data, "name");
     if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase() && q.id !== (queueId || 0))) throw new Error(`A QA list named '${name}' already exists.`);
     const items = (data.items || []).map((item, position) => {

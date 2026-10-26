@@ -315,8 +315,21 @@ def get_queue(db, user, queue_id):
     return queue
 
 
-def save_queue(db, user, data, queue_id=None):
+def save_queue(db, user, data, queue_id=None, _within_transaction=False):
     require(user, "configure")
+    if data.get("test_updates"):
+        if queue_id is None:
+            raise PortalError("Save the template before editing its tests.")
+        member_ids = {int(item["test_id"]) for item in data.get("items", [])}
+        with db.transaction():
+            for update in data["test_updates"]:
+                tid = int(update["test_id"])
+                existing = _get(db, "tests", tid)
+                if tid not in member_ids or (existing["owner_queue_id"] is not None and existing["owner_queue_id"] != queue_id):
+                    raise PortalError("Only this template's tests can be edited here.")
+                fields = {key: update[key] for key in ("name", "category", "type") if key in update}
+                save_test(db, user, {**existing, **fields}, tid)
+            return save_queue(db, user, {**data, "test_updates": []}, queue_id, _within_transaction=True)
     name = _text(data, "name", required=True)
     clash = db.one("SELECT id FROM queues WHERE name = ? AND id != ?", (name, queue_id or 0))
     if clash:
@@ -332,7 +345,8 @@ def save_queue(db, user, data, queue_id=None):
         raise PortalError("A check can only appear once in a QA list.")
     existing = _get(db, "queues", queue_id) if queue_id is not None else None
     is_template = _flag(data, "is_template", bool(existing["is_template"]) if existing else False)
-    with db.transaction():
+    from contextlib import nullcontext
+    with (nullcontext() if _within_transaction else db.transaction()):
         if queue_id is None:
             queue_id = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, ?, ?)",
                               (name, _text(data, "description"), _flag(data, "active"), is_template))

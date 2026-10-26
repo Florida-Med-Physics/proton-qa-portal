@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Edit test names, categories and result types directly in template rows; Save template commits definitions and defaults together with rollback on validation errors.
+
 - Use Select Import Folder in Machine Trends with recursive CSV/XLS discovery and visible subfolder paths.
 - Generalize PBS template labels, apply matching workbook warning/action bands without changing baselines/overrides, unify Perform typography, and prevent scroll-wheel changes to numbers.
 
