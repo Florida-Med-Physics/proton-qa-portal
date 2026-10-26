@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Explicitly label chart trend lines as least-squares fits; each series uses its own measurements from the selected period.
+
 - Group every measurement repeated across energies on one trend chart, including fall off, proximal depth, width, and shared X/Y series.
 
 - Group all Distal Depth energies together on one machine trend chart, including the linked values/detail view.

@@ -2758,7 +2758,7 @@ function yAxisLabel(names) {
 }
 
 const trendKey = (show, multi = false) => (show ? [
-  el("span", { class: "key-item" }, el("span", { class: `key-swatch fit${multi ? " multi" : ""}` }), multi ? "Trend (Straight-Line Fit, Each Series)" : "Trend (Straight-Line Fit)"),
+  el("span", { class: "key-item" }, el("span", { class: `key-swatch fit${multi ? " multi" : ""}` }), multi ? "Trend (Least-Squares Fit, Each Series)" : "Trend (Least-Squares Fit)"),
   el("span", { class: "key-item" }, el("span", { class: `key-swatch fit forecast${multi ? " multi" : ""}` }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)] : []);
 
 function seriesChart(series, unit, { small = false, delta = null, yLabel = null } = {}) {
@@ -2934,7 +2934,7 @@ function drawSeries(series, unit, { small = false, delta = false, yLabel = "Valu
     const cls = multi ? `axis-${k}` : "single";
     plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }),
       svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
-        svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (straight-line fit)`)));
+        svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (least-squares fit)`)));
   });
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
   kids.push(plotGroup);
@@ -3320,7 +3320,7 @@ function trendInsightsCard(series) {
     el('h3', {}, 'Trend insights'),
     messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.href ? el('a', { href: m.href, class: 'trend-insight-link' }, m.text, ' → View graph') : m.text))) : el('p', { class: 'muted small' }, 'No warning/action results or clear directional patterns were identified in the displayed data. At least five results on different dates are needed to assess a directional pattern.'),
     el('details', {}, el('summary', { class: 'small' }, 'How these insights work'),
-      el('p', { class: 'muted small' }, 'Calculated locally from the selected period. Patterns use a straight-line fit to the last 20 results relative to the current baseline: at least 5 results, R² ≥ 0.60, and fitted change of at least half the warning band when one is configured. These are descriptive signals for review, not clinical conclusions or an external AI assessment.')));
+      el('p', { class: 'muted small' }, 'Calculated locally from the selected period. Patterns use an ordinary least-squares straight-line fit to the last 20 results relative to the current baseline: at least 5 results, R² ≥ 0.60, and fitted change of at least half the warning band when one is configured. These are descriptive signals for review, not clinical conclusions or an external AI assessment.')));
 }
 async function renderTrends() {
   const params = queryParams();
