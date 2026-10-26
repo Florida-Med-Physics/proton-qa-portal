@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Refresh the browser backend cache fingerprint so the four demo accounts load into Users and rights.
+
 - Add the temporary MPA / MPA demo login without resetting existing account passwords.
 
 - Replace browser role selection with temporary password accounts (Physicist, Therapy, Admin), reject incorrect passwords, and support Admin-created accounts and password resets.
