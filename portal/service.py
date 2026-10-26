@@ -1158,7 +1158,7 @@ def _pbs_therapist_results(db, run):
 
 def _review_ready(db, run):
     checks=_pbs_therapist_results(db,run)
-    if run.get('trashed_at'): return False
+    if run.get('trashed_at') or run.get('therapist_approval_required') and not run.get('therapist_approved_by'): return False
     return checks is None or bool(checks) and all(r['status']=='pass' for r in checks)
 
 
@@ -1193,8 +1193,8 @@ def get_run(db, user, run_id):
 
 def trash_run(db, user, run_id, data):
     run=_get(db,'runs',run_id)
-    if not (auth.can(user,'review') or auth.can(user,'perform') and run['performed_by']==user['id'] and run['review_status']=='pending'):
-        raise PortalError('Only a reviewer or the performer of an unreviewed submission can move this QA to trash.',403)
+    if not (auth.can(user,'review') or auth.can(user,'therapist_approve') or auth.can(user,'perform') and run['performed_by']==user['id'] and run['review_status']=='pending'):
+        raise PortalError('Only a reviewer, therapist, or the performer of an unreviewed submission can move this QA to trash.',403)
     trashed=data.get('trashed',True) is not False
     reason=_text(data,'reason') or 'Created in error'
     with db.transaction():
@@ -1227,12 +1227,15 @@ def set_therapist_review(db,user,run_id,data):
     if decision not in ('pass','fail','clear'):raise PortalError('Choose Pass, Fail or Clear.')
     with db.transaction():
         run=_get(db,'runs',run_id)
-        if run.get('trashed_at') or run['review_status']!='pending' or not run['therapist_approval_required']:
+        if run.get('trashed_at') or not run['therapist_approval_required'] or decision=='clear' and run['review_status']!='pending':
             raise PortalError('Therapist review can be changed only before physicist review.')
         checks=_pbs_therapist_results(db,run)
         if checks is None:checks=db.all("SELECT res.* FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=? AND lower(trim(t.name))='qa reviewed by therapist?'",(run_id,))
         if not checks:raise PortalError('This QA has no therapist review test to change.')
-        previous={'approved_by':run['therapist_approved_by'],'approved_at':run['therapist_approved_at'],'results':[{'test_id':r['test_id'],'status':r['status'],'value':r['value_num']} for r in checks]}
+        previous={'approved_by':run['therapist_approved_by'],'approved_at':run['therapist_approved_at'],'physics':{k:run.get(k) for k in ('review_status','reviewed_by','reviewed_at','review_comment')},'results':[{'test_id':r['test_id'],'status':r['status'],'value':r['value_num']} for r in checks]}
+        if decision=='pass' and run['therapist_approved_by'] and all(r['status']=='pass' for r in checks):return {'ok':True}
+        if run['review_status']!='pending':
+            db.run("UPDATE runs SET review_status='pending',reviewed_by=NULL,reviewed_at=NULL,review_comment='' WHERE id=?",(run_id,))
         value=1 if decision=='pass' else 0 if decision=='fail' else None
         status='recorded' if decision=='clear' else decision
         for row in checks:db.run('UPDATE results SET value_num=?,value_text=NULL,status=? WHERE id=?',(value,status,row['id']))
@@ -1242,12 +1245,41 @@ def set_therapist_review(db,user,run_id,data):
     return {'ok':True}
 
 
+def unapprove_therapist_review(db,user,run_id):
+    require(user,'therapist_approve')
+    with db.transaction():
+        run=_get(db,'runs',run_id)
+        if run.get('trashed_at') or not run['therapist_approved_by']:
+            raise PortalError('This QA has no therapist approval to undo.')
+        previous={k:run.get(k) for k in ('therapist_approved_by','therapist_approved_at','review_status','reviewed_by','reviewed_at','review_comment')}
+        checks=_pbs_therapist_results(db,run)
+        if checks is None:checks=db.all("SELECT res.* FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=? AND lower(trim(t.name))='qa reviewed by therapist?'",(run_id,))
+        previous['results']=[{'test_id':r['test_id'],'value':r['value_num'],'status':r['status']} for r in checks]
+        for row in checks:db.run("UPDATE results SET value_num=NULL,value_text=NULL,status='recorded' WHERE id=?",(row['id'],))
+        rows=db.all('SELECT status,value_num,value_text FROM results WHERE run_id=?',(run_id,))
+        db.run("UPDATE runs SET therapist_approved_by=NULL,therapist_approved_at=NULL,review_status='pending',reviewed_by=NULL,reviewed_at=NULL,review_comment='',overall=? WHERE id=?",(_results_overall(rows),run_id))
+        db.audit(user['id'],'unapprove_therapist_review','run',run_id,previous=previous,physics_approval_cleared=run['review_status']=='approved')
+    return {'ok':True}
+
+
+def unapprove_physics_review(db,user,run_id):
+    require(user,'review')
+    if user['role']!='physicist':raise PortalError('Only a physicist can undo physics approval.',403)
+    with db.transaction():
+        run=_get(db,'runs',run_id)
+        if run.get('trashed_at') or run['review_status']!='approved':raise PortalError('This QA has no physics approval to undo.')
+        previous={k:run.get(k) for k in ('review_status','reviewed_by','reviewed_at','review_comment')}
+        db.run("UPDATE runs SET review_status='pending',reviewed_by=NULL,reviewed_at=NULL,review_comment='' WHERE id=?",(run_id,))
+        db.audit(user['id'],'unapprove_physics_review','run',run_id,previous=previous)
+    return {'ok':True}
+
+
 def review_run(db, user, run_id, data):
     with db.transaction():
         require(user, "review")
         run = _get(db, "runs", run_id)
         if not _review_ready(db,run):
-            raise PortalError("PBS Daily QA Sphinx needs test 4.06 marked Pass before physicist review.")
+            raise PortalError("Therapist approval with test 4.06 marked Pass is required before physicist review.")
         if run['therapist_approval_required']:
             if not run['therapist_approved_by']:
                 raise PortalError('Therapist approval is required before medical physicist review.')

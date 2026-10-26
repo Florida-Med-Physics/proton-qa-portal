@@ -260,6 +260,16 @@ def trash_run(db,user,m,body,q):
     return service.trash_run(db,user,int(m[1]),body)
 
 
+@route("POST", r"/api/runs/(\d+)/therapist-unapprove")
+def therapist_unapprove(db,user,m,body,q):
+    return service.unapprove_therapist_review(db,user,int(m[1]))
+
+
+@route("POST", r"/api/runs/(\d+)/physics-unapprove")
+def physics_unapprove(db,user,m,body,q):
+    return service.unapprove_physics_review(db,user,int(m[1]))
+
+
 @route("POST", r"/api/runs/(\d+)/therapist-review")
 def therapist_review(db,user,m,body,q):
     return service.set_therapist_review(db,user,int(m[1]),body)

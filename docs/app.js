@@ -77,10 +77,15 @@ function chip(status, label) {
   return el("span", { class: `chip ${status || ""}` }, label || STATUS_LABEL[status] || capitalize(status || "-"));
 }
 
-const REVIEW_LABEL = { pending: "Awaiting review", approved: "Approved", rejected: "Rejected", imported: "Historical import" };
+const REVIEW_LABEL = { pending: "Awaiting Physics Review", approved: "Approved", rejected: "Rejected", imported: "Historical import" };
 
-function reviewChip(status) {
-  return chip(status === "imported" ? "" : status, REVIEW_LABEL[status] || capitalize(status));
+function reviewStatusText(run) {
+  if(run.review_status==='pending') return run.therapist_approval_required&&(!run.therapist_approved_by||run.review_ready===false)?'Awaiting Therapy Review':'Awaiting Physics Review';
+  return REVIEW_LABEL[run.review_status]||capitalize(run.review_status);
+}
+function reviewChip(runOrStatus) {
+  const run=typeof runOrStatus==='object'?runOrStatus:{review_status:runOrStatus};
+  return chip(run.review_status==='imported'?'':run.review_status,reviewStatusText(run));
 }
 
 function readFileBase64(file) {
@@ -127,8 +132,10 @@ function personName(name, username) {
   return name || username || "";
 }
 
+function activeRole() { return state.user?.role === "admin" && state.previewRole ? state.previewRole : state.user?.role; }
+
 function can(permission) {
-  const role = state.user && state.user.role;
+  const role = activeRole();
   const rules = { perform: ["admin", "physicist", "therapist", "mpa"], therapist_approve: ["therapist"], review: ["admin", "physicist"], configure: ["admin", "physicist"], manage_users: ["admin"] };
   return !!role && rules[permission].includes(role);
 }
@@ -143,6 +150,7 @@ function toast(message, bad) {
 }
 
 async function api(method, path, body) {
+  if(state.user?.role==='admin' && state.previewRole && method!=='GET' && path!=='/api/logout') throw new Error('View As is a preview. Return to Admin to save changes.');
   // The browser-only build (GitHub Pages) answers every request from local storage instead of a server.
   if (window.localApi) return window.localApi(method, path, body);
   const response = await fetch(path, {
@@ -356,10 +364,15 @@ const FREQ_ORDER = { daily: 0, weekly: 1, monthly: 2, quarterly: 3, semiannual: 
 async function renderHome() {
   const data = await api('GET', '/api/dashboard');
   page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
-  const pending = data.machines.reduce((n,m) => n + m.pending_review,0);
+  const runs=await api('GET','/api/runs?limit=400');
+  const therapy=activeRole()==='therapist';
+  const reviews=runs.filter(r=>r.review_status==='pending'&&(therapy?r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false):can('review')&&r.review_ready!==false));
   const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
-  app.append(el('div',{class:'row home-brief'},el('a',{href:'#/perform-qa',class:'small'},`${due} QA ${due===1?'list':'lists'} to do`),
-    can('review') && pending ? el('a',{href:'#/runs?review_status=pending',class:'small'},`${pending} waiting for review`) : null));
+  app.append(el('div',{class:'row home-brief'},el('a',{href:'#/perform-qa',class:'small'},`${due} QA ${due===1?'list':'lists'} to do`)));
+  if(therapy||can('review')) {
+    app.append(el('section',{class:'card dashboard-review'},el('h2',{},therapy?'Awaiting Therapy Review':'Awaiting Physics Review'),
+      reviews.length?el('div',{},...reviews.map(r=>el('div',{class:'row'},el('a',{href:`#/runs/${r.id}`},`${r.machine_name} · ${r.queue_name}`),el('span',{class:'muted small'},shortDate(r.qa_date)),el('span',{class:'spacer'}),el('a',{class:'button small',href:`#/runs/${r.id}`},'Review')))):el('p',{class:'muted'},'You are caught up. No QA is waiting for your review.')));
+  }
   const grid=el('div',{class:'home-modality-grid'});
   for(const modality of MODALITIES){
     const machines=data.machines.filter((m)=>modalityOf(m.kind)===modality).sort((a,b)=>kindRank(a.kind)-kindRank(b.kind)||a.name.localeCompare(b.name));
@@ -432,6 +445,14 @@ function phoneDrawer(container, nodes, title) {
   return details;
 }
 
+function viewAsControl() {
+  if(state.user?.role!=='admin') { state.previewRole=null; return null; }
+  const pick=el('select',{'aria-label':'View As role'},...['admin','physicist','therapist','mpa'].map(role=>el('option',{value:role},ROLE_LABEL[role])));
+  pick.value=state.previewRole||'admin';
+  pick.addEventListener('change',()=>{state.previewRole=pick.value==='admin'?null:pick.value;location.hash='#/';renderShell();route();});
+  return el('label',{class:'inline view-as-control',title:'Preview another role. Changes are disabled in preview.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick,state.previewRole?el('span',{class:'small'},'Preview'):null);
+}
+
 function renderShell() {
   const bar = document.getElementById("topbar");
   bar.hidden = !state.user;
@@ -457,6 +478,7 @@ function renderShell() {
   search.addEventListener("keydown", (e) => { if (e.key === "Enter" && search.value.trim()) location.hash = `#/search?q=${encodeURIComponent(search.value.trim())}`; });
   document.getElementById("who").replaceChildren(
     search,
+    viewAsControl(),
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
     el('a',{href:'#/account',class:'button small phone-password-link'},'Change password'),
@@ -2544,7 +2566,7 @@ async function renderTests() {
 // ---------------------------------------------------------------------------
 
 // Review QA: what is waiting for a physicist's sign-off, then what was reviewed recently.
-function canTrashQa(run) {return can('review') || can('perform') && run.performed_by===state.user.id && run.review_status==='pending';}
+function canTrashQa(run) {return can('review') || can('therapist_approve') || can('perform') && run.performed_by===state.user.id && run.review_status==='pending';}
 function qaTrashButton(run) {
   if(!canTrashQa(run))return null;
   return el('button',{type:'button',class:run.trashed_at?'button small':'button danger small qa-trash-icon',title:run.trashed_at?'Restore QA':'Move QA to trash','aria-label':run.trashed_at?'Restore QA':'Move QA to trash',onclick:e=>{
@@ -2560,25 +2582,25 @@ async function renderReview() {
   const runs = await api("GET", "/api/runs?limit=400");
   page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
   const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
-    el("td", {}, el("a", { href: `#/runs/${r.id}` }, `${shortDate(r.qa_date)} ${r.qa_date.slice(0, 4)}`)),
+    el("td", {}, el("a", { href: `#/runs/${r.id}` }, shortDate(r.qa_date))),
     el("td", {}, el("strong", {}, r.machine_name)),
     el("td", {}, r.queue_name),
     el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
     el("td", {}, chip(r.overall)),
-    el("td", {}, r.review_status === "pending" && r.therapist_approval_required && !r.therapist_approved_by ? chip("due", "Therapist sign-off needed") : r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)),
+    el("td", {}, reviewChip(r)),
     el('td',{class:'center'},reviewRowActions(r)));
   const cols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "9%"], ["Review", "13%"], ["", "10%"]];
   const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
   const therapyMode=can('therapist_approve')&&!can('review');
   const waitingTherapist=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false));
-  if(therapyMode)app.append(el('h2',{class:'section-head'},`Needs your review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
+  if(therapyMode)app.append(el('h2',{class:'section-head'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
   const trashed=await api('GET','/api/runs?trashed=1&limit=200');
   if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
-  if(!therapyMode)app.append(el("h2", { class: "section-head modality-head" }, "Awaiting review", el("span", { class: "modality-count" }, String(pending.length))),
+  if(!therapyMode)app.append(el("h2", { class: "section-head modality-head" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
     fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
   const sent=runs.filter(r=>r.review_status==='pending'&&r.therapist_approved_by&&r.review_ready!==false).slice(0,25);
-  if(therapyMode&&sent.length)app.append(el('details',{class:'card therapist-sent'},el('summary',{},`Sent for physicist review (${sent.length})`),el('p',{class:'muted small'},'Open a submission to change your decision before physicist approval.'),fixedTable(cols,sent.map(row),'No submissions.')));
+  if(therapyMode&&sent.length)app.append(el('details',{class:'card therapist-sent'},el('summary',{},`Awaiting Physics Review (${sent.length})`),el('p',{class:'muted small'},'Open a submission to view or change your therapy review.'),fixedTable(cols,sent.map(row),'No submissions.')));
   app.append(el("h2", { class: "section-head" }, "Recently reviewed"),
     fixedTable(cols, decided.map(row), "No reviews yet."));
 }
@@ -2601,7 +2623,7 @@ async function renderRuns() {
       el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
       el("td", {}, r.machine_name), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)),
-      el("td", {}, r.review_status === "pending" && r.therapist_approval_required && !r.therapist_approved_by ? chip("due", "Therapist sign-off needed") : r.review_status === "imported" ? el("span", { class: "muted small" }, "Historical") : reviewChip(r.review_status)))), "No runs match."));
+      el("td", {}, reviewChip(r)))), "No runs match."));
 }
 
 // A self-contained PDF exporter shared by the server and browser builds.
@@ -2615,7 +2637,7 @@ function qaReportPdf(run) {
   const verdict = (v) => ({ pass: 'PASS', warn: 'WARNING', fail: 'ACTION' }[v] || clean(v || 'Recorded').toUpperCase());
   const lines = [run.queue_name, `Machine: ${run.machine_name} | QA date: ${run.qa_date} | Run: ${run.id}`,
     `Performed by: ${run.performer_name || run.performer || ''} | Recorded: ${run.performed_at || ''}`,
-    `Overall: ${verdict(run.overall)} | Review: ${run.review_status || 'pending'}`];
+    `Overall: ${verdict(run.overall)} | Review: ${reviewStatusText(run)}`];
   if (run.therapist_approval_required) lines.push(`Therapist approval: ${run.therapist_approved_by ? `${run.therapist_approver_name || run.therapist_approved_by} | ${run.therapist_approved_at}` : 'Awaiting therapist sign-off'}`);
   if (run.reviewed_at) lines.push(`Reviewed by: ${run.reviewer_name || run.reviewer || ''} | ${run.reviewed_at}`);
   if (run.comment) lines.push(`Notes: ${run.comment}`);
@@ -2720,19 +2742,19 @@ async function renderReviewMeasurements(run) {
       const missing=r.value_num==null&&r.value_text==null;
       const value=missing?'Unanswered':r.type==='boolean'?(r.value_num?'Pass':'Fail'):r.type==='status'?STATUS_WORDS[r.value_text]||r.value_text:['text','choice'].includes(r.type)?r.value_text:`${fmt(r.value_num)} ${unit}`.trim();
       const measured=el('div',{class:'review-measured'},value);
-      if(therapistReviewCheck(r)&&run.therapist_approval_required&&run.review_status==='pending'&&!run.trashed_at&&can('therapist_approve')){
-        const editor=el('div',{class:'therapist-decision-options'});
-        const change=el('details',{class:'therapist-change'},el('summary',{'aria-label':`Change therapist review for test ${numberFor(r)}`},'Change'),editor);
-        const save=async(decision,button)=>{
-          button.disabled=true;const scroll={x:scrollX,y:scrollY};
-          try{await api('POST',`/api/runs/${run.id}/therapist-review`,{decision});await route();requestAnimationFrame(()=>scrollTo(scroll.x,scroll.y));toast(decision==='pass'?'Therapist review signed and saved.':decision==='fail'?'Therapist review changed to Fail.':'Therapist review cleared.');}catch(err){toast(err.message,true);button.disabled=false;}
-        };
-        for(const [decision,label,cls] of [['pass','Pass & sign','seg pass'],['fail','Fail','seg fail'],['clear','Clear','link small']]){
-          if(decision==='clear'&&missing)continue;
-          const button=el('button',{type:'button',class:cls,'aria-label':decision==='pass'?`Mark ${numberFor(r)} Pass and sign as therapist`:`${decision==='fail'?'Mark':'Clear'} ${numberFor(r)}${decision==='fail'?' Fail':''}`,onclick:()=>save(decision,button)},label);editor.append(button);
-        }
-        if(run.therapist_approved_by){editor.append(el('button',{type:'button',class:'link small',onclick:()=>{change.open=false;}},'Cancel'));measured.append(change);}
-        else measured.append(editor);
+      if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
+        const {value:input,control}=passFailInput(r.name,false,false);
+        const original=r.value_num==null?'':r.value_num?'pass':'fail';input.value=original;
+        const sync=()=>control.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.value===input.value));sync();
+        input.addEventListener('input',async()=>{
+          const decision=input.value||'clear',scroll={x:scrollX,y:scrollY};control.querySelectorAll('button').forEach(b=>b.disabled=true);control.setAttribute('aria-busy','true');
+          try{
+            if(decision==='clear'&&run.therapist_approved_by)await api('POST',`/api/runs/${run.id}/therapist-unapprove`,{});
+            else await api('POST',`/api/runs/${run.id}/therapist-review`,{decision});
+            await route();requestAnimationFrame(()=>scrollTo(scroll.x,scroll.y));toast(decision==='pass'?'Saved. Awaiting Physics Review.':'Saved. Awaiting Therapy Review.');
+          }catch(err){input.value=original;sync();control.querySelectorAll('button').forEach(b=>b.disabled=false);control.removeAttribute('aria-busy');toast(err.message,true);}
+        });
+        measured.replaceChildren(control);
       }
       const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:10}));
       const trend=el('button',{class:'icon-btn',type:'button',title:'Show the trend here','aria-label':`Show trend for ${r.name}`,onclick:()=>{
@@ -2768,7 +2790,7 @@ async function renderRun(id) {
   const facts = el("dl", { class: "result-card card" },
     el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),
     el("dt", {}, "Performed by"), el("dd", {}, who, run.source === "sphinx" ? el("span", { class: "muted small" }, " · imported measurement file") : ""),
-    el("dt", {}, "Review"), el("dd", {}, reviewChip(run.review_status),
+    el("dt", {}, "Review"), el("dd", {}, reviewChip(run),
       run.reviewed_by ? ` ${personName(run.reviewer_name, run.reviewer)}, ${run.reviewed_at.slice(0, 16).replace("T", " ")}` : ""),
     run.comment ? [el("dt", {}, "Notes"), el("dd", { class: "pre" }, run.comment)] : null,
     run.review_comment ? [el("dt", {}, "Review note"), el("dd", {}, run.review_comment)] : null);
@@ -2779,10 +2801,10 @@ async function renderRun(id) {
     app.append(el('section',{class:'card review-workflow'},
       el('div',{},el('strong',{},'Therapist review'),el('span',{class:'small'},run.therapist_approved_by?`Signed by ${run.therapist_approver_name||'therapist'} · ${run.therapist_approved_at.replace('T',' ')}`:'Mark the therapist-review test below.')),
       el('span',{class:'workflow-arrow','aria-hidden':'true'},'→'),
-      el('div',{},el('strong',{},'Physicist approval'),el('span',{class:'small'},run.review_status==='approved'?'Approved':run.review_status==='rejected'?'Rejected':run.therapist_approved_by&&run.review_ready!==false?'Awaiting physicist':'After therapist review'))));
+      el('div',{},el('strong',{},'Physicist approval'),el('span',{class:'small'},run.review_status==='approved'?'Approved':run.review_status==='rejected'?'Rejected':run.therapist_approved_by&&run.review_ready!==false?'Awaiting Physics Review':'Awaiting Therapy Review'))));
     if(!run.results.some(therapistReviewCheck)&&!run.therapist_approved_by&&run.review_status==='pending'&&can('therapist_approve'))app.append(el('button',{class:'primary',onclick:async()=>{try{await api('POST',`/api/runs/${id}/therapist-approve`,{});route();}catch(err){toast(err.message,true);}}},'Sign therapist review'));
   }
-  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && state.user.role === 'physicist'))) {
+  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && activeRole() === 'physicist'))) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
@@ -2808,7 +2830,9 @@ async function renderRun(id) {
   if (unanswered.length) app.append(el('p', {class:'lead'}, `${unanswered.length} of ${run.results.length} tests unanswered. Submitted for review; missing results are not passes.`));
   await renderReviewMeasurements(run);
   const therapistMode=can('therapist_approve')&&!can('review');
-  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting physicist approval.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Not sent to the physicist.':'Therapist review is not yet signed.'):'Review results'),el('span',{class:'spacer'}),el('a',{class:'button primary',href:'#/review'},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':'Back to Review QA')));
+  if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
+
+  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):'Review results'),el('span',{class:'spacer'}),el('a',{class:'button primary',href:'#/review'},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':'Back to Review QA')));
 
 }
 

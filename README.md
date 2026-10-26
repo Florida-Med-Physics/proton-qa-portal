@@ -155,8 +155,10 @@ The TrueBeam SRS starter uses **Maximum delta < 1 mm** as its only measurement v
 
 GitHub Pages and the local static server serve the same `docs/` build. Their browser data and folder permissions remain separate by origin; identical app files do not synchronize accounts or recorded results. Shared multi-user deployment is separate work on the AWS integration branch.
 
-Review QA opens the full numbered results immediately. A signed-in therapist can use **Pass & sign** at the therapist-review test; the system records their identity and then enables the separate physicist stage. Review and Perform share the machine's matching historical measurements and inline graphs. Graph tooltips show the QA date, measurement and difference from its reference.
+Review QA opens the full numbered results immediately. A signed-in therapist can use **Pass / Fail** at the therapist-review test; the system records their identity and then enables the separate physicist stage. Review and Perform share the machine's matching historical measurements and inline graphs. Graph tooltips show the QA date, measurement and difference from its reference.
 
 Use **Trash** for an erroneous run. It is excluded from review, charts and schedule completion, while its original results and audit record are retained. Expand **Trash** on Review QA to restore it. Reviewers may manage any run; performers may manage their own pending submissions.
 
-Therapists can use **Change** beside their signed decision to select Pass, Fail, or Clear until physicist review is finalized. Changing away from Pass removes the signature and takes the run out of the physicist queue. Changes are audited. **Done — back to Review QA** closes the detail; therapist queues separate **Needs your review** from **Sent for physicist review**.
+Therapists use the same dynamic Pass / Fail controls as Perform QA. Clicking a selected Pass withdraws approval; changing therapy approval also clears dependent physics approval. Changing away from Pass removes the signature and takes the run out of the physicist queue. Changes are audited. **Done — back to Review QA** closes the detail; therapist queues separate **Needs your review** from **Awaiting Physics Review**.
+
+Admin can preview each role using the eye-icon View As selector; preview mode cannot save changes. Dashboard review lists follow the selected role. Therapists can trash and restore submissions from any performer; actions are audited.

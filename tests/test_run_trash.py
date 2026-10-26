@@ -13,9 +13,12 @@ class RunTrashTests(unittest.TestCase):
         a=service.save_assignment(db,admin,{'machine_id':m,'queue_id':q,'frequency':'asneeded'})['id']
         r=service.submit_run(db,u['therapist'],a,{'results':[{'test_id':t,'value':.2}]})['id']
         with self.assertRaises(service.PortalError):service.trash_run(db,u['mpa'],r,{})
+        other=service.submit_run(db,admin,a,{'results':[]})['id']
+        service.trash_run(db,u['therapist'],other,{'reason':'Entered in error by another user'})
+        self.assertIsNotNone(service.get_run(db,admin,other)['trashed_at'])
         service.trash_run(db,u['therapist'],r,{'reason':'Synthetic error'})
         self.assertEqual(service.list_runs(db,admin,{}),[])
-        self.assertEqual(service.list_runs(db,admin,{'trashed':'1'})[0]['id'],r)
+        self.assertEqual({x['id'] for x in service.list_runs(db,admin,{'trashed':'1'})},{r,other})
         self.assertEqual(service.machine_trends(db,admin,m),{})
         self.assertEqual(service.dashboard(db,admin)['machines'][0]['pending_review'],0)
         self.assertIsNone(service._last_done(db,a))

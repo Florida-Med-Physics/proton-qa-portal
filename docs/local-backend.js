@@ -974,7 +974,7 @@
     if(!/PBS\s*Daily\s*QA.*Sphinx/i.test(byId('queues',run.queue_id)?.name||''))return null;
     return S.results.filter(r=>{const t=byId('tests',r.test_id);return r.run_id===run.id && (t?.name?.trim().toLowerCase()==='qa reviewed by therapist?' || /Template 4\.06\./.test(t?.description||''));});
   }
-  function reviewReady(run) {if(run.trashed_at)return false;const checks=pbsTherapistResults(run);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
+  function reviewReady(run) {if(run.trashed_at||run.therapist_approval_required&&!run.therapist_approved_by)return false;const checks=pbsTherapistResults(run);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
   function runRow(r) {
     const m = byId("machines", r.machine_id), q = byId("queues", r.queue_id), p = byId("users", r.performed_by) || {}, rv = r.reviewed_by ? byId("users", r.reviewed_by) : null;
     return { ...r, review_ready:reviewReady(r), therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
@@ -995,7 +995,7 @@
   }
   function trashRun(user,id,data) {
     const run=get('runs',id);
-    if(!(can(user,'review') || can(user,'perform')&&run.performed_by===user.id&&run.review_status==='pending'))throw Error('Only a reviewer or the performer of an unreviewed submission can move this QA to trash.');
+    if(!(can(user,'review') || can(user,'therapist_approve') || can(user,'perform')&&run.performed_by===user.id&&run.review_status==='pending'))throw Error('Only a reviewer, therapist, or the performer of an unreviewed submission can move this QA to trash.');
     const trashed=data.trashed!==false,reason=data.reason||'Created in error';
     Object.assign(run,{trashed_at:trashed?now():null,trashed_by:trashed?user.id:null,trash_reason:trashed?reason:null});
     audit(user.id,trashed?'trash_run':'restore_run','run',id,{reason});save();return {ok:true};
@@ -1012,13 +1012,31 @@
     require(user,'therapist_approve');const decision=data.decision;
     if(!['pass','fail','clear'].includes(decision))throw Error('Choose Pass, Fail or Clear.');
     const run=get('runs',id);
-    if(run.trashed_at||run.review_status!=='pending'||!run.therapist_approval_required)throw Error('Therapist review can be changed only before physicist review.');
+    if(run.trashed_at||!run.therapist_approval_required||decision==='clear'&&run.review_status!=='pending')throw Error('Therapist review can be changed only before physicist review.');
     const checks=pbsTherapistResults(run)??S.results.filter(r=>r.run_id===id&&byId('tests',r.test_id)?.name.trim().toLowerCase()==='qa reviewed by therapist?');
     if(!checks.length)throw Error('This QA has no therapist review test to change.');
-    const previous={approved_by:run.therapist_approved_by,approved_at:run.therapist_approved_at,results:checks.map(r=>({test_id:r.test_id,status:r.status,value:r.value_num}))};
+    const previous={approved_by:run.therapist_approved_by,approved_at:run.therapist_approved_at,physics:{review_status:run.review_status,reviewed_by:run.reviewed_by,reviewed_at:run.reviewed_at,review_comment:run.review_comment},results:checks.map(r=>({test_id:r.test_id,status:r.status,value:r.value_num}))};
+    if(decision==='pass'&&run.therapist_approved_by&&checks.every(r=>r.status==='pass'))return {ok:true};
+    if(run.review_status!=='pending')Object.assign(run,{review_status:'pending',reviewed_by:null,reviewed_at:null,review_comment:null});
     checks.forEach(r=>Object.assign(r,{value_num:decision==='pass'?1:decision==='fail'?0:null,value_text:null,status:decision==='clear'?'recorded':decision}));
     Object.assign(run,{therapist_approved_by:decision==='pass'?user.id:null,therapist_approved_at:decision==='pass'?now():null,overall:resultOverall(S.results.filter(r=>r.run_id===id))});
     audit(user.id,'change_therapist_review','run',id,{previous,decision});save();return {ok:true};
+  }
+  function unapproveTherapistReview(user,id) {
+    require(user,'therapist_approve');const run=get('runs',id);
+    if(run.trashed_at||!run.therapist_approved_by)throw Error('This QA has no therapist approval to undo.');
+    const previous={};for(const k of ['therapist_approved_by','therapist_approved_at','review_status','reviewed_by','reviewed_at','review_comment'])previous[k]=run[k];
+    const checks=pbsTherapistResults(run)??S.results.filter(r=>r.run_id===id&&byId('tests',r.test_id)?.name.trim().toLowerCase()==='qa reviewed by therapist?');
+    previous.results=checks.map(r=>({test_id:r.test_id,value:r.value_num,status:r.status}));
+    checks.forEach(r=>Object.assign(r,{value_num:null,value_text:null,status:'recorded'}));
+    Object.assign(run,{therapist_approved_by:null,therapist_approved_at:null,review_status:'pending',reviewed_by:null,reviewed_at:null,review_comment:null,overall:resultOverall(S.results.filter(r=>r.run_id===id))});
+    audit(user.id,'unapprove_therapist_review','run',id,{previous,physics_approval_cleared:previous.review_status==='approved'});save();return {ok:true};
+  }
+  function unapprovePhysicsReview(user,id) {
+    require(user,'review');if(user.role!=='physicist')throw Error('Only a physicist can undo physics approval.');
+    const run=get('runs',id);if(run.trashed_at||run.review_status!=='approved')throw Error('This QA has no physics approval to undo.');
+    const previous={};for(const k of ['review_status','reviewed_by','reviewed_at','review_comment'])previous[k]=run[k];
+    Object.assign(run,{review_status:'pending',reviewed_by:null,reviewed_at:null,review_comment:null});audit(user.id,'unapprove_physics_review','run',id,{previous});save();return {ok:true};
   }
   function reviewRun(user, id, data) {
     require(user, "review");
@@ -1731,6 +1749,8 @@
   route("GET", "/api/runs", (u, m, body, q) => listRuns(q));
   route("GET", "/api/runs/(\\d+)", (u, m) => getRun(Number(m[1])));
   route("POST", "/api/runs/(\\d+)/trash", (u,m,body)=>trashRun(u,Number(m[1]),body));
+  route("POST", "/api/runs/(\\d+)/therapist-unapprove",(u,m)=>unapproveTherapistReview(u,Number(m[1])));
+  route("POST", "/api/runs/(\\d+)/physics-unapprove",(u,m)=>unapprovePhysicsReview(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/therapist-review",(u,m,body)=>setTherapistReview(u,Number(m[1]),body));
   route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
