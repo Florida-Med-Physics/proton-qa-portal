@@ -27,3 +27,13 @@ assert.equal(depths.length, 1);
 assert.equal(depths[0].base, 'Distal Depths');
 assert.equal(depths[0].members.length, 2);
 assert.equal(depths[0].members[0].axis, '100 MeV');
+
+for (const metric of ['Distal Fall Off', 'Proximal Depth', 'Width', 'DFO']) {
+ const grouped = context.trendGroups([100, 200, 225].map((energy, index) => ({test_id: index + 20, name: `Energy [${energy} MeV] – ${metric}`, unit: 'mm', category: 'Energy'})));
+ assert.equal(grouped.length, 1);
+ assert.equal(grouped[0].members.length, 3);
+}
+const positions = context.trendGroups([100,200].flatMap((energy,index) => ['X','Y'].map((axis,n) => ({test_id: index*2+n+30, name: `[${energy} MeV] – Position ${axis}`, unit: 'mm', category: 'Spot'}))));
+assert.equal(positions.length, 1);
+assert.equal(positions[0].members.length, 4);
+assert.equal(positions[0].members[0].axis, '100 MeV · X');

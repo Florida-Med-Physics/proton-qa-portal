@@ -2987,17 +2987,20 @@ function trendDisplayName(name) {
 }
 
 function trendGroups(items) {
-  const distal = items.filter(item => /distal\s+depth/i.test(item.name));
-  const groups = axisGroups(items.filter(item => !distal.includes(item)));
-  const byUnit = new Map();
-  for (const item of distal) {
-    const key = item.unit || '';
-    if (!byUnit.has(key)) byUnit.set(key, []);
-    const energy = /\d+(?:\.\d+)?\s*MeV/i.exec(item.name)?.[0];
-    byUnit.get(key).push({ ...item, axis: energy || item.name });
+  const families = new Map(), plain = [];
+  for (const item of items) {
+    const energy = /(\d+(?:\.\d+)?)\s*MeV/i.exec(item.name);
+    if (!energy) { plain.push(item); continue; }
+    let metric = item.name.replace(/\[\s*\d+(?:\.\d+)?\s*MeV\s*\]|\d+(?:\.\d+)?\s*MeV/ig, '').replace(/^.*?:\s*/, '').replace(/^\s*(?:Energy|Spot)\s*[-–—:]?\s*/i, '').replace(/^\s*[-–—:]\s*/, '').trim();
+    const axis = axisParts(metric);
+    if (axis) metric = axis.base;
+    const labels = { 'dfo': 'Distal Fall Off', 'distal falloff': 'Distal Fall Off', 'distal fall off': 'Distal Fall Off', 'distal depth': 'Distal Depths' };
+    metric = labels[metric.toLowerCase()] || metric;
+    const key = `${item.category || ''}|${metric.toLowerCase()}|${item.unit || ''}`;
+    if (!families.has(key)) families.set(key, { base: metric, category: item.category, members: [] });
+    families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis ? ` · ${axis.axis}` : ''}` });
   }
-  for (const members of byUnit.values()) groups.push({ base: 'Distal Depths', category: 'Energy', members: members.sort((a,b) => a.axis.localeCompare(b.axis, undefined, { numeric: true })) });
-  return groups;
+  return [...axisGroups(plain), ...[...families.values()].map(group => ({ ...group, members: group.members.sort((a,b) => a.axis.localeCompare(b.axis, undefined, { numeric: true })) }))];
 }
 
 async function renderTrendOverview(machines, machineId, range, listId = "") {

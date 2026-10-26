@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Group every measurement repeated across energies on one trend chart, including fall off, proximal depth, width, and shared X/Y series.
+
 - Group all Distal Depth energies together on one machine trend chart, including the linked values/detail view.
 
 - Simplify Machine Trends to one machine, grouped expandable measurements, clickable insights, energy-only spot labels, and shared X/Y graphs.
