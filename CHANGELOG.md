@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Group isocenter coincidence axis measurements into one side-by-side subplot panel.
+
+- Separate spot Position X/Y energy families; exclude >5-SD extreme values from plotting, scaling and least-squares fits using each point’s other-series results (minimum five), with a visible exclusion note and raw values preserved.
+
 - Default charts to Absolute with prediction off; restrict statistics to colored marker, energy, average ± standard deviation, and maximum outlier/date.
 
 - Limit displayed trend measurements, statistics, fits, insights, and axis values to two significant figures; preserve saved/exported precision and exact energy/date labels.

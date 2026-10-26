@@ -1172,3 +1172,6 @@ td, .measure-table td { font-size: 21px; }
 
 .trend-statistics { margin: 6px 0 10px; }
 .trend-statistics-line { font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.energy-plot-grid.plots-2 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+@media(max-width:600px){ .energy-plot-grid.plots-2 { grid-template-columns: minmax(0,1fr); } }

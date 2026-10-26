@@ -2761,6 +2761,25 @@ const trendKey = (show, multi = false, prediction = true) => (show ? [
   el("span", { class: "key-item" }, el("span", { class: `key-swatch fit${multi ? " multi" : ""}` }), multi ? "Trend (Least-Squares Fit, Each Series)" : "Trend (Least-Squares Fit)"),
   el("span", { class: "key-item" }, el("span", { class: `key-swatch fit forecast${multi ? " multi" : ""}` }), `Projected (Next ${FORECAST_DAYS / 7} Weeks)`)].filter((_, i) => prediction || i === 0) : []);
 
+// Compare each value with the other results so a gross error cannot inflate its own SD cutoff.
+function trendPlotPoints(points, delta = false) {
+  const value = p => delta ? asDeviation(p).dev : p.value;
+  const finite = points.filter(p => Number.isFinite(value(p)));
+  if (finite.length < 5) return finite;
+  return finite.filter((point, index) => {
+    const other = finite.filter((_, i) => i !== index).map(value);
+    const mean = other.reduce((sum, v) => sum + v, 0) / other.length;
+    const sd = Math.sqrt(other.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (other.length - 1));
+    return Math.abs(value(point) - mean) <= Math.max(5 * sd, 1e-12);
+  });
+}
+
+function trendExclusionNote(series, delta) {
+  const count = series.reduce((n, item) => n + item.points.length - trendPlotPoints(item.points, delta).length, 0);
+  return count ? el('details', { class: 'small trend-exclusion-note' }, el('summary', {}, `${count} extreme ${count === 1 ? 'value' : 'values'} outside plot/fit`),
+    'Values more than 5 standard deviations from the other results in the same energy/axis are excluded from plotted lines, Y-axis bounds and least-squares fits. At least 5 results are required. Statistics and saved values retain all results; open Values and details to inspect them.') : null;
+}
+
 function trendStatistics(series, unit, delta = false, colorIndex = null) {
   return el('div', { class: 'trend-statistics' }, series.map((item, index) => {
     const values = item.points.map(p => delta ? asDeviation(p).dev : p.value);
@@ -2790,9 +2809,10 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
     // Absolute view of several series (X and Y sit around different references): one subplot per series, stacked,
     // each on its own scale with its own reference line and bands.
     if (multi && !delta) {
-      box.replaceChildren(controls, el('div', { class: 'energy-plot-grid' }, ...series.map((x, k) => el('div', { class: 'subplot' },
+      box.replaceChildren(controls, el('div', { class: `energy-plot-grid plots-${series.length}` }, ...series.map((x, k) => el('div', { class: 'subplot' },
         el('div', { class: 'subplot-title' }, el('span', { class: `key-swatch line axis-${k}`, 'aria-hidden': 'true' }), ' ', x.label),
         drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k }),
+        trendExclusionNote([x], false),
         trendStatistics([x], unit, false, k)
       ))), el('div', { class: 'chart-key energy-shared-key' },
         el('span', { class: 'key-item' }, el('span', { class: 'key-swatch ref' }), 'Reference'),
@@ -2807,7 +2827,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null 
       drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
       drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
       ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
-    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), trendStatistics(series, unit, delta), key);
+    box.replaceChildren(controls, drawSeries(series, unit, { small, delta, yLabel, prediction }), trendExclusionNote(series, delta), trendStatistics(series, unit, delta), key);
   };
   draw();
   return box;
@@ -2830,6 +2850,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   const xt = (t) => L + ((t - t0) * (W - L - R)) / (tEnd - t0);
   const x = (d) => xt(timeOf(d));
   const val = (p) => (delta ? asDeviation(p).dev : p.value);
+  series = series.map(item => ({ ...item, points: trendPlotPoints(item.points, delta) }));
   // Straight-line fit (least squares on days since the first result) per series, projected FORECAST_DAYS ahead.
   const fits = series.map((s) => {
     const n = s.points.length;
@@ -2982,16 +3003,26 @@ function trendDisplayName(name) {
 function trendGroups(items) {
   const families = new Map(), plain = [];
   for (const item of items) {
+    const coincidence = /isocent(?:er|re).*coincidence|coincidence.*isocent(?:er|re)/i.test(item.name);
+    const coincidenceAxis = /\b([XYZ])\s+(?:offset|position|residual)\b|\b(?:offset|position|residual)\s*[-:–]?\s*([XYZ])\b|(?:[-:–]\s*|\s)([XYZ])(?:\s*\[[^\]]*\])?$/i.exec(item.name);
+    if (coincidence && coincidenceAxis) {
+      const axis = (coincidenceAxis[1] || coincidenceAxis[2] || coincidenceAxis[3]).toUpperCase();
+      const key = `isocenter-coincidence|${item.category || ''}|${item.unit || ''}`;
+      if (!families.has(key)) families.set(key, { base: 'Isocenter Coincidence', category: item.category, members: [] });
+      families.get(key).members.push({ ...item, axis });
+      continue;
+    }
     const energy = /(\d+(?:\.\d+)?)\s*MeV/i.exec(item.name);
     if (!energy) { plain.push(item); continue; }
     let metric = item.name.replace(/\[\s*\d+(?:\.\d+)?\s*MeV\s*\]|\d+(?:\.\d+)?\s*MeV/ig, '').replace(/^.*?:\s*/, '').replace(/^\s*(?:Energy|Spot)\s*[-–—:]?\s*/i, '').replace(/^\s*[-–—:]\s*/, '').trim();
     const axis = axisParts(metric);
-    if (axis) metric = axis.base;
+    const splitPosition = axis && /position/i.test(axis.base);
+    if (axis) metric = `${axis.base}${splitPosition ? ` ${axis.axis}` : ''}`;
     const labels = { 'dfo': 'Distal Fall Off', 'distal falloff': 'Distal Fall Off', 'distal fall off': 'Distal Fall Off', 'distal depth': 'Distal Depths' };
     metric = labels[metric.toLowerCase()] || metric;
     const key = `${item.category || ''}|${metric.toLowerCase()}|${item.unit || ''}`;
     if (!families.has(key)) families.set(key, { base: metric, category: item.category, members: [] });
-    families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis ? ` · ${axis.axis}` : ''}` });
+    families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis && !splitPosition ? ` · ${axis.axis}` : ''}` });
   }
   const order = new Map(items.map((item, index) => [item.test_id, index]));
   return [...axisGroups(plain), ...families.values()].sort((a,b) => Math.min(...a.members.map(m => order.get(m.test_id))) - Math.min(...b.members.map(m => order.get(m.test_id))));

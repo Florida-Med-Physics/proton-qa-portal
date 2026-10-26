@@ -34,9 +34,11 @@ for (const metric of ['Distal Fall Off', 'Proximal Depth', 'Width', 'DFO']) {
  assert.equal(grouped[0].members.length, 3);
 }
 const positions = context.trendGroups([100,200].flatMap((energy,index) => ['X','Y'].map((axis,n) => ({test_id: index*2+n+30, name: `[${energy} MeV] – Position ${axis}`, unit: 'mm', category: 'Spot'}))));
-assert.equal(positions.length, 1);
-assert.equal(positions[0].members.length, 4);
-assert.equal(positions[0].members[0].axis, '100 MeV · X');
+assert.equal(positions.length, 2);
+assert.equal(positions[0].members.length, 2);
+assert.equal(positions[0].base, 'Position X');
+assert.equal(positions[1].base, 'Position Y');
+assert.equal(positions[0].members[0].axis, '100 MeV');
 
 const csvOrder = context.trendGroups([
  {test_id: 80, name: 'Energy [225 MeV] – Width', category: 'Energy', unit: 'mm'},
@@ -46,3 +48,19 @@ const csvOrder = context.trendGroups([
 assert.equal(csvOrder[0].base, 'Width');
 assert.equal(csvOrder[0].members[0].axis, '225 MeV');
 assert.equal(csvOrder[0].members[1].axis, '100 MeV');
+
+vm.runInContext(source.slice(source.indexOf('function trendPlotPoints('), source.indexOf('function trendExclusionNote(')), context);
+const ordinary = Array.from({length:15}, (_,i) => ({value: (i%3-1)*0.2}));
+const gross = {value: -30000};
+const retained = context.trendPlotPoints([...ordinary, gross]);
+assert.equal(retained.length, 15);
+assert(!retained.includes(gross));
+assert.equal(context.trendPlotPoints(ordinary).length, 15);
+assert.equal(context.trendPlotPoints([{value:0},{value:0},{value:-30000}]).length, 3);
+assert.equal(context.trendPlotPoints([{value:1},{value:1},{value:1},{value:1},{value:99}]).length, 4);
+
+const iso = context.trendGroups(['X','Y'].map((axis,index) => ({test_id: 100+index, name: `Isocenter Coincidence [X-ray vs. Proton Beam]: ${axis} offset [mm]`, unit: 'mm', category: 'Coincidence'})));
+assert.equal(iso.length, 1);
+assert.equal(iso[0].members.length, 2);
+assert.equal(iso[0].members[0].axis, 'X');
+assert.equal(iso[0].members[1].axis, 'Y');
