@@ -866,7 +866,7 @@ def dashboard(db, user, today=None):
             a['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.assignment_id=? GROUP BY res.status',(a['id'],))}
         machine["queues"] = queues
         machine['history_counts']={r['status']:r['n'] for r in db.all('SELECT res.status,COUNT(*) AS n FROM results res JOIN runs r ON r.id=res.run_id WHERE r.machine_id=? GROUP BY res.status',(machine['id'],))}
-        machine["pending_review"] = db.one("SELECT COUNT(*) AS n FROM runs WHERE machine_id = ? AND review_status = 'pending'", (machine["id"],))["n"]
+        machine["pending_review"] = sum(_review_ready(db,r) for r in db.all("SELECT * FROM runs WHERE machine_id=? AND review_status='pending'",(machine["id"],)))
         machines.append(machine)
     return {"today": today.isoformat(), "machines": machines}
 
@@ -1149,6 +1149,18 @@ _RUN_SELECT = ("SELECT r.*, m.name AS machine_name, q.name AS queue_name, pu.ful
                "JOIN queues q ON q.id = r.queue_id JOIN users pu ON pu.id = r.performed_by LEFT JOIN users ru ON ru.id = r.reviewed_by ")
 
 
+def _pbs_therapist_results(db, run):
+    queue=db.one('SELECT name FROM queues WHERE id=?',(run['queue_id'],))
+    if not queue or not re.search(r'PBS\s*Daily\s*QA.*Sphinx',queue['name'],re.I):
+        return None
+    return db.all("SELECT res.* FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=? AND (lower(trim(t.name))='qa reviewed by therapist?' OR t.description LIKE '%Template 4.06.%')",(run['id'],))
+
+
+def _review_ready(db, run):
+    checks=_pbs_therapist_results(db,run)
+    return checks is None or bool(checks) and all(r['status']=='pass' for r in checks)
+
+
 def list_runs(db, user, filters):
     clauses, params = [], []
     for key in ("machine_id", "queue_id"):
@@ -1160,13 +1172,17 @@ def list_runs(db, user, filters):
         params.append(filters["review_status"])
     where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     limit = min(int(filters.get("limit") or 200), 1000)
-    return db.all(_RUN_SELECT + where + f" ORDER BY r.qa_date DESC, r.id DESC LIMIT {limit}", params)
+    runs=db.all(_RUN_SELECT + where + " ORDER BY r.qa_date DESC, r.id DESC", params)
+    for run in runs: run['review_ready']=_review_ready(db,run)
+    if filters.get('review_status')=='pending':runs=[r for r in runs if r['review_ready']]
+    return runs[:limit]
 
 
 def get_run(db, user, run_id):
     run = db.one(_RUN_SELECT + "WHERE r.id = ?", (run_id,))
     if not run:
         raise PortalError("Run not found.", 404)
+    run['review_ready']=_review_ready(db,run)
     signer = db.one('SELECT username, full_name FROM users WHERE id=?', (run['therapist_approved_by'],)) if run['therapist_approved_by'] else None
     run['therapist_approver_name'] = (signer['full_name'] or signer['username']) if signer else None
     run["results"] = db.all("SELECT res.*, t.name, t.category, t.type, t.unit, t.description FROM results res JOIN tests t ON t.id = res.test_id "
@@ -1183,6 +1199,11 @@ def therapist_approve_run(db, user, run_id):
         if run['therapist_approved_by']:
             raise PortalError('Therapist approval is already recorded.')
         db.run('UPDATE runs SET therapist_approved_by=?, therapist_approved_at=? WHERE id=?', (user['id'],now(),run_id))
+        checks=_pbs_therapist_results(db,run)
+        if checks:
+            for row in checks:db.run("UPDATE results SET value_num=1,value_text=NULL,status='pass' WHERE id=?",(row['id'],))
+            statuses=[r['status'] for r in db.all('SELECT status FROM results WHERE run_id=?',(run_id,))]
+            db.run('UPDATE runs SET overall=? WHERE id=?',(qa.overall(statuses),run_id))
         db.audit(user['id'],'therapist_approved','run',run_id)
     return {'ok': True}
 
@@ -1191,6 +1212,8 @@ def review_run(db, user, run_id, data):
     with db.transaction():
         require(user, "review")
         run = _get(db, "runs", run_id)
+        if not _review_ready(db,run):
+            raise PortalError("PBS Daily QA Sphinx needs test 4.06 marked Pass before physicist review.")
         if run['therapist_approval_required']:
             if not run['therapist_approved_by']:
                 raise PortalError('Therapist approval is required before medical physicist review.')

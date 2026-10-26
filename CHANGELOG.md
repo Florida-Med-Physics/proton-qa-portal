@@ -267,3 +267,5 @@ Development from 2026-10-21 to 2026-10-22. Everything is on `main` and pushed.
 - Recursive folder imports without a second file picker; Perform autofills only reports matching the selected QA date and keeps existing entries.
 - DoseLab Winston-Lutz PDF import: filename identifies TrueBeam; only Maximum delta < 1 mm passes (1 mm fails); total delta values are informational.
 - Template seed updates preserve local customization and historical results.
+
+- PBS Daily QA Sphinx enters the physicist review queue only after test 4.06 is Pass. Blank/failed checks remain saved; therapist sign-off records the passing check and preserves the separate physicist approval.

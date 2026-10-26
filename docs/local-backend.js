@@ -918,7 +918,7 @@
         return { ...a, history_counts, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status, qa_date: runs[0].qa_date } : null };
       });
       const history_counts={};for(const q of queues)for(const [key,count]of Object.entries(q.history_counts))history_counts[key]=(history_counts[key]||0)+count;
-      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => r.machine_id === m.id && r.review_status === "pending").length };
+      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => r.machine_id === m.id && r.review_status === "pending" && reviewReady(r)).length };
     });
     return { today: localIso(today), machines };
   }
@@ -970,16 +970,21 @@
     checkNotImported(ref);
     return insertRun(user, t, qaDate, rows, text(data, "comment"), ref ? "sphinx" : "manual", ref, "pending");
   }
+  function pbsTherapistResults(run) {
+    if(!/PBS\s*Daily\s*QA.*Sphinx/i.test(byId('queues',run.queue_id)?.name||''))return null;
+    return S.results.filter(r=>{const t=byId('tests',r.test_id);return r.run_id===run.id && (t?.name?.trim().toLowerCase()==='qa reviewed by therapist?' || /Template 4\.06\./.test(t?.description||''));});
+  }
+  function reviewReady(run) {const checks=pbsTherapistResults(run);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
   function runRow(r) {
     const m = byId("machines", r.machine_id), q = byId("queues", r.queue_id), p = byId("users", r.performed_by) || {}, rv = r.reviewed_by ? byId("users", r.reviewed_by) : null;
-    return { ...r, therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
+    return { ...r, review_ready:reviewReady(r), therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
       reviewer_name: rv ? rv.full_name : null, reviewer: rv ? rv.username : null };
   }
   function listRuns(q) {
     let runs = S.runs;
     if (q.machine_id) runs = runs.filter((r) => r.machine_id === Number(q.machine_id));
     if (q.queue_id) runs = runs.filter((r) => r.queue_id === Number(q.queue_id));
-    if (q.review_status) runs = runs.filter((r) => r.review_status === q.review_status);
+    if (q.review_status) runs = runs.filter((r) => r.review_status === q.review_status && (q.review_status!=="pending" || reviewReady(r)));
     const limit = Math.min(Number(q.limit || 200), 1000);
     return runs.slice().sort((a, b) => b.qa_date.localeCompare(a.qa_date) || b.id - a.id).slice(0, limit).map(runRow);
   }
@@ -993,11 +998,13 @@
     const run=get('runs',id,'Run');
     if(run.review_status!=='pending'||!run.therapist_approval_required||run.therapist_approved_by) throw new Error('This run is not waiting for therapist approval.');
     Object.assign(run,{therapist_approved_by:user.id,therapist_approved_at:now()});
+    const checks=pbsTherapistResults(run);if(checks?.length){checks.forEach(row=>Object.assign(row,{value_num:1,value_text:null,status:'pass'}));run.overall=resultOverall(S.results.filter(r=>r.run_id===run.id));}
     audit(user.id,'therapist_approved','run',id);save();return {ok:true};
   }
   function reviewRun(user, id, data) {
     require(user, "review");
     const r = get("runs", id);
+    if(!reviewReady(r)) throw Error("PBS Daily QA Sphinx needs test 4.06 marked Pass before physicist review.");
     if(r.therapist_approval_required) {
       if(!r.therapist_approved_by) throw new Error('Therapist approval is required before medical physicist review.');
       if(user.role!=='physicist') throw new Error('This run requires review by a medical physicist.');

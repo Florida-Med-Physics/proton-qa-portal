@@ -2559,7 +2559,9 @@ async function renderReview() {
       ? el("a", { class: "button primary small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Review")
       : el("a", { class: "button small", href: `#/runs/${r.id}`, onclick: (e) => e.stopPropagation() }, "Open")));
   const cols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "9%"], ["Review", "13%"], ["", "10%"]];
-  const pending = runs.filter((r) => r.review_status === "pending");
+  const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
+  const waitingTherapist = runs.filter(r=>r.review_status==='pending' && r.review_ready===false);
+  if (can('therapist_approve') && waitingTherapist.length) app.append(el('h2',{class:'section-head'},'Awaiting therapist review'),fixedTable(cols,waitingTherapist.map(row),'No submissions waiting.'));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
   app.append(el("h2", { class: "section-head modality-head" }, "Awaiting review", el("span", { class: "modality-count" }, String(pending.length))),
     fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
@@ -2702,7 +2704,7 @@ async function renderRun(id) {
       } }, 'Sign therapist approval') : null,
       el('h3', {}, '2. Medical physicist review'), el('p', {}, run.therapist_approved_by ? 'Ready for medical physicist review.' : 'Available after therapist approval.')));
   }
-  if (run.review_status === "pending" && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && state.user.role === 'physicist'))) {
+  if (run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && state.user.role === 'physicist'))) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
