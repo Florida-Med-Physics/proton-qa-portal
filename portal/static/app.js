@@ -425,7 +425,7 @@ function renderLogin() {
   const error = el("p", { class: "error" });
   const form = el("form", {},
     el("img", { class: "brand-logo", src: "uf-proton-logo.png", alt: "UF Health Proton Therapy Institute" }),
-    el("h1", { class: "login-title" }, el("img", { class: "login-mark", src: "gatorqa-logo.svg", alt: "" }), "Proton QA Portal"),
+    el("h1", { class: "login-title" }, el("img", { class: "login-mark", src: "gatorqa-logo.svg", alt: "" }), "GatorQA"),
     el("p", { class: "muted login-sub" }, "UFHPTI Machine QA"),
     window.localApi
       ? [el("p", { class: "muted" }, "Everything you record stays in this browser on this computer."),
@@ -2524,7 +2524,7 @@ function qaReportPdf(run) {
   const escape = (s) => clean(s).replace(/([\\()])/g, '\\$1');
   pages.forEach((page, index) => {
     const pageId = objects.length, streamId = pageId + 1; pageIds.push(pageId);
-    const stream = `BT /F1 15 Tf 48 750 Td (${escape('Proton QA Portal - QA Completion Report')}) Tj ET\n` +
+    const stream = `BT /F1 15 Tf 48 750 Td (${escape('GatorQA - QA Completion Report')}) Tj ET\n` +
       page.map((line, row) => `BT /F1 10 Tf 48 ${720 - row * 14} Td (${escape(line)}) Tj ET`).join('\n') +
       `\nBT /F1 8 Tf 48 40 Td (Run ${escape(run.id)} | Page ${index + 1} of ${pages.length} | Review status: ${escape(run.review_status || 'pending')}) Tj ET`;
     objects.push(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${streamId} 0 R >>`);

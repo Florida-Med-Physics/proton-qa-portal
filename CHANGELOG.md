@@ -8,7 +8,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 Entries marked **[Physics review]** change QA tests, tolerances, templates, or how results are judged, so a qualified medical physicist should review them before relying on the change. This software is not validated for clinical use.
 
 ## [Unreleased]
-- Renamed the portal from GatorQA to Proton QA Portal (header, browser tab, sign-in card, PDF report title, design note).
 
 - Home dashboard: responsive 2×2 Proton/Photon/Brachy/Simulation cards, including active daily/monthly/on-demand lists with individual due/start controls.
 - Remove Linac 1 from active defaults; expose machine deletion for unused machines and retirement for machines with history.

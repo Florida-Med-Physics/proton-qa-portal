@@ -557,7 +557,7 @@ tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, t
 .measure-table tbody td, .table-wrap:not(.fixed-wrap) tbody td { padding-left: 20px; }
 .fixed-table th { white-space: normal; line-height: 1.2; }   /* headers may wrap now that they are larger */
 
-/* Portal mark: the UF Proton dot grid in white on the navy bar, centre spot orange. */
+/* GatorQA mark: the UF Proton dot grid in white on the navy bar, centre spot orange. */
 .brand-title { display: inline-flex; align-items: baseline; gap: 8px; }
 .brand-mark { width: 26px; height: 26px; align-self: center; color: #fff; flex: none; }
 .brand-name { font-family: "Segoe UI", system-ui, sans-serif; font-weight: 700; font-size: 22px; letter-spacing: 0.01em; }
@@ -1144,8 +1144,3 @@ td, .measure-table td { font-size: 21px; }
   .home-qa-label { font-size: 21px; }
   #nav a { font-size: 16px; }
 }
-
-/* "Proton QA Portal" stays on one line: on the sign-in card and in the header bar. */
-.login-title { white-space: nowrap; font-size: clamp(22px, 6vw, 30px); }
-.brand-title .brand-name { white-space: nowrap; }
-@media (max-width: 760px) { .brand-title .brand-name { font-size: 19px; } }
