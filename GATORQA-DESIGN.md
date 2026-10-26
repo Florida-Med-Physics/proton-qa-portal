@@ -1,8 +1,8 @@
-# GatorQA on floridaphysics.com — design note
+# Proton QA Portal on floridaphysics.com — design note
 
 *Draft for discussion, 22 October 2026. Nothing here is built yet.*
 
-GatorQA is the machine QA portal prototyped in
+Proton QA Portal is the machine QA portal prototyped in
 [Florida-Med-Physics/proton-qa-portal](https://github.com/Florida-Med-Physics/proton-qa-portal):
 QA list templates instantiated per machine, scheduled daily lists, Sphinx export
 auto-fill, review and sign-off, history and trends. This note is the plan for
@@ -14,12 +14,12 @@ commissioned for clinical use.
 
 ## What stays exactly as it is
 
-The Monthly QA page established the shape of the site, and GatorQA adopts it
+The Monthly QA page established the shape of the site, and Proton QA Portal adopts it
 rather than bringing its own:
 
 - **One platform.** Plain HTML/CSS/JS in `web/`, Cognito sign-in, the one
   Lambda in `api/users/index.mjs`, the one DynamoDB table. No framework, no
-  build step, no second stack. GatorQA's Python server and SQLite file are not
+  build step, no second stack. Proton QA Portal's Python server and SQLite file are not
   deployed here.
 - **Templates are data in the table, never files in `web/`.** A QA protocol
   with its tolerances is internal; it travels through the API behind the
@@ -28,7 +28,7 @@ rather than bringing its own:
   keeps producing the monthly template from `GTR5_Monthly_QA_Worksheet.xlsx`.
   Daily templates come from their own sources (the myQA TG-224 export and the
   RadMachine lists), through importers that emit the same schema.
-- **Vocabulary.** PASS / WARNING / ACTION everywhere. GatorQA's current
+- **Vocabulary.** PASS / WARNING / ACTION everywhere. Proton QA Portal's current
   "Warn ±" / "Fail ±" labels are renamed to "Warning ±" / "Action ±" when it
   moves onto the site.
 - **Deploy rules in `CLAUDE.md`.** `AWS_PROFILE=fp`, only `web/` is published,
@@ -49,15 +49,15 @@ The monthly template's item shape is extended, not replaced:
   tgLimit, row }                          // as today
 ```
 
-`kind` keeps its meanings. GatorQA's cases map onto them directly:
+`kind` keeps its meanings. Proton QA Portal's cases map onto them directly:
 `functional` is a Pass / Fail / N/A check, `absolute` and `percent` are numeric
 limits, `radial` is an X / Y / Z offset with its 3D magnitude, `dose` and
-`derived` are the computed items (`[calc: …]` in GatorQA today). The kTP and
+`derived` are the computed items (`[calc: …]` in Proton QA Portal today). The kTP and
 √(dx²+dy²+dz²) formulas are already identical in both codebases.
 
 A template is stored once per machine and frequency:
 `pk QATEMPLATE / sk GTR1#daily`, `pk QATEMPLATE / sk GTR5#monthly`.
-"Instantiate on a Machine" from GatorQA becomes: copy the base template item to
+"Instantiate on a Machine" from Proton QA Portal becomes: copy the base template item to
 the machine's key and let Setup QA edit that copy. The `QAMACHINES` index row
 lists both frequencies.
 
@@ -87,7 +87,7 @@ date range against the current template, writes the new values back, and logs
 in the audit trail what changed and why. A corrected tolerance or formula still
 fixes the history — deliberately, visibly and signed, not silently on page load.
 
-`web/js/qa-eval.js` remains the single evaluation module; GatorQA's numeric,
+`web/js/qa-eval.js` remains the single evaluation module; Proton QA Portal's numeric,
 Yes/No and calculation rules are added to it, and `test/qa-eval.test.mjs` grows
 with them. The same module runs at entry time in the browser and at
 re-evaluation time.
@@ -106,13 +106,13 @@ Sphinx daily exports are `.xls` files on the G: drive. Two things happen:
 
 - **Upload in the browser.** A Perform QA page accepts the file and parses it
   client-side (SheetJS as a single file under `web/js`, no build step). Values
-  are matched to template items by what they measure (GatorQA's canonical key),
+  are matched to template items by what they measure (Proton QA Portal's canonical key),
   filled in read-only, evaluated, and saved with the entry.
 - **An on-site agent** on a UFHPTI host PC (a Python script run as a scheduled
   task) does what nothing in AWS can: it watches the Sphinx folders on G: and
   posts new exports to the API, and it pulls a nightly export of the table into
   a local SQLite/JSON copy. That local copy is the department's own database on
-  its own machine; GatorQA's existing Python server can run from it as an
+  its own machine; Proton QA Portal's existing Python server can run from it as an
   offline viewer if the site is unreachable. DynamoDB (with point-in-time
   recovery) is the source of truth.
 
@@ -121,8 +121,8 @@ Sphinx daily exports are `.xls` files on the G: drive. Two things happen:
 "QA" becomes a section of the site: **Daily** (Perform QA), **Monthly** (the
 existing form, rendered from the shared schema), **Trends**, **Setup**
 (templates, machines, instantiation, re-evaluate), **Review** (sign-off).
-Cognito groups carry the roles GatorQA has today: admin, physicist, therapist.
-Site styling stays; GatorQA's dot-grid mark and status colours become the QA
+Cognito groups carry the roles Proton QA Portal has today: admin, physicist, therapist.
+Site styling stays; Proton QA Portal's dot-grid mark and status colours become the QA
 section's accent.
 
 ## Phasing
@@ -135,7 +135,7 @@ Each step leaves the site working.
    One-time import of the GTR1 and GTR5 history from the local SQLite file.
 3. Trends and Setup pages; Cognito groups for roles; Re-evaluate.
 4. On-site agent: folder watcher and nightly local export.
-5. GatorQA's Python server becomes the offline viewer of that export; the
+5. Proton QA Portal's Python server becomes the offline viewer of that export; the
    public GitHub Pages demo is retired or kept as a sandbox with synthetic data.
 
 ## Open questions

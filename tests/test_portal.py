@@ -343,7 +343,7 @@ class HttpTests(unittest.TestCase):
     def test_static_files(self):
         response, raw = self.request("GET", "/")
         self.assertEqual(response.status, 200)
-        self.assertIn(b"GatorQA", raw)
+        self.assertIn(b"Proton QA Portal", raw)
         self.assertIn("default-src 'self'", response.getheader("Content-Security-Policy"))
         self.assertEqual(self.request("GET", "/../portal/db.py")[0].status, 404)
         self.assertEqual(self.request("GET", "/app.js")[0].status, 200)
