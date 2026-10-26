@@ -365,13 +365,12 @@ async function renderHome() {
   const data = await api('GET', '/api/dashboard');
   page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
   const runs=await api('GET','/api/runs?limit=400');
-  const therapy=activeRole()==='therapist';
-  const reviews=runs.filter(r=>r.review_status==='pending'&&(therapy?r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false):can('review')&&r.review_ready!==false));
   const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
   app.append(el('div',{class:'row home-brief'},el('a',{href:'#/perform-qa',class:'small'},`${due} QA ${due===1?'list':'lists'} to do`)));
-  if(therapy||can('review')) {
-    app.append(el('section',{class:'card dashboard-review'},el('h2',{},therapy?'Awaiting Therapy Review':'Awaiting Physics Review'),
-      reviews.length?el('div',{},...reviews.map(r=>el('div',{class:'row'},el('a',{href:`#/runs/${r.id}`},`${r.machine_name} · ${r.queue_name}`),el('span',{class:'muted small'},shortDate(r.qa_date)),el('span',{class:'spacer'}),el('a',{class:'button small',href:`#/runs/${r.id}`},'Review')))):el('p',{class:'muted'},'You are caught up. No QA is waiting for your review.')));
+  for(const therapy of [true,false]) {
+    const reviews=runs.filter(r=>r.review_status==='pending'&&(therapy?r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false):r.review_ready!==false));
+    app.append(el('section',{class:'card dashboard-review'},el('h2',{},`${therapy?'Awaiting Therapy Review':'Awaiting Physics Review'} (${reviews.length})`),
+      reviews.length?el('div',{},...reviews.map(r=>el('div',{class:'row'},el('a',{href:`#/runs/${r.id}`},`${r.machine_name} · ${r.queue_name}`),el('span',{class:'muted small'},shortDate(r.qa_date)),el('span',{class:'spacer'}),el('a',{class:'button small',href:`#/runs/${r.id}`},'Open')))):el('p',{class:'muted'},'No QA is waiting for this review.')));
   }
   const grid=el('div',{class:'home-modality-grid'});
   for(const modality of MODALITIES){
@@ -2593,14 +2592,12 @@ async function renderReview() {
   const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
   const therapyMode=can('therapist_approve')&&!can('review');
   const waitingTherapist=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false));
-  if(therapyMode)app.append(el('h2',{class:'section-head'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
+  app.append(el('h2',{class:'section-head'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
   const trashed=await api('GET','/api/runs?trashed=1&limit=200');
   if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
-  if(!therapyMode)app.append(el("h2", { class: "section-head modality-head" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
+  app.append(el("h2", { class: "section-head modality-head" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
     fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
-  const sent=runs.filter(r=>r.review_status==='pending'&&r.therapist_approved_by&&r.review_ready!==false).slice(0,25);
-  if(therapyMode&&sent.length)app.append(el('details',{class:'card therapist-sent'},el('summary',{},`Awaiting Physics Review (${sent.length})`),el('p',{class:'muted small'},'Open a submission to view or change your therapy review.'),fixedTable(cols,sent.map(row),'No submissions.')));
   app.append(el("h2", { class: "section-head" }, "Recently reviewed"),
     fixedTable(cols, decided.map(row), "No reviews yet."));
 }
