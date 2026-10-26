@@ -1375,3 +1375,11 @@ td, .measure-table td { font-size: 21px; }
 .dashboard-review-grid .dashboard-review .row { flex-wrap:wrap; padding:8px 0; }
 .dashboard-review-grid .dashboard-review .row > a:first-child { overflow-wrap:anywhere; flex:1 1 220px; }
 @media(max-width:760px) { .dashboard-review-grid { grid-template-columns:1fr; gap:0; } }
+
+.dashboard-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; margin-bottom:20px; }
+.dashboard-count { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; text-decoration:none; color:var(--text); padding:22px; margin:0; }
+.dashboard-count-number { font-size:52px; line-height:1.1; color:var(--accent); }
+.dashboard-count:hover { outline:2px solid var(--accent); }
+.dashboard-count:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+#therapy-review-queue, #physics-review-queue { scroll-margin-top:100px; }
+@media(max-width:760px) { .dashboard-counts { gap:8px; } .dashboard-count { padding:14px 6px; font-size:14px; } .dashboard-count-number { font-size:36px; } }

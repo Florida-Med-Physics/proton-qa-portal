@@ -366,7 +366,14 @@ async function renderHome() {
   page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
   const runs=await api('GET','/api/runs?limit=400');
   const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
-  app.append(el('div',{class:'row home-brief'},el('a',{href:'#/perform-qa',class:'small'},`${due} QA ${due===1?'list':'lists'} to do`)));
+  const pendingTherapy=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false)).length;
+  const pendingPhysics=runs.filter(r=>r.review_status==='pending'&&r.review_ready!==false).length;
+  app.append(el('div',{class:'dashboard-counts'},...[
+    ['Machine QA Due',due,'#/perform-qa'],
+    ['QA Awaiting Therapy Review',pendingTherapy,'#/review?stage=therapy'],
+    ['QA Awaiting Physics Review',pendingPhysics,'#/review?stage=physics']
+  ].map(([label,count,href])=>el('a',{href,class:'card dashboard-count','aria-label':`${label}: ${count}`},el('strong',{class:'dashboard-count-number'},String(count)),el('span',{},label)))));
+
   const reviewGrid=el('div',{class:'dashboard-review-grid'});
   for(const therapy of [true,false]) {
     const reviews=runs.filter(r=>r.review_status==='pending'&&(therapy?r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false):r.review_ready!==false));
@@ -2593,14 +2600,16 @@ async function renderReview() {
   const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
   const therapyMode=can('therapist_approve')&&!can('review');
   const waitingTherapist=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false));
-  app.append(el('h2',{class:'section-head'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
+  app.append(el('h2',{class:'section-head',id:'therapy-review-queue'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
   const trashed=await api('GET','/api/runs?trashed=1&limit=200');
   if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
-  app.append(el("h2", { class: "section-head modality-head" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
+  app.append(el("h2", { class: "section-head modality-head", id: "physics-review-queue" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
     fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
   app.append(el("h2", { class: "section-head" }, "Recently reviewed"),
     fixedTable(cols, decided.map(row), "No reviews yet."));
+  const stage=queryParams().get('stage');
+  if(stage==='therapy'||stage==='physics') requestAnimationFrame(()=>document.getElementById(`${stage}-review-queue`)?.scrollIntoView({block:'start'}));
 }
 
 async function renderRuns() {
