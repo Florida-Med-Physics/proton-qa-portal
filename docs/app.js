@@ -1015,7 +1015,8 @@ function importFolderField(a) {
     try {
       const name = await window.localFolders.choose(a.id);
       label.textContent = `Folder: ${name}`;
-      toast("Folder remembered for this list");
+      window.dispatchEvent(new CustomEvent("import-folder-changed", { detail: a.id }));
+      toast("Folder remembered. Scanning new files…");
     } catch (err) {
       if (err.name !== "AbortError") toast(err.message, true);
     }
@@ -1691,7 +1692,7 @@ async function renderPerform(assignmentId) {
           }
         } }, "Add them") : "Ask a physicist to add them.") : null));
   };
-  const sphinxFile = el("input", { type: "file", accept: ".xls", "aria-label": "Sphinx export file" });
+  const sphinxFile = el("input", { type: "file", accept: ".xls,.csv", "aria-label": "Sphinx export file" });
   sphinxFile.addEventListener("change", async () => {
     if (!sphinxFile.files[0]) return;
     await useUpload(await readFileBase64(sphinxFile.files[0]));
@@ -1801,7 +1802,7 @@ async function renderPerform(assignmentId) {
 }
 
 function importSphinxDialog(a) {
-  const files = el("input", { type: "file", accept: ".xls", multiple: true });
+  const files = el("input", { type: "file", accept: ".xls,.csv", multiple: true });
   const progress = el("p", { class: "muted small" });
   modal(`Import Sphinx files: ${a.queue_name}`, el("div", {},
     el("p", { class: "muted" }, "Each file becomes a run with the values, limits and Sphinx verdicts recorded in that file. Files already imported are skipped, and tests not yet in the queue are added."),
@@ -3364,7 +3365,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
     const a = selected();
     if (!a) return toast('Schedule a QA list on this machine first.', true);
     const content = el('div'), message = el('p', { class: 'muted small' });
-    const checks = [], filePicker = el('input', { type: 'file', accept: '.xls', multiple: true, 'aria-label': 'Sphinx files to import' });
+    const checks = [], filePicker = el('input', { type: 'file', accept: '.xls,.csv', multiple: true, 'aria-label': 'Sphinx files to import' });
     let chosenFiles = [], currentId = String(a.id);
     filePicker.addEventListener('change', () => { chosenFiles = [...filePicker.files]; checks.forEach((c) => { c.checked = false; }); message.textContent = `${chosenFiles.length} selected files`; });
     const load = async () => {
@@ -3606,24 +3607,44 @@ async function renderAdmin() {
   // is read automatically when someone starts that list's QA (no file dialog).
   app.append(el("h2", { class: "section-head" }, "Import folders (auto-read)"),
     el("p", { class: "muted" }, window.localApi
-      ? "Choose the folder each list's export files (Sphinx .xls) are saved to. When QA is started, the newest file not yet recorded is read in automatically. Folders are remembered in this browser on this computer (Chrome or Edge)."
-      : "The folder (on this PC or a network share it can read) each list's export files (Sphinx .xls) are saved to. When QA is started, the newest file not yet recorded is read in automatically."));
+      ? "Choose the folder each list's Sphinx exports (.xls or .csv) are saved to. All new files are scanned and imported when you open this page or choose a folder, then every minute while this page is open. Imported results await review. Folders are remembered in this browser on this computer (Chrome or Edge)."
+      : "The folder (on this PC or a network share it can read) each list's Sphinx exports (.xls or .csv) are saved to. All new files are scanned and imported when you open this page or choose a folder, then every minute while this page is open. Imported results await review."));
   const rows = [];
   for (const m of machines.filter((x) => x.active)) {
     for (const a of await api("GET", `/api/machines/${m.id}/assignments`)) {
       const status = el("span", { class: "muted small" }, a.import_folder ? "Checking…" : "No folder");
+      let scanning = false;
+      const rejected = new Map();
       const check = async () => {
-        if (!a.import_folder && !window.localApi) { status.textContent = "No folder"; return; }
+        if (scanning) return;
+        scanning = true;
+        if (!a.import_folder && !window.localApi) { status.textContent = "No folder"; scanning = false; return; }
         try {
           const r = await api("GET", `/api/assignments/${a.id}/files`);
           if (r.permission === "none" && window.localApi) { status.textContent = "No folder chosen on this computer"; return; }
           if (r.permission && r.permission !== "granted" && r.permission !== "none") { status.textContent = "Needs permission again (open the list's Perform page)"; return; }
-          const waiting = r.files.filter((f) => !f.run_id).length;
-          status.replaceChildren(chip(waiting ? "due" : "pass", `${r.files.length} files · ${waiting} not yet recorded`));
+          const waiting = r.files.filter((f) => !f.run_id && !rejected.has(`${f.path}|${f.modified}|${f.size}`));
+          let imported = 0;
+          for (const file of waiting) {
+            status.textContent = `Scanning ${file.name}… (${++imported}/${waiting.length})`;
+            try {
+              const upload = await api("GET", `/api/assignments/${a.id}/file?path=${encodeURIComponent(file.path)}`);
+              const result = await api("POST", `/api/assignments/${a.id}/sphinx/import`, { files: [upload], historical: false });
+              for (const skip of result.skipped) rejected.set(`${file.path}|${file.modified}|${file.size}`, `${file.name}: ${skip.reason}`);
+            } catch (err) { rejected.set(`${file.path}|${file.modified}|${file.size}`, `${file.name}: ${err.message}`); }
+          }
+          status.replaceChildren(chip(rejected.size ? "due" : "pass", `${r.files.length} files scanned${rejected.size ? ` · ${rejected.size} need attention` : " · Up to date"}`));
+          if (rejected.size) status.append(el("details", {}, el("summary", {}, "File details"), ...[...rejected.values()].map((reason) => el("div", { class: "small" }, reason))));
         } catch (err) {
           status.replaceChildren(el("span", { class: "error small" }, err.message));
-        }
+        } finally { scanning = false; }
       };
+      const onFolderChange = (event) => { if (Number(event.detail) === Number(a.id)) check(); };
+      window.addEventListener("import-folder-changed", onFolderChange);
+      const timer = setInterval(() => {
+        if (!status.isConnected) { clearInterval(timer); window.removeEventListener("import-folder-changed", onFolderChange); return; }
+        if (!document.hidden) check();
+      }, 60000);
       let pathCell;
       if (window.localApi) {
         pathCell = importFolderField(a);

@@ -7,6 +7,7 @@ Section headings ('Energy', 'Spot', ...) and item headings ('Energy [100.81 MeV]
 'Spot 1 [226.18 MeV]', 'PPC-05', ...) sit alone in the Setup column.
 """
 
+import csv
 import hashlib
 import io
 import re
@@ -79,6 +80,14 @@ def _cell_text(value):
 
 def read_rows(data):
     """Rows of the first sheet as lists of (column, text), skipping empty cells."""
+    if data and not data.startswith(bytes.fromhex("D0CF11E0")):
+        try:
+            text = data.decode("utf-8-sig")
+            dialect = csv.Sniffer().sniff(text[:16384], delimiters=",;\t")
+            return [[(c, value.strip()) for c, value in enumerate(row) if value.strip()]
+                    for row in csv.reader(io.StringIO(text), dialect)]
+        except (UnicodeError, csv.Error):
+            pass
     try:
         import xlrd
     except ImportError as exc:  # pragma: no cover - depends on the install

@@ -120,7 +120,7 @@
   // ---- default import folders (one per scheduled list) -----------------------------------
   // The folder handle lives in this browser's storage; the list keeps only the folder's name.
   const FOLDER_PREFIX = "folder:";
-  const IMPORT_EXTENSIONS = [".xls"];
+  const IMPORT_EXTENSIONS = [".xls", ".csv"];
   async function folderHandle(assignmentId) { return kvGet(FOLDER_PREFIX + assignmentId); }
   async function folderPermission(handle) {
     try { return await handle.queryPermission({ mode: "read" }); } catch { return "denied"; }
@@ -136,14 +136,14 @@
       }
     }
   }
-  async function listImportFiles(assignmentId, limit = 40) {
+  async function listImportFiles(assignmentId, limit = undefined) {
     const a = get("assignments", assignmentId, "Schedule");
     const handle = await folderHandle(a.id);
     if (!handle) return { folder: a.import_folder || "", files: [], permission: "none" };
     const permission = await folderPermission(handle);
     if (permission !== "granted") return { folder: handle.name, files: [], permission };
     const found = [];
-    await walkFolder(handle, "", 3, found);
+    await walkFolder(handle, "", Infinity, found);
     const withFiles = await Promise.all(found.map(async (f) => ({ ...f, file: await f.entry.getFile() })));
     withFiles.sort((x, y) => y.file.lastModified - x.file.lastModified);
     const files = [];
@@ -368,7 +368,7 @@
     if (!window.XLSX) throw new Error("The spreadsheet reader did not load. Reload the portal.");
     let wb;
     try {
-      wb = XLSX.read(bytes, { type: "array" });
+      wb = XLSX.read(bytes, { type: "array", codepage: 65001, raw: true });
     } catch (err) {
       throw new Error(`Not a readable .xls file (${err.message}).`);
     }

@@ -685,7 +685,7 @@ def save_assignment(db, user, data, assignment_id=None):
 
 # ---- default import folder (where each scheduled list's export files appear) ----------------
 
-IMPORT_EXTENSIONS = (".xls",)  # Sphinx exports today; DQA3 exports once that importer exists.
+IMPORT_EXTENSIONS = (".xls", ".csv")  # Sphinx exports today; DQA3 exports once that importer exists.
 
 
 def _import_root(assignment):
@@ -698,7 +698,7 @@ def _import_root(assignment):
     return root.resolve()
 
 
-def list_import_files(db, user, assignment_id, limit=40):
+def list_import_files(db, user, assignment_id, limit=None):
     """Newest export files in the list's default folder (searched recursively), with any run already recorded from each."""
     assignment = _get(db, "assignments", assignment_id)
     if not assignment["import_folder"]:
