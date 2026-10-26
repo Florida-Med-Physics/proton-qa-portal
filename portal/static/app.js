@@ -2983,7 +2983,7 @@ function judgedByList(item, points) {
 }
 
 function trendDisplayName(name) {
-  return String(name || '').replace(/\bSpot\s+\d+\s*(?=\[|\d+(?:\.\d+)?\s*MeV)/gi, '').trim();
+  return String(name || '').replace(/\bSpot\s+\d+(?:\s*(?=\[)|\s+(?=\d+(?:\.\d+)?\s*MeV))/gi, '').trim();
 }
 
 async function renderTrendOverview(machines, machineId, range, listId = "") {
