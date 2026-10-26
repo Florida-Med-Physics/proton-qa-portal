@@ -258,6 +258,10 @@
     if (!has(limits.fail) && !has(limits.warn)) return "recorded";
     return "pass";
   }
+  const resultOverall = rows => {
+    const verdict = rows.length ? overall(rows.map(r=>r.status)) : "recorded";
+    return verdict === "pass" && rows.some(r=>r.value_num == null && r.value_text == null) ? "recorded" : verdict;
+  };
   const overall = (statuses) => statuses.reduce((w, s) => ((STATUS_RANK[s] || 0) > STATUS_RANK[w] ? s : w), "pass");
 
   // ---- scheduling (qa.py) ----------------------------------------------------
@@ -655,7 +659,7 @@
     }
     for (const runId of runs) {
       const run = byId("runs", runId);
-      if (run) run.overall = S.results.filter((r) => r.run_id === runId).reduce((w, r) => (rank[r.status] > rank[w] ? r.status : w), "pass");
+      if (run) run.overall = resultOverall(S.results.filter((r) => r.run_id === runId));
     }
     save();
     audit(user.id, "reevaluate", "queue", q.id, { name: q.name, runs: runs.size, verdicts_changed: changed });
@@ -809,7 +813,7 @@
       if (status !== r.status) changed++;
       Object.assign(r, { ...limits, status }); runs.add(r.run_id);
     }
-    for (const id of runs) byId("runs", id).overall = S.results.filter((r) => r.run_id === id).reduce((w, r) => rank[r.status] > rank[w] ? r.status : w, "pass");
+    for (const id of runs) byId("runs", id).overall = resultOverall(S.results.filter((r) => r.run_id === id));
     save(); audit(user.id, "reevaluate", "assignment", a.id, { runs: runs.size, verdicts_changed: changed });
     return { runs: runs.size, changed };
   }
@@ -906,7 +910,7 @@
   // ---- runs -------------------------------------------------------------------
 
   function insertRun(user, t, qaDate, rows, comment, source, sourceRef, reviewStatus) {
-    const result = rows.length ? overall(rows.map((r) => r.status)) : "recorded";
+    const result = resultOverall(rows);
     const id = insert("runs", { assignment_id: t.assignment.id, machine_id: t.machine.id, queue_id: t.queue.id, performed_by: user.id,
       performed_at: now(), qa_date: qaDate, overall: result, comment, source, source_ref: sourceRef, review_status: reviewStatus, therapist_approval_required: reviewStatus === 'pending' && t.items.some(item => /therapist/i.test(item.name) && /review|approv/i.test(item.name) || /\[approval: therapist\]/i.test(item.description || '')), therapist_approved_by: null, therapist_approved_at: null,
       reviewed_by: null, reviewed_at: null, review_comment: "" });
@@ -927,11 +931,11 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(qaDate)) throw new Error("QA date must be YYYY-MM-DD.");
     if (qaDate > todayIso()) throw new Error("QA date cannot be in the future.");
     const entered = Object.fromEntries((data.results || []).map((r) => [Number(r.test_id), r]));
-    const rows = [], missing = [];
+    const rows = [];
     for (const item of t.items) {
       const raw = entered[item.test_id] || {};
       let value = raw.value;
-      if (value === null || value === undefined || String(value).trim() === "") { if (item.type !== "text") missing.push(item.name); continue; }
+      if (value === null || value === undefined || String(value).trim() === "") { if (item.type !== "text") rows.push({test_id:item.test_id, value_num:null, value_text:null, limits:item.limits, status:"recorded", comment:text(raw,"comment")}); continue; }
       if (item.type === "numeric") { value = Number(value); if (!Number.isFinite(value)) throw new Error(`${item.name}: enter a number.`); }
       else if (item.type === "boolean") value = [true, 1, "1", "true", "pass", "yes"].includes(value);
       else if (item.type === "status") {
@@ -945,8 +949,6 @@
       rows.push({ test_id: item.test_id, value_num: textual ? null : Number(value), value_text: textual ? value : null,
         limits: item.limits, status, comment: text(raw, "comment") });
     }
-    if (missing.length) throw new Error("Missing results for: " + missing.join(", "));
-    if (!rows.length && t.items.length) throw new Error("This queue has no recorded results.");
     const ref = text(data, "source_ref") || null;
     checkNotImported(ref);
     return insertRun(user, t, qaDate, rows, text(data, "comment"), ref ? "sphinx" : "manual", ref, "pending");

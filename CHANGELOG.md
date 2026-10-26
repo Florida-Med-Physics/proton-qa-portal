@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Allow blank or partial QA lists to be submitted for review; preserve unanswered tests in review/PDF and never count them as passes.
+
 - Refresh the browser backend cache fingerprint so the four demo accounts load into Users and rights.
 
 - Add the temporary MPA / MPA demo login without resetting existing account passwords.

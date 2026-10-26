@@ -262,8 +262,14 @@ class ServiceTests(unittest.TestCase):
 
     def test_submit_rules(self):
         self.assertEqual(self.submit("therapist", door="fail")["overall"], "fail")
-        with self.assertRaisesRegex(PortalError, "Missing results for: Door interlock"):
-            service.submit_run(self.db, self.users["therapist"], self.assignment, {"results": [{"test_id": self.dist, "value": "100"}]})
+        partial = service.submit_run(self.db, self.users["therapist"], self.assignment, {"results": [{"test_id": self.dist, "value": "100"}]})
+        self.assertEqual(partial["overall"], "recorded")
+        blank = service.submit_run(self.db, self.users["therapist"], self.assignment, {"results": []})
+        run = service.get_run(self.db, self.users["physicist"], blank["id"])
+        self.assertEqual(run["review_status"], "pending")
+        self.assertEqual(run["overall"], "recorded")
+        self.assertTrue(run["results"])
+        self.assertTrue(all(r["value_num"] is None and r["value_text"] is None and r["status"] == "recorded" for r in run["results"]))
         with self.assertRaisesRegex(PortalError, "enter a number"):
             self.submit("therapist", dist="abc")
         with self.assertRaisesRegex(PortalError, "future"):

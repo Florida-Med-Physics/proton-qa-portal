@@ -2517,7 +2517,7 @@ function qaReportPdf(run) {
   const blocks = [lines.flatMap((x) => wrap(x))];
   for (const [index, r] of (run.results || []).entries()) {
     const unit = r.unit && r.unit !== 'unitless' ? r.unit : '';
-    const value = r.type === 'boolean' ? (r.value_num ? 'Yes' : 'No') : r.type === 'numeric' ? `${r.value_num ?? ''} ${unit}` : r.value_text || '';
+    const value = r.value_num == null && r.value_text == null ? 'Unanswered' : r.type === 'boolean' ? (r.value_num ? 'Yes' : 'No') : r.type === 'numeric' ? `${r.value_num ?? ''} ${unit}` : r.value_text || '';
     const block = [`${index + 1}. ${r.name}`, `Result: ${value} | ${verdict(r.status)}`];
     if (r.type === 'numeric') {
       const suffix = r.tol_mode === 'percent' ? '%' : unit;
@@ -2605,22 +2605,24 @@ async function renderRun(id) {
     }
   }
 
+  const unanswered = run.results.filter(r => r.value_num == null && r.value_text == null);
+  if (unanswered.length) app.append(el('p', {class:'lead'}, `${unanswered.length} of ${run.results.length} tests unanswered. Submitted for review; missing results are not passes.`));
   // Problems first; passes are there but folded away.
   const problems = run.results.filter((r) => r.status === "fail" || r.status === "warn");
   const rest = run.results.filter((r) => !problems.includes(r));
-  const valueText = (r) => r.type === "boolean" ? (r.value_num ? "Pass" : "Fail") : r.type === "status" ? STATUS_WORDS[r.value_text] || r.value_text
+  const valueText = (r) => r.value_num == null && r.value_text == null ? "Unanswered" : r.type === "boolean" ? (r.value_num ? "Pass" : "Fail") : r.type === "status" ? STATUS_WORDS[r.value_text] || r.value_text
     : r.type === "text" ? r.value_text : `${fmt(r.value_num)} ${r.unit}`.trim();
   const rows = (list) => list.map((r) => el("tr", {},
     el("td", {}, el("strong", {}, r.name), r.comment ? el("div", { class: "muted small" }, r.comment) : null),
     el("td", { class: "num" }, valueText(r)),
-    el("td", { class: "num" }, r.type === "numeric" ? deltaBadge(r.value_num, r, r.unit, r.status) : ""),
+    el("td", { class: "num" }, r.type === "numeric" && r.value_num != null ? deltaBadge(r.value_num, r, r.unit, r.status) : ""),
     el("td", { class: "small muted" }, r.type === "numeric" ? limitsText(r, r.unit) : ""),
     el("td", {}, chip(r.status))));
   const headers = ["Test", "#Result", "#Δ", "Expected / limits", "Status"];
   if (problems.length) {
     app.append(el("h2", {}, `${problems.length} to look at`), table(headers, rows(problems)));
   } else {
-    app.append(el("p", { class: "lead" }, "Everything passed."));
+    app.append(el("p", { class: "lead" }, unanswered.length ? "Entered results have no warning or action flags." : run.overall === "pass" ? "Everything passed." : "Results recorded for review."));
   }
   if (rest.length) {
     app.append(el("details", { class: "card", open: !problems.length && rest.length <= 12 },

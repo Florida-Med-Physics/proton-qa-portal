@@ -408,7 +408,7 @@ def reevaluate_queue(db, user, queue_id):
                     changed += 1
                 runs.add(res["run_id"])
         for run_id in runs:
-            db.run("UPDATE runs SET overall = ? WHERE id = ?", (qa.overall(r["status"] for r in db.all("SELECT status FROM results WHERE run_id = ?", (run_id,))), run_id))
+            db.run("UPDATE runs SET overall = ? WHERE id = ?", (_results_overall(db.all("SELECT status, value_num, value_text FROM results WHERE run_id = ?", (run_id,))), run_id))
         db.audit(user["id"], "reevaluate", "queue", queue_id, name=queue["name"], runs=len(runs), verdicts_changed=changed)
     return {"runs": len(runs), "changed": changed}
 
@@ -653,7 +653,7 @@ def reevaluate_assignment(db, user, assignment_id):
             db.run("UPDATE results SET expected = ?, warn = ?, fail = ?, tol_mode = ?, status = ? WHERE id = ?", (limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"], status, res["id"]))
             runs.add(res["run_id"])
         for rid in runs:
-            db.run("UPDATE runs SET overall = ? WHERE id = ?", (qa.overall(i["status"] for i in db.all("SELECT status FROM results WHERE run_id = ?", (rid,))), rid))
+            db.run("UPDATE runs SET overall = ? WHERE id = ?", (_results_overall(db.all("SELECT status, value_num, value_text FROM results WHERE run_id = ?", (rid,))), rid))
         db.audit(user["id"], "reevaluate", "assignment", assignment_id, runs=len(runs), verdicts_changed=changed)
     return {"runs": len(runs), "changed": changed}
 
@@ -842,13 +842,13 @@ def submit_run(db, user, assignment_id, data):
     if qa_date > date.today():
         raise PortalError("QA date cannot be in the future.")
     entered = {int(r["test_id"]): r for r in data.get("results") or []}
-    results, missing = [], []
+    results = []
     for item in template["items"]:
         raw = entered.get(item["test_id"], {})
         value = raw.get("value")
         if value is None or (isinstance(value, str) and not value.strip()):
             if item["type"] != "text":
-                missing.append(item["name"])
+                results.append((item, None, "recorded", _text(raw, "comment")))
             continue
         if item["type"] == "numeric":
             try:
@@ -868,13 +868,9 @@ def submit_run(db, user, assignment_id, data):
         except ValueError as exc:
             raise PortalError(f"{item['name']}: {exc}")
         results.append((item, value, status, _text(raw, "comment")))
-    if missing:
-        raise PortalError("Missing results for: " + ", ".join(missing))
-    if not results and template["items"]:
-        raise PortalError("This queue has no recorded results.")
     source_ref = _text(data, "source_ref") or None
     _check_not_imported(db, source_ref)
-    rows = [{"test_id": item["test_id"], "value_num": float(value) if item["type"] in ("numeric", "boolean") else None,
+    rows = [{"test_id": item["test_id"], "value_num": float(value) if value is not None and item["type"] in ("numeric", "boolean") else None,
              "value_text": value if item["type"] in ("text", "status") else None, "limits": item["limits"], "status": status, "comment": comment}
             for item, value, status, comment in results]
     return _insert_run(db, user, template, qa_date.isoformat(), rows, _text(data, "comment"),
@@ -894,8 +890,16 @@ def needs_therapist_approval(template):
                or '[approval: therapist]' in item.get('description', '').lower() for item in template['items'])
 
 
+def _results_overall(rows):
+    rows = list(rows)
+    verdict = qa.overall(r["status"] for r in rows) if rows else "recorded"
+    if verdict == "pass" and any(r["value_num"] is None and r["value_text"] is None for r in rows):
+        return "recorded"
+    return verdict
+
+
 def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, review_status):
-    result_overall = qa.overall(r["status"] for r in rows) if rows else "recorded"
+    result_overall = _results_overall(rows)
     with db.transaction():
         run_id = db.run(
             "INSERT INTO runs (assignment_id, machine_id, queue_id, performed_by, performed_at, qa_date, overall, comment, source, "
