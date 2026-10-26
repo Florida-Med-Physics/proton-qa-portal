@@ -1350,3 +1350,9 @@ td, .measure-table td { font-size: 21px; }
 
 #app[data-page="perform-qa"] .qa-schedule-status .chip { font-size:inherit; line-height:1.35; white-space:normal; }
 .chart .dot,.spark .dot { pointer-events:all; }
+
+/* Last Result verdicts match the QA list description text. */
+#app[data-page="perform-qa"] .fixed-table td .chip { font-size:inherit; line-height:1.35; }
+.home-last-result .chip { font-size:22px; line-height:1.35; }
+
+@media(max-width:760px) { .home-last-result .chip { font-size:21px; } }
