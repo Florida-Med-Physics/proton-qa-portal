@@ -2442,7 +2442,7 @@ async function renderQueueEditor(id) {
   } }, "Customize tests");
   const machineToleranceHelp=(test,item)=>{
     const names=(q.schedules||[]).filter(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length).map(schedule=>schedule.machine);
-    return names.length?el('span',{class:'machine-difference-note'},...names.flatMap((name,i)=>[i?' · ':'',el('span',{class:machineColorClass(name)},`${name} differs`)])):null;
+    return names.length?el('span',{class:'machine-difference-note'},...names.map(name=>el('span',{class:machineColorClass(name)+' machine-difference-line'},`${name} differs`))):null;
   };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';

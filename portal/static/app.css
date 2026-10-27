@@ -1628,3 +1628,7 @@ td, .measure-table td { font-size: 21px; }
 .name-with-edit:has(> .machine-difference-note) .inline-test-name { flex:1 1 auto; min-width:0; }
 .name-with-edit > .machine-difference-note { flex:0 0 auto; white-space:nowrap; font-size:13px; line-height:1.2; }
 .machine-difference-note .machine-color { font-size:inherit; }
+
+.name-with-edit > .machine-difference-note { display:flex; flex-direction:column; align-items:flex-start; gap:4px; white-space:normal; }
+.machine-difference-note .machine-difference-line { display:block; padding:3px 6px; border-radius:4px; background:#fef3c7; white-space:nowrap; font-size:13px; }
+:root[data-theme="dark"] .machine-difference-note .machine-difference-line { background:#493b13; }
