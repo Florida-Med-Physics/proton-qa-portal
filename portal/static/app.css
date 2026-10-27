@@ -1418,3 +1418,8 @@ td, .measure-table td { font-size: 21px; }
 .derived-formula-heading .qa-info[open] { flex:1; }
 .derived-editor > input[aria-label="Derived formula"] { width:100%; }
 .derived-formula-status { color:var(--fail); margin:6px 0; }
+
+.derived-variable-row { grid-template-columns:24px minmax(0,1fr) 36px; }
+.derived-variable-row .derived-remove { grid-column:3; width:36px; height:36px; padding:0; font-size:24px; line-height:1; }
+.derived-editor textarea[aria-label="Derived formula"] { display:block; width:100%; min-width:0; min-height:120px; padding:12px; font:inherit; font-size:20px; font-weight:500; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; resize:vertical; background:var(--surface); border:2px solid var(--border); }
+.derived-editor textarea[aria-label="Derived formula"]:focus { border-color:var(--accent); }

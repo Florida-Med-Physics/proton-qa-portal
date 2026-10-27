@@ -2396,7 +2396,7 @@ async function renderQueueEditor(id) {
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule={inputs:[],formula:'A'};t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), QADerived.read(t.description)?derivedEditor(QADerived.read(t.description),items.slice(0,index).map(x=>byId[x.test_id]),rule=>{t.description=(t.description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}):null, t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
+        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), QADerived.read(t.description)?derivedEditor(QADerived.read(t.description),items.slice(0,index).map(x=>byId[x.test_id]),rule=>{t.description=(t.description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}):null, t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -2517,21 +2517,28 @@ function choiceOptions(description) {
   const m=/\[choices: ([^\]]+)\]/.exec(description||'');
   try{return m?JSON.parse(decodeURIComponent(m[1])):[];}catch{return [];}
 }
+function defaultDerivedRule(prior=[]) {
+  const temperature=prior.find(t=>t.type==='numeric'&&/chamber temperature|air temperature|temperature \[/i.test(t.name));
+  const pressure=prior.find(t=>t.type==='numeric'&&/air pressure|pressure \[/i.test(t.name));
+  const inputs=temperature&&pressure?[temperature,pressure].map(t=>({name:t.name,category:t.category||''})):[];
+  return {inputs,formula:`(273.15 + A) / 295.15 * ${pressure&&/hpa/i.test(pressure.unit||'')?'1013.25':'101.325'} / B`};
+}
+
 function derivedEditor(rule,prior,onChange,formMode=false) {
-  rule=rule||{inputs:[],formula:'A'};
+  rule=rule||defaultDerivedRule(prior);
   const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
   const inputNumbers=blockNumbers(prior.map(t=>({...t,test_id:t.test_id||t.id})));
   const inputLabel=t=>{const n=inputNumbers.get(t.test_id||t.id)||checkNumber(t.description);return n?`Test ${n} · ${t.name}`:t.name;};
   const key=t=>JSON.stringify([t.name,t.category||'']);
   const selected=rule.inputs.map(x=>key(x));
-  if(!selected.length)selected.push('');
+  if(!selected.length)selected.push('','');
   const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
-  const formula=el('input',{'aria-label':'Derived formula',value:rule.formula,placeholder:'Example: 100 * (A - B) / A'});
+  const formula=el('textarea',{'aria-label':'Derived formula',rows:4,value:rule.formula,spellcheck:false,wrap:'soft',placeholder:'Enter an equation using A, B, C…'});
   const rows=el('div',{class:'derived-variable-rows'}),status=el('p',{class:'small derived-formula-status','aria-live':'polite'});
   const update=()=>{
     rule={inputs:selected.map(k=>{const t=numeric.find(x=>key(x)===k);return {name:t?.name||'',category:t?.category||''};}),formula:formula.value};
     hidden.value=JSON.stringify(rule);
-    try{if(selected.some(x=>!x))throw Error('Choose a prior test for each variable.');QADerived.validate(rule);status.textContent='';}
+    try{if(selected.some(x=>!x))throw Error('Choose a prior test for each variable.');if(formula.value.includes('?'))throw Error('Replace ? in the equation after removing a variable.');QADerived.validate(rule);status.textContent='';}
     catch(err){status.textContent=err.message;}
     if(onChange)onChange(rule);
   };
@@ -2539,16 +2546,21 @@ function derivedEditor(rule,prior,onChange,formMode=false) {
     rows.replaceChildren(...selected.map((k,i)=>{
       const letter=String.fromCharCode(65+i);
       const pick=select('',[['','Choose a prior test…'],...numeric.map(t=>[key(t),inputLabel(t)])],k,{'aria-label':`Prior test for ${letter}`,onchange:e=>{selected[i]=e.target.value;update();}});
-      const insert=el('button',{type:'button',class:'small',title:`Insert ${letter} into equation`,'aria-label':`Insert variable ${letter}`,onclick:()=>{const start=formula.selectionStart??formula.value.length,end=formula.selectionEnd??start;formula.setRangeText(letter,start,end,'end');formula.focus();update();}},`Insert ${letter}`);
-      const remove=i===selected.length-1&&selected.length>1?el('button',{type:'button',class:'small','aria-label':`Remove variable ${letter}`,onclick:()=>{selected.pop();draw();update();}},'Remove'):null;
-      return el('div',{class:'derived-variable-row'},el('strong',{class:'derived-variable-letter'},letter),pick,insert,...(remove?[remove]:[]));
+      const remove=el('button',{type:'button',class:'derived-remove',title:`Remove variable ${letter}`,'aria-label':`Remove variable ${letter}`,onclick:()=>{
+        selected.splice(i,1);
+        formula.value=formula.value.replace(/\b[A-Z]\b/g,l=>{const n=l.charCodeAt(0)-65;return n===i?'?':n>i?String.fromCharCode(64+n):l;});
+        draw();update();
+      }},'×');
+      return el('div',{class:'derived-variable-row'},el('strong',{class:'derived-variable-letter'},letter),pick,remove);
+
     }));
     add.disabled=selected.length>=26||!numeric.length;
   };
   const add=el('button',{type:'button',class:'small',onclick:()=>{selected.push('');draw();update();rows.lastElementChild?.querySelector('select')?.focus();}},'+ Add input');
-  formula.addEventListener('input',update);draw();
+  formula.addEventListener('input',()=>{formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';update();});draw();
+  requestAnimationFrame(()=>{if(formula.clientWidth)formula.style.height=Math.max(120,formula.scrollHeight)+'px';});
   return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Calculation inputs'),rows,add,
-    el('div',{class:'derived-formula-heading'},el('strong',{},'Equation'),infoDisclosure(el('div',{},el('p',{},'Each letter represents the prior test selected beside it. Use Insert A, Insert B, etc. to put that variable into your equation.'),el('p',{},'Use numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), or mean(). Example: 100 * (A - B) / A. Missing inputs leave the result blank.')),'Equation help')),
+    el('div',{class:'derived-formula-heading'},el('strong',{},'Equation'),infoDisclosure(el('div',{},el('p',{},'Each letter represents the prior test selected beside it. Type that letter in the equation. + Add input creates another variable; × removes it. Replace any ? left by a removed variable before saving.'),el('p',{},'Use numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), or mean(). Example: 100 * (A - B) / A. Missing inputs leave the result blank.')),'Equation help')),
     formula,status);
 }
 
