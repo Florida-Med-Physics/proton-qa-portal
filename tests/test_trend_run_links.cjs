@@ -40,6 +40,12 @@ const {chromium}=require('playwright');
     await page.waitForSelector('.dot.st-fail');await page.locator('.dot.st-fail').first().click();
     await page.waitForSelector('.selected-qa-result');
     assert(page.url().includes(`/runs/${sample.failed}?test_id=${sample.test}`));
+    const latestFail=await page.evaluate(async s=>(await api('POST','/api/assignments/1/runs',{qa_date:'2026-10-22',results:[{test_id:s.test,value:s.baseline+5}]})).id,sample);
+    await page.evaluate(()=>location.hash='#/trends?machine_id=1&list=1&range=all');
+    const alert=page.locator(`a[href="#/runs/${latestFail}?test_id=${sample.test}"]`).first();
+    await alert.waitFor();assert((await alert.textContent()).includes(`Test ${sample.number}`));
+    await alert.click();await page.waitForSelector('.selected-qa-result');
+    assert(page.url().includes(`/runs/${latestFail}?test_id=${sample.test}`));
     assert.deepEqual(errors,[]);
     console.log('Exact test/run links, same-day failing retests, recorded baselines/verdicts and measurement precision verified.');
   }finally{await browser.close();}

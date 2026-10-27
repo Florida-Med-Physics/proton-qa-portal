@@ -3858,7 +3858,7 @@ function trendInsightsCard(series) {
     const last = item.points.at(-1); if (!last) continue;
     const who = item.machine_name ? `${item.machine_name} · ` : '';
     if (last.status === 'fail' || last.status === 'warn') messages.push({ priority: last.status === 'fail' ? 3 : 2,
-      href: item.href, text: `${who}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
+      href: last.run_id?trendRunHref(last):item.href, text: `${who}${last.source_test_number?'Test '+last.source_test_number+' · ':''}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
     const pattern = trendPattern(item.points);
     if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${sig(pattern.change)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${sig(pattern.r2)}).` });
   }
