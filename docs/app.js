@@ -1434,7 +1434,13 @@ function wireCalculations(entries) {
       const start = e.item.last_text || (d && d[1].trim());
       if (start) { e.input.value = start; e.input.title = e.item.last_text ? "As recorded last time; change it if different" : "Usual value; change it if different"; }
     }
-    const m = MARKER.exec(e.item.description || "");
+    const hdrKinds = {
+      'Dwell time — difference':'hdr-dwell-difference',
+      'Source air kerma strength — difference':'hdr-strength-difference',
+      'Position verification — console minus ruler':'hdr-position-difference'
+    };
+    const hdrKind = e.item.category === 'HDR treatment-day QA' ? hdrKinds[e.item.name] : null;
+    const m = MARKER.exec(e.item.description || "") || (hdrKind ? [null,'calc',hdrKind] : null);
     if (!m) return;
     const kind = m[2].trim();
     if (m[1] === "auto" && kind === "sphinx-finished") {
@@ -1456,7 +1462,13 @@ function wireCalculations(entries) {
       return;
     }
     let sources = [], compute = null, decimals = 2;
-    if (kind.startsWith("sum")) {                              // "[calc: sum:3]": the sum of the N numeric fields above
+    if (kind.startsWith('hdr-')) {
+      const names=kind==='hdr-dwell-difference'?['Dwell time — set time','Dwell time — measured time']:kind==='hdr-strength-difference'?['Source air kerma strength — TCS Sk','Source air kerma strength — decay table Sk']:kind==='hdr-position-difference'?['Position verification — console distance','Position verification — ruler reading']:[];
+      sources=names.map(name=>entries.find(x=>x.item.name===name&&x.item.category===e.item.category));
+      if(sources.length!==2||sources.some(x=>!x))return;
+      compute=([a,b])=>kind==='hdr-position-difference'?a-b:kind==='hdr-dwell-difference'?(a===0?NaN:100*(a-b)/a):(b===0?NaN:100*(a-b)/b);
+      e.input.title=kind==='hdr-position-difference'?'Console distance − ruler reading (mm)':kind==='hdr-dwell-difference'?'100 × (set time − measured time) / set time':'100 × (TCS Sk − decay table Sk) / decay table Sk';
+    } else if (kind.startsWith("sum")) {                              // "[calc: sum:3]": the sum of the N numeric fields above
       const count = Number(kind.split(":")[1]) || 2;
       sources = entries.slice(0, i).filter((x) => x.item.type === "numeric").slice(-count);
       compute = (v) => v.reduce((a, b) => a + b, 0);
@@ -1487,9 +1499,10 @@ function wireCalculations(entries) {
       compute = ([q, f, k]) => q * 1e-9 * f * k * 100;
     }
     if (!compute || !sources.length) return;
-    lock(e, "Calculated from the fields it depends on");
+    lock(e, e.input.title || "Calculated from the fields it depends on");
     const update = () => { const v = sources.map(num); set(e, v.some((x) => !Number.isFinite(x)) ? NaN : compute(v), decimals); };
     sources.forEach((src) => src.input.addEventListener("input", update));
+    if(kind.startsWith('hdr-')) update();
   });
 }
 
