@@ -1592,9 +1592,9 @@ td, .measure-table td { font-size: 21px; }
   .review-action-bar .error:not(:empty) { flex-basis:100%; order:2; }
 }
 
-.tolerance-mode-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
-.tolerance-mode-actions select { width:auto; }
-.tolerance-mode-actions button { white-space:normal; }
+.tolerance-mode-actions { display:flex; flex:1 0 100%; min-width:0; flex-wrap:nowrap; align-items:center; gap:6px; }
+.tolerance-mode-actions select { width:auto; min-width:0; flex:0 1 auto; }
+.tolerance-mode-actions button { white-space:nowrap; flex:none; padding:5px 8px; font-size:14px; }
 .machine-tolerances-dialog { width:min(920px, calc(100vw - 32px)); max-width:calc(100vw - 32px); }
 .machine-tolerances-dialog table { width:100%; }
 .machine-limit-custom { display:block; color:var(--link); font-weight:600; }

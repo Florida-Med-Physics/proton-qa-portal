@@ -2554,7 +2554,7 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el('div',{class:'tolerance-mode-actions'},select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
-            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machine tolerances'))) : el("span", { class: "muted" }, "—")),
+            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'))) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
@@ -2602,7 +2602,7 @@ async function renderQueueEditor(id) {
   info.addEventListener("input", markDirty);
   holder.addEventListener("input", markDirty);
   holder.addEventListener("change", markDirty);
-  holder.addEventListener("click", (e) => { if (e.target.closest("button")) markDirty(); });
+  holder.addEventListener("click", (e) => { if (e.target.closest("button") && !e.target.closest('.machine-tolerances-button')) markDirty(); });
 
   function dragProps(index) {
     if (!editable || valuesFor) return {};
