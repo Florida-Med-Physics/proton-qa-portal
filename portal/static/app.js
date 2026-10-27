@@ -374,13 +374,6 @@ async function renderHome() {
     ['QA Awaiting Physics Review',pendingPhysics,'#/review?stage=physics']
   ].map(([label,count,href])=>el('a',{href,class:'card dashboard-count','aria-label':`${label}: ${count}`},el('strong',{class:'dashboard-count-number'},String(count)),el('span',{},label)))));
 
-  const reviewGrid=el('div',{class:'dashboard-review-grid'});
-  for(const therapy of [true,false]) {
-    const reviews=runs.filter(r=>r.review_status==='pending'&&(therapy?r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false):r.review_ready!==false));
-    reviewGrid.append(el('section',{class:'card dashboard-review'},el('h2',{},`${therapy?'Awaiting Therapy Review':'Awaiting Physics Review'} (${reviews.length})`),
-      reviews.length?el('div',{},...reviews.map(r=>el('div',{class:'row'},el('a',{href:`#/runs/${r.id}`},`${r.machine_name} · ${r.queue_name}`),el('span',{class:'muted small'},shortDate(r.qa_date)),el('span',{class:'spacer'}),el('a',{class:'button small',href:`#/runs/${r.id}`},'Open')))):el('p',{class:'muted'},'No QA is waiting for this review.')));
-  }
-  app.append(reviewGrid);
   const grid=el('div',{class:'home-modality-grid'});
   for(const modality of MODALITIES){
     const machines=data.machines.filter((m)=>modalityOf(m.kind)===modality).sort((a,b)=>kindRank(a.kind)-kindRank(b.kind)||a.name.localeCompare(b.name));
