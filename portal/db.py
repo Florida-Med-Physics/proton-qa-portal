@@ -169,6 +169,27 @@ class Database:
         self._install_department_templates()
         self._install_srs_winston_lutz()
         self._install_requested_dashboard_schedules()
+        self._install_derived_calculations()
+
+    def _install_derived_calculations(self):
+        from . import derived
+        seed=json.loads((Path(__file__).parent/'seed.json').read_text())
+        changed=0
+        with self.transaction():
+            for q in self.all('SELECT * FROM queues'):
+                tpl=next((t for t in seed['templates'] if t['name']==q['name']),None)
+                if not tpl:continue
+                prior=[]
+                for test in self.all('SELECT t.* FROM queue_items qi JOIN tests t ON t.id=qi.test_id WHERE qi.queue_id=? ORDER BY qi.position',(q['id'],)):
+                    original=next((x for x in tpl['checks'] if x['name']==test['name'] and x['category']==test['category']),None)
+                    rule=derived.read(original['description']) if original else None
+                    if rule and not derived.read(test['description']) and ('[calc:' in test['description'] or test['category']=='HDR treatment-day QA'):
+                        try:derived.resolve(rule,prior)
+                        except ValueError:pass
+                        else:
+                            self.run('UPDATE tests SET description=? WHERE id=?',(derived.encode(test['description'],rule),test['id']));changed+=1
+                    prior.append(test)
+            if changed:self.audit(None,'install_derived_calculations','test',None,count=changed)
 
     def _approval_migrations(self):
         users_schema = self.one("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")["sql"]

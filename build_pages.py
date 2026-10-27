@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DOCS = ROOT / "docs"
 
-for name in ("pdf.min.mjs", "pdf.worker.min.mjs", "pdfjs-LICENSE.txt", "wl-import.js", "app.js", "app.css", "theme.js", "xlsx.full.min.js", "monthly-workbooks.js", "monthly-workbook-data.js", "uf-proton-logo.png", "gatorqa-logo.svg"):
+for name in ("derived.js", "pdf.min.mjs", "pdf.worker.min.mjs", "pdfjs-LICENSE.txt", "wl-import.js", "app.js", "app.css", "theme.js", "xlsx.full.min.js", "monthly-workbooks.js", "monthly-workbook-data.js", "uf-proton-logo.png", "gatorqa-logo.svg"):
     shutil.copyfile(ROOT / "portal" / "static" / name, DOCS / name)
     print("copied", name)
 seed = json.loads((ROOT / "portal" / "seed.json").read_text(encoding="utf-8"))
@@ -31,7 +31,7 @@ shutil.copytree(ROOT / "portal" / "static" / "templates", DOCS / "templates", di
 # copy of an older version after a push (GitHub Pages lets browsers cache files for several minutes).
 index = DOCS / "index.html"
 html = index.read_text(encoding="utf-8")
-for name in ("wl-import.js", "theme.js", "app.css", "seed-data.js", "local-backend.js", "xlsx.full.min.js", "monthly-workbooks.js", "monthly-workbook-data.js", "app.js"):
+for name in ("derived.js", "wl-import.js", "theme.js", "app.css", "seed-data.js", "local-backend.js", "xlsx.full.min.js", "monthly-workbooks.js", "monthly-workbook-data.js", "app.js"):
     tag = hashlib.sha256((DOCS / name).read_bytes()).hexdigest()[:10]
     html, n = re.subn(r'((?:src|href)=")' + re.escape(name) + r'(\?v=[^"]*)?"', lambda m: f'{m[1]}{name}?v={tag}"', html)
     assert n == 1, name

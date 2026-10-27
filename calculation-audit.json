@@ -1,0 +1,156 @@
+[
+  {
+    "template": "Daily QA template – Proton gantry (TG-224)",
+    "tests_reviewed": 83,
+    "derived": [],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Daily QA template – TrueBeam (TG-142 / TG-198)",
+    "tests_reviewed": 25,
+    "derived": [],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Bigbore CT Daily template – Big Bore CT",
+    "tests_reviewed": 13,
+    "derived": [],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Daily QA template – MRI simulator",
+    "tests_reviewed": 6,
+    "derived": [],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "SRS QA template – TrueBeam (Dose Pro)",
+    "tests_reviewed": 3,
+    "derived": [],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "PBS DailyQA Template - Sphinx",
+    "tests_reviewed": 103,
+    "derived": [
+      "Temp. & Press. Correction (Output)",
+      "[Ortho - kV/kV] PPS 2 XRAY Offset [cm]",
+      "[CBCT - Pelvis SFOV ND] Required 3D Correction Vector Offset [cm]",
+      "[OBs] Required 3D Correction Vector Offset [cm]",
+      "Overall Calibration Factor [Gy/C]",
+      "Daily output: Dose [cGy]"
+    ],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Eyeline Daily QA template",
+    "tests_reviewed": 46,
+    "derived": [
+      "Total Offset [cm]",
+      "Measured Range Eyeline Field 1 (D90) [cm]",
+      "Temp. & Press. Correction"
+    ],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Monthly QA template – Proton gantry (TG-224)",
+    "tests_reviewed": 128,
+    "derived": [
+      "Temp. & Press. Correction kTP",
+      "Couch angle 0° – BB walkout [mm]",
+      "Couch angle 315° – BB walkout [mm]",
+      "Couch angle 270° – BB walkout [mm]",
+      "Couch angle 225° – BB walkout [mm]",
+      "Couch angle 180° – BB walkout [mm]",
+      "Couch isocentricity — max radial displacement [mm]",
+      "Couch isocentricity — range of ΔX (max − min) [mm]",
+      "Couch isocentricity — range of ΔY (max − min) [mm]",
+      "Couch isocentricity — range of ΔZ (max − min) [mm]",
+      "XRV — max over all angles [mm]",
+      "Output G0 – 70 MeV – dose [cGy]",
+      "Output G0 – 120 MeV – dose [cGy]",
+      "Output G0 – 180 MeV – dose [cGy]",
+      "Output G0 – 225 MeV – dose [cGy]",
+      "Output G90 – 70 MeV – dose [cGy]",
+      "Output G90 – 120 MeV – dose [cGy]",
+      "Output G90 – 180 MeV – dose [cGy]",
+      "Output G90 – 225 MeV – dose [cGy]"
+    ],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Daily QA – HDR Flexitron",
+    "tests_reviewed": 26,
+    "derived": [
+      "Source air kerma strength — difference",
+      "Position verification — console minus ruler",
+      "Dwell time — difference"
+    ],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Source Exchange QA – HDR Flexitron",
+    "tests_reviewed": 0,
+    "derived": [],
+    "native_workbook_calculations": [],
+    "unresolved": []
+  },
+  {
+    "template": "Monthly QA – TrueBeam",
+    "tests_reviewed": 225,
+    "derived": [],
+    "native_workbook_calculations": [
+      "Symmetric field 4×4 cm — Y total",
+      "Symmetric field 4×4 cm — X total",
+      "Symmetric field 30×30 cm — Y total",
+      "Symmetric field 30×30 cm — X total",
+      "Temperature–pressure correction",
+      "Output constancy — 6X corrected reading",
+      "Output constancy — 6X difference",
+      "Output constancy — 10X corrected reading",
+      "Output constancy — 10X difference",
+      "Output constancy — 6X FFF corrected reading",
+      "Output constancy — 6X FFF difference",
+      "Output constancy — 10X FFF corrected reading",
+      "Output constancy — 10X FFF difference",
+      "Energy constancy — 6X corrected reading",
+      "Energy constancy — 6X ratio",
+      "Energy constancy — 6X difference",
+      "Energy constancy — 10X corrected reading",
+      "Energy constancy — 10X ratio",
+      "Energy constancy — 10X difference",
+      "Energy constancy — 6X FFF corrected reading",
+      "Energy constancy — 6X FFF ratio",
+      "Energy constancy — 6X FFF difference",
+      "Energy constancy — 10X FFF corrected reading",
+      "Energy constancy — 10X FFF ratio",
+      "Energy constancy — 10X FFF difference",
+      "Dose-rate constancy — 6X difference",
+      "Dose-rate constancy — 10X difference",
+      "Dose-rate constancy — 6X FFF difference",
+      "Dose-rate constancy — 10X FFF difference",
+      "Backup monitor — 6X difference",
+      "Backup monitor — 10X difference",
+      "Backup monitor — 6X FFF difference",
+      "Backup monitor — 10X FFF difference",
+      "MLC travel speed at -4.5 cm — Rcorr",
+      "MLC travel speed at -4.5 cm — difference",
+      "MLC travel speed at -1.5 cm — Rcorr",
+      "MLC travel speed at -1.5 cm — difference",
+      "MLC travel speed at 1.5 cm — Rcorr",
+      "MLC travel speed at 1.5 cm — difference",
+      "MLC travel speed at 4.5 cm — Rcorr",
+      "MLC travel speed at 4.5 cm — difference"
+    ],
+    "unresolved": []
+  }
+]

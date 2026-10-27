@@ -1383,3 +1383,7 @@ td, .measure-table td { font-size: 21px; }
 .dashboard-count:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
 #therapy-review-queue, #physics-review-queue { scroll-margin-top:100px; }
 @media(max-width:760px) { .dashboard-counts { gap:8px; } .dashboard-count { padding:14px 6px; font-size:14px; } .dashboard-count-number { font-size:36px; } }
+
+.derived-editor { padding:12px 0; min-width:200px; }
+.derived-inputs { max-height:200px; overflow:auto; display:flex; flex-direction:column; gap:8px; margin:8px 0; }
+.derived-editor input:not([type=checkbox]) { max-width:100%; }

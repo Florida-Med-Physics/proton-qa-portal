@@ -9,7 +9,7 @@ from urllib.parse import unquote, quote
 from datetime import date, datetime
 from pathlib import Path
 
-from . import auth, checklist, qa, sphinx, winston_lutz
+from . import auth, checklist, qa, sphinx, winston_lutz, derived
 from .db import now
 
 TEST_TYPES = ("numeric", "boolean", "status", "text", "choice")
@@ -211,7 +211,19 @@ def choice_options(description):
 
 def save_test(db, user, data, test_id=None):
     require(user, "configure")
+    data=dict(data)
     test_type = data.get("type") or "numeric"
+    if test_type=='derived':
+        try:
+            rule=data.get('derived')
+            if isinstance(rule,str):rule=json.loads(rule)
+            rule=rule or derived.read(data.get('description'))
+            derived.validate(rule)
+            data['description']=derived.encode(data.get('description'),rule)
+        except (ValueError,TypeError,SyntaxError) as exc:raise PortalError(str(exc))
+        test_type='numeric'
+    elif 'derived' in data:
+        data['description']=derived.encode(data.get('description'),None)
     if test_type not in TEST_TYPES:
         raise PortalError("Test type must be numeric, boolean, status, or text.")
     data=dict(data)
@@ -369,7 +381,7 @@ def save_queue(db, user, data, queue_id=None, _within_transaction=False):
                 existing = _get(db, "tests", tid)
                 if tid not in member_ids or (existing["owner_queue_id"] is not None and existing["owner_queue_id"] != queue_id):
                     raise PortalError("Only this template's tests can be edited here.")
-                fields = {key: update[key] for key in ("name", "category", "type", "choices") if key in update}
+                fields = {key: update[key] for key in ("name", "category", "type", "choices", "derived") if key in update}
                 save_test(db, user, {**existing, **fields}, tid)
             return save_queue(db, user, {**data, "test_updates": []}, queue_id, _within_transaction=True)
     name = _text(data, "name", required=True)
@@ -383,6 +395,14 @@ def save_queue(db, user, data, queue_id=None, _within_transaction=False):
             raise PortalError(f"'{test['name']}' belongs to another QA list. Duplicate that list, or add a new check here.")
         limits = _limits(item, allow_blank_mode=True) if test["type"] == "numeric" else {"expected": None, "warn": None, "fail": None, "tol_mode": None}
         items.append((test["id"], position, limits))
+    prior=[]
+    for tid,position,limits in items:
+        test=_get(db,'tests',tid)
+        try:
+            rule=derived.read(test.get('description'))
+            if rule:derived.resolve(rule,prior)
+        except (ValueError,TypeError,SyntaxError) as exc:raise PortalError(str(exc))
+        prior.append(test)
     if len({i[0] for i in items}) != len(items):
         raise PortalError("A check can only appear once in a QA list.")
     existing = _get(db, "queues", queue_id) if queue_id is not None else None
@@ -886,9 +906,17 @@ def submit_run(db, user, assignment_id, data):
         raise PortalError("QA date cannot be in the future.")
     entered = {int(r["test_id"]): r for r in data.get("results") or []}
     results = []
+    prior=[]
+    computed={}
     for item in template["items"]:
         raw = entered.get(item["test_id"], {})
         value = raw.get("value")
+        try:
+            rule=derived.read(item.get('description'))
+            if rule:value=derived.calculate(rule,prior,lambda x:computed.get(x['test_id']))
+        except (ValueError,TypeError,SyntaxError) as exc:raise PortalError(f"{item['name']}: {exc}")
+        prior.append(item)
+        computed[item['test_id']]=value
         if value is None or (isinstance(value, str) and not value.strip()):
             if item["type"] != "text":
                 results.append((item, None, "recorded", _text(raw, "comment")))

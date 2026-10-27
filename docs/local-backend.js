@@ -527,7 +527,10 @@
 
   function saveTest(user, data, testId) {
     require(user, "configure");
-    const type = data.type || "numeric";
+    data={...data};
+    let type = data.type || "numeric";
+    if(type==='derived') {let rule=typeof data.derived==='string'?JSON.parse(data.derived):data.derived;rule=rule||QADerived.read(data.description);data.description=QADerived.encode(data.description,QADerived.validate(rule));type='numeric';}
+    else if('derived' in data)data.description=QADerived.encode(data.description,null);
     if (!["numeric", "boolean", "status", "text", "choice"].includes(type)) throw new Error("Test type must be numeric, boolean, status, or text.");
     data={...data};
     if(type==='choice') {
@@ -599,7 +602,7 @@
         for (const update of data.test_updates) {
           const test = get('tests', update.test_id, 'Check');
           if (!members.has(test.id) || (test.owner_queue_id && test.owner_queue_id !== queueId)) throw new Error("Only this template's tests can be edited here.");
-          const fields = Object.fromEntries(['name','category','type','choices'].filter(key => key in update).map(key => [key,update[key]]));
+          const fields = Object.fromEntries(['name','category','type','choices','derived'].filter(key => key in update).map(key => [key,update[key]]));
           saveTest(user, {...test,...fields}, test.id);
         }
         return saveQueue(user, {...data,test_updates:[]}, queueId);
@@ -613,6 +616,7 @@
       const limits = test.type === "numeric" ? limitsOf(item, true) : { expected: null, warn: null, fail: null, tol_mode: null };
       return { test_id: test.id, position, ...limits };
     });
+    const priorDerived=[];for(const item of items){const test=get('tests',item.test_id,'Check');const rule=QADerived.read(test.description);if(rule)QADerived.resolve(rule,priorDerived);priorDerived.push(test);}
     if (new Set(items.map((i) => i.test_id)).size !== items.length) throw new Error("A check can only appear once in a QA list.");
     const existing = queueId ? get("queues", queueId, "QA list") : null;
     const isTemplate = flag(data, "is_template", existing ? !!existing.is_template : false);
@@ -948,9 +952,13 @@
     if (qaDate > todayIso()) throw new Error("QA date cannot be in the future.");
     const entered = Object.fromEntries((data.results || []).map((r) => [Number(r.test_id), r]));
     const rows = [];
+    const prior=[],computed={};
     for (const item of t.items) {
       const raw = entered[item.test_id] || {};
       let value = raw.value;
+      const rule=QADerived.read(item.description);
+      if(rule)value=QADerived.calculate(rule,prior,x=>computed[x.test_id]);
+      prior.push(item);computed[item.test_id]=value;
       if (value === null || value === undefined || String(value).trim() === "") { if (item.type !== "text") rows.push({test_id:item.test_id, value_num:null, value_text:null, limits:item.limits, status:"recorded", comment:text(raw,"comment")}); continue; }
       if (item.type === "numeric") { value = Number(value); if (!Number.isFinite(value)) throw new Error(`${item.name}: enter a number.`); }
       else if (item.type === "boolean") value = [true, 1, "1", "true", "pass", "yes"].includes(value);
@@ -1238,8 +1246,20 @@
     installDepartmentTemplates();
     installSrsWinstonLutz();
     installRequestedDashboardSchedules();
+    installDerivedCalculations();
     for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
   })();
+
+  function installDerivedCalculations(){
+    let changed=0;
+    for(const q of S.queues){const tpl=PORTAL_SEED.templates.find(t=>t.name===q.name);if(!tpl)continue;const prior=[];
+      for(const qi of S.queue_items.filter(x=>x.queue_id===q.id).sort((a,b)=>a.position-b.position)){const t=get('tests',qi.test_id,'Check');const seed=tpl.checks.find(x=>x.name===t.name&&x.category===t.category);const rule=seed&&QADerived.read(seed.description);
+        if(rule&&!QADerived.read(t.description)&&(/\[calc:/.test(t.description||'')||t.category==='HDR treatment-day QA')){try{QADerived.resolve(rule,prior);t.description=QADerived.encode(t.description,rule);changed++;}catch{/* Customized lists need explicit input selection. */}}
+        prior.push(t);
+      }
+    }
+    if(changed){audit(null,'install_derived_calculations','test',null,{count:changed});save();}
+  }
 
   function installRequestedDashboardSchedules() {
     if(S.requestedDashboardSchedules20261026)return;

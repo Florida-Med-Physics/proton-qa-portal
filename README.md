@@ -162,3 +162,8 @@ Use **Trash** for an erroneous run. It is excluded from review, charts and sched
 Therapists use the same dynamic Pass / Fail controls as Perform QA. Clicking a selected Pass withdraws approval; changing therapy approval also clears dependent physics approval. Changing away from Pass removes the signature and takes the run out of the physicist queue. Changes are audited. **Done — back to Review QA** closes the detail; therapist queues separate **Needs your review** from **Awaiting Physics Review**.
 
 Admin can preview each role using the eye-icon View As selector; preview mode cannot save changes. Dashboard review lists follow the selected role. Therapists can trash and restore submissions from any performer; actions are audited.
+
+### Derived results
+In template setup, choose **Derived** as a result type, select earlier numeric tests, and enter an arithmetic formula using A, B, C in the displayed input order. For example `100*(A-B)/A` computes a signed percentage difference. Supported functions are `sqrt`, `abs`, `min`, `max`, and `mean`. Derived outputs remain numeric for units, tolerances, trends, and exports. Inputs must precede the output, so forward references and cycles are rejected. Missing inputs, zero denominators, and nonfinite results stay unanswered. Derived values are recalculated during submission rather than trusted from the client. Changing a source name or category requires updating dependent definitions. Historical results are preserved.
+
+The template audit is recorded in `calculation-audit.json`: 658 tests reviewed, 31 explicit arithmetic calculations connected to Derived, and 41 TrueBeam calculations retained in the native Excel formula engine. Imported metrics without sufficient source readings remain measurements.

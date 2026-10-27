@@ -73,10 +73,10 @@ window.QAExcel = (() => {
   }
   function wire(entries) {
     if(!entries.some(e=>keyOf(e.item)))return;
-    const derived=entries.filter(e=>data().mapping.find(m=>m.key===keyOf(e.item))?.formula);
+    const derived=entries.filter(e=>!window.QADerived?.read(e.item.description)&&data().mapping.find(m=>m.key===keyOf(e.item))?.formula);
     derived.forEach(e=>{e.input.readOnly=true;e.input.placeholder='calculated';e.input.classList.add('from-file');});
     const refresh=()=>{try{const engine=evaluate(valuesFromEntries(entries));for(const e of derived){const v=engine.cell(...keyOf(e.item).split('!'));e.input.value=v==null||v===''?'':typeof v==='number'?String(Number(v.toPrecision(12))):String(v);e.input.dispatchEvent(new Event('input'));}}catch(err){console.error('Workbook calculation:',err.message);}};
-    entries.filter(e=>!derived.includes(e)).forEach(e=>e.input.addEventListener('input',refresh));refresh();
+    entries.filter(e=>!derived.includes(e)&&!window.QADerived?.read(e.item.description)).forEach(e=>e.input.addEventListener('input',refresh));refresh();
   }
   const textEncoder=new TextEncoder(), textDecoder=new TextDecoder();
   const u16=(v,p)=>new DataView(v.buffer,v.byteOffset,v.byteLength).getUint16(p,true),u32=(v,p)=>new DataView(v.buffer,v.byteOffset,v.byteLength).getUint32(p,true);

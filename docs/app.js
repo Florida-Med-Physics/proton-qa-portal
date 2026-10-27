@@ -290,7 +290,7 @@ function limitsText(limits, unit) {
   return parts.join(" · ");
 }
 
-const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice" };
+const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived" };
 const STATUS_WORDS = { pass: "PASS", warn: "WARNING", fail: "ACTION" };
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
@@ -1319,7 +1319,7 @@ const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function helpText(description, { inline = false } = {}) {
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule): [^\]]+\]\s*/g, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
   if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
     const one = text.replace(/\s+/g, " ");
@@ -1433,6 +1433,15 @@ function wireCalculations(entries) {
       const d = DEFAULT_MARK.exec(e.item.description || "");
       const start = e.item.last_text || (d && d[1].trim());
       if (start) { e.input.value = start; e.input.title = e.item.last_text ? "As recorded last time; change it if different" : "Usual value; change it if different"; }
+    }
+    const derivedRule=QADerived.read(e.item.description);
+    if(derivedRule){
+      let sources;
+      try{sources=QADerived.resolve(derivedRule,entries.slice(0,i).map(x=>x.item)).map(item=>entries.find(x=>x.item===item));}
+      catch(err){lock(e,err.message);e.input.value='';e.input.setCustomValidity(err.message);return;}
+      lock(e,derivedRule.inputs.map((x,n)=>`${String.fromCharCode(65+n)} = ${x.name}`).join('; ')+'; '+derivedRule.formula);
+      const update=()=>{try{const value=QADerived.calculate(derivedRule,entries.slice(0,i).map(x=>x.item),item=>entries.find(x=>x.item===item).input.value);e.input.value=value===null?'':String(Number(value.toPrecision(12)));e.input.setCustomValidity('');e.input.dispatchEvent(new Event('input'));}catch(err){e.input.value='';e.input.setCustomValidity(err.message);}};
+      sources.forEach(src=>src.input.addEventListener('input',update));update();return;
     }
     const hdrKinds = {
       'Dwell time — difference':'hdr-dwell-difference',
@@ -2127,7 +2136,7 @@ async function renderNewTemplate() {
     const rows = checks.map((t) => el('tr', {},
       el('td', {}, el('input', { type: 'checkbox', checked: t.included, disabled: source.value !== 'import', 'aria-label': `Include ${t.name}`, onchange: (e) => { t.included = e.target.checked; count.textContent = `${checks.filter((x) => x.included).length} of ${checks.length} tests included.`; } })),
       el('td', {}, t.name, t.category ? el('div', { class: 'muted small' }, t.category) : null),
-      el('td', {}, source.value === 'import' ? select('', [['numeric','Numeric'],['boolean','Yes / No'],['status','Pass / Warning / Action'],['text','Text']], t.type, { 'aria-label': `Type for ${t.name}`, onchange: (e) => { t.type = e.target.value; } }) : TYPE_LABELS[t.type]),
+      el('td', {}, source.value === 'import' ? select('', [['numeric','Numeric'],['boolean','Yes / No'],['status','Pass / Warning / Action'],['text','Text']], t.type, { 'aria-label': `Type for ${t.name}`, onchange: (e) => { t.type = e.target.value; } }) : QADerived.read(t.description)?'Derived':/\[calc: workbook\]/.test(t.description||'')?'Derived (Excel)':TYPE_LABELS[t.type]),
       el('td', {}, t.unit || '—'), el('td', {}, t.expected ?? '—'), el('td', {}, t.warn ?? '—'), el('td', {}, t.fail ?? '—')));
     preview.replaceChildren(count, table(['Include', 'Test', 'Type', 'Unit', 'Baseline', 'Default Warning', 'Default Action'], rows));
   };
@@ -2325,7 +2334,7 @@ async function renderQueueEditor(id) {
     body.replaceChildren(...matches.flatMap(({ item, index, axis }) => {
       if (!valuesFor) index = items.indexOf(item);
       const t = byId[item.test_id];
-      const numeric = t.type === "numeric";
+      const numeric = t.type === "numeric" || t.type === "derived";
       const editDefinition = (field, value) => {
         t[field] = value;
         testUpdates.set(t.id, { ...(testUpdates.get(t.id) || {}), [field]: value });
@@ -2348,7 +2357,7 @@ async function renderQueueEditor(id) {
       const lastInFamily = family && family[family.length - 1].item === item;
       const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
       const directions = family
-        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
         : helpText(t.description);
       const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 6 }, directions)) : null;
       lastSection = n;
@@ -2356,7 +2365,7 @@ async function renderQueueEditor(id) {
       return [head, groupHead, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
-          editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
+          editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t,items.slice(0,index).map(x=>byId[x.test_id])), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
             await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
             toast("Test saved");
             route();
@@ -2365,7 +2374,7 @@ async function renderQueueEditor(id) {
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, editable && !valuesFor ? el('div', {}, select('', Object.entries(TYPE_LABELS), t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { editDefinition('type', e.target.value); draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
+        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule={inputs:[],formula:'A'};t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), QADerived.read(t.description)?derivedEditor(QADerived.read(t.description),items.slice(0,index).map(x=>byId[x.test_id]),rule=>{t.description=(t.description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}):null, t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -2440,7 +2449,7 @@ async function renderQueueEditor(id) {
   holder.before(el("div", { class: "row template-search" }, search, el("button", { type: "button", onclick: () => { search.value = ""; searchTerm = ""; draw(); search.focus(); } }, "Clear"), searchCount),
     el("p", { class: "muted small" }, "Default limits apply to all machines. Select a machine above to set its own limits; blank fields use the defaults."));
   if (editable) {
-    const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => { if (valuesFor && dirty) { toast("Save your limits before adding a test.", true); return; } modal("New test for this list", testForm(), async (data) => {
+    const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => { if (valuesFor && dirty) { toast("Save your limits before adding a test.", true); return; } modal("New test for this list", testForm(null,items.map(x=>byId[x.test_id])), async (data) => {
       const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
       if (valuesFor) {
         const refreshed = await api("GET", "/api/tests");
@@ -2486,9 +2495,23 @@ function choiceOptions(description) {
   const m=/\[choices: ([^\]]+)\]/.exec(description||'');
   try{return m?JSON.parse(decodeURIComponent(m[1])):[];}catch{return [];}
 }
-function testForm(test) {
+function derivedEditor(rule,prior,onChange,formMode=false) {
+  rule=rule||{inputs:[],formula:'A'};
+  const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
+  const picked=new Set(rule.inputs.map(x=>JSON.stringify([x.name,x.category||''])));
+  const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
+  const formula=el('input',{'aria-label':'Derived formula',value:rule.formula,placeholder:'e.g. 100 * (A - B) / A'});
+  const mapping=el('p',{class:'small muted'});
+  const controls=numeric.map(t=>({t,input:el('input',{type:'checkbox',checked:picked.has(JSON.stringify([t.name,t.category||''])),'aria-label':`Use input: ${t.name}`})}));
+  const update=()=>{rule={inputs:controls.filter(x=>x.input.checked).map(x=>({name:x.t.name,category:x.t.category||''})),formula:formula.value};hidden.value=JSON.stringify(rule);mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');if(onChange)onChange(rule);};
+  controls.forEach(x=>x.input.addEventListener('change',update));formula.addEventListener('input',update);
+  mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');
+  return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Inputs from earlier tests'),numeric.length?el('div',{class:'derived-inputs'},...controls.map(({t,input})=>el('label',{class:'check'},input,t.name))):el('p',{class:'muted small'},'Add earlier numeric tests in this template first.'),mapping,field('Formula',formula),el('p',{class:'muted small'},'Use A, B, C in input order, numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), mean(). Missing inputs leave the result blank.'));
+}
+
+function testForm(test,prior=[]) {
   const t = test || { type: "numeric", tol_mode: "absolute", active: 1 };
-  const type = select("type", Object.entries(TYPE_LABELS), t.type);
+  const type = select("type", Object.entries(TYPE_LABELS), QADerived.read(t.description)?'derived':t.type);
   const limits = el("div", { class: "form-grid wide" },
     field("Unit", el("input", { name: "unit", value: t.unit || "", placeholder: "mm, %, cGy, °" })),
     field("Expected value", el("input", { name: "expected", type: "number", step: "any", value: t.expected ?? "" })),
@@ -2496,7 +2519,8 @@ function testForm(test) {
     field("Default Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0, value: t.fail ?? "" })),
     field("Limits are", select("tol_mode", [["absolute", "Absolute (same units)"], ["percent", "Percent of expected"]], t.tol_mode)));
   const choices=field('Answer options (one per line)',el('textarea',{name:'choices',rows:5},choiceOptions(t.description).join('\n')),'wide');
-  const sync = () => {limits.hidden=type.value!=='numeric';choices.hidden=type.value!=='choice';};
+  const derivedBox=derivedEditor(QADerived.read(t.description),prior,null,true);
+  const sync = () => {limits.hidden=!['numeric','derived'].includes(type.value);choices.hidden=type.value!=='choice';derivedBox.hidden=type.value!=='derived';};
   type.addEventListener("change", sync);
   sync();
   return el("div", { class: "form-grid" },
@@ -2504,7 +2528,7 @@ function testForm(test) {
     field("Category", el("input", { name: "category", value: t.category || "", placeholder: "e.g. Energy, Spot, Safety" })),
     field("Test name", el("input", { name: "name", value: t.name || "", required: true })),
     field("Type", type),
-    choices, limits,
+    choices, derivedBox, limits,
     field("Instructions", el("textarea", { name: "description" }, t.description || ""), "wide"),
     el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!t.active }), "Active"));
 }

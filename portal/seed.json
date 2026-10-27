@@ -1280,7 +1280,7 @@
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 1.07. [Section: Setup and Safety] [calc: ktp]"
+     "description": "Template 1.07. [Section: Setup and Safety] [calc: ktp] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20Temperature%2C%20%5Cu00b0C%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%2C%20%7B%22name%22%3A%20%22Air%20Pressure%20%5BkPa%5D%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22%28273.15%2BA%29%2F295.15%2A101.325%2FB%22%7D]"
     },
     {
      "category": "Safety",
@@ -1364,7 +1364,7 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.05. [Section: Mechanical and Imaging] [calc: 3d-offset]"
+     "description": "Template 2.05. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22%5BOrtho%20-%20kV%2FkV%5D%20PPS%202%20XRAY%20Offset%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%2C%20%7B%22name%22%3A%20%22%5BOrtho%20-%20kV%2FkV%5D%20PPS%202%20XRAY%20Offset%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%2C%20%7B%22name%22%3A%20%22%5BOrtho%20-%20kV%2FkV%5D%20PPS%202%20XRAY%20Offset%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1407,7 +1407,7 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.10. [Section: Mechanical and Imaging] [calc: 3d-offset]"
+     "description": "Template 2.10. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22%5BCBCT%20-%20Pelvis%20SFOV%20ND%5D%20Required%20Correction%20Vector%20-%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22%5BCBCT%20-%20Pelvis%20SFOV%20ND%5D%20Required%20Correction%20Vector%20-%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22%5BCBCT%20-%20Pelvis%20SFOV%20ND%5D%20Required%20Correction%20Vector%20-%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1457,7 +1457,7 @@
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.16. [Section: Mechanical and Imaging] [calc: 3d-offset]"
+     "description": "Template 2.16. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22%5BOBs%5D%20Required%20Correction%20Vector%20-%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22%5BOBs%5D%20Required%20Correction%20Vector%20-%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22%5BOBs%5D%20Required%20Correction%20Vector%20-%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1525,7 +1525,7 @@
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product]"
+     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20Cal.%20Factor%28Proton%29%2C%20Gy%2FC%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Electrometer%20Calibration%20Factor%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%22%7D]"
     },
     {
      "category": "Daily_PBS_Dosimetry",
@@ -1543,7 +1543,7 @@
      "unit": "cGy",
      "expected": 150,
      "tol_mode": "absolute",
-     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose]"
+     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Daily%20output%3A%20Charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Daily_PBS_Dosimetry%22%7D%2C%20%7B%22name%22%3A%20%22Overall%20Calibration%20Factor%20%5BGy%2FC%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20%28Output%29%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22A%2A0.000000001%2AB%2AC%2A100%22%7D]"
     },
     {
      "category": "Data",
@@ -2347,7 +2347,7 @@
      "unit": "cm",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 2.13. [Section: Dosimetry: PDD] [calc: sum:3]"
+     "description": "Template 2.13. [Section: Dosimetry: PDD] [calc: sum:3] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20Offset%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Phantom%20Offset%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Record%20User%20offset%20%28feeler%20gauge%20or%20gauge%20block%29%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22formula%22%3A%20%22A%2BB%2BC%22%7D]"
     },
     {
      "category": "Dosimetry",
@@ -2365,7 +2365,7 @@
      "unit": "cm",
      "expected": 2.5,
      "tol_mode": "absolute",
-     "description": "Template 2.15. [Section: Dosimetry: PDD] [calc: sum:2]"
+     "description": "Template 2.15. [Section: Dosimetry: PDD] [calc: sum:2] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Total%20Offset%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Measured%20Range%20%28D90%29%20without%20offset%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22A%2BB%22%7D]"
     },
     {
      "category": "Dosimetry",
@@ -2455,7 +2455,7 @@
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.03. [Section: Dosimetry: Output] [calc: ktp]"
+     "description": "Template 3.03. [Section: Dosimetry: Output] [calc: ktp] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Air%20Temperature%20%5B%5Cu00b0C%5D%22%2C%20%22category%22%3A%20%22Temp%20%26%20Pressure%22%7D%2C%20%7B%22name%22%3A%20%22Air%20Pressure%20%5BkPa%5D%22%2C%20%22category%22%3A%20%22Temp%20%26%20Pressure%22%7D%5D%2C%20%22formula%22%3A%20%22%28273.15%2BA%29%2F295.15%2A101.325%2FB%22%7D]"
     },
     {
      "category": "Device Selection",
@@ -2648,7 +2648,7 @@
      "type": "numeric",
      "unit": "",
      "tol_mode": "absolute",
-     "description": "Template 0.04. [Section: Chamber and conditions] [calc: ktp]"
+     "description": "Template 0.04. [Section: Chamber and conditions] [calc: ktp] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20temperature%20%5B%5Cu00b0C%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22Air%20pressure%20%5BhPa%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22%28273.15%2BA%29%2F295.15%2A1013.25%2FB%22%7D]"
     },
     {
      "category": "Conditions",
@@ -2924,7 +2924,7 @@
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.18. [Section: Mechanical] [calc: 3d-offset]"
+     "description": "Template 2.18. [Section: Mechanical] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -2959,7 +2959,7 @@
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.22. [Section: Mechanical] [calc: 3d-offset]"
+     "description": "Template 2.22. [Section: Mechanical] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -2994,7 +2994,7 @@
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.26. [Section: Mechanical] [calc: 3d-offset]"
+     "description": "Template 2.26. [Section: Mechanical] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3029,7 +3029,7 @@
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.30. [Section: Mechanical] [calc: 3d-offset]"
+     "description": "Template 2.30. [Section: Mechanical] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3064,7 +3064,7 @@
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.34. [Section: Mechanical] [calc: 3d-offset]"
+     "description": "Template 2.34. [Section: Mechanical] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3075,7 +3075,7 @@
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.35. [Section: Mechanical] [calc: max:BB walkout [mm]:5] Calculated here: max of the 5 rows above. Worst case of the couch angles above (sets the limits used by those rows)\nRadius form of the TG-224 ≤2 mm circle-diameter limit.\nTG-224: ≤2 mm dia"
+     "description": "Template 2.35. [Section: Mechanical] [calc: max:BB walkout [mm]:5] Calculated here: max of the 5 rows above. Worst case of the couch angles above (sets the limits used by those rows)\nRadius form of the TG-224 ≤2 mm circle-diameter limit.\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28abs%28A%29%2Cabs%28B%29%2Cabs%28C%29%2Cabs%28D%29%2Cabs%28E%29%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3086,7 +3086,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.36. [Section: Mechanical] [calc: range:BB walkout X [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia"
+     "description": "Template 2.36. [Section: Mechanical] [calc: range:BB walkout X [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3097,7 +3097,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.37. [Section: Mechanical] [calc: range:BB walkout Y [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia"
+     "description": "Template 2.37. [Section: Mechanical] [calc: range:BB walkout Y [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3108,7 +3108,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.38. [Section: Mechanical] [calc: range:BB walkout Z [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia"
+     "description": "Template 2.38. [Section: Mechanical] [calc: range:BB walkout Z [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
     },
     {
      "category": "Snout",
@@ -3174,7 +3174,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.44. [Section: Mechanical] [calc: max:XRV ISO difference:4] Calculated here: max of the 4 rows above. Worst case of the four gantry angles above\nTG-224: ±2 mm"
+     "description": "Template 2.44. [Section: Mechanical] [calc: max:XRV ISO difference:4] Calculated here: max of the 4 rows above. Worst case of the four gantry angles above\nTG-224: ±2 mm [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G000%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G060%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G120%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G180%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%5D%2C%20%22formula%22%3A%20%22max%28abs%28A%29%2Cabs%28B%29%2Cabs%28C%29%2Cabs%28D%29%29%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3193,7 +3193,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.02. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.02. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%2070%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3212,7 +3212,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.04. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.04. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20120%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3231,7 +3231,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.06. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.06. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20180%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3250,7 +3250,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.08. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.08. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20225%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3269,7 +3269,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.10. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.10. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%2070%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3288,7 +3288,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.12. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.12. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20120%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3307,7 +3307,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.14. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.14. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20180%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Output constancy",
@@ -3326,7 +3326,7 @@
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "percent",
-     "description": "Template 3.16. [Section: Dosimetry] [calc: dose-ndw]"
+     "description": "Template 3.16. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20225%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "Range verification (Zebra)",
@@ -3985,7 +3985,7 @@
      "category": "HDR treatment-day QA",
      "type": "numeric",
      "unit": "%",
-     "description": "Template 1.06. [Section: HDR treatment-day QA] Enter the calculated signed percent difference.\nSource: 10-20-2026.pdf, check 6.",
+     "description": "Template 1.06. [Section: HDR treatment-day QA] Enter the calculated signed percent difference.\nSource: 10-20-2026.pdf, check 6. [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Source%20air%20kerma%20strength%20%5Cu2014%20TCS%20Sk%22%2C%20%22category%22%3A%20%22HDR%20treatment-day%20QA%22%7D%2C%20%7B%22name%22%3A%20%22Source%20air%20kerma%20strength%20%5Cu2014%20decay%20table%20Sk%22%2C%20%22category%22%3A%20%22HDR%20treatment-day%20QA%22%7D%5D%2C%20%22formula%22%3A%20%22100%2A%28A-B%29%2FB%22%7D]",
      "expected": 0,
      "warn": null,
      "fail": 1,
@@ -4029,7 +4029,7 @@
      "category": "HDR treatment-day QA",
      "type": "numeric",
      "unit": "mm",
-     "description": "Template 1.07. [Section: HDR treatment-day QA] Enter console distance minus ruler reading.\nSource: 10-20-2026.pdf, check 7.",
+     "description": "Template 1.07. [Section: HDR treatment-day QA] Enter console distance minus ruler reading.\nSource: 10-20-2026.pdf, check 7. [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Position%20verification%20%5Cu2014%20console%20distance%22%2C%20%22category%22%3A%20%22HDR%20treatment-day%20QA%22%7D%2C%20%7B%22name%22%3A%20%22Position%20verification%20%5Cu2014%20ruler%20reading%22%2C%20%22category%22%3A%20%22HDR%20treatment-day%20QA%22%7D%5D%2C%20%22formula%22%3A%20%22A-B%22%7D]",
      "expected": 0,
      "warn": null,
      "fail": 1,
@@ -4139,7 +4139,7 @@
      "category": "HDR treatment-day QA",
      "type": "numeric",
      "unit": "%",
-     "description": "Template 1.13. [Section: HDR treatment-day QA] Enter the calculated signed percent difference.\nSource: 10-20-2026.pdf, check 13.",
+     "description": "Template 1.13. [Section: HDR treatment-day QA] Enter the calculated signed percent difference.\nSource: 10-20-2026.pdf, check 13. [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Dwell%20time%20%5Cu2014%20set%20time%22%2C%20%22category%22%3A%20%22HDR%20treatment-day%20QA%22%7D%2C%20%7B%22name%22%3A%20%22Dwell%20time%20%5Cu2014%20measured%20time%22%2C%20%22category%22%3A%20%22HDR%20treatment-day%20QA%22%7D%5D%2C%20%22formula%22%3A%20%22100%2A%28A-B%29%2FA%22%7D]",
      "expected": 0,
      "warn": null,
      "fail": 2,
