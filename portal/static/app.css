@@ -1607,3 +1607,5 @@ td, .measure-table td { font-size: 21px; }
 .tolerance-mode-actions .machine-tolerances-warning { color:#eab308; display:inline-flex; align-items:center; justify-content:center; padding:3px; border:0; background:transparent; }
 :root[data-theme="dark"] .tolerance-mode-actions .machine-tolerances-warning { color:#fbbf24; }
 .machine-tolerances-warning svg { flex:none; }
+
+.machine-difference-note { color:var(--muted); font-size:13px; line-height:1.3; }

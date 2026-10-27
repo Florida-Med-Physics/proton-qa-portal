@@ -2433,22 +2433,8 @@ async function renderQueueEditor(id) {
     }, "Save machine tests");
   } }, "Customize tests");
   const machineToleranceHelp=(test,item)=>{
-    const differs=(q.schedules||[]).some(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length);
-    if(!differs)return null;
-    const button=el('button',{type:'button',title:'Machines differ from default','aria-label':'Machines differ from default',onclick:()=>{
-      const valueText=(value,label,mode)=>label==='Tolerance mode'?(value==='percent'?'Percent':value==='absolute'?'Absolute':value):value==='Not set'?value:`${fmt(Number(value))}${label==='Baseline'?(test.unit?' '+test.unit:''):mode==='percent'?' %':test.unit?' '+test.unit:''}`;
-      const defaultMode=item.tol_mode||test.tol_mode||'absolute';
-      const rows=(q.schedules||[]).flatMap(schedule=>{
-        const own=machineValues[schedule.id]?.[item.test_id]||{};
-        return machineTestDifferences(test,item,own).map(d=>el('tr',{},el('th',{scope:'row'},schedule.machine),el('td',{},d.label),el('td',{},valueText(d.default,d.label,defaultMode)),el('td',{class:'machine-limit-different'},valueText(d.machine,d.label,own.tol_mode||defaultMode))));
-      });
-      const dialog=el('dialog',{class:'machine-tolerances-dialog','aria-label':'Machines differ from default'},el('h2',{},'Differences from default'),el('p',{},el('strong',{},test.name)),
-        el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine','Setting','Default','Machine value'].map(h=>el('th',{},h)))),el('tbody',{},rows))),
-        el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close'),el('button',{type:'button',class:'primary',onclick:()=>{dialog.close();showMachineTolerances(test,item);}},'Edit machine values')));
-      dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
-    }});
-    button.replaceChildren(svg('svg',{viewBox:'0 0 20 20',width:18,height:18,'aria-hidden':'true'},svg('circle',{cx:10,cy:10,r:9,fill:'currentColor'}),svg('path',{d:'M10 5v6',stroke:'#332500','stroke-width':2,'stroke-linecap':'round'}),svg('circle',{cx:10,cy:14,r:1,fill:'#332500'})));
-    button.classList.add('small','machine-tolerances-button','machine-tolerances-warning');return button;
+    const names=(q.schedules||[]).filter(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length).map(schedule=>schedule.machine);
+    return names.length?el('span',{class:'machine-difference-note'},`${names.join(', ')} ${names.length===1?'differs':'differ'}`):null;
   };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
@@ -2506,14 +2492,6 @@ async function renderQueueEditor(id) {
           try{await saveTemplateChanges();dialog.close();}catch(err){popupError.textContent=err.message;button.disabled=false;}
         }},'Save template'):null));
     dialog.addEventListener('close',()=>{dialog.remove();draw();});drawRows();document.body.append(dialog);dialog.showModal();
-  };
-  const differenceFlags=(test,item,base=true)=>{
-    const schedules=(q.schedules||[]).filter(x=>!valuesFor||String(x.id)===String(valuesFor));
-    return schedules.flatMap(schedule=>{
-      const differences=machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{},machineSelections[schedule.id]||{},base);
-      if(!differences.length)return [];
-      return [el('details',{class:'test-machine-difference'},el('summary',{'aria-label':`${schedule.machine}: differs from default`},`${schedule.machine} · differs`),el('div',{class:'test-difference-content'},...differences.map(d=>el('div',{},el('strong',{},`${d.label}: `),`Default ${d.default} → ${schedule.machine} ${d.machine}`))))];
-    });
   };
   const draw = () => {
     const selection = machineSelections[valuesFor] || {};
@@ -2602,7 +2580,7 @@ async function renderQueueEditor(id) {
           }) }, "✎") : null,
           editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
-            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, differenceFlags(t,item,baseIds.has(item.test_id)))),
+            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
