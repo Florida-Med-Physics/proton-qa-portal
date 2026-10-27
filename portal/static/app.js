@@ -2515,7 +2515,7 @@ function choiceOptions(description) {
 function derivedEditor(rule,prior,onChange,formMode=false) {
   rule=rule||{inputs:[],formula:'A'};
   const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
-  const inputNumbers=blockNumbers(prior);
+  const inputNumbers=blockNumbers(prior.map(t=>({...t,test_id:t.test_id||t.id})));
   const inputLabel=t=>{const n=inputNumbers.get(t.test_id||t.id)||checkNumber(t.description);return n?`Test ${n} · ${t.name}`:t.name;};
   const picked=new Set(rule.inputs.map(x=>JSON.stringify([x.name,x.category||''])));
   const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
