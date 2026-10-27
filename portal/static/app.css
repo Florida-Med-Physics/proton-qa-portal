@@ -1620,3 +1620,6 @@ td, .measure-table td { font-size: 21px; }
 :root[data-theme="dark"] .machine-color-eyeline { --machine-color:#d8b4fe; }
 :root[data-theme="dark"] .machine-color-gtr5 { --machine-color:#86efac; }
 .machine-color.machine-color { color:var(--machine-color); }
+
+.machine-tolerances-dialog .machine-limit-different.machine-color,
+:root[data-theme="dark"] .machine-tolerances-dialog .machine-limit-different.machine-color { color:var(--machine-color); }

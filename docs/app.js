@@ -404,7 +404,7 @@ async function renderHome() {
           el('div',{class:'home-qa-info'},el('span',{class:'home-qa-label',title:a.queue_name},label),el('span',{class:`small ${status==='Overdue'?'home-overdue':'muted'}`},status)),historyRing(a.history_counts,`#/trends?machine_id=${m.id}&list=${a.id}`,`${m.name} · ${a.queue_name}`));
       });
       body.append(el('div',{class:'home-machine-block'},
-        el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name '+machineColorClass(m.name)},m.name),
+        el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
           el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
             el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
         scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
@@ -509,7 +509,7 @@ function machineColorClass(name) {
   const match=/\bG(?:TR)?\s*([125])\b/i.exec(text);
   return match?`machine-color machine-color-gtr${match[1]}`:'';
 }
-function machineLabel(name) { return el('span',{class:machineColorClass(name)},name); }
+function machineLabel(name,colored=false) { return el('span',{class:colored?machineColorClass(name):''},name); }
 
 function shortDate(iso) {
   return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
@@ -2442,7 +2442,7 @@ async function renderQueueEditor(id) {
   } }, "Customize tests");
   const machineToleranceHelp=(test,item)=>{
     const names=(q.schedules||[]).filter(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length).map(schedule=>schedule.machine);
-    return names.length?el('span',{class:'machine-difference-note'},...names.flatMap((name,i)=>[i?', ':'',machineLabel(name)]),` ${names.length===1?'differs':'differ'}`):null;
+    return names.length?el('span',{class:'machine-difference-note'},...names.flatMap((name,i)=>[i?' · ':'',el('span',{class:machineColorClass(name)},`${name} differs`)])):null;
   };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
@@ -2452,6 +2452,8 @@ async function renderQueueEditor(id) {
     const paint=(field,custom,base)=>{
       const differs=!blank(custom)&&(field.dataset.inheritKey==='tol_mode'?custom!==base:blank(base)||Number(custom)!==Number(base));
       field.classList.toggle('machine-limit-different',differs);
+      field.classList.remove('machine-color','machine-color-gtr1','machine-color-gtr2','machine-color-gtr5','machine-color-eyeline');
+      const color=machineColorClass(field.dataset.machineName);if(differs&&color)field.classList.add(...color.split(' '));
       field.title=differs?`Different from default (${blank(base)?'not set':base})`:'';
     };
     const changed=aid=>{if(aid)modifiedMachineValues.add(String(aid));else defaultLimitsDirty=true;markDirty();};
@@ -2459,7 +2461,7 @@ async function renderQueueEditor(id) {
       const base=defaults();
       const cells=(name,target,aid)=>keys.map(k=>{
         const control=k==='tol_mode'?select('',[['absolute','Absolute'],['percent','Percent']],aid?(target[k]||base[k]):base[k],{'aria-label':`${name} ${labels[k]}`,disabled:!editable}):el('input',{type:'number',step:'any',...(k==='warn'||k==='fail'?{min:0}:{}),value:aid?(target[k]??base[k]??''):(base[k]??''),placeholder:blank(base[k])?'Not set':String(base[k]),'aria-label':`${name} ${labels[k]}`,disabled:!editable});
-        if(aid){control.dataset.inheritKey=k;control.dataset.machineId=aid;}
+        if(aid){control.dataset.inheritKey=k;control.dataset.machineId=aid;control.dataset.machineName=name;}
         if(aid)paint(control,target[k],base[k]);
         const update=()=>{
           target[k]=control.value;changed(aid);
@@ -2472,6 +2474,7 @@ async function renderQueueEditor(id) {
             paint(field,custom,latest[key]);
             if(key!=='tol_mode')field.placeholder=blank(latest[key])?'Not set':String(latest[key]);
           }
+          for(const row of body.querySelectorAll('tr[data-machine-id]')){const name=row.querySelector('th span');if(name)name.className=machineTestDifferences(test,item,machineValues[row.dataset.machineId][item.test_id]).length?machineColorClass(name.textContent):'';}
         };
         control.addEventListener('input',update);control.addEventListener('change',update);
         return el('td',{},control);
@@ -2486,7 +2489,7 @@ async function renderQueueEditor(id) {
       }},'↻');
       body.replaceChildren(el('tr',{},el('th',{scope:'row'},el('div',{class:'row'},'Default template',sync)),...cells('Default template',item,null)),...(q.schedules||[]).map(schedule=>{
         const own=machineValues[schedule.id][item.test_id] ||= {};
-        return el('tr',{},el('th',{scope:'row'},machineLabel(schedule.machine)),...cells(schedule.machine,own,schedule.id));
+        return el('tr',{'data-machine-id':schedule.id},el('th',{scope:'row'},machineLabel(schedule.machine,machineTestDifferences(test,item,own).length>0)),...cells(schedule.machine,own,schedule.id));
       }));
     };
     const popupError=el('p',{class:'error',role:'alert'});
@@ -2588,7 +2591,7 @@ async function renderQueueEditor(id) {
           }) }, "✎") : null,
           editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
-            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
+            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item))),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
@@ -2597,7 +2600,7 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el('div',{class:'tolerance-mode-actions'},select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
-            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'),machineToleranceHelp(t,item))) : el("span", { class: "muted" }, "—")),
+            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'))) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
