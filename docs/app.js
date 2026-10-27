@@ -2434,7 +2434,7 @@ async function renderQueueEditor(id) {
   } }, "Customize tests");
   const machineToleranceHelp=()=>{
     const button=infoPopup(el('p',{},'Editing the default Baseline, Warning, or Action updates every machine. The sync icon resets all values to the defaults. Blue values differ from the default. Save template to keep your changes.'),'Machine tolerances help');
-    button.textContent='(!)';button.classList.add('small','machine-tolerances-button');return button;
+    button.replaceChildren(svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},svg('path',{d:'M12 3 2 21h20L12 3Z'}),svg('path',{d:'M12 9v5'}),svg('circle',{cx:12,cy:17,r:0.7,fill:'currentColor',stroke:'none'})));button.classList.add('small','machine-tolerances-button','machine-tolerances-warning');return button;
   };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
