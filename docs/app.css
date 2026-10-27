@@ -1308,14 +1308,12 @@ td, .measure-table td { font-size: 21px; }
  #app[data-page="perform-qa"] .fixed-table .machine-row { border:0; padding:0; }
 }
 
-/* Selected Pass is vivid without changing the control typography. */
-.seg.pass.on, .chip.pass, .delta.st-pass { background:#25e65f; color:#072b14; border-color:#119b3a; }
+
 
 /* Result words match the measurement column headings. */
 .measure-table .status-cell .chip { font-size:18px; }
 
-/* Fail has the same vivid treatment as Pass. */
-.seg.fail.on, .chip.fail, .delta.st-fail { background:#ff3030; color:#fff; border-color:#c81010; }
+
 
 /* Review uses the same measurement language and numbered rows as Perform. */
 .review-section { padding:0; overflow:hidden; }
@@ -1390,3 +1388,13 @@ td, .measure-table td { font-size: 21px; }
 
 .derived-explanation { margin-top:8px; padding:8px 10px; border-left:3px solid var(--accent); font-size:16px; font-weight:400; line-height:1.5; overflow-wrap:anywhere; }
 .derived-input-reference { color:var(--muted); font-size:14px; }
+
+/* One reading size throughout the QA form, including explanatory and result text. */
+#app[data-page^="perform/"], #app[data-page^="runs/"] { --qa-form-font-size:22px; }
+#app[data-page^="perform/"] *, #app[data-page^="runs/"] * {
+  font-family:inherit !important;
+  font-size:var(--qa-form-font-size) !important;
+}
+@media(max-width:760px) {
+  #app[data-page^="perform/"], #app[data-page^="runs/"] { --qa-form-font-size:20px; }
+}

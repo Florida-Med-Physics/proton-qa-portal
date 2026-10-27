@@ -168,6 +168,8 @@ class Database:
         self._apply_imaging_defaults()
         self._install_department_templates()
         self._install_srs_winston_lutz()
+        for name,number in [('Maximum total delta','1.02'),('Mean total delta','1.03')]:
+            self.run("UPDATE tests SET expected=0 WHERE expected IS NULL AND name=? AND description LIKE ? AND category='Winston-Lutz' AND type='numeric' AND unit='mm' AND warn IS NULL AND fail IS NULL AND id IN (SELECT qi.test_id FROM queue_items qi JOIN queues q ON q.id=qi.queue_id WHERE q.name=?)",(name,'Template '+number+'.%','SRS QA template – TrueBeam (Dose Pro)'))
         self._install_requested_dashboard_schedules()
         self._install_derived_calculations()
 

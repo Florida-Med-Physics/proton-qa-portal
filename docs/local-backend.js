@@ -1245,6 +1245,10 @@
     applyImagingDefaults();
     installDepartmentTemplates();
     installSrsWinstonLutz();
+    for(const q of S.queues.filter(q=>q.name==='SRS QA template – TrueBeam (Dose Pro)'))for(const qi of S.queue_items.filter(i=>i.queue_id===q.id)){
+      const t=get('tests',qi.test_id,'Check');const number={'Maximum total delta':'1.02','Mean total delta':'1.03'}[t.name];
+      if(number&&t.description.startsWith('Template '+number+'.')&&t.category==='Winston-Lutz'&&t.type==='numeric'&&t.unit==='mm'&&t.expected==null&&t.warn==null&&t.fail==null){t.expected=0;save();}
+    }
     installRequestedDashboardSchedules();
     installDerivedCalculations();
     for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;

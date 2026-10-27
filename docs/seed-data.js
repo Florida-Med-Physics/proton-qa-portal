@@ -1210,7 +1210,7 @@ window.PORTAL_SEED = {
      "name": "Maximum total delta",
      "type": "numeric",
      "unit": "mm",
-     "expected": null,
+     "expected": 0,
      "warn": null,
      "fail": null,
      "description": "Template 1.02. Context only; does not determine pass or fail."
@@ -1220,7 +1220,7 @@ window.PORTAL_SEED = {
      "name": "Mean total delta",
      "type": "numeric",
      "unit": "mm",
-     "expected": null,
+     "expected": 0,
      "warn": null,
      "fail": null,
      "description": "Template 1.03. Context only; does not determine pass or fail."
