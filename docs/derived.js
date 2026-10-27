@@ -17,5 +17,7 @@ window.QADerived=(()=>{
   function encode(description,rule){return (description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+(rule?' [derived: '+encodeURIComponent(JSON.stringify(validate(rule)))+']':'');}
   function resolve(rule,prior){validate(rule);return rule.inputs.map(source=>{const matches=prior.filter(x=>x.name===source.name&&(x.category||'')===source.category&&x.type==='numeric');if(matches.length!==1)throw Error(`Derived input “${source.name}” must be an earlier numeric test in this list.`);return matches[0];});}
   function calculate(rule,prior,get){const sources=resolve(rule,prior),values=sources.map(get);if(values.some(v=>v===null||v===undefined||String(v).trim()===''||!Number.isFinite(Number(v))))return null;return evaluate(rule.formula,Object.fromEntries(values.map((v,i)=>[String.fromCharCode(65+i),Number(v)])));}
-  return {read,evaluate,validate,encode,resolve,calculate};
+  function value(input){return input.readOnly&&input.dataset.derivedValue!==undefined?input.dataset.derivedValue:input.value;}
+  function setInput(input,result){const valid=result!==null&&Number.isFinite(Number(result));input.dataset.derivedValue=valid?String(result):'';input.value=valid?Number(result).toPrecision(3):'';}
+  return {read,evaluate,validate,encode,resolve,calculate,value,setInput};
 })();

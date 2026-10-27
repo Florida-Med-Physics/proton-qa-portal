@@ -1442,9 +1442,9 @@ function derivedExplanation(item,items,numbers) {
 
 function wireCalculations(entries) {
   const byName = (re) => entries.find((e) => re.test(e.item.name));
-  const num = (e) => (e && e.input.value.trim() !== "" ? Number(e.input.value) : NaN);
+  const num = (e) => (e && e.input.value.trim() !== "" ? Number(QADerived.value(e.input)) : NaN);
   const lock = (e, title) => { e.input.readOnly = true; e.input.classList.add("from-file"); e.input.placeholder = "calculated"; e.input.title = title; };
-  const set = (e, v, decimals) => { e.input.value = Number.isFinite(v) ? v.toFixed(decimals) : ""; e.input.dispatchEvent(new Event("input")); };
+  const set = (e, v, decimals) => { QADerived.setInput(e.input,Number.isFinite(v)?v:null); e.input.dispatchEvent(new Event("input")); };
   entries.forEach((e, i) => {
     if (e.item.type === "text" && !e.input.value && !/\[auto: performer\]/.test(e.item.description || "")) {
       const d = DEFAULT_MARK.exec(e.item.description || "");
@@ -1457,7 +1457,7 @@ function wireCalculations(entries) {
       try{sources=QADerived.resolve(derivedRule,entries.slice(0,i).map(x=>x.item)).map(item=>entries.find(x=>x.item===item));}
       catch(err){lock(e,err.message);e.input.value='';e.input.setCustomValidity(err.message);return;}
       lock(e,derivedRule.inputs.map((x,n)=>`${String.fromCharCode(65+n)} = ${x.name}`).join('; ')+'; '+derivedRule.formula);
-      const update=()=>{try{const value=QADerived.calculate(derivedRule,entries.slice(0,i).map(x=>x.item),item=>entries.find(x=>x.item===item).input.value);e.input.value=value===null?'':String(Number(value.toPrecision(12)));e.input.setCustomValidity('');e.input.dispatchEvent(new Event('input'));}catch(err){e.input.value='';e.input.setCustomValidity(err.message);}};
+      const update=()=>{try{const value=QADerived.calculate(derivedRule,entries.slice(0,i).map(x=>x.item),item=>QADerived.value(entries.find(x=>x.item===item).input));QADerived.setInput(e.input,value);e.input.setCustomValidity('');e.input.dispatchEvent(new Event('input'));}catch(err){QADerived.setInput(e.input,null);e.input.setCustomValidity(err.message);}};
       sources.forEach(src=>src.input.addEventListener('input',update));update();return;
     }
     const hdrKinds = {
@@ -1597,13 +1597,14 @@ async function renderPerform(assignmentId) {
       const entry = {
         item, input, comment, note, required: item.type !== "text",
         status() {
-          const raw = input.value.trim();
+          const raw = QADerived.value(input).trim();
           if (!raw) return null;
           if (item.type === "numeric") return Number.isFinite(Number(raw)) ? evaluate("numeric", Number(raw), item.limits) : null;
           return evaluate(item.type, raw, item.limits);
         },
       };
       const update = () => {
+        if(input.readOnly&&input.dataset.derivedValue!==undefined) QADerived.setInput(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
         const s = entry.status();
         statusCell.replaceChildren(s ? chip(s) : "");
         if (s === "warn" || s === "fail") { comment.hidden = false; noteToggle.hidden = true; }
@@ -1670,7 +1671,7 @@ async function renderPerform(assignmentId) {
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
         const dlt = el("div", { class: "delta-slot" });
-        const showDelta = () => { const v = Number(control.value); dlt.replaceChildren(...present([control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : null])); };
+        const showDelta = () => { const v = Number(QADerived.value(control)); dlt.replaceChildren(...present([control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : null])); };
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           numberCell(it),
@@ -1868,7 +1869,7 @@ async function renderPerform(assignmentId) {
     error.textContent = "";
     submit.disabled = true;
     try {
-      const results = inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value.trim(), comment: i.comment.value }));
+      const results = inputs.map((i) => ({ test_id: i.item.test_id, value: QADerived.value(i.input).trim(), comment: i.comment.value }));
       autosaveStopped = true;
       clearTimeout(autosaveTimer);
       await draftWrites;
@@ -1893,7 +1894,7 @@ async function renderPerform(assignmentId) {
   const persistDraft = () => {
     if (autosaveStopped) return draftWrites;
     const data = { qa_date: qaDate.value, comment: runComment.value,
-      results: inputs.map((i) => ({ test_id: i.item.test_id, value: i.input.value, comment: i.comment.value })) };
+      results: inputs.map((i) => ({ test_id: i.item.test_id, value: QADerived.value(i.input), comment: i.comment.value })) };
     draftNote.textContent = "Saving…";
     draftWrites = draftWrites.catch(() => {}).then(async () => {
       const saved = await api("PUT", `/api/assignments/${assignmentId}/draft`, data);
@@ -2796,7 +2797,7 @@ async function renderReviewMeasurements(run) {
       const recent=[...prior].reverse().slice(0,3);
       const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+' '+unit}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+(unit?' '+unit:''))))):el('span',{class:'muted small'},'—');
       const missing=r.value_num==null&&r.value_text==null;
-      const value=missing?'Unanswered':r.type==='boolean'?(r.value_num?'Pass':'Fail'):r.type==='status'?STATUS_WORDS[r.value_text]||r.value_text:['text','choice'].includes(r.type)?r.value_text:`${fmt(r.value_num)} ${unit}`.trim();
+      const value=missing?'Unanswered':r.type==='boolean'?(r.value_num?'Pass':'Fail'):r.type==='status'?STATUS_WORDS[r.value_text]||r.value_text:['text','choice'].includes(r.type)?r.value_text:`${QADerived.read(r.description)||/\[calc:/.test(r.description||'')?Number(r.value_num).toPrecision(3):fmt(r.value_num)} ${unit}`.trim();
       const measured=el('div',{class:'review-measured'},value);
       if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
         const {value:input,control}=passFailInput(r.name,false,false);
