@@ -1328,8 +1328,6 @@ def review_run(db, user, run_id, data):
         if run["performed_by"] == user["id"]:
             raise PortalError("Runs must be reviewed by someone other than the person who performed them.")
         comment = _text(data, "comment")
-        if decision == "rejected" and not comment:
-            raise PortalError("Add a comment explaining the rejection.")
         db.run("UPDATE runs SET review_status = ?, reviewed_by = ?, reviewed_at = ?, review_comment = ? WHERE id = ?",
                (decision, user["id"], now(), comment, run_id))
         db.audit(user["id"], decision, "run", run_id, comment=comment)

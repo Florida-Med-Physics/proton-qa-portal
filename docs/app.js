@@ -213,6 +213,7 @@ function modal(title, body, onSave, saveLabel) {
 const qaTableObservers = new Set();
 function page(title, subtitle, actions) {
   for(const observer of qaTableObservers)observer.disconnect();qaTableObservers.clear();
+  app.style.removeProperty('--review-actions-height');
   app.dataset.page = location.hash.split("?")[0].replace(/^#\//, "") || "home";
   app.replaceChildren(el("div", { class: "page-head" },
     el("div", {}, el("h1", {}, title), subtitle ? el("div", { class: "muted" }, subtitle) : null),
@@ -2428,6 +2429,27 @@ async function renderQueueEditor(id) {
       await reloadMachine(); toast("Machine tests saved");
     }, "Save machine tests");
   } }, "Customize tests");
+  const showMachineTolerances=(test,item)=>{
+    const blank=v=>v===null||v===undefined||v==='';
+    const defaults=Object.fromEntries(['expected','warn','fail','tol_mode'].map(k=>[k,!blank(item[k])?item[k]:test[k]??(k==='tol_mode'?'absolute':null)]));
+    const cells=(values,own={})=>['expected','warn','fail','tol_mode'].map(k=>{
+      const value=values[k],text=blank(value)?'Not set':k==='tol_mode'?(value==='percent'?'Percent':'Absolute'):`${k==='expected'?'':'± '}${fmt(value)}${k!=='expected'&&values.tol_mode==='percent'?' %':test.unit?' '+test.unit:''}`;
+      return el('td',{},text,!blank(own[k])?el('span',{class:'small machine-limit-custom'},'Machine-specific'):null);
+    });
+    const rows=[el('tr',{},el('th',{scope:'row'},'Default template'),...cells(defaults))];
+    for(const schedule of q.schedules||[]){
+      const own=machineValues[schedule.id]?.[item.test_id]||{},values={...defaults};
+      for(const k of Object.keys(defaults))if(!blank(own[k]))values[k]=own[k];
+      rows.push(el('tr',{},el('th',{scope:'row'},schedule.machine),...cells(values,own)));
+    }
+    const dialog=el('dialog',{class:'machine-tolerances-dialog','aria-label':'Machine-Specific Tolerances'},
+      el('h2',{},'Machine-Specific Tolerances'),el('p',{},el('strong',{},test.name)),
+      el('p',{class:'muted small'},'Values without a machine-specific label use the default template. This comparison includes your current unsaved changes.'),
+      el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine','Baseline','Warning','Action','Mode'].map(h=>el('th',{},h)))),el('tbody',{},rows))),
+      !(q.schedules||[]).length?el('p',{},'Schedule this QA template on a machine to compare its limits.'):null,
+      el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close')));
+    dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+  };
   const differenceFlags=(test,item,base=true)=>{
     const schedules=(q.schedules||[]).filter(x=>!valuesFor||String(x.id)===String(valuesFor));
     return schedules.flatMap(schedule=>{
@@ -2531,8 +2553,8 @@ async function renderQueueEditor(id) {
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
-          select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
-            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } })) : el("span", { class: "muted" }, "—")),
+          el('div',{class:'tolerance-mode-actions'},select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
+            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machine tolerances'))) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
@@ -3116,7 +3138,7 @@ async function renderRun(id) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
-      const comment = el("textarea", { placeholder: "Note (required to reject)" });
+      const comment = el("textarea", { placeholder: "Review note (optional)", 'aria-label': 'Review note (optional)' });
       const error = el("p", { class: "error" });
       const decide = (decision) => async () => {
         error.textContent = "";
@@ -3128,9 +3150,12 @@ async function renderRun(id) {
           error.textContent = err.message;
         }
       };
-      app.append(el("div", { class: "card review-box" }, el("strong", {}, "Your review"), comment, error, el("div", { class: "row" },
+      const actions=el('div',{class:'review-action-bar'},el('strong',{},'Your review'),error,el('span',{class:'spacer'}),
         el("button", { class: "primary", onclick: decide("approved") }, "Approve"),
-        el("button", { class: "danger", onclick: decide("rejected") }, "Reject"))));
+        el("button", { class: "danger", onclick: decide("rejected") }, "Reject"));
+      app.append(el("div", { class: "card review-box" }, el("strong", {}, "Review note (optional)"), comment, actions));
+      const resize=new ResizeObserver(()=>app.style.setProperty('--review-actions-height',`${actions.getBoundingClientRect().height}px`));
+      resize.observe(actions);qaTableObservers.add(resize);
     }
   }
 

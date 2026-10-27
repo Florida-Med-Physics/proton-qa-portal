@@ -207,8 +207,9 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual((dist["status"], dist["warn"]), ("warn", 0.5))  # limits are snapshotted on the result
         with self.assertRaisesRegex(PortalError, "permission"):
             service.review_run(self.db, self.users["therapist"], result["id"], {"decision": "approved"})
-        with self.assertRaisesRegex(PortalError, "comment"):
-            service.review_run(self.db, self.users["physicist"], result["id"], {"decision": "rejected"})
+        rejected = self.submit("therapist")
+        service.review_run(self.db, self.users["physicist"], rejected["id"], {"decision": "rejected"})
+        self.assertEqual(service.get_run(self.db, self.users["admin"], rejected["id"])["review_status"], "rejected")
         service.review_run(self.db, self.users["physicist"], result["id"], {"decision": "approved"})
         with self.assertRaisesRegex(PortalError, "already been reviewed"):
             service.review_run(self.db, self.users["admin"], result["id"], {"decision": "approved"})

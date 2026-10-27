@@ -1067,7 +1067,6 @@
     if (r.review_status !== "pending") throw new Error("This run has already been reviewed.");
     if (r.performed_by === user.id) throw new Error("Runs must be reviewed by someone other than the person who performed them.");
     const comment = text(data, "comment");
-    if (data.decision === "rejected" && !comment) throw new Error("Add a comment explaining the rejection.");
     Object.assign(r, { review_status: data.decision, reviewed_by: user.id, reviewed_at: now(), review_comment: comment });
     save();
     audit(user.id, data.decision, "run", r.id, { comment });

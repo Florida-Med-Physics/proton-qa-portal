@@ -1574,3 +1574,27 @@ td, .measure-table td { font-size: 21px; }
   }
   .topbar #nav a { flex:0 0 auto; white-space:nowrap; min-height:44px; padding:12px 14px; font-size:15px; }
 }
+
+/* Review decisions stay reachable without covering the final test or page controls. */
+#app:has(.review-action-bar) { padding-bottom:calc(var(--review-actions-height, 88px) + 24px); }
+.review-action-bar {
+  position:fixed; bottom:0; left:0; right:0; z-index:40;
+  display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  padding:12px 24px calc(12px + env(safe-area-inset-bottom));
+  background:var(--surface); color:var(--text); border-top:1px solid var(--border);
+  box-shadow:0 -3px 12px #0002;
+}
+.review-action-bar .error { margin:0; }
+.review-action-bar .error:empty { display:none; }
+.review-action-bar button { min-height:44px; }
+@media(max-width:600px) {
+  .review-action-bar { padding:10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .review-action-bar .error:not(:empty) { flex-basis:100%; order:2; }
+}
+
+.tolerance-mode-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.tolerance-mode-actions select { width:auto; }
+.tolerance-mode-actions button { white-space:normal; }
+.machine-tolerances-dialog { width:min(920px, calc(100vw - 32px)); max-width:calc(100vw - 32px); }
+.machine-tolerances-dialog table { width:100%; }
+.machine-limit-custom { display:block; color:var(--link); font-weight:600; }
