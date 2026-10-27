@@ -1078,7 +1078,7 @@
       if(!runs[x.run_id] || x.value_num==null)continue;
       const test=byId('tests',x.test_id);if(!test)continue;
       const key=historyKey(test);if(!groups.has(key))groups.set(key,[]);
-      groups.get(key).push({run_id:x.run_id,source:runs[x.run_id].source,source_order:x.id,assignment_id:runs[x.run_id].assignment_id,qa_date:runs[x.run_id].qa_date,value:x.value_num,expected:x.expected,warn:x.warn,fail:x.fail,tol_mode:x.tol_mode,status:x.status});
+      groups.get(key).push({source_test_id:x.test_id,source_test_number:/Template\s+(\d+\.\d+)/.exec(test.description||'')?.[1]||null,run_id:x.run_id,source:runs[x.run_id].source,source_order:x.id,assignment_id:runs[x.run_id].assignment_id,qa_date:runs[x.run_id].qa_date,value:x.value_num,expected:x.expected,warn:x.warn,fail:x.fail,tol_mode:x.tol_mode,status:x.status});
     }
     for(const pts of groups.values())pts.sort((a,b)=>a.qa_date.localeCompare(b.qa_date)||a.run_id-b.run_id||a.source_order-b.source_order);
     const out={};for(const test of S.tests){const pts=groups.get(historyKey(test));if(pts)out[test.id]=pts;}

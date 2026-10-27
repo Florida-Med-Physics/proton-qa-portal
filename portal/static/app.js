@@ -210,7 +210,9 @@ function modal(title, body, onSave, saveLabel) {
   return dialog;
 }
 
+const qaTableObservers = new Set();
 function page(title, subtitle, actions) {
+  for(const observer of qaTableObservers)observer.disconnect();qaTableObservers.clear();
   app.dataset.page = location.hash.split("?")[0].replace(/^#\//, "") || "home";
   app.replaceChildren(el("div", { class: "page-head" },
     el("div", {}, el("h1", {}, title), subtitle ? el("div", { class: "muted" }, subtitle) : null),
@@ -443,7 +445,7 @@ function phoneDrawer(container, nodes, title) {
     return {node, slot};
   });
   container.append(details);
-  const media = matchMedia('(max-width: 760px)');
+  const media = matchMedia('(max-width: 1200px)');
   const update = () => {
     if (!container.isConnected && slots.some(x=>!x.slot.isConnected)) return;
     for (const {node,slot} of slots) {
@@ -1342,8 +1344,24 @@ function infoPopup(content,label='Calculation details') {
     dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }},'ⓘ');
 }
+function fitQaTable(table) {
+  requestAnimationFrame(()=>{
+    if(!table?.isConnected)return;
+    const wrap=table.parentElement;
+    const adapt=()=>{
+      const compact=matchMedia('(max-width: 1200px)').matches;
+      const count=compact?3:Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-822-280)/144)));
+      table.querySelectorAll('.hist-row').forEach(row=>[...row.children].forEach((cell,i)=>cell.hidden=i>=count));
+      let cols=table.querySelector('colgroup');
+      if(!cols){cols=el('colgroup',{},Array.from({length:10},()=>el('col')));table.prepend(cols);}
+      const widths=['72px','auto','156px','130px','76px','128px','132px',`${count*136+(count-1)*8+16}px`,'64px','64px'];
+      [...cols.children].forEach((col,i)=>col.style.width=widths[i]);
+    };
+    const observer=new ResizeObserver(adapt);qaTableObservers.add(observer);observer.observe(wrap);adapt();
+  });
+}
 function orderMeasurementRow(row) {
-  for(const name of ['qa-n','qa-label','qa-measured','qa-unit','qa-result','qa-dev','qa-baseline','history-cell','qa-comment','qa-trends']) {
+  for(const name of ['qa-n','qa-label','qa-measured','qa-dev','qa-unit','qa-result','qa-baseline','history-cell','qa-comment','qa-trends']) {
     const cell=[...row.children].find(c=>c.classList.contains(name));if(cell)row.append(cell);
   }
 }
@@ -1575,7 +1593,7 @@ async function renderPerform(assignmentId) {
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions", open: !matchMedia("(max-width: 760px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
+    app.append(el("details", { class: "card instructions", open: !matchMedia("(max-width: 1200px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
   }
   const inputs = [];
   const sections = [];
@@ -1640,7 +1658,6 @@ async function renderPerform(assignmentId) {
         if(input.readOnly&&input.dataset.derivedValue!==undefined) QADerived.setInput(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
         const s = entry.status();
         statusCell.replaceChildren(s ? chip(s) : "");
-        if (s === "warn" || s === "fail") { comment.hidden = false; noteToggle.hidden = true; }
         refresh();
       };
       input.addEventListener("input", update);
@@ -1699,7 +1716,7 @@ async function renderPerform(assignmentId) {
           if (!pts.length) return toast("No results yet for this test.", true);
           if (chart.hidden) chart.firstChild.replaceChildren(
             el("div", { class: "row" }, el("strong", {}, label(it)), el("span", { class: "spacer" }),
-              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
+              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&list=${t.assignment.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
             seriesChart([{ label: it.name, points: pts }], unit, { small: true, yLabel: yAxisLabel([it.name]) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
@@ -1732,13 +1749,14 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "190px", "100px", "130px", "150px", "150px", "424px", "130px", "100px"];
+      const widths = ["100px", "auto", "190px", "150px", "100px", "130px", "150px", "424px", "130px", "100px"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["#", firstHeader, "Measured", "Unit", "Result", "Deviation", "Baseline", "History", "Comment", "Trends"].map((h) => el("th", {}, h))),
+          el("thead", {}, el("tr", {}, ["#", firstHeader, "Measured", "Deviation", "Unit", "Result", "Baseline", "History", "Comment", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
+      fitQaTable(tableEl);
       // Axis and energy tables carry the shared limits in their title rather than on every row.
       if (title && firstHeader !== "Test") {
         const withLimits = members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null));
@@ -1980,7 +1998,7 @@ async function renderPerform(assignmentId) {
         const e = byTest[r.test_id];
         if (!e) continue;
         if (r.value !== undefined && r.value !== null && r.value !== "") { e.input.value = r.value; e.input.dispatchEvent(new Event("input")); }
-        if (r.comment) { e.comment.value = r.comment; e.comment.hidden = false; }
+        if (r.comment) e.comment.value = r.comment;
       }
       if (draft.qa_date) qaDate.value = draft.qa_date;
       if (draft.comment) runComment.value = draft.comment;
@@ -2967,7 +2985,7 @@ async function renderReviewMeasurements(run) {
       const trend=el('button',{class:'icon-btn',type:'button',title:'Show the trend here','aria-label':`Show trend for ${r.name}`,onclick:()=>{
         const pts=(history[r.test_id]||[]).slice(-60);
         if(!pts.length)return toast('No numeric results yet for this test.',true);
-        if(chart.hidden)chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
+        if(chart.hidden)chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
         chart.hidden=!chart.hidden;
       }},trendIcon(16));
       const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
@@ -2985,8 +3003,9 @@ async function renderReviewMeasurements(run) {
       orderMeasurementRow(row);
       tbody.append(row,chart);
     }
-    const headers=['#','Test','Measured','Unit','Result','Deviation','Baseline','History','Comment','Trends'];
+    const headers=['#','Test','Measured','Deviation','Unit','Result','Baseline','History','Comment','Trends'];
     app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'},el('thead',{},el('tr',{},headers.map(h=>el('th',{},h)))),tbody))));
+    fitQaTable(tbody.closest('table'));
   }
 }
 
@@ -3037,6 +3056,11 @@ async function renderRun(id) {
   const unanswered = run.results.filter(r => r.value_num == null && r.value_text == null);
   if (unanswered.length) app.append(el('p', {class:'lead'}, `${unanswered.length} of ${run.results.length} tests unanswered. Submitted for review; missing results are not passes.`));
   await renderReviewMeasurements(run);
+  const selectedTest=queryParams().get('test_id');
+  if(selectedTest)requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const row=[...app.querySelectorAll('[data-test-id]')].find(r=>r.dataset.testId===selectedTest);
+    if(row){row.classList.add('selected-qa-result');row.setAttribute('tabindex','-1');row.focus({preventScroll:true});row.scrollIntoView({block:'center'});}
+  }));
   const therapistMode=can('therapist_approve')&&!can('review');
   if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
 
@@ -3227,7 +3251,7 @@ function trendPassCounts(points) {
 function trendPassRing(points, label = 'Selected period') {
   const c = trendPassCounts(points), scale = c.total ? 100 / c.total : 0;
   const passEnd = c.pass * scale, warningEnd = passEnd + c.warn * scale, actionEnd = warningEnd + c.fail * scale;
-  const description = `${label}: ${c.percent}% passed. ${c.pass} pass, ${c.warn} warning, ${c.fail} action${c.other ? `, ${c.other} unclassified` : ''}; ${c.total} measurements in selected period. Uses current limits; includes extreme values.`;
+  const description = `${label}: ${c.percent}% passed. ${c.pass} pass, ${c.warn} warning, ${c.fail} action${c.other ? `, ${c.other} unclassified` : ''}; ${c.total} measurements in selected period. Uses the baseline and verdict saved with each result; includes extreme values.`;
   return el('span', { class: 'trend-pass-rate', title: description, role: 'img', 'aria-label': description },
     el('span', { class: 'trend-pass-donut', style: `background: conic-gradient(var(--pass) 0% ${passEnd}%, var(--warn) ${passEnd}% ${warningEnd}%, var(--fail) ${warningEnd}% ${actionEnd}%, var(--border) ${actionEnd}% 100%)` },
       el('span', { class: 'trend-pass-value' }, c.total ? `${c.percent}%` : '—')),
@@ -3244,7 +3268,7 @@ function trendStatistics(series, unit, delta = false, colorIndex = null) {
     const st = seriesStats(values), outlier = item.points[st.outlier];
     const color = item.colorIndex !== undefined ? `axis-${item.colorIndex}` : colorIndex !== null ? `axis-${colorIndex}` : series.length > 1 ? `axis-${index}` : 'single';
     return el('div', { class: 'trend-statistics-line' }, el('span', { class: `key-swatch line ${color}`, 'aria-hidden': 'true' }),
-      ` ${item.label}: Ref: ${sig(item.points.at(-1)?.expected)}: Trend Avg: ${sig(st.mean)} ± ${sig(st.sd)}${unit ? ` ${unit}` : ''}, Max Outlier: ${sig(values[st.outlier])} on ${shortDate(outlier.qa_date)}`);
+      ` ${item.label}: Baseline: ${fmt(item.points.at(-1)?.expected) || "—"}: Trend Avg: ${fmt(st.mean)} ± ${sig(st.sd)}${unit ? ` ${unit}` : ''}, Max Outlier: ${fmt(values[st.outlier])} on ${shortDate(outlier.qa_date)}`);
   }));
 }
 
@@ -3315,12 +3339,15 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
 const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
 
 let activePointTooltip=null;
+function trendRunHref(point) {
+  return `#/runs/${point.run_id}${point.source_test_id?'?test_id='+point.source_test_id:''}`;
+}
 function pointTooltip(dot,point,label,unit,event) {
   let tip=document.getElementById('qa-point-tooltip');
   if(!tip){tip=el('div',{id:'qa-point-tooltip',class:'point-tooltip',role:'tooltip',hidden:true});document.body.append(tip);window.addEventListener('hashchange',hidePointTooltip);document.addEventListener('scroll',hidePointTooltip,true);document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.dot'))hidePointTooltip();});}
   const ref=point.expected,change=ref==null?null:point.value-ref;
   const deltaText=change==null?'Δ: — (no reference)':`Δ: ${sigSigned(change)}${unit?' '+unit:''}`;
-  tip.replaceChildren(el('strong',{},label),el('span',{},`Date: ${shortDate(point.qa_date)}`),el('span',{},`Measured: ${sig(point.value)}${unit?' '+unit:''}`),el('span',{},deltaText));
+  tip.replaceChildren(el('strong',{},`${point.source_test_number?'Test '+point.source_test_number+' · ':''}${label}`),el('span',{},`Date: ${shortDate(point.qa_date)}`),el('span',{},`Measured: ${fmt(point.value)}${unit?' '+unit:''}`),el('span',{},deltaText),el('span',{},`Baseline: ${ref==null?'—':fmt(ref)+(unit?' '+unit:'')}`),point.current_expected!=null&&point.current_expected!==ref?el('span',{},`Current template baseline: ${fmt(point.current_expected)}${unit?' '+unit:''}`):null);
   tip.hidden=false;activePointTooltip=dot;dot.setAttribute('aria-describedby',tip.id);
   const rect=dot.getBoundingClientRect(),cx=event?.clientX||rect.left+rect.width/2,cy=event?.clientY||rect.top;
   tip.style.left=Math.max(8,Math.min(innerWidth-tip.offsetWidth-8,cx+14))+'px';
@@ -3401,11 +3428,11 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
   const seenTickLabels = new Set();
   for (const v of ticks) {
-    const tickLabel = (delta && v > 0 ? "+" : "") + sig(v);
+    const tickLabel = (delta && v > 0 ? "+" : "") + fmt(v,decimals);
     if (seenTickLabels.has(tickLabel)) continue;
     seenTickLabels.add(tickLabel);
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
-      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + sig(v)));
+      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v,decimals)));
   }
   const shortLabel = small && yLabel.length > 30 ? `${yLabel.slice(0, 29)}…` : yLabel;
   const yTitle = `${delta ? "Δ " : ""}${shortLabel}${unit ? ` (${unit})` : ""}`;   // "Y Offset (mm)" / "Δ Y Offset (mm)": the unit never changes between the two views
@@ -3432,15 +3459,15 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${cls || "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
       const change=p.expected==null?null:p.value-p.expected;
-      const description=`${s.label} · Date: ${shortDate(p.qa_date)} · Measured: ${sig(p.value)}${unit?' '+unit:''} · Δ: ${change==null?'— (no reference)':sigSigned(change)+(unit?' '+unit:'')}`;
+      const description=`${p.source_test_number?"Test "+p.source_test_number+" · ":""}${s.label} · Date: ${shortDate(p.qa_date)} · Measured: ${fmt(p.value)}${unit?' '+unit:''} · Δ: ${change==null?'— (no reference)':sigSigned(change)+(unit?' '+unit:'')}`;
       const dot=svg('circle',{class:`dot ${cls||'single'} st-${p.status}`,cx:x(p.qa_date),cy:y(val(p)),r,tabindex:0,'aria-label':description},svg('title',{},description));
       dot.addEventListener('pointerenter',e=>pointTooltip(dot,p,s.label,unit,e));
       dot.addEventListener('pointermove',e=>pointTooltip(dot,p,s.label,unit,e));
       dot.addEventListener('pointerleave',hidePointTooltip);
       dot.addEventListener('focus',()=>pointTooltip(dot,p,s.label,unit));
       dot.addEventListener('blur',hidePointTooltip);
-      dot.addEventListener('keydown',e=>{if(e.key==='Escape')hidePointTooltip();});
-      dot.addEventListener('click',e=>{e.stopPropagation();pointTooltip(dot,p,s.label,unit,e);});
+      dot.addEventListener('keydown',e=>{if(e.key==='Escape')hidePointTooltip();if((e.key==='Enter'||e.key===' ')&&p.run_id){e.preventDefault();location.hash=trendRunHref(p);}});
+      dot.addEventListener('click',e=>{e.stopPropagation();if(p.run_id){hidePointTooltip();location.hash=trendRunHref(p);}else pointTooltip(dot,p,s.label,unit,e);});
       plot.push(dot);
     }
   });
@@ -3467,17 +3494,21 @@ function axisLegend(group) {
 }
 
 const signed = (v, d = 2) => `${v >= 0 ? "+" : "−"}${fmt(Math.abs(v), d)}`;
-// Two significant figures for displayed trend measurements and statistics (77.7, 0.06, 157), trailing zeros dropped.
+// Compact precision is used only for statistical summaries; measurements and baselines use fmt.
 const sig = (v, n = 2) => (v === null || v === undefined || Number.isNaN(v) ? "—" : v === 0 ? "0" : String(Number(Number(v).toPrecision(n))));
 const sigSigned = (v, n = 2) => `${v >= 0 ? "+" : "−"}${sig(Math.abs(v), n)}`;
 
-// Trend points judged by the QA list's current limits (the same reference / warning / action the Perform page shows),
-// not by whatever limits were stored with each result. Points keep their recorded verdict in `recorded_status`.
-function judgedByList(item, points) {
-  const L = item.limits || {};
-  if (L.expected === null || L.expected === undefined) return points;
-  return points.map((p) => ({ ...p, expected: L.expected, warn: L.warn ?? null, fail: L.fail ?? null, tol_mode: L.tol_mode || "absolute",
-    recorded_status: p.status, status: evaluate("numeric", p.value, L) }));
+// Historical charts retain the same baseline and verdict shown in their source run.
+// Explicit current-limit comparisons remain available in the labeled CSV columns.
+function trendSourceNumberer(templates) {
+  const maps=new Map(templates.map(t=>[String(t.assignment.id),blockNumbers(t.items)]));
+  return point=>({...point,source_test_number:maps.get(String(point.assignment_id))?.get(point.source_test_id)||point.source_test_number});
+}
+function judgedByList(item, points, current = false) {
+  const L=item.limits||{};
+  return points.map(p=>({...p,current_expected:L.expected,
+    recorded_expected:p.recorded_expected??p.expected,recorded_status:p.recorded_status??p.status,
+    ...(current&&L.expected!=null?{expected:L.expected,warn:L.warn??null,fail:L.fail??null,tol_mode:L.tol_mode||'absolute',status:evaluate('numeric',p.value,L)}:{})}));
 }
 
 function trendDisplayName(name) {
@@ -3512,12 +3543,13 @@ function trendGroups(items) {
   return [...axisGroups(plain), ...families.values()].sort((a,b) => Math.min(...a.members.map(m => order.get(m.test_id))) - Math.min(...b.members.map(m => order.get(m.test_id))));
 }
 
-async function renderTrendOverview(machines, machineId, range, listId = "") {
+async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = []) {
   const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (!listId || String(a.id) === String(listId)));
   const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
+  const numberPoint=trendSourceNumberer(sourceTemplates.length?sourceTemplates:templates);
   const sections = [], insights = [];
   for (const template of templates) {
-    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range)) })).filter(i => i.points.length);
+    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range)).map(numberPoint) })).filter(i => i.points.length);
     // Result insertion order preserves the CSV analysis order, including for existing templates.
     const imported = Object.entries(histories).flatMap(([testId, points]) => points.filter(p => p.source === 'sphinx' && String(p.assignment_id) === String(template.assignment.id)).map(p => ({ ...p, testId })));
     const newest = imported.reduce((id, p) => Math.max(id, p.run_id), 0);
@@ -3560,26 +3592,33 @@ async function renderTrendOverview(machines, machineId, range, listId = "") {
   app.append(el('h2', { class: 'section-head' }, 'Measurements'), el('p', { class: 'muted small' }, 'Organized by QA list and measurement type. Select a row to open its graph. Matching X and Y measurements share a graph.'), search, ...sections);
 }
 
-function renderTrendDetail(group, range) {
+function renderTrendDetail(group, range, assignments=[]) {
   const unit = group.members[0].unit;
   const multi = group.members.length > 1;
   app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }));
-  // One row per date, one column per axis.
-  const byDate = new Map();
-  group.members.forEach((m, k) => m.points.forEach((p) => {
-    if (!byDate.has(p.qa_date)) byDate.set(p.qa_date, { run_id: p.run_id, cells: [] });
-    byDate.get(p.qa_date).cells[k] = p;
+  // Keep separate runs on the same date so a later pass never hides an earlier failure.
+  const byRun=new Map();
+  group.members.forEach((m,k)=>m.points.forEach(p=>{
+    const key=`${p.qa_date}|${p.run_id}`;
+    if(!byRun.has(key))byRun.set(key,{qa_date:p.qa_date,run_id:p.run_id,cells:[]});
+    byRun.get(key).cells[k]=p;
   }));
-  const dates = [...byDate.keys()].sort().reverse().slice(0, 100);
-  app.append(el("details", { class: "card", open: dates.length <= 20 }, el("summary", {}, byDate.size > 100 ? "Latest 100 days" : "Values"),
-    table(["QA date", ...group.members.map((m) => `#${m.axis || "Value"}`)], dates.map((d) => {
-      const row = byDate.get(d);
-      return el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${row.run_id}`) },
-        el("td", {}, d), group.members.map((m, k) => {
-          const p = row.cells[k];
-          return el("td", { class: "num" }, p ? [`${sig(p.value)} ${unit}`.trim(), " ", chip(p.status)] : "");
-        }));
-    }))));
+  const rows=[...byRun.values()].sort((a,b)=>b.qa_date.localeCompare(a.qa_date)||b.run_id-a.run_id).slice(0,100);
+  const valueRows=rows.map(row=>{
+    const cells=group.members.map((m,k)=>{
+      const p=row.cells[k];
+      const title=p?`Baseline at submission: ${fmt(p.expected)} ${unit}. Current template baseline: ${fmt(p.current_expected)} ${unit}.`:null;
+      return el('td',{class:'num',title},p?el('a',{href:trendRunHref(p),class:'trend-result-link'},
+        p.source_test_number?el('span',{class:'small'},`Test ${p.source_test_number}`):null,
+        el('span',{},`${fmt(p.value)} ${unit}`.trim()),chip(p.status)):'');
+    });
+    return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}`},row.qa_date)),
+      el('td',{},assignments.find(a=>String(a.id)===String(row.cells.find(Boolean)?.assignment_id))?.queue_name||'Recorded QA'),cells);
+  });
+  app.append(el('details',{class:'card',open:rows.length<=20},
+    el('summary',{},byRun.size>100?'Latest 100 runs':'Values'),
+    table(['QA date','Source QA list',...group.members.map(m=>m.axis||'Value')],valueRows)));
+
 }
 
 function stat(label, value, note) {
@@ -3653,8 +3692,8 @@ function trendCsvRows(machine, templates, histories, range, testIds = []) {
   const seen = new Set();
   for (const t of templates) for (const item of t.items) {
     if (item.type !== 'numeric' || (testIds.length && !testIds.includes(String(item.test_id)))) continue;
-    const points = filterRange(histories[item.test_id] || [], range);
-    const judged = judgedByList(item, points);
+    const points = filterRange(histories[item.test_id] || [], range).filter(p=>String(p.assignment_id)===String(t.assignment.id));
+    const judged = judgedByList(item, points, true);
     points.forEach((point, i) => {
       const key = `${point.run_id}:${point.source_order??item.test_id}`; if (seen.has(key)) return; seen.add(key);
       const l = item.limits;
@@ -3843,7 +3882,14 @@ async function renderTrends() {
   const testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
   const lists = machineId ? (await api("GET", `/api/machines/${machineId}/assignments`)).filter((a) => a.active) : [];
-  const listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
+  const templates=await Promise.all(lists.map(a=>api('GET',`/api/assignments/${a.id}/template`)));
+  const numberPoint=trendSourceNumberer(templates);
+  let listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
+  if(testIds.length){
+    const matches=t=>testIds.every(id=>t.items.some(i=>String(i.test_id)===id));
+    const selected=templates.find(t=>String(t.assignment.id)===listId&&matches(t))||templates.find(matches);
+    if(selected)listId=String(selected.assignment.id);
+  }
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
     select('machine_id', machines.map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
@@ -3853,22 +3899,21 @@ async function renderTrends() {
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds));
-  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId);
+  app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
+  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
-  const assignments = await api("GET", `/api/machines/${machineId}/assignments`);
-  const templates = await Promise.all(assignments.filter((a) => a.active).map((a) => api("GET", `/api/assignments/${a.id}/template`)));
-  const listItems = new Map(templates.flatMap((t) => t.items).map((i) => [String(i.test_id), i]));
+  const listItems = new Map(templates.filter(t=>!listId||String(t.assignment.id)===listId).flatMap(t=>t.items).map(i=>[String(i.test_id),i]));
   const items = data.map((d) => {
     const li = listItems.get(String(d.test.id));
     const limits = li ? li.limits : { expected: d.test.expected, warn: d.test.warn, fail: d.test.fail, tol_mode: d.test.tol_mode };
-    return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)) };
+    return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)).map(numberPoint) };
   }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = trendGroups(items)[0];
   app.append(el("h2", {}, group ? group.base : trendDisplayName(head.name), group ? axisLegend(group) : null),
     el("p", { class: "muted small" }, [sectionOf(head), categoryLabel(head.category)].join(" · ")));
   if (!group) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
-  renderTrendDetail(group, range);
+  renderTrendDetail(group, range, lists);
 }
 
 // ---------------------------------------------------------------------------

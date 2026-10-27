@@ -1,0 +1,15 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('portal/static/app.js','utf8');
+const ctx={evaluate:(_,value,limits)=>Math.abs(value-limits.expected)>limits.fail?'fail':'pass'};vm.createContext(ctx);
+vm.runInContext(source.slice(source.indexOf('function judgedByList('),source.indexOf('function trendDisplayName(')),ctx);
+vm.runInContext(source.slice(source.indexOf('function trendRunHref('),source.indexOf('function pointTooltip(')),ctx);
+vm.runInContext(source.slice(source.indexOf('function fmt('),source.indexOf('function today(')),ctx);
+const original={run_id:17,source_test_id:42,value:158.5,expected:158.5,warn:0.5,fail:1,tol_mode:'absolute',status:'pass'};
+const item={limits:{expected:160,warn:0.5,fail:1,tol_mode:'absolute'}};
+const saved=ctx.judgedByList(item,[original])[0];
+assert.equal(saved.expected,158.5);assert.equal(saved.status,'pass');assert.equal(saved.current_expected,160);
+assert.equal(ctx.judgedByList(item,[original],true)[0].status,'fail');
+assert.equal(original.expected,158.5);assert.equal(original.status,'pass');
+assert.equal(ctx.trendRunHref(original),'#/runs/17?test_id=42');
+for(const value of [77.7,158.5,260.7,101.325])assert.equal(ctx.fmt(value),String(value));
+console.log('Historical baseline/verdict preserved; explicit comparisons separate; exact source links and precision verified.');

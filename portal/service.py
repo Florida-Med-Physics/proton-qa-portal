@@ -1345,7 +1345,11 @@ def machine_trends(db, user, machine_id):
     groups={}
     for row in rows:
         test=by_id.get(row.pop('test_id'))
-        if test:groups.setdefault(_history_key(test),[]).append(row)
+        if test:
+            row['source_test_id']=test['id']
+            number=re.search(r'Template\s+(\d+\.\d+)',test.get('description') or '')
+            row['source_test_number']=number.group(1) if number else None
+            groups.setdefault(_history_key(test),[]).append(row)
     return {str(t['id']):groups[_history_key(t)] for t in tests if _history_key(t) in groups}
 
 

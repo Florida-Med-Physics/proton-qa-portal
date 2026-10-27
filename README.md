@@ -169,3 +169,5 @@ In template setup, choose **Derived** as a result type, select earlier numeric t
 The template audit is recorded in `calculation-audit.json`: 658 tests reviewed, 31 explicit arithmetic calculations connected to Derived, and 41 TrueBeam calculations retained in the native Excel formula engine. Imported metrics without sufficient source readings remain measurements.
 
 Perform QA keeps derived formulas behind an optional information button. Frequently used QA shortcuts use each signed-in user’s submission history. HDR Daily PDFs use a dedicated local reader with a confirmation preview; unreadable checkboxes stay unanswered. The bundled OCR assets run in the browser.
+
+Historical trend charts retain the baseline, tolerance and verdict stored with each source result. Current-template comparisons remain separate, labeled CSV columns. Same-day retests remain separate rows; result links and chart points open the exact source run and highlight its test. QA tables adapt the visible history count to the available width and use the compact layout on smaller screens. Notes open only through the plus button, including when restoring a draft.
