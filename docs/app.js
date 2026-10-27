@@ -3101,6 +3101,10 @@ async function renderRun(id) {
   app.append(facts);
 
   if (run.trashed_at) app.append(el("p",{class:"card"},"This QA is in Trash. ",run.trash_reason||"Created in error"));
+  const unanswered = run.results.filter(r => r.value_num == null && r.value_text == null);
+  if (unanswered.length) app.append(el('p', {class:'lead'}, `${unanswered.length} of ${run.results.length} tests unanswered. Submitted for review; missing results are not passes.`));
+  await renderReviewMeasurements(run);
+
   if (!run.trashed_at && run.therapist_approval_required) {
     app.append(el('section',{class:'card review-workflow'},
       el('div',{},el('strong',{},'Therapist review'),el('span',{class:'small'},run.therapist_approved_by?`Signed by ${run.therapist_approver_name||'therapist'} · ${run.therapist_approved_at.replace('T',' ')}`:'Mark the therapist-review test below.')),
@@ -3130,9 +3134,7 @@ async function renderRun(id) {
     }
   }
 
-  const unanswered = run.results.filter(r => r.value_num == null && r.value_text == null);
-  if (unanswered.length) app.append(el('p', {class:'lead'}, `${unanswered.length} of ${run.results.length} tests unanswered. Submitted for review; missing results are not passes.`));
-  await renderReviewMeasurements(run);
+
   const selectedTest=queryParams().get('test_id');
   if(selectedTest)requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const row=[...app.querySelectorAll('[data-test-id]')].find(r=>r.dataset.testId===selectedTest);
