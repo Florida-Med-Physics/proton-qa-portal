@@ -1623,3 +1623,8 @@ td, .measure-table td { font-size: 21px; }
 
 .machine-tolerances-dialog .machine-limit-different.machine-color,
 :root[data-theme="dark"] .machine-tolerances-dialog .machine-limit-different.machine-color { color:var(--machine-color); }
+
+.name-with-edit:has(> .machine-difference-note) { flex-wrap:nowrap; align-items:center; }
+.name-with-edit:has(> .machine-difference-note) .inline-test-name { flex:1 1 auto; min-width:0; }
+.name-with-edit > .machine-difference-note { flex:0 0 auto; white-space:nowrap; font-size:13px; line-height:1.2; }
+.machine-difference-note .machine-color { font-size:inherit; }
