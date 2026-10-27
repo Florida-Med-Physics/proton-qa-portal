@@ -254,6 +254,21 @@ class Database:
                 self.run('UPDATE queues SET description=? WHERE id=?',(tpl['setup'],q['id']))
                 self.audit(None,'install_winston_lutz','queue',q['id'],rule='Maximum delta < 1 mm')
 
+        for q in self.all('SELECT * FROM queues WHERE name=?',(tpl['name'],)):
+            marker='expand_winston_lutz_fields_v1'
+            if self.one('SELECT id FROM audit WHERE action=? AND entity_id=?',(marker,str(q['id']))): continue
+            items=self.all('SELECT t.name,t.category FROM queue_items i JOIN tests t ON t.id=i.test_id WHERE i.queue_id=?',(q['id'],))
+            if not any(i['name']=='Maximum delta' and i['category']=='Winston-Lutz' for i in items): continue
+            with self.transaction():
+                position=self.one('SELECT MAX(position) AS p FROM queue_items WHERE queue_id=?',(q['id'],))['p'] or 0
+                for c in tpl['checks'][3:]:
+                    if any(i['name']==c['name'] and i['category']==c['category'] for i in items): continue
+                    position+=1
+                    tid=self.run('INSERT INTO tests(name,category,type,unit,description,expected,warn,fail,tol_mode,active,owner_queue_id) VALUES(?,?,?,?,?,?,?,?,?,1,?)',(c['name'],c['category'],c['type'],c['unit'],c['description'],c['expected'],c['warn'],c['fail'],'absolute',q['id']))
+                    self.run('INSERT INTO queue_items(queue_id,test_id,position) VALUES(?,?,?)',(q['id'],tid,position))
+                self.run('UPDATE queues SET description=? WHERE id=?',(tpl['setup'],q['id']))
+                self.audit(None,marker,'queue',q['id'],context_only=True)
+
     def _install_department_templates(self):
         # Install only into existing departmental databases; empty databases use seed-defaults.
         if not self.one("SELECT id FROM machines LIMIT 1"):

@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm');
+const context={window:{}};vm.createContext(context);vm.runInContext(fs.readFileSync('portal/static/wl-import.js','utf8'),context);
+const header='DoseLab Winston-Lutz Results\nDate: July 07, 2026\nMaximum delta: 0.45 mm\nMaximum total delta: 0.60 mm\nMean total delta: 0.32mm\nSID: 150 cm\nRadiation field threshold: 50%\nCenter object threshold: 80%\nRegion Images\n';
+const field='G 0 ° , C 0 ° , T 270 °\nRI.example.dcm\n∆ =-0.39; Total ∆ =0.60mm\n∆ =+0.45mm\n';
+const parse=t=>context.window.QAWinstonLutz.parseText(t,'TrueBeam.pdf');
+const data=parse(header+field).measurements;
+assert.equal(data.length,13);assert.equal(data.find(m=>m.name==='Horizontal delta').result,-.39);assert.equal(data.find(m=>m.name==='Vertical delta').result,.45);
+assert(data.slice(3).every(m=>m.sphinx_status==='Recorded'&&m.fail===null&&m.warn===null));
+assert.throws(()=>parse(header+field+field),/Duplicate/);assert.throws(()=>parse(header+field.replace('∆ =+0.45mm','')),/Missing/);
+console.log('Signed offsets, whitespace, context-only verdicts and malformed field validation verified.');

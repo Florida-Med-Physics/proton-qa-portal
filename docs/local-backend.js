@@ -1247,6 +1247,7 @@
     applyImagingDefaults();
     installDepartmentTemplates();
     installSrsWinstonLutz();
+    expandWinstonLutzFields();
     for(const q of S.queues.filter(q=>q.name==='SRS QA template – TrueBeam (Dose Pro)'))for(const qi of S.queue_items.filter(i=>i.queue_id===q.id)){
       const t=get('tests',qi.test_id,'Check');const number={'Maximum total delta':'1.02','Mean total delta':'1.03'}[t.name];
       if(number&&t.description.startsWith('Template '+number+'.')&&t.category==='Winston-Lutz'&&t.type==='numeric'&&t.unit==='mm'&&t.expected==null&&t.warn==null&&t.fail==null){t.expected=0;save();}
@@ -1291,6 +1292,23 @@
       S.queue_items=S.queue_items.filter(i=>i.queue_id!==q.id);
       tpl.checks.forEach((c,position)=>{const id=insert('tests',{...c,tol_mode:'absolute',active:1,owner_queue_id:q.id});insert('queue_items',{queue_id:q.id,test_id:id,position,expected:null,warn:null,fail:null,tol_mode:null});});
       q.description=tpl.setup;audit(null,'install_winston_lutz','queue',q.id,{rule:'Maximum delta < 1 mm'});save();
+    }
+  }
+
+  function expandWinstonLutzFields() {
+    S.wlExpandedFieldsV1 ||= {};
+    const tpl=window.PORTAL_SEED.templates.find(t=>t.name==='SRS QA template – TrueBeam (Dose Pro)');
+    for(const q of S.queues.filter(q=>q.name===tpl.name)){
+      if(S.wlExpandedFieldsV1[q.id])continue;
+      const items=S.queue_items.filter(i=>i.queue_id===q.id).map(i=>byId('tests',i.test_id));
+      if(!items.some(t=>t?.name==='Maximum delta'&&t.category==='Winston-Lutz'))continue;
+      let position=Math.max(0,...S.queue_items.filter(i=>i.queue_id===q.id).map(i=>i.position));
+      for(const c of tpl.checks.slice(3)){
+        if(items.some(t=>t?.name===c.name&&t.category===c.category))continue;
+        const id=insert('tests',{...c,tol_mode:'absolute',active:1,owner_queue_id:q.id});
+        insert('queue_items',{queue_id:q.id,test_id:id,position:++position,expected:null,warn:null,fail:null,tol_mode:null});
+      }
+      q.description=tpl.setup;S.wlExpandedFieldsV1[q.id]=true;save();
     }
   }
 

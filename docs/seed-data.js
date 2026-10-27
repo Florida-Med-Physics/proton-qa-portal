@@ -1193,7 +1193,7 @@ window.PORTAL_SEED = {
    "kind": "Linac",
    "list": "SRS QA",
    "frequency": "asneeded",
-   "setup": "Run on SRS treatment days. The DoseLab Winston-Lutz PDF fills the measurements from the configured import folder for the selected QA date. Only Maximum delta determines the measurement verdict: strictly less than 1 mm passes; 1 mm or more fails. Maximum total delta and Mean total delta are recorded for context.",
+   "setup": "Run on SRS treatment days. Import the DoseLab Winston-Lutz PDF to fill summary results, report settings, and individual field offsets. Only Maximum delta determines pass/fail: less than 1 mm passes; 1 mm or more fails.",
    "checks": [
     {
      "category": "Winston-Lutz",
@@ -1224,6 +1224,526 @@ window.PORTAL_SEED = {
      "warn": null,
      "fail": null,
      "description": "Template 1.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL settings",
+     "name": "SID",
+     "type": "numeric",
+     "unit": "cm",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 2.0 WL settings] Template 2.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL settings",
+     "name": "Radiation field threshold",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 2.0 WL settings] Template 2.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL settings",
+     "name": "Center object threshold",
+     "type": "numeric",
+     "unit": "%",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 2.0 WL settings] Template 2.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL settings",
+     "name": "Image count",
+     "type": "numeric",
+     "unit": "",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 2.0 WL settings] Template 2.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 0°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 3.0 WL field G 0°, C 0°, T 0°] Template 3.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 0°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 3.0 WL field G 0°, C 0°, T 0°] Template 3.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 0°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 3.0 WL field G 0°, C 0°, T 0°] Template 3.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 0°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 3.0 WL field G 0°, C 0°, T 0°] Template 3.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 0°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 3.0 WL field G 0°, C 0°, T 0°] Template 3.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 0°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 3.0 WL field G 0°, C 0°, T 0°] Template 3.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 270°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 4.0 WL field G 0°, C 0°, T 270°] Template 4.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 270°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 4.0 WL field G 0°, C 0°, T 270°] Template 4.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 270°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 4.0 WL field G 0°, C 0°, T 270°] Template 4.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 270°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 4.0 WL field G 0°, C 0°, T 270°] Template 4.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 270°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 4.0 WL field G 0°, C 0°, T 270°] Template 4.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 270°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 4.0 WL field G 0°, C 0°, T 270°] Template 4.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 180°, C 90°, T 0°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 5.0 WL field G 180°, C 90°, T 0°] Template 5.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 180°, C 90°, T 0°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 5.0 WL field G 180°, C 90°, T 0°] Template 5.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 180°, C 90°, T 0°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 5.0 WL field G 180°, C 90°, T 0°] Template 5.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 180°, C 90°, T 0°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 5.0 WL field G 180°, C 90°, T 0°] Template 5.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 180°, C 90°, T 0°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 5.0 WL field G 180°, C 90°, T 0°] Template 5.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 180°, C 90°, T 0°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 5.0 WL field G 180°, C 90°, T 0°] Template 5.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 90°, C 90°, T 0°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 6.0 WL field G 90°, C 90°, T 0°] Template 6.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 90°, C 90°, T 0°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 6.0 WL field G 90°, C 90°, T 0°] Template 6.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 90°, C 90°, T 0°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 6.0 WL field G 90°, C 90°, T 0°] Template 6.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 90°, C 90°, T 0°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 6.0 WL field G 90°, C 90°, T 0°] Template 6.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 90°, C 90°, T 0°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 6.0 WL field G 90°, C 90°, T 0°] Template 6.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 90°, C 90°, T 0°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 6.0 WL field G 90°, C 90°, T 0°] Template 6.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 90°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 7.0 WL field G 0°, C 0°, T 90°] Template 7.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 90°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 7.0 WL field G 0°, C 0°, T 90°] Template 7.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 90°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 7.0 WL field G 0°, C 0°, T 90°] Template 7.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 90°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 7.0 WL field G 0°, C 0°, T 90°] Template 7.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 90°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 7.0 WL field G 0°, C 0°, T 90°] Template 7.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 0°, T 90°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 7.0 WL field G 0°, C 0°, T 90°] Template 7.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 270°, T 0°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 8.0 WL field G 0°, C 270°, T 0°] Template 8.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 270°, T 0°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 8.0 WL field G 0°, C 270°, T 0°] Template 8.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 270°, T 0°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 8.0 WL field G 0°, C 270°, T 0°] Template 8.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 270°, T 0°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 8.0 WL field G 0°, C 270°, T 0°] Template 8.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 270°, T 0°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 8.0 WL field G 0°, C 270°, T 0°] Template 8.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 270°, T 0°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 8.0 WL field G 0°, C 270°, T 0°] Template 8.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 90°, T 0°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 9.0 WL field G 0°, C 90°, T 0°] Template 9.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 90°, T 0°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 9.0 WL field G 0°, C 90°, T 0°] Template 9.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 90°, T 0°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 9.0 WL field G 0°, C 90°, T 0°] Template 9.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 90°, T 0°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 9.0 WL field G 0°, C 90°, T 0°] Template 9.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 90°, T 0°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 9.0 WL field G 0°, C 90°, T 0°] Template 9.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 0°, C 90°, T 0°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 9.0 WL field G 0°, C 90°, T 0°] Template 9.06. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 270°, C 90°, T 0°",
+     "name": "Gantry angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 10.0 WL field G 270°, C 90°, T 0°] Template 10.01. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 270°, C 90°, T 0°",
+     "name": "Collimator angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 10.0 WL field G 270°, C 90°, T 0°] Template 10.02. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 270°, C 90°, T 0°",
+     "name": "Couch angle",
+     "type": "numeric",
+     "unit": "°",
+     "expected": null,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 10.0 WL field G 270°, C 90°, T 0°] Template 10.03. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 270°, C 90°, T 0°",
+     "name": "Horizontal delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 10.0 WL field G 270°, C 90°, T 0°] Template 10.04. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 270°, C 90°, T 0°",
+     "name": "Vertical delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 10.0 WL field G 270°, C 90°, T 0°] Template 10.05. Context only; does not determine pass or fail."
+    },
+    {
+     "category": "WL field G 270°, C 90°, T 0°",
+     "name": "Total delta",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": null,
+     "fail": null,
+     "description": "[Section: 10.0 WL field G 270°, C 90°, T 0°] Template 10.06. Context only; does not determine pass or fail."
     }
    ]
   },

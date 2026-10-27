@@ -11,8 +11,29 @@ window.QAWinstonLutz = (() => {
       const re=new RegExp('(?:^|\\n)\\s*'+name+'\\s*:\\s*([+\\-]?\\d+(?:\\.\\d+)?)\\s*mm\\b','i');
       const m=re.exec(text); if(!m) throw Error(`Missing ${name} in the report.`);
       const result=Number(m[1]);if(!Number.isFinite(result)||result<0)throw Error(`Invalid ${name}.`);
-      return {category:'Winston-Lutz',name,unit:'mm',result,expected:i===0?0:null,warn:null,fail:i===0?1:null,tol_mode:'absolute',criterion:i===0?'wl-max-delta':null,sphinx_status:i===0?(result<1?'Passed':'Failed'):'Recorded',sphinx_label:name};
+      return {category:'Winston-Lutz',name,unit:'mm',result,expected:0,warn:null,fail:i===0?1:null,tol_mode:'absolute',criterion:i===0?'wl-max-delta':null,sphinx_status:i===0?(result<1?'Passed':'Failed'):'Recorded',sphinx_label:name};
     });
+    const record=(category,name,unit,value)=>measurements.push({category,name,unit,result:Number(String(value).replace('−','-')),expected:unit==='mm'?0:null,warn:null,fail:null,tol_mode:'absolute',criterion:null,sphinx_status:'Recorded',sphinx_label:category+' · '+name});
+    for(const [label,unit] of [['SID','cm'],['Radiation field threshold','%'],['Center object threshold','%']]) {
+      const m=new RegExp(label+':\\s*(\\d+(?:\\.\\d+)?)\\s*'+unit,'i').exec(text);
+      if(m)record('WL settings',label,unit,m[1]);
+    }
+    const regions=text.split('Region Images');
+    if(regions.length>1){
+      const fields=[...regions[1].matchAll(/G\s*([\d.]+)\s*°\s*,\s*C\s*([\d.]+)\s*°\s*,\s*T\s*([\d.]+)\s*°/g)],seen=new Set();
+      for(let i=0;i<fields.length;i++){
+        const field=fields[i],angles=field.slice(1).map(Number),key=angles.join(',');
+        if(seen.has(key))throw Error('Duplicate Winston-Lutz field angles.');seen.add(key);
+        const block=regions[1].slice(field.index+field[0].length,fields[i+1]?.index);
+        const offsets=/[∆Δ]\s*=\s*([+−-]?[\d.]+)\s*;\s*Total\s*[∆Δ]\s*=\s*([\d.]+)\s*mm\s*[∆Δ]\s*=\s*([+−-]?[\d.]+)\s*mm/.exec(block);
+        if(!offsets)throw Error('Missing offsets for Winston-Lutz field '+key);
+        const category=`WL field G ${angles[0]}°, C ${angles[1]}°, T ${angles[2]}°`;
+        ['Gantry angle','Collimator angle','Couch angle'].forEach((name,j)=>record(category,name,'°',angles[j]));
+        ['Horizontal delta','Vertical delta','Total delta'].forEach((name,j)=>record(category,name,'mm',[offsets[1],offsets[3],offsets[2]][j]));
+      }
+      if(!fields.length)throw Error('No readable Winston-Lutz region fields.');
+      record('WL settings','Image count','',fields.length);
+    }
     const report_machine = /(?:^|\n)\s*Machine:\s*([^\n]+)/i.exec(text)?.[1]?.trim() || '';
     return {filename,qa_date,finished:qa_date+'T00:00:00',sphinx_user:'',report_machine,measurements};
   }
