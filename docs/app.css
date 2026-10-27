@@ -1604,6 +1604,6 @@ td, .measure-table td { font-size: 21px; }
 .machine-tolerances-dialog th .row { gap:8px; flex-wrap:nowrap; }
 .sync-machine-defaults { font-size:24px; line-height:1; flex:none; }
 
-.tolerance-mode-actions .machine-tolerances-warning { color:#b45309; display:inline-flex; align-items:center; justify-content:center; padding:5px 7px; }
+.tolerance-mode-actions .machine-tolerances-warning { color:#eab308; display:inline-flex; align-items:center; justify-content:center; padding:3px; border:0; background:transparent; }
 :root[data-theme="dark"] .tolerance-mode-actions .machine-tolerances-warning { color:#fbbf24; }
 .machine-tolerances-warning svg { flex:none; }

@@ -2432,9 +2432,12 @@ async function renderQueueEditor(id) {
       await reloadMachine(); toast("Machine tests saved");
     }, "Save machine tests");
   } }, "Customize tests");
-  const machineToleranceHelp=()=>{
-    const button=infoPopup(el('p',{},'Editing the default Baseline, Warning, or Action updates every machine. The sync icon resets all values to the defaults. Blue values differ from the default. Save template to keep your changes.'),'Machine tolerances help');
-    button.replaceChildren(svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},svg('path',{d:'M12 3 2 21h20L12 3Z'}),svg('path',{d:'M12 9v5'}),svg('circle',{cx:12,cy:17,r:0.7,fill:'currentColor',stroke:'none'})));button.classList.add('small','machine-tolerances-button','machine-tolerances-warning');return button;
+  const machineToleranceHelp=(test,item)=>{
+    const differs=(q.schedules||[]).some(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length);
+    if(!differs)return null;
+    const button=infoPopup(el('p',{},'One or more machines have values that differ from this test’s defaults. Open Machines to review them. Editing the default Baseline, Warning, or Action updates every machine. The sync icon resets all values to the defaults. Save template to keep your changes.'),'Machines differ from default');
+    button.replaceChildren(svg('svg',{viewBox:'0 0 20 20',width:18,height:18,'aria-hidden':'true'},svg('circle',{cx:10,cy:10,r:9,fill:'currentColor'}),svg('path',{d:'M10 5v6',stroke:'#332500','stroke-width':2,'stroke-linecap':'round'}),svg('circle',{cx:10,cy:14,r:1,fill:'#332500'})));
+    button.classList.add('small','machine-tolerances-button','machine-tolerances-warning');return button;
   };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
@@ -2597,7 +2600,7 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el('div',{class:'tolerance-mode-actions'},select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
-            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'),machineToleranceHelp())) : el("span", { class: "muted" }, "—")),
+            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'),machineToleranceHelp(t,item))) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
