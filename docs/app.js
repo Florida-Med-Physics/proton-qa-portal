@@ -1342,6 +1342,11 @@ function infoPopup(content,label='Calculation details') {
     dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }},'ⓘ');
 }
+function orderMeasurementRow(row) {
+  for(const name of ['qa-n','qa-label','qa-measured','qa-result','qa-baseline','qa-unit','qa-dev','qa-comment','history-cell','qa-trends']) {
+    const cell=[...row.children].find(c=>c.classList.contains(name));if(cell)row.append(cell);
+  }
+}
 function performDirections(item){return QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description,{inline:true});}
 
 function helpText(description, { inline = false } = {}) {
@@ -1711,10 +1716,11 @@ async function renderPerform(assignmentId) {
           el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, comment),
           el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
-          el("td", {}, trend));
+          el("td", {class:"qa-trends"}, trend));
         const extras = el('td', {class:'qa-phone-extras', colspan:10});
+        orderMeasurementRow(row);
         row.append(extras);
-        const secondary = [row.children[5], row.children[7], row.children[8], row.children[9]];
+        const secondary = ['qa-dev','qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
         secondary.forEach((cell,index) => {
           cell.classList.add('qa-secondary');
           const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Deviation','Comment','History','Trends'][index]));
@@ -1726,10 +1732,10 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "100px", "150px", "190px", "150px", "130px", "130px", "424px", "100px"];
+      const widths = ["100px", "auto", "190px", "130px", "150px", "100px", "150px", "130px", "424px", "100px"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
+          el("thead", {}, el("tr", {}, ["#", firstHeader, "Measured", "Result", "Baseline", "Unit", "Deviation", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
@@ -2975,10 +2981,11 @@ async function renderReviewMeasurements(run) {
         el('td',{class:'qa-result','data-label':'Result'},el('div',{class:'status-cell'},chip(r.status))),
         el('td',{class:'qa-comment','data-label':'Comment'},r.comment||'—'),
         el('td',{class:'history-cell','data-label':'History'},hist),
-        el('td',{'data-label':'Trends'},r.type==='numeric'?trend:'—'));
+        el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
+      orderMeasurementRow(row);
       tbody.append(row,chart);
     }
-    const headers=['#','Test','Unit','Baseline','Measured','Deviation','Result','Comment','History','Trends'];
+    const headers=['#','Test','Measured','Result','Baseline','Unit','Deviation','Comment','History','Trends'];
     app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'},el('thead',{},el('tr',{},headers.map(h=>el('th',{},h)))),tbody))));
   }
 }
