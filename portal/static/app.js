@@ -2435,7 +2435,18 @@ async function renderQueueEditor(id) {
   const machineToleranceHelp=(test,item)=>{
     const differs=(q.schedules||[]).some(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length);
     if(!differs)return null;
-    const button=infoPopup(el('p',{},'One or more machines have values that differ from this test’s defaults. Open Machines to review them. Editing the default Baseline, Warning, or Action updates every machine. The sync icon resets all values to the defaults. Save template to keep your changes.'),'Machines differ from default');
+    const button=el('button',{type:'button',title:'Machines differ from default','aria-label':'Machines differ from default',onclick:()=>{
+      const valueText=(value,label,mode)=>label==='Tolerance mode'?(value==='percent'?'Percent':value==='absolute'?'Absolute':value):value==='Not set'?value:`${fmt(Number(value))}${label==='Baseline'?(test.unit?' '+test.unit:''):mode==='percent'?' %':test.unit?' '+test.unit:''}`;
+      const defaultMode=item.tol_mode||test.tol_mode||'absolute';
+      const rows=(q.schedules||[]).flatMap(schedule=>{
+        const own=machineValues[schedule.id]?.[item.test_id]||{};
+        return machineTestDifferences(test,item,own).map(d=>el('tr',{},el('th',{scope:'row'},schedule.machine),el('td',{},d.label),el('td',{},valueText(d.default,d.label,defaultMode)),el('td',{class:'machine-limit-different'},valueText(d.machine,d.label,own.tol_mode||defaultMode))));
+      });
+      const dialog=el('dialog',{class:'machine-tolerances-dialog','aria-label':'Machines differ from default'},el('h2',{},'Differences from default'),el('p',{},el('strong',{},test.name)),
+        el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine','Setting','Default','Machine value'].map(h=>el('th',{},h)))),el('tbody',{},rows))),
+        el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close'),el('button',{type:'button',class:'primary',onclick:()=>{dialog.close();showMachineTolerances(test,item);}},'Edit machine values')));
+      dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+    }});
     button.replaceChildren(svg('svg',{viewBox:'0 0 20 20',width:18,height:18,'aria-hidden':'true'},svg('circle',{cx:10,cy:10,r:9,fill:'currentColor'}),svg('path',{d:'M10 5v6',stroke:'#332500','stroke-width':2,'stroke-linecap':'round'}),svg('circle',{cx:10,cy:14,r:1,fill:'#332500'})));
     button.classList.add('small','machine-tolerances-button','machine-tolerances-warning');return button;
   };
