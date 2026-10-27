@@ -172,6 +172,25 @@ class Database:
             self.run("UPDATE tests SET expected=0 WHERE expected IS NULL AND name=? AND description LIKE ? AND category='Winston-Lutz' AND type='numeric' AND unit='mm' AND warn IS NULL AND fail IS NULL AND id IN (SELECT qi.test_id FROM queue_items qi JOIN queues q ON q.id=qi.queue_id WHERE q.name=?)",(name,'Template '+number+'.%','SRS QA template – TrueBeam (Dose Pro)'))
         self._install_requested_dashboard_schedules()
         self._install_derived_calculations()
+        self._unify_pbs_selections()
+
+    def _unify_pbs_selections(self):
+        from .sphinx import is_pbs_template, template_match
+        for q in self.all('SELECT * FROM queues'):
+            if not is_pbs_template(q['name']): continue
+            items=self.all('SELECT t.* FROM queue_items i JOIN tests t ON t.id=i.test_id WHERE i.queue_id=?',(q['id'],))
+            for a in self.all('SELECT * FROM assignments WHERE queue_id=?',(q['id'],)):
+                selection=json.loads(a.get('test_selection') or '{}')
+                if selection.get('uniform_g5_v1'): continue
+                with self.transaction():
+                    for tid in selection.get('added',[]):
+                        old=self.one('SELECT * FROM tests WHERE id=?',(tid,))
+                        target=template_match(items,old['name']) if old else None
+                        if target and not self.one('SELECT test_id FROM assignment_overrides WHERE assignment_id=? AND test_id=?',(a['id'],target['id'])):
+                            self.run('UPDATE assignment_overrides SET test_id=? WHERE assignment_id=? AND test_id=?',(target['id'],a['id'],tid))
+                    selection.update(added=[],excluded=[],uniform_g5_v1=True)
+                    self.run('UPDATE assignments SET test_selection=? WHERE id=?',(json.dumps(selection),a['id']))
+                    self.audit(None,'unify_pbs_template','assignment',a['id'],source='G5 shared template',preserve_historical_results=True)
 
     def _install_derived_calculations(self):
         from . import derived

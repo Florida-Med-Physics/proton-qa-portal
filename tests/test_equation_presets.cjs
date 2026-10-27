@@ -1,0 +1,7 @@
+const assert=require('node:assert/strict'),{chromium}=require('playwright');
+(async()=>{const b=await chromium.launch({channel:'chrome',headless:true});try{const p=await b.newPage();await p.goto('http://127.0.0.1:8791/');await p.locator('[name=username]').fill('Admin');await p.locator('[name=password]').fill('Admin');await p.locator('button[type=submit]').click();await p.waitForSelector('.dashboard-count');
+assert.equal(await p.evaluate(()=>derivedPresetFor('sqrt(A*A+B*B+C*C)')),'rss');assert.equal(await p.evaluate(()=>derivedPresetFor('sqrt((A*A+B*B+C*C)/3)')),'rms');assert.equal(await p.evaluate(()=>derivedPresetFor('mean(A,B,C)')),'mean');
+await p.evaluate(()=>location.hash='#/queues/6');await p.waitForSelector('.derived-editor');
+const editors=p.locator('.derived-editor').filter({has:p.locator('textarea[aria-label="Derived formula"]')});let found=0;
+for(let i=0;i<await editors.count();i++){const e=editors.nth(i),f=await e.getByLabel('Derived formula',{exact:true}).inputValue();if(f.replace(/\s/g,'')==='sqrt(A*A+B*B+C*C)'){assert.equal(await e.getByLabel('Equation preset',{exact:true}).inputValue(),'rss');assert.equal(await e.locator('.derived-variable-row').count(),3);found++;}}
+assert(found>0);console.log('3D equations show RSS with all three inputs; RMS and average equations identified correctly.');}finally{await b.close();}})().catch(e=>{console.error(e);process.exit(1)});

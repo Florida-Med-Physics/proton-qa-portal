@@ -2676,6 +2676,17 @@ function derivedPresetFormula(preset,count,pressureUnit='kPa') {
   throw Error('Choose an equation preset.');
 }
 
+function derivedPresetFor(formula) {
+  const f=String(formula||'').replace(/\s/g,'');
+  const letters=[...new Set(f.match(/\b[A-Z]\b/g)||[])];
+  const count=letters.length;
+  for(const type of ['ptp','rss','rms','mean']){
+    if(!count)continue;
+    for(const unit of ['kPa','hPa'])if(f===derivedPresetFormula(type,count,unit).replace(/\s/g,''))return type;
+  }
+  return 'custom';
+}
+
 function derivedEditor(rule,prior=[],onChange,formMode=false) {
   let current=rule||defaultDerivedRule(prior);
   const mode=select('',[['equation','Equation'],['lookup','Device calibration lookup']],current.kind==='lookup'?'lookup':'equation',{'aria-label':'Derivation method'});
@@ -2712,6 +2723,9 @@ function arithmeticDerivedEditor(rule,prior,onChange,formMode=false) {
   const inputLabel=t=>{const n=inputNumbers.get(t.test_id||t.id)||checkNumber(t.description);return n?`Test ${n} · ${t.name}`:t.name;};
   const key=t=>JSON.stringify([t.name,t.category||'']);
   const selected=rule.inputs.map(x=>key(x));
+  const referenced=rule.formula.match(/\b[A-Z]\b/g)||[];
+  const required=referenced.length?Math.max(...referenced.map(l=>l.charCodeAt(0)-64)):0;
+  while(selected.length<required)selected.push('');
   if(!selected.length)selected.push('','');
   const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
   const formula=el('textarea',{'aria-label':'Derived formula',rows:4,value:rule.formula,spellcheck:false,wrap:'soft',placeholder:'Enter an equation using A, B, C…'});
@@ -2738,7 +2752,7 @@ function arithmeticDerivedEditor(rule,prior,onChange,formMode=false) {
     add.disabled=selected.length>=26||!numeric.length;
   };
   const add=el('button',{type:'button',class:'small',onclick:()=>{selected.push('');draw();update();rows.lastElementChild?.querySelector('select')?.focus();}},'+ Add input');
-  const preset=select('',[['custom','Custom equation'],['ptp','PTP — temperature / pressure correction'],['rms','RMS — root mean square'],['rss','RSS — distance / magnitude'],['mean','Average — arithmetic mean']],rule.formula.replace(/\s/g,'')===defaultDerivedRule(prior).formula.replace(/\s/g,'')?'ptp':'custom',{'aria-label':'Equation preset'});
+  const preset=select('',[['custom','Custom equation'],['ptp','PTP — temperature / pressure correction'],['rms','RMS — root mean square'],['rss','RSS — distance / magnitude'],['mean','Average — arithmetic mean']],derivedPresetFor(rule.formula),{'aria-label':'Equation preset'});
   const presetNote=el('p',{class:'muted small'});
   const describePreset=()=>{presetNote.textContent=({ptp:'A: temperature in °C · B: pressure. Reference: 22 °C and 101.325 kPa.',rms:'Square each selected input, average the squares, then take the square root.',rss:'Square each selected input, add the squares, then take the square root. Use this for a 3D offset.',mean:'Average all selected inputs.',custom:''})[preset.value];applyPreset.disabled=preset.value==='custom';};
   const applyPreset=el('button',{type:'button',class:'small',onclick:()=>{
@@ -2749,11 +2763,12 @@ function arithmeticDerivedEditor(rule,prior,onChange,formMode=false) {
       }
       const pressure=numeric.find(x=>key(x)===selected[1]);
       formula.value=derivedPresetFormula(preset.value,selected.length,pressure?.unit||'kPa');
-      draw();update();formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';
+      draw();update();describePreset();formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';
     }catch(err){status.textContent=err.message;}
   }},'Apply equation');
   preset.addEventListener('change',describePreset);describePreset();
-  formula.addEventListener('input',()=>{preset.value='custom';describePreset();formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';update();});draw();
+  formula.addEventListener('input',()=>{preset.value=derivedPresetFor(formula.value);describePreset();formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';update();});draw();
+  try{QADerived.validate(rule);}catch(err){status.textContent=err.message;}
   requestAnimationFrame(()=>{if(formula.clientWidth)formula.style.height=Math.max(120,formula.scrollHeight)+'px';});
   return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Calculation inputs'),rows,add,
     el('div',{class:'derived-formula-heading'},el('strong',{},'Equation'),infoDisclosure(el('div',{},el('p',{},'Each letter represents the prior test selected beside it. Type that letter in the equation. + Add input creates another variable; × removes it. Replace any ? left by a removed variable before saving.'),el('p',{},'Use numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), or mean(). Example: 100 * (A - B) / A. Missing inputs leave the result blank.')),'Equation help')),

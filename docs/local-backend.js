@@ -359,6 +359,13 @@
     const energy = ["dfo", "distal", "proximal", "width"].includes(metric) || spot ? nominalEnergy(name) : null;
     return `${metric}|${energy ?? ""}|${spot ? spot[1] : ""}`;
   }
+  const isPbsTemplate=name=>/PBS\s*DailyQA/i.test(name||'');
+  function templateMatch(items,name){
+    const key=canonicalKey(name);if(!key)return null;
+    const [metric,energy,spot]=key.split('|');if(!spot)return null;
+    const matches=items.filter(i=>{const k=(canonicalKey(i.name)||'').split('|');return k[0]===metric&&k[1]===energy&&/spot\s*\d+/i.test(i.name);});
+    return matches.length===1?matches[0]:null;
+  }
   function standardName(category, item, metric, spot) {
     metric = metric.replace(/\s+/g, " ").trim();
     const e = nominalEnergy(item);
@@ -1073,15 +1080,22 @@
   function trend(machineId,testId) {const test=get('tests',testId,'Check');return {test,points:machineTrends(machineId)[testId]||[]};}
   function machineTrends(machineId) {
     const runs=Object.fromEntries(S.runs.filter(r=>!r.trashed_at&&r.machine_id===Number(machineId)).map(r=>[r.id,r]));
+    const aliases=new Map();
+    for(const q of S.queues.filter(q=>isPbsTemplate(q.name))){
+      const base=S.queue_items.filter(i=>i.queue_id===q.id).map(i=>byId('tests',i.test_id));
+      const ids=new Set(base.map(t=>t.id));
+      for(const t of S.tests.filter(t=>t.owner_queue_id===q.id&&!ids.has(t.id))){const target=templateMatch(base,t.name);if(target)aliases.set(t.id,target);}
+    }
+    const keyFor=t=>historyKey(aliases.get(t.id)||t);
     const groups=new Map();
     for(const x of S.results){
       if(!runs[x.run_id] || x.value_num==null)continue;
       const test=byId('tests',x.test_id);if(!test)continue;
-      const key=historyKey(test);if(!groups.has(key))groups.set(key,[]);
+      const key=keyFor(test);if(!groups.has(key))groups.set(key,[]);
       groups.get(key).push({source_test_id:x.test_id,source_test_number:/Template\s+(\d+\.\d+)/.exec(test.description||'')?.[1]||null,run_id:x.run_id,source:runs[x.run_id].source,source_order:x.id,assignment_id:runs[x.run_id].assignment_id,qa_date:runs[x.run_id].qa_date,value:x.value_num,expected:x.expected,warn:x.warn,fail:x.fail,tol_mode:x.tol_mode,status:x.status});
     }
     for(const pts of groups.values())pts.sort((a,b)=>a.qa_date.localeCompare(b.qa_date)||a.run_id-b.run_id||a.source_order-b.source_order);
-    const out={};for(const test of S.tests){const pts=groups.get(historyKey(test));if(pts)out[test.id]=pts;}
+    const out={};for(const test of S.tests){const pts=groups.get(keyFor(test));if(pts)out[test.id]=pts;}
     return out;
   }
 
@@ -1092,13 +1106,14 @@
     const byMeaning = Object.fromEntries(t.items.filter((i) => canonicalKey(i.name)).map((i) => [canonicalKey(i.name), i.test_id]));
     const excluded = (t.all_items || []).filter((i) => i.excluded);
     const isExcluded = (m) => excluded.some((i) => (i.category === m.category && i.name === m.name) || (canonicalKey(i.name) && canonicalKey(i.name) === canonicalKey(m.name)));
-    const ids = {}, added = [];
+    const ids = {}, added = [],uniform=isPbsTemplate(t.queue.name);
     for (const m of measurements) {
       if (isExcluded(m)) continue;
       const key = `${m.category}|${m.name}`;
+      if(uniform&&!inQueue[key]){const equivalent=templateMatch(t.items,m.name);if(equivalent)inQueue[key]=equivalent.test_id;}
       if (!inQueue[key] && byMeaning[canonicalKey(m.name)]) inQueue[key] = byMeaning[canonicalKey(m.name)];
       if (inQueue[key]) { ids[key] = inQueue[key]; continue; }
-      if (!create) continue;
+      if (!create || uniform) continue;
       require(user, "configure");
       const queueId = t.queue.id;
       const existing = S.tests.find((x) => x.owner_queue_id === queueId && x.category === m.category && x.name === m.name);
@@ -1124,7 +1139,8 @@
     const excluded = (t.all_items || []).filter((i) => i.excluded);
     for (const m of parsed.measurements) {
       if (excluded.some((i) => (i.category === m.category && i.name === m.name) || (canonicalKey(i.name) && canonicalKey(i.name) === canonicalKey(m.name)))) continue;
-      const item = items[`${m.category}|${m.name}`] || byMeaning[canonicalKey(m.name)];
+      const item = items[`${m.category}|${m.name}`] || byMeaning[canonicalKey(m.name)] || (isPbsTemplate(t.queue.name)?templateMatch(t.items,m.name):null);
+      if (!item && isPbsTemplate(t.queue.name)) continue;
       if (!item) { unmatched.push({ category: m.category, name: m.name, unit: m.unit }); continue; }
       const fl = fileLimits(m);
       matched.push({ test_id: item.test_id, value: m.result, sphinx_status: m.sphinx_status, file_limits: fl,
@@ -1254,8 +1270,25 @@
     }
     installRequestedDashboardSchedules();
     installDerivedCalculations();
+    unifyPbsSelections();
     for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
   })();
+
+  function unifyPbsSelections(){
+    for(const q of S.queues.filter(q=>isPbsTemplate(q.name))){
+      const items=S.queue_items.filter(i=>i.queue_id===q.id).map(i=>byId('tests',i.test_id));
+      for(const a of S.assignments.filter(a=>a.queue_id===q.id)){
+        const selection=testSelection(a);if(selection.uniform_g5_v1)continue;
+        for(const tid of selection.added||[]){
+          const old=byId('tests',tid),target=old&&templateMatch(items,old.name);
+          const override=S.overrides.find(o=>o.assignment_id===a.id&&o.test_id===tid);
+          if(target&&override&&!S.overrides.some(o=>o.assignment_id===a.id&&o.test_id===target.id))override.test_id=target.id;
+        }
+        a.test_selection={...selection,added:[],excluded:[],uniform_g5_v1:true};
+        audit(null,'unify_pbs_template','assignment',a.id,{source:'G5 shared template',preserve_historical_results:true});save();
+      }
+    }
+  }
 
   function installDerivedCalculations(){
     let changed=0;

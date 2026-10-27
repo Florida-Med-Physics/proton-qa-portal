@@ -1027,16 +1027,20 @@ def _sphinx_test_ids(db, user, template, measurements, create):
     in_queue = {(i["category"], i["name"]): i["test_id"] for i in template["items"]}
     by_meaning = {sphinx.canonical_key(i["name"]): i["test_id"] for i in template["items"] if sphinx.canonical_key(i["name"])}
     ids, added = {}, []
+    uniform=sphinx.is_pbs_template(template["queue"]["name"])
     for m in measurements:
         key = (m["category"], m["name"])
         if key in excluded_keys or sphinx.canonical_key(m["name"]) in excluded_meanings:
             continue
+        if uniform and key not in in_queue:
+            equivalent=sphinx.template_match(template['items'],m['name'])
+            if equivalent: in_queue[key]=equivalent['test_id']
         if key not in in_queue and sphinx.canonical_key(m["name"]) in by_meaning:
             in_queue[key] = by_meaning[sphinx.canonical_key(m["name"])]  # same measurement under the list's own wording
         if key in in_queue:
             ids[key] = in_queue[key]
             continue
-        if not create:
+        if not create or uniform:
             continue
         require(user, "configure")
         queue_id = template["queue"]["id"]
@@ -1076,7 +1080,10 @@ def sphinx_preview(db, user, assignment_id, upload):
         if (m["category"], m["name"]) in excluded_keys or sphinx.canonical_key(m["name"]) in excluded_meanings:
             continue
         item = items.get((m["category"], m["name"])) or by_meaning.get(sphinx.canonical_key(m["name"]))
+        if not item and sphinx.is_pbs_template(template['queue']['name']):
+            item=sphinx.template_match(template['items'],m['name'])
         if not item:
+            if sphinx.is_pbs_template(template["queue"]["name"]): continue
             unmatched.append(m)
             continue
         file_limits = _file_limits(m)
@@ -1341,6 +1348,16 @@ def trend(db, user, machine_id, test_id):
 def machine_trends(db, user, machine_id):
     """Same-machine measurements across list copies, matched by type, units and identity."""
     tests=db.all('SELECT * FROM tests');by_id={t['id']:t for t in tests}
+    aliases={}
+    for q in db.all('SELECT id,name FROM queues'):
+        if not sphinx.is_pbs_template(q['name']): continue
+        base=db.all('SELECT t.* FROM queue_items i JOIN tests t ON t.id=i.test_id WHERE i.queue_id=?',(q['id'],))
+        base_ids={t['id'] for t in base}
+        for t in tests:
+            if t.get('owner_queue_id')==q['id'] and t['id'] not in base_ids:
+                target=sphinx.template_match(base,t['name'])
+                if target: aliases[t['id']]=target
+    def key(t): return _history_key(aliases.get(t['id'],t))
     rows=db.all('SELECT res.test_id,res.id AS source_order,r.source,r.id AS run_id,r.assignment_id,r.qa_date,res.value_num AS value,res.expected,res.warn,res.fail,res.tol_mode,res.status FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.machine_id=? AND res.value_num IS NOT NULL ORDER BY r.qa_date,r.id,res.id',(machine_id,))
     groups={}
     for row in rows:
@@ -1349,8 +1366,8 @@ def machine_trends(db, user, machine_id):
             row['source_test_id']=test['id']
             number=re.search(r'Template\s+(\d+\.\d+)',test.get('description') or '')
             row['source_test_number']=number.group(1) if number else None
-            groups.setdefault(_history_key(test),[]).append(row)
-    return {str(t['id']):groups[_history_key(t)] for t in tests if _history_key(t) in groups}
+            groups.setdefault(key(test),[]).append(row)
+    return {str(t['id']):groups[key(t)] for t in tests if key(t) in groups}
 
 
 def list_audit(db, user, limit=300):

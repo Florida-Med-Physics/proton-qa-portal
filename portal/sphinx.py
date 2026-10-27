@@ -218,3 +218,20 @@ def canonical_key(name):
     energy = nominal_energy(name) if metric in ("dfo", "distal", "proximal", "width") or spot else None
     return f"{metric}|{energy or ''}|{spot[1] if spot else ''}"
 
+
+
+def is_pbs_template(name):
+    return bool(re.search(r'PBS\s*DailyQA', name or '', re.I))
+
+
+def template_match(items, name):
+    """Use metric and nominal energy when an export renumbers the same spot.
+
+    Only a unique candidate may match; never guess between repeated same-energy spots.
+    """
+    key=canonical_key(name)
+    if not key: return None
+    metric,energy,spot=key.split('|')
+    if not spot: return None
+    matches=[i for i in items if (canonical_key(i['name']) or '').split('|')[:2]==[metric,energy] and re.search(r'spot\s*\d+',i['name'],re.I)]
+    return matches[0] if len(matches)==1 else None
