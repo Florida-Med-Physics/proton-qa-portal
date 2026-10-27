@@ -2432,6 +2432,10 @@ async function renderQueueEditor(id) {
       await reloadMachine(); toast("Machine tests saved");
     }, "Save machine tests");
   } }, "Customize tests");
+  const machineToleranceHelp=()=>{
+    const button=infoPopup(el('p',{},'Editing the default Warning updates every machine. The sync icon resets all values to the defaults. Blue values differ from the default. Save template to keep your changes.'),'Machine tolerances help');
+    button.textContent='(!)';button.classList.add('small','machine-tolerances-button');return button;
+  };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
     const keys=['expected','warn','fail','tol_mode'],labels={expected:'Baseline',warn:'Warning',fail:'Action',tol_mode:'Mode'};
@@ -2480,7 +2484,6 @@ async function renderQueueEditor(id) {
     const popupError=el('p',{class:'error',role:'alert'});
     const dialog=el('dialog',{class:'machine-tolerances-dialog','aria-label':'Machine-Specific Tolerances'},
       el('h2',{},'Machine-Specific Tolerances'),el('p',{},el('strong',{},test.name)),
-      el('p',{class:'muted small'},'Editing the default Warning updates every machine. The sync icon resets all values to the defaults. Save template to keep your changes.'),
       el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine',`Baseline${test.unit?' ('+test.unit+')':''}`,'Warning ±','Action ±','Mode'].map(h=>el('th',{},h)))),body)),
       !(q.schedules||[]).length?el('p',{},'Schedule this QA template on a machine to compare its limits.'):null,
       popupError,el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close'),
@@ -2594,7 +2597,7 @@ async function renderQueueEditor(id) {
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el('div',{class:'tolerance-mode-actions'},select("", [["absolute", "Absolute"], ["percent", "Percent"]], target.tol_mode || (own ? item.tol_mode : null) || t.tol_mode || "absolute",
-            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'))) : el("span", { class: "muted" }, "—")),
+            { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'),machineToleranceHelp())) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
