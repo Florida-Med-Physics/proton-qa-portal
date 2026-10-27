@@ -1501,3 +1501,16 @@ td, .measure-table td { font-size: 21px; }
 .qa-test-title { display:flex; align-items:flex-start; gap:8px; }
 .qa-test-name { flex:1; min-width:0; }
 .qa-test-title > button { flex:0 0 auto; margin-top:0; }
+
+/* History dates and values share generous, separate slots. */
+.measure-table .hist-row { display:inline-flex; gap:8px; white-space:nowrap; }
+.measure-table .hist-row .hist { flex:0 0 136px; width:136px; min-width:136px; margin:0; padding:6px 8px; border:0; border-radius:6px; white-space:nowrap; box-sizing:border-box; }
+.measure-table .hist-row .hist.date { line-height:1.3; }
+@media(min-width:761px) {
+  .measure-table .history-cell { min-width:424px; }
+  .measure-wrap .measure-table { min-width:1740px; }
+  .measure-wrap .measure-table:not(.axis-table):not(.energy-table) { min-width:2004px; }
+}
+@media(max-width:760px) {
+  .measure-table .hist-row { flex-wrap:wrap; max-width:100%; gap:8px; }
+}

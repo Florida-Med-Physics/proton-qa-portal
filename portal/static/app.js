@@ -1726,22 +1726,13 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "100px", "150px", "190px", "150px", "130px", "130px", "160px", "100px"];
+      const widths = ["100px", "auto", "100px", "150px", "190px", "150px", "130px", "130px", "424px", "100px"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, ["#", firstHeader, "Unit", "Baseline", "Measured", "Deviation", "Result", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
-      // Only as many history dates as fit on one line of the History column (re-checked when the window is resized).
-      const fitHistory = () => {
-        const th = tableEl.querySelector("th.history-cell");
-        if (!th || !th.clientWidth) return;
-        const n = Math.max(1, Math.min(dates.length, Math.floor((th.clientWidth - 10) / 58)));
-        tableEl.querySelectorAll(".hist-row").forEach((row) => [...row.children].forEach((c, i) => { c.hidden = i >= n; }));
-      };
-      requestAnimationFrame(fitHistory);
-      window.addEventListener("resize", fitHistory);
       // Axis and energy tables carry the shared limits in their title rather than on every row.
       if (title && firstHeader !== "Test") {
         const withLimits = members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null));
