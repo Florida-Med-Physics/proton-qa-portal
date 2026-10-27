@@ -2442,17 +2442,19 @@ async function renderQueueEditor(id) {
       const base=defaults();
       const cells=(name,target,aid)=>keys.map(k=>{
         const own=aid&&!blank(target[k]);
-        const control=k==='tol_mode'?select('',[...(aid?[['',`Use default (${base.tol_mode==='percent'?'Percent':'Absolute'})`]]:[]),['absolute','Absolute'],['percent','Percent']],aid?(target[k]||''):base[k],{'aria-label':`${name} ${labels[k]}`,disabled:!editable}):el('input',{type:'number',step:'any',...(k==='warn'||k==='fail'?{min:0}:{}),value:aid?(target[k]??''):(base[k]??''),placeholder:blank(base[k])?'Not set':String(base[k]),'aria-label':`${name} ${labels[k]}`,disabled:!editable});
-        if(aid)control.dataset.inheritKey=k;
-        const hint=aid?el('span',{class:own?'small machine-limit-custom':'small muted'},own?'Machine-specific':'Uses default'):null;
+        const control=k==='tol_mode'?select('',[['absolute','Absolute'],['percent','Percent']],aid?(target[k]||base[k]):base[k],{'aria-label':`${name} ${labels[k]}`,disabled:!editable}):el('input',{type:'number',step:'any',...(k==='warn'||k==='fail'?{min:0}:{}),value:aid?(target[k]??base[k]??''):(base[k]??''),placeholder:blank(base[k])?'Not set':String(base[k]),'aria-label':`${name} ${labels[k]}`,disabled:!editable});
+        if(aid){control.dataset.inheritKey=k;control.dataset.machineId=aid;}
+        const hint=aid?el('span',{class:own?'small machine-limit-custom':'small muted'},own?'Machine-specific':''):null;
         const update=()=>{
           target[k]=control.value;changed(aid);
-          if(hint){hint.textContent=blank(target[k])?'Uses default':'Machine-specific';hint.className=blank(target[k])?'small muted':'small machine-limit-custom';}
+          if(!aid&&k==='warn')for(const schedule of q.schedules||[]){machineValues[schedule.id][item.test_id].warn=null;changed(schedule.id);}
+          if(hint){hint.textContent=blank(target[k])?'':'Machine-specific';hint.className=blank(target[k])?'small muted':'small machine-limit-custom';}
           const latest=defaults();
           for(const field of body.querySelectorAll('[data-inherit-key]')){
             const key=field.dataset.inheritKey;
-            if(key==='tol_mode')field.options[0].textContent=`Use default (${latest.tol_mode==='percent'?'Percent':'Absolute'})`;
-            else field.placeholder=blank(latest[key])?'Not set':String(latest[key]);
+            const custom=machineValues[field.dataset.machineId]?.[item.test_id]?.[key];
+            if(blank(custom)){field.value=latest[key]??'';if(field.nextElementSibling)field.nextElementSibling.textContent='';}
+            if(key!=='tol_mode')field.placeholder=blank(latest[key])?'Not set':String(latest[key]);
           }
         };
         control.addEventListener('input',update);control.addEventListener('change',update);
@@ -2474,7 +2476,7 @@ async function renderQueueEditor(id) {
     const popupError=el('p',{class:'error',role:'alert'});
     const dialog=el('dialog',{class:'machine-tolerances-dialog','aria-label':'Machine-Specific Tolerances'},
       el('h2',{},'Machine-Specific Tolerances'),el('p',{},el('strong',{},test.name)),
-      el('p',{class:'muted small'},'Blank machine values use the default template. The sync icon resets all machines to these defaults. Save template to keep your changes.'),
+      el('p',{class:'muted small'},'Editing the default Warning updates every machine. The sync icon resets all values to the defaults. Save template to keep your changes.'),
       el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine',`Baseline${test.unit?' ('+test.unit+')':''}`,'Warning ±','Action ±','Mode'].map(h=>el('th',{},h)))),body)),
       !(q.schedules||[]).length?el('p',{},'Schedule this QA template on a machine to compare its limits.'):null,
       popupError,el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close'),
