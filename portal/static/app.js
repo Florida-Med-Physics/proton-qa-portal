@@ -2464,7 +2464,7 @@ async function renderQueueEditor(id) {
         if(aid){control.dataset.inheritKey=k;control.dataset.machineId=aid;control.dataset.machineName=name;}
         if(k!=='tol_mode'){
           control.addEventListener('focus',()=>{if(aid&&blank(target[k]))control.select();});
-          control.addEventListener('blur',()=>{if(control.value.trim()!==''&&Number.isFinite(Number(control.value)))control.value=String(Number(control.value));});
+          control.addEventListener('blur',()=>{if(control.value.trim()!==''&&Number.isFinite(Number(control.value)))control.value=String(Number(control.value));else if(aid&&blank(target[k]))control.value=defaults()[k]??'';});
         }
         if(aid)paint(control,target[k],base[k]);
         const update=()=>{
@@ -2474,7 +2474,7 @@ async function renderQueueEditor(id) {
           for(const field of body.querySelectorAll('[data-inherit-key]')){
             const key=field.dataset.inheritKey;
             const custom=machineValues[field.dataset.machineId]?.[item.test_id]?.[key];
-            if(blank(custom))field.value=latest[key]??'';
+            if(blank(custom)&&field!==document.activeElement)field.value=latest[key]??'';
             paint(field,custom,latest[key]);
             if(key!=='tol_mode')field.placeholder=blank(latest[key])?'Not set':String(latest[key]);
           }
