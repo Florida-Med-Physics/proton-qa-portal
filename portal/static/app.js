@@ -2462,6 +2462,10 @@ async function renderQueueEditor(id) {
       const cells=(name,target,aid)=>keys.map(k=>{
         const control=k==='tol_mode'?select('',[['absolute','Absolute'],['percent','Percent']],aid?(target[k]||base[k]):base[k],{'aria-label':`${name} ${labels[k]}`,disabled:!editable}):el('input',{type:'number',step:'any',...(k==='warn'||k==='fail'?{min:0}:{}),value:aid?(target[k]??base[k]??''):(base[k]??''),placeholder:blank(base[k])?'Not set':String(base[k]),'aria-label':`${name} ${labels[k]}`,disabled:!editable});
         if(aid){control.dataset.inheritKey=k;control.dataset.machineId=aid;control.dataset.machineName=name;}
+        if(k!=='tol_mode'){
+          control.addEventListener('focus',()=>{if(aid&&blank(target[k]))control.select();});
+          control.addEventListener('blur',()=>{if(control.value.trim()!==''&&Number.isFinite(Number(control.value)))control.value=String(Number(control.value));});
+        }
         if(aid)paint(control,target[k],base[k]);
         const update=()=>{
           target[k]=control.value;changed(aid);
