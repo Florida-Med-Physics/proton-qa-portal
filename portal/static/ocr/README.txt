@@ -1,0 +1,1 @@
+Local HDR PDF OCR runtime: tesseract.js 7.0.0, tesseract.js-core 7.0.0, @tesseract.js-data/eng 1.0.0. Sources: https://github.com/naptha/tesseract.js and https://github.com/naptha/tesseract.js-core . License notices are included alongside these assets. No PDF is sent to an external OCR service.

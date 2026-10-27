@@ -11,7 +11,7 @@ document.addEventListener('wheel', () => {
   if (input instanceof HTMLInputElement && input.type === 'number') input.blur();
 }, { capture: true, passive: true });
 
-const state = { user: null, cache: {} };
+const state = { user: null, cache: {}, actingRole:(()=>{try{return sessionStorage.getItem('qa_admin_acting_role')||null;}catch{return null;}})() };
 const app = document.getElementById("app");
 // Nothing on the page may ever read "null" or "undefined": the main container drops empty children instead of
 // turning them into text (native append/replaceChildren would), and flattens arrays of elements.
@@ -132,7 +132,7 @@ function personName(name, username) {
   return name || username || "";
 }
 
-function activeRole() { return state.user?.role === "admin" && state.previewRole ? state.previewRole : state.user?.role; }
+function activeRole() { return state.user?.role === "admin" && state.actingRole ? state.actingRole : state.user?.role; }
 
 function can(permission) {
   const role = activeRole();
@@ -150,13 +150,12 @@ function toast(message, bad) {
 }
 
 async function api(method, path, body) {
-  if(state.user?.role==='admin' && state.previewRole && method!=='GET' && path!=='/api/logout') throw new Error('View As is a preview. Return to Admin to save changes.');
   // The browser-only build (GitHub Pages) answers every request from local storage instead of a server.
-  if (window.localApi) return window.localApi(method, path, body);
+  if (window.localApi) return window.localApi(method,path,body,{actingRole:state.user?.role==='admin'?state.actingRole:null});
   const response = await fetch(path, {
     method,
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json", "X-Portal": "1" },
+    headers: { "Content-Type": "application/json", "X-Portal": "1", ...(state.user?.role==='admin'&&state.actingRole?{'X-Act-As-Role':state.actingRole}:{}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json().catch(() => ({}));
@@ -361,6 +360,12 @@ function homeIcon() {
 // Dashboard: one look at every machine — today's QA, last result, and what is waiting for review.
 const FREQ_ORDER = { daily: 0, weekly: 1, monthly: 2, quarterly: 3, semiannual: 4, annual: 5, custom: 6, asneeded: 7 };
 
+function frequentQaAssignments(data,runs,userId) {
+  const schedules=data.machines.flatMap(m=>m.queues.filter(q=>q.active!==0).map(q=>({...q,machine_name:m.name})));
+  return schedules.map(q=>{const history=runs.filter(r=>r.performed_by===userId&&r.assignment_id===q.id&&!r.trashed_at);return {...q,use_count:history.length,last_used:history.map(r=>r.qa_date).sort().at(-1)||''};})
+    .filter(q=>q.use_count).sort((a,b)=>b.use_count-a.use_count||b.last_used.localeCompare(a.last_used)||a.queue_name.localeCompare(b.queue_name)).slice(0,4);
+}
+
 async function renderHome() {
   const data = await api('GET', '/api/dashboard');
   page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
@@ -373,6 +378,12 @@ async function renderHome() {
     ['QA Awaiting Therapy Review',pendingTherapy,'#/review?stage=therapy'],
     ['QA Awaiting Physics Review',pendingPhysics,'#/review?stage=physics']
   ].map(([label,count,href])=>el('a',{href,class:'card dashboard-count','aria-label':`${label}: ${count}`},el('strong',{class:'dashboard-count-number'},String(count)),el('span',{},label)))));
+
+  const frequent=frequentQaAssignments(data,runs,state.user.id);
+  if(can('perform')&&frequent.length){
+    const cards=frequent.map(q=>el('div',{class:'frequent-qa-item'},el('strong',{},q.machine_name),el('span',{},q.queue_name),el('span',{class:'small muted'},q.state==='overdue'?'Overdue':q.state==='done'?'Done today':q.state==='ready'?'As needed':dueIn(q.next_due,q.frequency)),el('a',{class:'button primary',href:`#/perform/${q.id}`},'Start QA')));
+    app.append(el('section',{class:'card frequent-qa'},el('h2',{},'Frequently used QA'),el('p',{class:'muted small'},'Based on your recent QA submissions.'),el('div',{class:'frequent-qa-grid'},cards)));
+  }
 
   const grid=el('div',{class:'home-modality-grid'});
   for(const modality of MODALITIES){
@@ -447,16 +458,17 @@ function phoneDrawer(container, nodes, title) {
 }
 
 function viewAsControl() {
-  if(state.user?.role!=='admin') { state.previewRole=null; return null; }
+  if(state.user?.role!=='admin') { state.actingRole=null; return null; }
   const pick=el('select',{'aria-label':'View As role'},...['admin','physicist','therapist','mpa'].map(role=>el('option',{value:role},ROLE_LABEL[role])));
-  pick.value=state.previewRole||'admin';
-  pick.addEventListener('change',()=>{state.previewRole=pick.value==='admin'?null:pick.value;location.hash='#/';renderShell();route();});
-  return el('label',{class:'inline view-as-control',title:'Preview another role. Changes are disabled in preview.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick,state.previewRole?el('span',{class:'small'},'Preview'):null);
+  pick.value=state.actingRole||'admin';
+  pick.addEventListener('change',()=>{state.actingRole=pick.value==='admin'?null:pick.value;if(state.actingRole)sessionStorage.setItem('qa_admin_acting_role',state.actingRole);else sessionStorage.removeItem('qa_admin_acting_role');location.hash='#/';renderShell();route();});
+  return el('label',{class:'inline view-as-control',title:'Operate with the selected role. Your Admin identity remains in the audit trail.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick,state.actingRole?el('span',{class:'small'},'Active'):null);
 }
 
 function renderShell() {
   const bar = document.getElementById("topbar");
   bar.hidden = !state.user;
+  document.getElementById('acting-role-notice')?.remove();
   if (!state.user) return;
   bar.classList.remove('phone-menu-open');
   let menu = bar.querySelector('.phone-menu-toggle');
@@ -482,8 +494,10 @@ function renderShell() {
     ...[viewAsControl()].filter(Boolean),
     el("a", { href: "#/account", title: ROLE_LABEL[state.user.role], class: "person" }, personIcon(), personName(state.user.full_name, state.user.username)),
     el("button", { class: "link", onclick: logout }, "Sign out"),
-    el('a',{href:'#/account',class:'button small phone-password-link'},'Change password'),
+    el('a',{href:'#/account',class:'button small password-link'},'Change password'),
     themeToggle());
+  document.getElementById('acting-role-notice')?.remove();
+  if(state.user.role==='admin'&&state.actingRole)bar.after(el('div',{id:'acting-role-notice',class:'acting-role-notice',role:'status'},`Operating as ${ROLE_LABEL[state.actingRole]} · Actions are saved as ${personName(state.user.full_name,state.user.username)} (Admin).`));
 }
 
 function shortDate(iso) {
@@ -516,6 +530,7 @@ function renderLogin() {
 }
 
 async function logout() {
+  state.actingRole=null;sessionStorage.removeItem('qa_admin_acting_role');
   await api("POST", "/api/logout").catch(() => {});
   state.user = null;
   location.hash = "#/";
@@ -1106,7 +1121,7 @@ function importFolderField(a) {
 
 // The files waiting in a list's default folder, newest first, each with a button that loads it into the form.
 // Perform: the newest export not yet recorded is read in from the list's folder on its own; this is the one line that says so.
-function autoReadLine(assignmentId, onPick, dateInput) {
+function autoReadLine(assignmentId, onPick, dateInput, previewBuilder=null) {
   const line=el('div',{class:'muted small auto-read'},'Checking the import folder…');
   const loaded=new Set(), previews=new Map();let busy=false;
   const scan=async()=>{
@@ -1124,7 +1139,7 @@ function autoReadLine(assignmentId, onPick, dateInput) {
         try {
           const cacheKey=file.path+'|'+file.modified+'|'+file.size;
           let cached=previews.get(cacheKey);
-          if(!cached){const upload=await api('GET',`/api/assignments/${assignmentId}/file?path=${encodeURIComponent(file.path)}`);const preview=await api('POST',`/api/assignments/${assignmentId}/sphinx/preview`,{file:upload});cached={upload,preview};if(previews.size>=200)previews.clear();previews.set(cacheKey,cached);}
+          if(!cached){const upload=await api('GET',`/api/assignments/${assignmentId}/file?path=${encodeURIComponent(file.path)}`);const preview=previewBuilder?await previewBuilder(upload):await api('POST',`/api/assignments/${assignmentId}/sphinx/preview`,{file:upload});cached={upload,preview};if(previews.size>=200)previews.clear();previews.set(cacheKey,cached);}
           const {upload,preview}=cached;
           if(dateInput.value!==selectedDate || !line.isConnected)return;
           if(preview.qa_date!==selectedDate || !preview.matched.length || preview.duplicate_run)continue;
@@ -1321,7 +1336,16 @@ function infoDisclosure(content,label='Test information',open=false) {
   return el('details',{class:'qa-info',open},el('summary',{title:label,'aria-label':label},el('span',{'aria-hidden':'true'},'i')),el('div',{class:'qa-info-content'},content));
 }
 
+function infoPopup(content,label='Calculation details') {
+  return el('button',{type:'button',class:'qa-calculation-info',title:label,'aria-label':label,onclick:()=>{
+    const dialog=el('dialog',{class:'calculation-dialog'},el('h2',{},label),content,el('button',{type:'button',onclick:()=>dialog.close()},'Close'));
+    dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+  }},'ⓘ');
+}
+function performDirections(item){return QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description,{inline:true});}
+
 function helpText(description, { inline = false } = {}) {
+  description=(description||'').replace(/(?:^|\n)\s*Source:[^\n]*/g,'');
   if (!description || description.startsWith("Measured by Sphinx")) return null;
   const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
@@ -1679,7 +1703,7 @@ async function renderPerform(assignmentId) {
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           numberCell(it),
-          el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, derivedExplanation(it,t.items,numbers), note),
+          el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, derivedExplanation(it,t.items,numbers)?infoPopup(derivedExplanation(it,t.items,numbers),'Calculation details'):null, note),
           el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
           el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
@@ -1747,7 +1771,7 @@ async function renderPerform(assignmentId) {
       let plain = [];
       const emitPlain = () => {
         if (plain.length) rows.push(measureTable(plain, { firstHeader: "Test", title: null, directions: null, label: shortName,
-          firstCell: (it) => [el("strong", {}, shortName(it)), helpText(it.description, { inline: true })] }));
+          firstCell: (it) => [el("strong", {}, shortName(it)), performDirections(it)] }));
         plain = [];
       };
       for (const m of foldAxes(pending)) {
@@ -1758,7 +1782,7 @@ async function renderPerform(assignmentId) {
         rows.push(measureTable(members, {
           firstHeader: "Axis",
           title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : ""),
-            helpText((m.calc || m.axes[0]).description, { inline: true })),
+            performDirections(m.calc || m.axes[0])),
           directions: null,
           label: (it) => `${m.base} ${it.axisLabel}`,
           firstCell: (it) => el("strong", {}, it.axisLabel),
@@ -1775,7 +1799,7 @@ async function renderPerform(assignmentId) {
       const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
       rows.push(measureTable(family.map((f) => f.item), {
         firstHeader: "Energy",
-        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), helpText(item.description, { inline: true })),
+        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), performDirections(item)),
         directions: null,
         firstCell: (it) => el("strong", {}, measureParts(it.name).rowLabel),
         label: (it) => { const mp = measureParts(it.name); return `${mp.rowLabel} · ${mp.metricLabel}`; },
@@ -1847,8 +1871,36 @@ async function renderPerform(assignmentId) {
     if (!sphinxFile.files[0]) return;
     await useUpload(await readFileBase64(sphinxFile.files[0]));
   });
+  const hdrPreview=async upload=>{
+    if(!/\.pdf$/i.test(upload.name))throw Error('Choose an HDR Daily QA PDF.');
+    const bytes=Uint8Array.from(atob(upload.data),c=>c.charCodeAt(0));
+    const parsed=await QAHdrDaily.parse(bytes,upload.name,message=>sphinxInfo.textContent=message);
+    const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+    const ref='hdrpdf:'+digest;
+    const matched=t.items.filter(i=>Object.hasOwn(parsed.values,i.name)&&!QADerived.read(i.description)).map(i=>({test_id:i.test_id,name:i.name,type:i.type,value:parsed.values[i.name],unit:i.unit}));
+    if(!matched.length)throw Error('No readable measurements match this HDR list.');
+    const runs=await api('GET','/api/runs?limit=400');
+    return {...parsed,hdr:true,matched,source_ref:ref,duplicate_run:runs.find(r=>r.source_ref===ref)?.id||null};
+  };
+  const reviewHdr=async(upload,preview,automatic)=>{
+    const p=preview?.hdr?preview:await hdrPreview(upload);
+    if(p.duplicate_run)throw Error('This HDR PDF was already submitted.');
+    const date=el('input',{type:'date',value:p.qa_date,max:today(),'aria-label':'HDR report QA date',required:true});
+    const warnings=p.unread_checkboxes?el('p',{class:'muted'},`${p.unread_checkboxes} checkbox(es) could not be identified clearly and will stay unanswered.`):null;
+    const show=()=>modal('Review HDR Daily QA PDF',el('div',{},el('p',{},'Review these recognized values before filling the form.'),field('QA date',date),warnings,table(['Test','Recognized value'],p.matched.map(m=>el('tr',{},el('td',{},m.name),el('td',{},m.type==='boolean'?(m.value?'Pass':'Fail'):`${m.value} ${m.unit||''}`))))),async()=>{
+      if(!date.value||date.value>today())throw Error('Choose a valid QA date.');
+      for(const m of p.matched){const e=inputs.find(x=>x.item.test_id===m.test_id);if(automatic&&e.input.value.trim())continue;e.input.value=m.type==='boolean'?(m.value?'pass':'fail'):String(m.value);e.input.dispatchEvent(new Event('input'));}
+      qaDate.value=date.value;qaDate.dispatchEvent(new Event('change'));sourceRef=p.source_ref;
+      sphinxInfo.textContent=`Filled ${p.matched.length} values from ${upload.name}. Review the results, then submit.`;
+      toast('HDR Daily QA values filled');
+    },'Fill recognized values');
+    if(automatic){sphinxInfo.replaceChildren(el('span',{},`HDR report ready: ${upload.name}. `),el('button',{type:'button',onclick:show},'Review PDF values'));return false;}
+    show();return true;
+  };
   const useUpload = async (upload, preview = null, automatic = false) => {
     try {
+      if(QAHdrDaily.supported(t))return await reviewHdr(upload,preview,automatic);
+      if(/\.pdf$/i.test(upload.name)&&!t.items.some(i=>(i.description||'').includes('[rule: wl-max-delta]')))throw Error('This QA list does not use a Winston–Lutz PDF. Choose a file supported by this list.');
       state.sphinxFile = upload;
       return await applySphinx(preview, automatic);
     } catch (err) {
@@ -1858,7 +1910,7 @@ async function renderPerform(assignmentId) {
   const autoLine = t.assignment.import_folder ? el("div") : null;
   if (window.QAExcel?.supported(t)) app.append(monthlyWorkbookTools(t, inputs, qaDate));
   const fileCard = el("div", { class: "card step" }, el("strong", {}, "Measurement file"),
-    el("span", { class: "muted small" }, " Import a supported measurement file to fill in matching results."),
+    el("span", { class: "muted small" }, QAHdrDaily.supported(t)?" Import the HDR Daily QA PDF and review its values.":" Import a supported measurement file to fill in matching results."),
     autoLine, el("div", {}, sphinxFile), sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
@@ -1946,7 +1998,7 @@ async function renderPerform(assignmentId) {
     control.addEventListener("input", queueAutosave);
     control.addEventListener("change", queueAutosave);
   }
-  if (autoLine) autoLine.append(autoReadLine(assignmentId, useUpload, qaDate));
+  if (autoLine) autoLine.append(autoReadLine(assignmentId,useUpload,qaDate,QAHdrDaily.supported(t)?hdrPreview:null));
   // Programmatic imports also persist their filled measurements.
   if (state.applySphinxOnLoad && state.sphinxFile) {
     state.applySphinxOnLoad = false;

@@ -192,7 +192,9 @@
     if (!row) throw new Error(`${label || table.slice(0, -1)} not found.`);
     return row;
   }
+  let actingContext=null;
   function audit(userId, action, entity, entityId, detail) {
+    if(actingContext)detail={...(detail||{}),acting_role:actingContext,authenticated_role:'admin'};
     insert("audit", { at: now(), user_id: userId, action, entity, entity_id: entityId ?? null, detail: JSON.stringify(detail || {}) });
   }
 
@@ -976,7 +978,7 @@
     }
     const ref = text(data, "source_ref") || null;
     checkNotImported(ref);
-    return insertRun(user, t, qaDate, rows, text(data, "comment"), ref ? "sphinx" : "manual", ref, "pending");
+    return insertRun(user, t, qaDate, rows, text(data, "comment"), ref?.startsWith("hdrpdf:")?"hdr-pdf":ref ? "sphinx" : "manual", ref, "pending");
   }
   function pbsTherapistResults(run) {
     if(!/PBS\s*Daily\s*QA.*Sphinx/i.test(byId('queues',run.queue_id)?.name||''))return null;
@@ -1851,19 +1853,24 @@
     async clear() { await kvDelete(DB_FILE_KEY); },
   };
 
-  window.localApi = async function localApi(method, path, body) {
-    await ready;
-    const [pathname, query = ""] = path.split("?");
-    const q = Object.fromEntries(new URLSearchParams(query));
-    for (const r of routes) {
-      const m = r.pattern.exec(pathname);
-      if (m && r.method === method) {
-        const user = currentUser();
-        if (!user && !r.pub) throw new Error("Please sign in.");
-        const result = await r.handler(user, m, body || {}, q);
-        return JSON.parse(JSON.stringify(result));
-      }
-    }
-    throw new Error(`Not found: ${method} ${pathname}`);
+  let requestQueue=Promise.resolve();
+  window.localApi = function localApi(method,path,body,options={}) {
+    const execute=async()=>{
+      await ready;
+      const [pathname,query='']=path.split('?'),q=Object.fromEntries(new URLSearchParams(query));
+      const actual=currentUser(),role=options.actingRole;
+      if(role&&(!actual||actual.role!=='admin'||!['admin','physicist','therapist','mpa'].includes(role)))throw Error('Only an Admin can switch operating roles.');
+      const user=role?{...actual,role,authenticated_role:'admin'}:actual;
+      actingContext=role||null;
+      try{
+        for(const r of routes){const m=r.pattern.exec(pathname);if(m&&r.method===method){
+          if(!user&&!r.pub)throw Error('Please sign in.');
+          const result=await r.handler(pathname==='/api/me'?actual:user,m,body||{},q);
+          return JSON.parse(JSON.stringify(result));
+        }}
+        throw Error(`Not found: ${method} ${pathname}`);
+      }finally{actingContext=null;}
+    };
+    const result=requestQueue.then(execute,execute);requestQueue=result.catch(()=>{});return result;
   };
 })();

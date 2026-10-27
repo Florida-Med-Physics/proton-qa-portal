@@ -1460,3 +1460,32 @@ td, .measure-table td { font-size: 21px; }
 :root[data-theme="dark"] .chart .fit.axis-4, :root[data-theme="dark"] .spark .fit.axis-4, :root[data-theme="dark"] .outlier.axis-4 { stroke:#c49a88; }
 :root[data-theme="dark"] .stats-line.axis-5 { fill:#9bb6c2; }
 :root[data-theme="dark"] .chart .fit.axis-5, :root[data-theme="dark"] .spark .fit.axis-5, :root[data-theme="dark"] .outlier.axis-5 { stroke:#9bb6c2; }
+
+.topbar .who .password-link { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:6px 10px; background:transparent; color:#fff; border:1px solid #91a5bf; text-decoration:none; }
+.topbar .who .password-link:hover { background:#2b526d; }
+.topbar .who .password-link:focus-visible { outline:3px solid var(--uf-orange); outline-offset:2px; }
+.acting-role-notice { padding:10px 20px; background:var(--info-bg); color:var(--info); border-bottom:1px solid var(--border); }
+.frequent-qa-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+.frequent-qa-item { display:flex; flex-direction:column; gap:8px; padding:14px; background:var(--surface-2); border-radius:8px; }
+.frequent-qa-item .button { margin-top:auto; align-self:flex-start; }
+@media(max-width:760px) {
+  #app .measure-table > tbody > tr:not(.quick-trend) { grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:10px; }
+  #app .measure-table td.qa-n { grid-column:1; grid-row:1; }
+  #app .measure-table td.qa-label { grid-column:1; grid-row:2; min-width:0; }
+  #app .measure-table td.qa-measured { grid-column:2; grid-row:1 / span 2; align-self:center; min-width:0; }
+  #app .measure-table td.qa-result { grid-column:2; grid-row:3; align-self:start; }
+  #app .measure-table td.qa-unit { grid-column:1; grid-row:3; }
+  #app .measure-table td.qa-baseline { grid-column:1; grid-row:4; }
+  #app .measure-table td.qa-phone-extras { grid-column:1/-1; grid-row:5; }
+  #app .review-measure-table td.qa-dev, #app .review-measure-table td.qa-comment, #app .review-measure-table td.history-cell, #app .review-measure-table td[data-label="Trends"] { grid-column:1/-1; }
+  #app .measure-table .segmented { flex-wrap:wrap; }
+  #app .measure-table .segmented button { min-width:0; padding:8px 6px; }
+  #app .measure-table input, #app .measure-table select, #app .measure-table textarea { max-width:100%; min-width:0; }
+  .phone-details > summary { color:var(--accent); }
+  .acting-role-notice { padding:8px 12px; font-size:14px; }
+  .topbar .who .password-link { min-height:44px; }
+}
+
+.qa-calculation-info { display:inline-flex; align-items:center; justify-content:center; width:36px; min-height:36px; padding:0; margin-top:6px; color:var(--accent); background:var(--surface); }
+.calculation-dialog { max-width:min(720px,calc(100vw - 24px)); color:var(--text); background:var(--surface); border:1px solid var(--border); }
+@media(max-width:760px) { .qa-calculation-info { width:44px; min-height:44px; } }

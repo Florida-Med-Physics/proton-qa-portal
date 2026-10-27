@@ -949,7 +949,7 @@ def submit_run(db, user, assignment_id, data):
              "value_text": value if item["type"] in ("text", "status", "choice") else None, "limits": item["limits"], "status": status, "comment": comment}
             for item, value, status, comment in results]
     return _insert_run(db, user, template, qa_date.isoformat(), rows, _text(data, "comment"),
-                       "sphinx" if source_ref else "manual", source_ref, "pending")
+                       "hdr-pdf" if source_ref and source_ref.startswith("hdrpdf:") else "sphinx" if source_ref else "manual", source_ref, "pending")
 
 
 def _check_not_imported(db, source_ref):

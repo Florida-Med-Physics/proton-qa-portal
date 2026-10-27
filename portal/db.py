@@ -413,6 +413,8 @@ class Database:
         return _Transaction(self)
 
     def audit(self, user_id, action, entity, entity_id=None, **detail):
+        from .auth import ACTING_ROLE
+        if ACTING_ROLE.get():detail={**detail,'acting_role':ACTING_ROLE.get(),'authenticated_role':'admin'}
         self.run(
             "INSERT INTO audit (at, user_id, action, entity, entity_id, detail) VALUES (?, ?, ?, ?, ?, ?)",
             (now(), user_id, action, entity, entity_id, json.dumps(detail, default=str)),

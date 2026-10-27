@@ -427,7 +427,13 @@ class Handler(BaseHTTPRequestHandler):
                 if match and route_method == method:
                     if not user and not public:
                         raise PortalError("Please sign in.", 401)
-                    return self._send(200, handler(db, user, match, body, query))
+                    acting_role=self.headers.get('X-Act-As-Role')
+                    try: acting_user=auth.act_as(user,acting_role)
+                    except ValueError as exc: raise PortalError(str(exc),403)
+                    token=auth.ACTING_ROLE.set(acting_role)
+                    try:
+                        return self._send(200, handler(db, user if url.path=='/api/me' else acting_user, match, body, query))
+                    finally:auth.ACTING_ROLE.reset(token)
             raise PortalError("Not found.", 404)
         except PortalError as exc:
             self._send(exc.status, {"error": str(exc)})

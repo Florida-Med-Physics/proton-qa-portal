@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import secrets
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 
 from .db import now
@@ -93,3 +94,13 @@ def authenticate(db, username, password):
     if row and verify_password(password or "", row["password_hash"]):
         return row
     return None
+
+
+ACTING_ROLE = ContextVar('qa_acting_role', default=None)
+
+def act_as(user,role):
+    """Only an authenticated Admin may use another role, with their own identity."""
+    if not role:return user
+    if not user or user['role']!='admin' or role not in ROLES:
+        raise ValueError('Only an Admin can switch operating roles.')
+    return {**user,'role':role,'authenticated_role':'admin'}
