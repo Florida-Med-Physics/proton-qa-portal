@@ -1637,3 +1637,8 @@ td, .measure-table td { font-size: 21px; }
 .machine-difference-line:hover { filter:brightness(0.96); }
 .machine-difference-line:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
 :root[data-theme="dark"] .machine-difference-line { border-color:#8b7225; }
+
+.machine-tolerances-dialog td.machine-limit-changed-cell { background:#fef3c7; }
+.machine-tolerances-dialog .machine-limit-changed-cell input,
+.machine-tolerances-dialog .machine-limit-changed-cell select { background:transparent; }
+:root[data-theme="dark"] .machine-tolerances-dialog td.machine-limit-changed-cell { background:#493b13; }

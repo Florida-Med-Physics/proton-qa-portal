@@ -2452,6 +2452,7 @@ async function renderQueueEditor(id) {
     const paint=(field,custom,base)=>{
       const differs=!blank(custom)&&(field.dataset.inheritKey==='tol_mode'?custom!==base:blank(base)||Number(custom)!==Number(base));
       field.classList.toggle('machine-limit-different',differs);
+      field.closest('td')?.classList.toggle('machine-limit-changed-cell',differs);
       field.classList.remove('machine-color','machine-color-gtr1','machine-color-gtr2','machine-color-gtr5','machine-color-eyeline');
       const color=machineColorClass(field.dataset.machineName);if(differs&&color)field.classList.add(...color.split(' '));
       field.title=differs?`Different from default (${blank(base)?'not set':base})`:'';
@@ -2481,7 +2482,7 @@ async function renderQueueEditor(id) {
           for(const row of body.querySelectorAll('tr[data-machine-id]')){const name=row.querySelector('th span');if(name)name.className=machineTestDifferences(test,item,machineValues[row.dataset.machineId][item.test_id]).length?machineColorClass(name.textContent):'';}
         };
         control.addEventListener('input',update);control.addEventListener('change',update);
-        return el('td',{},control);
+        return el('td',{class:control.classList.contains('machine-limit-different')?'machine-limit-changed-cell':''},control);
       });
       const sync=el('button',{type:'button',class:'icon-btn sync-machine-defaults',title:'Sync all machines to this default','aria-label':'Sync all machines to default',disabled:!editable||!(q.schedules||[]).length,onclick:()=>{
         for(const schedule of q.schedules||[]){
