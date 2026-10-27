@@ -1609,3 +1609,14 @@ td, .measure-table td { font-size: 21px; }
 .machine-tolerances-warning svg { flex:none; }
 
 .machine-difference-note { color:var(--muted); font-size:13px; line-height:1.3; }
+
+/* Stable machine identity colors, with readable equivalents in dark mode. */
+.machine-color-gtr1 { --machine-color:#1d4ed8; }
+.machine-color-gtr2 { --machine-color:#800020; }
+.machine-color-eyeline { --machine-color:#7e22ce; }
+.machine-color-gtr5 { --machine-color:#15803d; }
+:root[data-theme="dark"] .machine-color-gtr1 { --machine-color:#93c5fd; }
+:root[data-theme="dark"] .machine-color-gtr2 { --machine-color:#fda4af; }
+:root[data-theme="dark"] .machine-color-eyeline { --machine-color:#d8b4fe; }
+:root[data-theme="dark"] .machine-color-gtr5 { --machine-color:#86efac; }
+.machine-color.machine-color { color:var(--machine-color); }

@@ -384,7 +384,7 @@ async function renderHome() {
 
   const frequent=frequentQaAssignments(data,runs,state.user.id);
   if(can('perform')&&frequent.length){
-    const cards=frequent.map(q=>el('div',{class:'frequent-qa-item'},el('strong',{},q.machine_name),el('span',{},q.queue_name),el('span',{class:'small muted'},q.state==='overdue'?'Overdue':q.state==='done'?'Done today':q.state==='ready'?'As needed':dueIn(q.next_due,q.frequency)),el('a',{class:'button primary',href:`#/perform/${q.id}`},'Start QA')));
+    const cards=frequent.map(q=>el('div',{class:'frequent-qa-item'},el('strong',{},machineLabel(q.machine_name)),el('span',{},q.queue_name),el('span',{class:'small muted'},q.state==='overdue'?'Overdue':q.state==='done'?'Done today':q.state==='ready'?'As needed':dueIn(q.next_due,q.frequency)),el('a',{class:'button primary',href:`#/perform/${q.id}`},'Start QA')));
     app.append(el('section',{class:'card frequent-qa'},el('h2',{},'Frequently used QA'),el('p',{class:'muted small'},'Based on your recent QA submissions.'),el('div',{class:'frequent-qa-grid'},cards)));
   }
 
@@ -404,7 +404,7 @@ async function renderHome() {
           el('div',{class:'home-qa-info'},el('span',{class:'home-qa-label',title:a.queue_name},label),el('span',{class:`small ${status==='Overdue'?'home-overdue':'muted'}`},status)),historyRing(a.history_counts,`#/trends?machine_id=${m.id}&list=${a.id}`,`${m.name} · ${a.queue_name}`));
       });
       body.append(el('div',{class:'home-machine-block'},
-        el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
+        el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name '+machineColorClass(m.name)},m.name),
           el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
             el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
         scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
@@ -502,6 +502,14 @@ function renderShell() {
   document.getElementById('acting-role-notice')?.remove();
   if(state.user.role==='admin'&&state.actingRole)bar.after(el('div',{id:'acting-role-notice',class:'acting-role-notice',role:'status'},`Operating as ${ROLE_LABEL[state.actingRole]} · Actions are saved as ${personName(state.user.full_name,state.user.username)} (Admin).`));
 }
+
+function machineColorClass(name) {
+  const text=String(name||'');
+  if(/eyeline|eye\s*light/i.test(text))return 'machine-color machine-color-eyeline';
+  const match=/\bG(?:TR)?\s*([125])\b/i.exec(text);
+  return match?`machine-color machine-color-gtr${match[1]}`:'';
+}
+function machineLabel(name) { return el('span',{class:machineColorClass(name)},name); }
 
 function shortDate(iso) {
   return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
@@ -640,7 +648,7 @@ async function renderDashboard() {
     const pending = await api("GET", "/api/runs?review_status=pending&limit=50");
     app.append(el("h2", { class: "section-head" }, "Waiting for review"), table(["Date", "Machine", "QA list", "Result", "Performed by", ""], pending.map((r) =>
       el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
-        el("td", {}, shortDate(r.qa_date)), el("td", {}, r.machine_name), el("td", {}, r.queue_name),
+        el("td", {}, shortDate(r.qa_date)), el("td", {}, machineLabel(r.machine_name)), el("td", {}, r.queue_name),
         el("td", {}, chip(r.overall)), el("td", { class: "muted" }, personName(r.performer_name, r.performer)),
         el("td", { class: "right" }, el("a", { class: "button small", href: `#/runs/${r.id}` }, "Review"))))));
   }
@@ -650,7 +658,7 @@ async function renderDashboard() {
     if (!machines.length) continue;
     // Grouped by machine, as on Setup QA: a header row per machine, then its lists (daily first, then monthly, …).
     const rows = machines.flatMap((machine) => {
-      const header = el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("strong", {}, machine.name), machine.kind ? el("span", { class: "muted small" }, ` · ${machine.kind}`) : null));
+      const header = el("tr", { class: "machine-row" }, el("td", { colspan: 4 }, el("strong", {}, machineLabel(machine.name)), machine.kind ? el("span", { class: "muted small" }, ` · ${machine.kind}`) : null));
       if (!machine.queues.length) return [header, el("tr", {}, el("td", { class: "muted indent", colspan: 4 }, "Nothing scheduled."))];
       const lists = [...machine.queues].sort((a, b) => (FREQ_ORDER[a.frequency] ?? 9) - (FREQ_ORDER[b.frequency] ?? 9) || a.queue_name.localeCompare(b.queue_name));
       return [header, ...lists.map((q) => {
@@ -1038,7 +1046,7 @@ async function renderMachines() {
     const rows = list.flatMap((machine) => {
       const mine = assignments[machine.id].filter((a) => (queues[a.queue_id] || {}).active !== 0);  // archived lists stay hidden
       const head = el("tr", { class: "machine-row" },
-        el("td", { colspan: 4 }, el("strong", {}, machine.name), el("span", { class: "muted small" }, ` · ${[machine.kind, machine.location].filter(Boolean).join(" · ")}`),
+        el("td", { colspan: 4 }, el("strong", {}, machineLabel(machine.name)), el("span", { class: "muted small" }, ` · ${[machine.kind, machine.location].filter(Boolean).join(" · ")}`),
           machine.active ? null : [" ", chip("", "Retired")]),
         el("td", { class: "right" }, editable ? el("div", { class: "row nowrap end" },
           el("button", { class: "small", onclick: () => addListDialog(machine, mine) }, "Add a QA list"),
@@ -2391,7 +2399,7 @@ async function renderQueueEditor(id) {
             controls.forEach((control) => { control.disabled = false; });
           }
         },
-      }), label))) : null;
+      }), value?machineLabel(label):label))) : null;
   const changed = Object.fromEntries(q.items.map((i) => [i.test_id, i]));
   const body = el("tbody");
   const holder = el("div");
@@ -2434,7 +2442,7 @@ async function renderQueueEditor(id) {
   } }, "Customize tests");
   const machineToleranceHelp=(test,item)=>{
     const names=(q.schedules||[]).filter(schedule=>machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{}).length).map(schedule=>schedule.machine);
-    return names.length?el('span',{class:'machine-difference-note'},`${names.join(', ')} ${names.length===1?'differs':'differ'}`):null;
+    return names.length?el('span',{class:'machine-difference-note'},...names.flatMap((name,i)=>[i?', ':'',machineLabel(name)]),` ${names.length===1?'differs':'differ'}`):null;
   };
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
@@ -2478,7 +2486,7 @@ async function renderQueueEditor(id) {
       }},'↻');
       body.replaceChildren(el('tr',{},el('th',{scope:'row'},el('div',{class:'row'},'Default template',sync)),...cells('Default template',item,null)),...(q.schedules||[]).map(schedule=>{
         const own=machineValues[schedule.id][item.test_id] ||= {};
-        return el('tr',{},el('th',{scope:'row'},schedule.machine),...cells(schedule.machine,own,schedule.id));
+        return el('tr',{},el('th',{scope:'row'},machineLabel(schedule.machine)),...cells(schedule.machine,own,schedule.id));
       }));
     };
     const popupError=el('p',{class:'error',role:'alert'});
@@ -2941,7 +2949,7 @@ async function renderReview() {
   page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
   const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
     el("td", {}, el("a", { href: `#/runs/${r.id}` }, shortDate(r.qa_date))),
-    el("td", {}, el("strong", {}, r.machine_name)),
+    el("td", {}, el("strong", {}, machineLabel(r.machine_name))),
     el("td", {}, r.queue_name),
     el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
     el("td", {}, chip(r.overall)),
@@ -2979,7 +2987,7 @@ async function renderRuns() {
   app.append(table(["Date", "Machine", "QA list", "Result", "Review"], runs.map((r) =>
     el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
       el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
-      el("td", {}, r.machine_name), el("td", {}, r.queue_name),
+      el("td", {}, machineLabel(r.machine_name)), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)),
       el("td", {}, reviewChip(r)))), "No runs match."));
 }
