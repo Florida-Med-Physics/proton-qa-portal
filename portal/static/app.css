@@ -1489,3 +1489,11 @@ td, .measure-table td { font-size: 21px; }
 .qa-calculation-info { display:inline-flex; align-items:center; justify-content:center; width:36px; min-height:36px; padding:0; margin-top:6px; color:var(--accent); background:var(--surface); }
 .calculation-dialog { max-width:min(720px,calc(100vw - 24px)); color:var(--text); background:var(--surface); border:1px solid var(--border); }
 @media(max-width:760px) { .qa-calculation-info { width:44px; min-height:44px; } }
+
+/* Keep directions readable while bringing axis labels next to their readings. */
+@media (min-width: 761px) {
+  .measure-wrap .measure-table:not(.axis-table):not(.energy-table) { min-width: 1740px; }
+  .measure-table:not(.axis-table):not(.energy-table) td.qa-label { min-width: 420px; }
+  .measure-table.axis-table td.qa-label,
+  .measure-table.axis-table th:nth-child(2) { text-align: right; padding-right: 24px; }
+}
