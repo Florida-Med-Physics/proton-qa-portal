@@ -1439,3 +1439,24 @@ td, .measure-table td { font-size: 21px; }
 .derived-preset-bar { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin:8px 0; }
 .derived-preset-bar label { flex:1; min-width:220px; }
 .derived-preset-bar select { width:100%; }
+
+/* Header colors are independent of the page theme: the header stays navy. */
+.topbar label.view-as-control { color:#fff; gap:8px; flex-shrink:0; }
+.topbar .view-as-control svg { color:#fff; flex:none; }
+.topbar .view-as-control select { color:var(--text); background:var(--surface); border:1px solid #91a5bf; min-height:36px; max-width:155px; }
+.topbar .view-as-control option { color:var(--text); background:var(--surface); }
+.topbar .view-as-control .small { color:#fff; }
+.topbar .view-as-control select:focus-visible { outline:3px solid var(--uf-orange); outline-offset:2px; }
+.toast.bad { background:var(--fail-bg); color:var(--fail); border:1px solid var(--fail); }
+:root[data-theme="dark"] .chart .fit:not([class*="axis-"]), :root[data-theme="dark"] .spark .fit:not([class*="axis-"]) { stroke:var(--fail); }
+:root[data-theme="dark"] .key-swatch.fit:not([class*="axis-"]) { border-color:var(--fail); }
+:root[data-theme="dark"] .chart .series.axis-4, :root[data-theme="dark"] .spark .series.axis-4 { stroke:#c49a88; }
+:root[data-theme="dark"] .dot.axis-4 { fill:#c49a88; }
+:root[data-theme="dark"] .key-swatch.line.axis-4, :root[data-theme="dark"] .key-swatch.line.axis-4::after { border-color:#c49a88; background-color:#c49a88; }
+:root[data-theme="dark"] .chart .series.axis-5, :root[data-theme="dark"] .spark .series.axis-5 { stroke:#9bb6c2; }
+:root[data-theme="dark"] .dot.axis-5 { fill:#9bb6c2; }
+:root[data-theme="dark"] .key-swatch.line.axis-5, :root[data-theme="dark"] .key-swatch.line.axis-5::after { border-color:#9bb6c2; background-color:#9bb6c2; }
+:root[data-theme="dark"] .stats-line.axis-4 { fill:#c49a88; }
+:root[data-theme="dark"] .chart .fit.axis-4, :root[data-theme="dark"] .spark .fit.axis-4, :root[data-theme="dark"] .outlier.axis-4 { stroke:#c49a88; }
+:root[data-theme="dark"] .stats-line.axis-5 { fill:#9bb6c2; }
+:root[data-theme="dark"] .chart .fit.axis-5, :root[data-theme="dark"] .spark .fit.axis-5, :root[data-theme="dark"] .outlier.axis-5 { stroke:#9bb6c2; }
