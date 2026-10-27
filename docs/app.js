@@ -1423,6 +1423,23 @@ function checkNumber(description) {
 
 // Fields marked [auto: …] or [calc: …] in their directions are filled here instead of typed:
 // the signed-in user, a 3D offset from the X, Y, Z fields above it, kTP, a product, or the daily output dose.
+function derivedExplanation(item,items,numbers) {
+  const rule=QADerived.read(item.description);
+  if(rule){
+    const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name};});
+    const equation=rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
+    return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Calculated: '),equation),el('div',{class:'derived-input-reference'},refs.map(r=>`${r.letter} = Test ${r.number} · ${r.name}`).join('; ')));
+  }
+  if(/\[calc: workbook\]/.test(item.description||'')&&window.QAExcel){
+    const key=QAExcel.keyOf(item),split=key?.lastIndexOf('!');if(!key||split<0)return null;
+    const sheet=key.slice(0,split),cell=key.slice(split+1),formula=QAExcel.data().model[sheet]?.[cell]?.f;
+    if(!formula)return null;
+    const refs=items.filter(t=>{const k=QAExcel.keyOf(t);return k&&k.startsWith(sheet+'!')&&new RegExp('\\b'+k.slice(sheet.length+1)+'\\b').test(formula);});
+    return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Excel equation: '),formula),el('div',{class:'derived-input-reference'},refs.map(t=>`Test ${numbers.get(t.test_id)||checkNumber(t.description)||'?'} · ${t.name}`).join('; ')));
+  }
+  return null;
+}
+
 function wireCalculations(entries) {
   const byName = (re) => entries.find((e) => re.test(e.item.name));
   const num = (e) => (e && e.input.value.trim() !== "" ? Number(e.input.value) : NaN);
@@ -1657,7 +1674,7 @@ async function renderPerform(assignmentId) {
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           numberCell(it),
-          el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
+          el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, derivedExplanation(it,t.items,numbers), note),
           el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
           el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
@@ -2498,6 +2515,8 @@ function choiceOptions(description) {
 function derivedEditor(rule,prior,onChange,formMode=false) {
   rule=rule||{inputs:[],formula:'A'};
   const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
+  const inputNumbers=blockNumbers(prior);
+  const inputLabel=t=>{const n=inputNumbers.get(t.test_id||t.id)||checkNumber(t.description);return n?`Test ${n} · ${t.name}`:t.name;};
   const picked=new Set(rule.inputs.map(x=>JSON.stringify([x.name,x.category||''])));
   const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
   const formula=el('input',{'aria-label':'Derived formula',value:rule.formula,placeholder:'e.g. 100 * (A - B) / A'});
@@ -2506,7 +2525,7 @@ function derivedEditor(rule,prior,onChange,formMode=false) {
   const update=()=>{rule={inputs:controls.filter(x=>x.input.checked).map(x=>({name:x.t.name,category:x.t.category||''})),formula:formula.value};hidden.value=JSON.stringify(rule);mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');if(onChange)onChange(rule);};
   controls.forEach(x=>x.input.addEventListener('change',update));formula.addEventListener('input',update);
   mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');
-  return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Inputs from earlier tests'),numeric.length?el('div',{class:'derived-inputs'},...controls.map(({t,input})=>el('label',{class:'check'},input,t.name))):el('p',{class:'muted small'},'Add earlier numeric tests in this template first.'),mapping,field('Formula',formula),el('p',{class:'muted small'},'Use A, B, C in input order, numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), mean(). Missing inputs leave the result blank.'));
+  return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Inputs from earlier tests'),numeric.length?el('div',{class:'derived-inputs'},...controls.map(({t,input})=>el('label',{class:'check'},input,inputLabel(t)))):el('p',{class:'muted small'},'Add earlier numeric tests in this template first.'),mapping,field('Formula',formula),el('p',{class:'muted small'},'Use A, B, C in input order, numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), mean(). Missing inputs leave the result blank.'));
 }
 
 function testForm(test,prior=[]) {
@@ -2803,7 +2822,7 @@ async function renderReviewMeasurements(run) {
       const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
       const row=el('tr',{'data-test-id':r.test_id},
         el('td',{class:'qa-n'},numberFor(r)),
-        el('td',{class:'qa-label'},el('strong',{},r.name),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null,helpText(r.description,{inline:true})),
+        el('td',{class:'qa-label'},el('strong',{},r.name),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null,helpText(r.description,{inline:true}),derivedExplanation(r,run.results,numbers)),
         el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?'Pass / Fail':unit),
         el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'?'Pass':r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         el('td',{class:'qa-measured','data-label':'Measured'},measured),
