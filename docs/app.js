@@ -1988,8 +1988,6 @@ async function renderPerform(assignmentId) {
       await draftWrites;
       const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef });
       await api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
-      try { await downloadQaReport(result.id); }
-      catch (err) { toast("QA completed. PDF could not download; use Download PDF report on the saved run.", true); }
       toast(`Submitted. Overall: ${capitalize(result.overall)}`);
       location.hash = `#/runs/${result.id}`;
     } catch (err) {
