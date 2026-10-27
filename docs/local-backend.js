@@ -506,8 +506,16 @@
     return !!(user && user.password_salt && user.password_hash === await passwordHash(password, user.password_salt));
   }
   async function setupDemoAccounts() {
+    if(!S.demoTherapistRenameV1){
+      const old=S.users.find(u=>u.username.toLowerCase()==='therapy'&&u.role==='therapist');
+      if(old&&!S.users.some(u=>u.username.toLowerCase()==='therapist')){
+        old.username='Therapist';old.full_name='Therapist';await setPassword(old,'Therapist');
+        audit(null,'rename_demo_therapist','user',old.id,{previous_username:'Therapy',username:'Therapist'});
+      }
+      S.demoTherapistRenameV1=true;save();
+    }
     if (S.demoPasswordAccountsV1) return;
-    for (const [name, role] of [['Physicist','physicist'],['Therapy','therapist'],['Admin','admin']]) {
+    for (const [name, role] of [['Physicist','physicist'],['Therapist','therapist'],['Admin','admin']]) {
       let user = S.users.find(u => u.username.toLowerCase() === name.toLowerCase());
       if (!user) user = byId('users', insert('users', {username:name, full_name:name, role, active:1, created_at:now()}));
       user.role = role;
