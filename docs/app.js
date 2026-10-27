@@ -2976,7 +2976,7 @@ async function renderReviewMeasurements(run) {
       const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
       const row=el('tr',{'data-test-id':r.test_id},
         el('td',{class:'qa-n'},numberFor(r)),
-        el('td',{class:'qa-label'},el('strong',{},r.name),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null,helpText(r.description,{inline:true}),derivedExplanation(r,run.results,numbers)),
+        el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},r.name)),derivedExplanation(r,run.results,numbers)?infoPopup(derivedExplanation(r,run.results,numbers),'Calculation details'):null),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null,performDirections(r)),
         el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?'Pass / Fail':unit),
         el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'?'Pass':r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         el('td',{class:'qa-measured','data-label':'Measured'},measured),
