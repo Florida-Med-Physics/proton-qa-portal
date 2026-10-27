@@ -184,8 +184,11 @@ class Database:
                 prior=[]
                 for test in self.all('SELECT t.* FROM queue_items qi JOIN tests t ON t.id=qi.test_id WHERE qi.queue_id=? ORDER BY qi.position',(q['id'],)):
                     original=next((x for x in tpl['checks'] if x['name']==test['name'] and x['category']==test['category']),None)
+                    if original and original['type']=='choice' and '[device:' in original.get('description','') and test['type']=='text':
+                        description=test['description']+' '+re.search(r'\[device: [^\]]+\]',original['description']).group()+' '+re.search(r'\[choices: [^\]]+\]',original['description']).group()
+                        self.run("UPDATE tests SET type='choice',description=? WHERE id=?",(description,test['id']));test['type']='choice';test['description']=description;changed+=1
                     rule=derived.read(original['description']) if original else None
-                    if rule and not derived.read(test['description']) and ('[calc:' in test['description'] or test['category']=='HDR treatment-day QA'):
+                    if rule and not derived.read(test['description']) and ('[calc:' in test['description'] or test['category']=='HDR treatment-day QA' or rule.get('kind')=='lookup'):
                         try:derived.resolve(rule,prior)
                         except ValueError:pass
                         else:

@@ -50,4 +50,4 @@ class DerivedTests(unittest.TestCase):
                 if rule:
                     derived.resolve(rule,prior);count+=1
                 prior.append(item)
-        self.assertEqual(count,31)
+        self.assertEqual(count,35)

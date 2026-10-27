@@ -1370,7 +1370,7 @@ function performDirections(item){return QADerived.read(item.description)||/\[cal
 function helpText(description, { inline = false } = {}) {
   description=(description||'').replace(/(?:^|\n)\s*Source:[^\n]*/g,'');
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
   if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
     const one = text.replace(/\s+/g, " ");
@@ -1478,6 +1478,7 @@ function derivedExplanation(item,items,numbers) {
   const rule=QADerived.read(item.description);
   if(rule){
     const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name};});
+    if(rule.kind==='lookup')return el('div',{class:'derived-explanation'},el('strong',{},'Device calibration lookup'),el('p',{},`Uses the selected device from Test ${refs[0].number} · ${refs[0].name}. Unconfigured factors stay blank.`));
     const equation=rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
     return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Calculated: '),equation),el('div',{class:'derived-input-reference'},refs.map(r=>`${r.letter} = Test ${r.number} · ${r.name}`).join('; ')));
   }
@@ -1507,7 +1508,7 @@ function wireCalculations(entries) {
       let sources;
       try{sources=QADerived.resolve(derivedRule,entries.slice(0,i).map(x=>x.item)).map(item=>entries.find(x=>x.item===item));}
       catch(err){lock(e,err.message);e.input.value='';e.input.setCustomValidity(err.message);return;}
-      lock(e,derivedRule.inputs.map((x,n)=>`${String.fromCharCode(65+n)} = ${x.name}`).join('; ')+'; '+derivedRule.formula);
+      lock(e,derivedRule.kind==='lookup'?'From selected device':derivedRule.inputs.map((x,n)=>`${String.fromCharCode(65+n)} = ${x.name}`).join('; ')+'; '+derivedRule.formula);
       const update=()=>{try{const value=QADerived.calculate(derivedRule,entries.slice(0,i).map(x=>x.item),item=>QADerived.value(entries.find(x=>x.item===item).input));QADerived.setInput(e.input,value);e.input.setCustomValidity('');e.input.dispatchEvent(new Event('input'));}catch(err){QADerived.setInput(e.input,null);e.input.setCustomValidity(err.message);}};
       sources.forEach(src=>src.input.addEventListener('input',update));update();return;
     }
@@ -1639,7 +1640,7 @@ async function renderPerform(assignmentId) {
         control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
           readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
       }
-      else if (item.type==='choice') control=input=select('', [['','Choose an answer…'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
+      else if (item.type==='choice') control=input=select('', [['',choiceOptions(item.description).length?'Choose an answer…':'Configure devices in Setup QA'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
       else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
       const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
       const noteToggle = el("button", { type: "button", class: "link small", onclick: () => { comment.hidden = false; noteToggle.hidden = true; comment.focus(); } }, "+ note");
@@ -2453,6 +2454,7 @@ async function renderQueueEditor(id) {
       const numeric = t.type === "numeric" || t.type === "derived";
       const editDefinition = (field, value) => {
         t[field] = value;
+        if(field==='choices')t.description=(t.description||'').replace(/\s*\[choices: [^\]]+\]/g,'')+' [choices: '+encodeURIComponent(JSON.stringify(value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean)))+']';
         testUpdates.set(t.id, { ...(testUpdates.get(t.id) || {}), [field]: value });
         markDirty();
       };
@@ -2473,7 +2475,7 @@ async function renderQueueEditor(id) {
       const lastInFamily = family && family[family.length - 1].item === item;
       const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
       const directions = family
-        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
         : helpText(t.description);
       const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 6 }, directions)) : null;
       lastSection = n;
@@ -2491,7 +2493,7 @@ async function renderQueueEditor(id) {
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, differenceFlags(t,item,baseIds.has(item.test_id)))),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
+        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -2642,7 +2644,36 @@ function derivedPresetFormula(preset,count,pressureUnit='kPa') {
   throw Error('Choose an equation preset.');
 }
 
-function derivedEditor(rule,prior,onChange,formMode=false) {
+function derivedEditor(rule,prior=[],onChange,formMode=false) {
+  let current=rule||defaultDerivedRule(prior);
+  const mode=select('',[['equation','Equation'],['lookup','Device calibration lookup']],current.kind==='lookup'?'lookup':'equation',{'aria-label':'Derivation method'});
+  const host=el('div');
+  const changed=value=>{current=value;if(onChange)onChange(value);};
+  const draw=()=>host.replaceChildren(mode.value==='lookup'?derivedLookupEditor(current,prior,changed,formMode):arithmeticDerivedEditor(current,prior,changed,formMode));
+  mode.addEventListener('change',()=>{
+    const source=prior.find(t=>t.type==='choice');
+    current=mode.value==='lookup'?{kind:'lookup',inputs:[{name:source?.name||'',category:source?.category||''}],values:source?choiceOptions(source.description).map(choice=>({choice,value:null})):[]}:defaultDerivedRule(prior);
+    changed(current);draw();
+  });draw();
+  return el('div',{class:'derived-method-editor wide'},field('Derivation method',mode),host);
+}
+function derivedLookupEditor(rule,prior,onChange,formMode) {
+  const choices=prior.filter(t=>t.type==='choice'),key=t=>JSON.stringify([t.name,t.category||'']);
+  let selected=choices.find(t=>key(t)===key(rule.inputs?.[0]||{}));
+  const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
+  const pick=select('',[['','Choose the device-selection test…'],...choices.map(t=>[key(t),t.name])],selected?key(selected):'',{'aria-label':'Device selection test'});
+  const rows=el('div',{class:'calibration-lookup-rows'});
+  const save=()=>{rule={kind:'lookup',inputs:[{name:selected?.name||'',category:selected?.category||''}],values:[...rows.querySelectorAll('input')].map(input=>({choice:input.dataset.choice,value:input.value.trim()===''?null:Number(input.value)}))};hidden.value=JSON.stringify(rule);if(onChange)onChange(rule);};
+  const draw=()=>{
+    const options=selected?choiceOptions(selected.description):[];
+    rows.replaceChildren(...options.map(choice=>{const value=rule.values?.find(row=>row.choice===choice)?.value;return field(choice,el('input',{type:'number',step:'any',value:value??'','data-choice':choice,'aria-label':`Calibration factor for ${choice}`,placeholder:'Not configured',oninput:save}));}));
+    if(!options.length)rows.append(el('p',{class:'muted'},'Add the device choices to the earlier multiple-choice test, then enter each device’s calibration factor here.'));
+  };
+  pick.addEventListener('change',()=>{selected=choices.find(t=>key(t)===pick.value);draw();save();});draw();
+  return el('div',{class:'derived-editor wide'},hidden,rule.sample?el('p',{class:'muted'},'Sample devices and placeholder factors. Replace these with your device calibration data.'):null,field('Device selection',pick),el('strong',{},'Calibration factors'),rows,el('p',{class:'muted small'},'A blank or unrecognized selection leaves this result blank. Values are recalculated when the device changes and again on submission.'));
+}
+
+function arithmeticDerivedEditor(rule,prior,onChange,formMode=false) {
   rule=rule||defaultDerivedRule(prior);
   const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
   const inputNumbers=blockNumbers(prior.map(t=>({...t,test_id:t.test_id||t.id})));

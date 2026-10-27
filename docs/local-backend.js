@@ -537,7 +537,7 @@
     data={...data};
     if(type==='choice') {
       const choices=typeof data.choices==='string'?data.choices.split(/\r?\n/).map(c=>c.trim()).filter(Boolean):data.choices||choiceOptions(data.description);
-      if(!Array.isArray(choices)||choices.length<2||choices.length>100||new Set(choices).size!==choices.length||choices.some(c=>typeof c!=='string'||!c.trim()||c.length>200))throw Error('Multiple choice needs 2–100 unique, nonempty choices (up to 200 characters each).');
+      if(!Array.isArray(choices)||choices.length<(/\[device: (?:chamber|electrometer)\]/.test(data.description||'')?0:2)||choices.length>100||new Set(choices).size!==choices.length||choices.some(c=>typeof c!=='string'||!c.trim()||c.length>200))throw Error('Multiple choice needs 2–100 unique, nonempty choices (up to 200 characters each).');
       data.description=(data.description||'').replace(/\s*\[choices: [^\]]+\]/g,'')+' [choices: '+encodeURIComponent(JSON.stringify(choices))+']';
     }
     const limits = type === "numeric" ? limitsOf(data, false) : { expected: null, warn: null, fail: null, tol_mode: "absolute" };
@@ -1259,8 +1259,8 @@
   function installDerivedCalculations(){
     let changed=0;
     for(const q of S.queues){const tpl=PORTAL_SEED.templates.find(t=>t.name===q.name);if(!tpl)continue;const prior=[];
-      for(const qi of S.queue_items.filter(x=>x.queue_id===q.id).sort((a,b)=>a.position-b.position)){const t=get('tests',qi.test_id,'Check');const seed=tpl.checks.find(x=>x.name===t.name&&x.category===t.category);const rule=seed&&QADerived.read(seed.description);
-        if(rule&&!QADerived.read(t.description)&&(/\[calc:/.test(t.description||'')||t.category==='HDR treatment-day QA')){try{QADerived.resolve(rule,prior);t.description=QADerived.encode(t.description,rule);changed++;}catch{/* Customized lists need explicit input selection. */}}
+      for(const qi of S.queue_items.filter(x=>x.queue_id===q.id).sort((a,b)=>a.position-b.position)){const t=get('tests',qi.test_id,'Check');const seed=tpl.checks.find(x=>x.name===t.name&&x.category===t.category);if(seed?.type==='choice'&&seed.description.includes('[device:')&&t.type==='text'){t.type='choice';t.description+=' '+/\[device: [^\]]+\]/.exec(seed.description)[0]+' '+/\[choices: [^\]]+\]/.exec(seed.description)[0];changed++;}const rule=seed&&QADerived.read(seed.description);
+        if(rule&&!QADerived.read(t.description)&&(/\[calc:/.test(t.description||'')||t.category==='HDR treatment-day QA'||rule.kind==='lookup')){try{QADerived.resolve(rule,prior);t.description=QADerived.encode(t.description,rule);changed++;}catch{/* Customized lists need explicit input selection. */}}
         prior.push(t);
       }
     }

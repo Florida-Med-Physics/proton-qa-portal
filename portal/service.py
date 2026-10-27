@@ -231,7 +231,7 @@ def save_test(db, user, data, test_id=None):
         choices=data.get('choices')
         if isinstance(choices,str): choices=[c.strip() for c in choices.splitlines() if c.strip()]
         if choices is None: choices=choice_options(data.get('description'))
-        if not isinstance(choices,list) or not 2<=len(choices)<=100 or len(set(choices))!=len(choices) or any(not isinstance(c,str) or not c.strip() or len(c)>200 for c in choices):
+        if not isinstance(choices,list) or not (0 if re.search(r'\[device: (?:chamber|electrometer)\]',data.get('description') or '') else 2)<=len(choices)<=100 or len(set(choices))!=len(choices) or any(not isinstance(c,str) or not c.strip() or len(c)>200 for c in choices):
             raise PortalError('Multiple choice needs 2–100 unique, nonempty choices (up to 200 characters each).')
         clean=re.sub(r'\s*\[choices: [^\]]+\]','',data.get('description') or '')
         data['description']=clean+' [choices: '+quote(json.dumps(choices),safe='')+']'

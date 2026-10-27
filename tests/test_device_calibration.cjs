@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict');const {chromium}=require('playwright');
+(async()=>{const browser=await chromium.launch({channel:'chrome',headless:true});try{
+  const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(process.env.PORTAL_TEST_URL||'http://127.0.0.1:8791/');await page.locator('[name=username]').fill('Admin');await page.locator('[name=password]').fill('Admin');await page.locator('button[type=submit]').click();await page.waitForSelector('.dashboard-count');
+  const t=await page.evaluate(()=>api('GET','/api/assignments/1/template'));
+  const chamber=t.items.find(i=>i.name==='Chamber'),meter=t.items.find(i=>i.name==='Electrometer'),factor=t.items.find(i=>i.name.startsWith('Chamber Cal. Factor')),ef=t.items.find(i=>i.name==='Electrometer Calibration Factor'),overall=t.items.find(i=>i.name==='Overall Calibration Factor [Gy/C]');
+  await page.evaluate(()=>location.hash='#/perform/1');await page.waitForSelector('.measure-table');
+  assert.equal(await page.getByLabel(factor.name,{exact:true}).inputValue(),'');
+  await page.getByLabel(chamber.name,{exact:true}).selectOption({label:'SAMPLE chamber A — placeholder'});await page.getByLabel(meter.name,{exact:true}).selectOption({label:'SAMPLE electrometer A — placeholder'});
+  assert.equal(await page.getByLabel(factor.name,{exact:true}).evaluate(e=>e.readOnly),true);
+  assert.equal(await page.getByLabel(factor.name,{exact:true}).evaluate(e=>e.dataset.derivedValue),'100000000');
+  assert.equal(await page.getByLabel(ef.name,{exact:true}).evaluate(e=>e.dataset.derivedValue),'1');
+  await page.getByLabel(chamber.name,{exact:true}).selectOption({label:'SAMPLE chamber B — placeholder'});await page.getByLabel(meter.name,{exact:true}).selectOption({label:'SAMPLE electrometer B — placeholder'});
+  assert.equal(await page.getByLabel(overall.name,{exact:true}).evaluate(e=>Number(e.dataset.derivedValue)),220000000.00000003);
+  await page.getByLabel(chamber.name,{exact:true}).selectOption('');assert.equal(await page.getByLabel(factor.name,{exact:true}).inputValue(),'');assert.equal(await page.getByLabel(overall.name,{exact:true}).inputValue(),'');
+  await page.evaluate(id=>location.hash='#/queues/'+id,t.queue.id);await page.waitForSelector('.calibration-lookup-rows');
+  const input=page.getByLabel('Calibration factor for SAMPLE chamber A — placeholder',{exact:true});await input.fill('150000000');await page.getByRole('button',{name:'Save template',exact:true}).click();await page.waitForTimeout(400);
+  const edited=await page.evaluate(()=>api('GET','/api/assignments/1/template'));const rule=JSON.parse(decodeURIComponent(/\[derived: ([^\]]+)\]/.exec(edited.items.find(i=>i.name===factor.name).description)[1]));assert.equal(rule.values[0].value,150000000);
+  assert.deepEqual(errors,[]);console.log('Device choices, live read-only factors, downstream recalculation, blank selections and editable calibration tables verified.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1)});

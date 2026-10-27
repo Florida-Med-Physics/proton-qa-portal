@@ -42,6 +42,8 @@
       "[Ortho - kV/kV] PPS 2 XRAY Offset [cm]",
       "[CBCT - Pelvis SFOV ND] Required 3D Correction Vector Offset [cm]",
       "[OBs] Required 3D Correction Vector Offset [cm]",
+      "Chamber Cal. Factor(Proton), Gy/C",
+      "Electrometer Calibration Factor",
       "Overall Calibration Factor [Gy/C]",
       "Daily output: Dose [cGy]"
     ],
@@ -54,7 +56,9 @@
     "derived": [
       "Total Offset [cm]",
       "Measured Range Eyeline Field 1 (D90) [cm]",
-      "Temp. & Press. Correction"
+      "Temp. & Press. Correction",
+      "Chamber Cal. Factor [Gy/C]",
+      "Electrometer Calibration Factor"
     ],
     "native_workbook_calculations": [],
     "unresolved": []
