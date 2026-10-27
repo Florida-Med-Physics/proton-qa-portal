@@ -2211,6 +2211,20 @@ async function renderNewTemplate() {
     el('div', { class: 'row template-save-bar' }, el('a', { class: 'button', href: '#/setup' }, 'Cancel'), createButton));
 }
 
+function machineTestDifferences(test,item,override={},selection={},base=true) {
+  const differences=[];
+  if((selection.excluded||[]).includes(item.test_id))differences.push({label:'Test inclusion',default:'Included',machine:'Excluded'});
+  if(!base||(selection.added||[]).includes(item.test_id))differences.push({label:'Test inclusion',default:'Not in template',machine:'Machine-only test'});
+  const blank=v=>v===null||v===undefined||v==='';
+  for(const [key,label] of [['expected','Baseline'],['warn','Warning'],['fail','Action'],['tol_mode','Tolerance mode']]){
+    const own=override[key];if(blank(own))continue;
+    const original=!blank(item[key])?item[key]:test[key]??(key==='tol_mode'?'absolute':null);
+    if(key==='tol_mode'?own===(original||'absolute'):!blank(original)&&Number(own)===Number(original))continue;
+    differences.push({label,default:blank(original)?'Not set':String(original),machine:String(own)});
+  }
+  return differences;
+}
+
 async function renderQueueEditor(id) {
   const isNew = id === "new";
   if (isNew) return renderNewTemplate();
@@ -2241,6 +2255,11 @@ async function renderQueueEditor(id) {
   let saveBtn = null;
   const machineValues = {};
   const machineSelections = {};
+  await Promise.all((q.schedules||[]).map(async schedule=>{
+    const template=await api('GET',`/api/assignments/${schedule.id}/template`);
+    machineValues[schedule.id]=Object.fromEntries((template.all_items||template.items).map(i=>[i.test_id,{...(i.override||{})}]));
+    machineSelections[schedule.id]=template.test_selection||{};
+  }));
   const machineName = (aid) => ((q.schedules || []).find((x) => String(x.id) === String(aid)) || {}).machine || "";
   const valuesPick = (q.schedules || []).length ? el("div", { class: "row", role: "radiogroup", "aria-label": "Tests and limits for" },
     [["", "Default template"], ...q.schedules.map((x) => [String(x.id), x.machine])].map(([value, label]) =>
@@ -2309,12 +2328,20 @@ async function renderQueueEditor(id) {
       await reloadMachine(); toast("Machine tests saved");
     }, "Save machine tests");
   } }, "Customize tests");
+  const differenceFlags=(test,item,base=true)=>{
+    const schedules=(q.schedules||[]).filter(x=>!valuesFor||String(x.id)===String(valuesFor));
+    return schedules.flatMap(schedule=>{
+      const differences=machineTestDifferences(test,item,machineValues[schedule.id]?.[item.test_id]||{},machineSelections[schedule.id]||{},base);
+      if(!differences.length)return [];
+      return [el('details',{class:'test-machine-difference'},el('summary',{'aria-label':`${schedule.machine}: differs from default`},`${schedule.machine} · differs`),el('div',{class:'test-difference-content'},...differences.map(d=>el('div',{},el('strong',{},`${d.label}: `),`Default ${d.default} → ${schedule.machine} ${d.machine}`))))];
+    });
+  };
   const draw = () => {
     const selection = machineSelections[valuesFor] || {};
     const baseIds = new Set(items.map((i) => i.test_id));
     const extras = valuesFor ? (selection.added || []).filter((tid) => !baseIds.has(tid) && byId[tid]).map((test_id) => ({ test_id })) : [];
     const scopedItems = valuesFor ? [...items.filter((i) => !(selection.excluded || []).includes(i.test_id)), ...extras] : items;
-    customizationNote.textContent = valuesFor ? `${machineName(valuesFor)}: ${(selection.excluded || []).filter((tid) => baseIds.has(tid)).length} excluded · ${extras.length} machine-only tests. Other tests stay synced.` : "Shared tests stay synced on every machine. Select a machine to customize its tests or limits.";
+    customizationNote.textContent = valuesFor ? `${machineName(valuesFor)}: ${(selection.excluded || []).filter((tid) => baseIds.has(tid)).length} excluded · ${extras.length} machine-only tests. Other tests stay synced.` : "Highlighted gantry labels show tests that differ from the default. Open a label to see each change.";
     customizeButton.hidden = !valuesFor || !editable;
     // Laid out like the myQA sheet: a heading per section, then each numbered item with its directions.
     const sectionCats = new Map();
@@ -2368,7 +2395,7 @@ async function renderQueueEditor(id) {
       const input = (name, props) => el("input", { type: "number", step: "any", value: target[name] ?? "", placeholder: fmt(fallback(name)), disabled: !editable || !numeric,
         class: own && target[name] !== undefined && target[name] !== null && target[name] !== "" ? "own-value" : null,
         title: own ? `${machineName(valuesFor)} only. Blank uses the default (${fmt(fallback(name))}).` : null,
-        oninput: (e) => { target[name] = e.target.value; e.target.classList.toggle("own-value", !!own && e.target.value !== ""); }, ...(props || {}) });
+        onchange:()=>draw(), oninput: (e) => { target[name] = e.target.value; e.target.classList.toggle("own-value", !!own && e.target.value !== ""); }, ...(props || {}) });
       const m = changed[item.test_id] || {};
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = ((own && own.tol_mode) || item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
@@ -2395,7 +2422,7 @@ async function renderQueueEditor(id) {
           }) }, "✎") : null,
           editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
             el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
-            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null)),
+            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, differenceFlags(t,item,baseIds.has(item.test_id)))),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value)},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
@@ -2410,6 +2437,18 @@ async function renderQueueEditor(id) {
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
           el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), derivedRow, dirRow];
     }).filter(Boolean));
+    if(valuesFor){
+      for(const tid of selection.excluded||[]){const test=byId[tid],item=items.find(x=>x.test_id===tid);if(!test||!item)continue;if(searchTerm&&!`${test.name} ${test.category||''}`.toLowerCase().includes(searchTerm))continue;
+        body.append(el('tr',{class:'machine-only-difference-row'},el('td',{colspan:6},el('strong',{},test.name),' ',el('span',{class:'test-machine-only-label'},`${machineName(valuesFor)} · excluded`),el('span',{class:'muted small'},' · Included in the default template. Use Customize tests to include it.'))));
+      }
+    }
+    if(!valuesFor){
+      const extraIds=[...new Set(Object.values(machineSelections).flatMap(x=>x.added||[]))].filter(tid=>!baseIds.has(tid)&&byId[tid]);
+      for(const tid of extraIds){const test=byId[tid];if(searchTerm&&!`${test.name} ${test.category||''}`.toLowerCase().includes(searchTerm))continue;
+        const flags=(q.schedules||[]).filter(a=>(machineSelections[a.id]?.added||[]).includes(tid)).map(a=>el('span',{class:'test-machine-only-label'},`${a.machine} only`));
+        body.append(el('tr',{class:'machine-only-difference-row'},el('td',{colspan:6},el('strong',{},test.name),' ',flags,el('span',{class:'muted small'},' · Not in the default template'))));
+      }
+    }
     if (!matches.length && items.length) body.append(el("tr", {}, el("td", { colspan: 6, class: "muted" }, "No matching tests. Clear the search to see all tests.")));
     holder.replaceChildren(scopedItems.length ? el("div", { class: "table-wrap" }, el("table", { class: "list-editor" },
       el("thead", {}, el("tr", {}, ["Test Name", "Category", "Result Type", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
