@@ -1317,15 +1317,15 @@ const SECTION_NAME = /\[Section: ([^\]]+)\]\s*/;
 const MARKER = /\[(auto|calc): ((?:[^\[\]]|\[[^\]]*\])+)\]\s*/;
 const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist]": the value a text field starts with   // the rule may itself contain "[mm]"         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
+function infoDisclosure(content,label='Test information',open=false) {
+  return el('details',{class:'qa-info',open},el('summary',{title:label,'aria-label':label},el('span',{'aria-hidden':'true'},'i')),el('div',{class:'qa-info-content'},content));
+}
+
 function helpText(description, { inline = false } = {}) {
-  if (!description || description.startsWith("Measured by Sphinx")) return null;
+  if (!description || description.startsWith("Measured by Sphinx") || QADerived.read(description) || /\[calc: workbook\]/.test(description)) return null;
   const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
-  if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
-    const one = text.replace(/\s+/g, " ");
-    return el("span", { class: "qa-sub", title: text }, one.length > 150 ? `${one.slice(0, 148)}…` : one);
-  }
-  return el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text);
+  return infoDisclosure(el('div',{class:'directions pre'},text),'Instructions');
 }
 
 // Which numbered section a test belongs to: the template number in its directions ("Template 2.03.") when
@@ -1425,17 +1425,18 @@ function checkNumber(description) {
 // the signed-in user, a 3D offset from the X, Y, Z fields above it, kTP, a product, or the daily output dose.
 function derivedExplanation(item,items,numbers) {
   const rule=QADerived.read(item.description);
+  const notes=(item.description||'').replace(TEMPLATE_NUMBER,'').replace(SECTION_NAME,'').replace(MARKER,'').replace(/\[(?:derived|excel|rule): [^\]]+\]\s*/g,'').trim();
   if(rule){
     const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name};});
     const equation=rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
-    return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Calculated: '),equation),el('div',{class:'derived-input-reference'},refs.map(r=>`${r.letter} = Test ${r.number} · ${r.name}`).join('; ')));
+    return infoDisclosure(el('div',{class:'derived-explanation'},notes?el('p',{},notes):null,el('div',{},el('strong',{},'Equation: '),equation),el('ul',{class:'derived-input-reference'},refs.map(r=>el('li',{},`${r.letter} = Test ${r.number} · ${r.name}`)))),'Calculation details');
   }
   if(/\[calc: workbook\]/.test(item.description||'')&&window.QAExcel){
     const key=QAExcel.keyOf(item),split=key?.lastIndexOf('!');if(!key||split<0)return null;
     const sheet=key.slice(0,split),cell=key.slice(split+1),formula=QAExcel.data().model[sheet]?.[cell]?.f;
     if(!formula)return null;
     const refs=items.filter(t=>{const k=QAExcel.keyOf(t);return k&&k.startsWith(sheet+'!')&&new RegExp('\\b'+k.slice(sheet.length+1)+'\\b').test(formula);});
-    return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Excel equation: '),formula),el('div',{class:'derived-input-reference'},refs.map(t=>`Test ${numbers.get(t.test_id)||checkNumber(t.description)||'?'} · ${t.name}`).join('; ')));
+    return infoDisclosure(el('div',{class:'derived-explanation'},notes?el('p',{},notes):null,el('div',{},el('strong',{},'Excel equation: '),formula),el('ul',{class:'derived-input-reference'},refs.map(t=>el('li',{},`Test ${numbers.get(t.test_id)||checkNumber(t.description)||'?'} · ${t.name}`)))),'Calculation details');
   }
   return null;
 }
@@ -2526,7 +2527,7 @@ function derivedEditor(rule,prior,onChange,formMode=false) {
   const update=()=>{rule={inputs:controls.filter(x=>x.input.checked).map(x=>({name:x.t.name,category:x.t.category||''})),formula:formula.value};hidden.value=JSON.stringify(rule);mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');if(onChange)onChange(rule);};
   controls.forEach(x=>x.input.addEventListener('change',update));formula.addEventListener('input',update);
   mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');
-  return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Inputs from earlier tests'),numeric.length?el('div',{class:'derived-inputs'},...controls.map(({t,input})=>el('label',{class:'check'},input,inputLabel(t)))):el('p',{class:'muted small'},'Add earlier numeric tests in this template first.'),mapping,field('Formula',formula),el('p',{class:'muted small'},'Use A, B, C in input order, numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), mean(). Missing inputs leave the result blank.'));
+  return infoDisclosure(el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Inputs from earlier tests'),numeric.length?el('div',{class:'derived-inputs'},...controls.map(({t,input})=>el('label',{class:'check'},input,inputLabel(t)))):el('p',{class:'muted small'},'Add earlier numeric tests in this template first.'),mapping,field('Formula',formula),el('p',{class:'muted small'},'Use A, B, C in input order, numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), mean(). Missing inputs leave the result blank.')),'Configure calculation',!rule.inputs.length);
 }
 
 function testForm(test,prior=[]) {

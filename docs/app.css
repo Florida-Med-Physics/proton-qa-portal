@@ -1398,3 +1398,12 @@ td, .measure-table td { font-size: 21px; }
 @media(max-width:760px) {
   #app[data-page^="perform/"], #app[data-page^="runs/"] { --qa-form-font-size:20px; }
 }
+
+.qa-info { margin:6px 0; font-weight:400; }
+.qa-info > summary { display:inline-flex; align-items:center; justify-content:center; list-style:none; width:32px; height:32px; cursor:pointer; color:var(--accent); border:1px solid var(--border); border-radius:50%; font-weight:600; }
+.qa-info > summary::-webkit-details-marker { display:none; }
+.qa-info > summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.qa-info-content { margin-top:8px; padding:12px; background:var(--surface-2); border:1px solid var(--border); border-radius:6px; overflow-wrap:anywhere; }
+.qa-info-content .derived-explanation { margin:0; padding:0; border:0; }
+.qa-info-content ul { padding-left:22px; margin:8px 0 0; }
+.qa-info-content li { margin:6px 0; }
