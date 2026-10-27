@@ -2433,7 +2433,7 @@ async function renderQueueEditor(id) {
     }, "Save machine tests");
   } }, "Customize tests");
   const machineToleranceHelp=()=>{
-    const button=infoPopup(el('p',{},'Editing the default Warning updates every machine. The sync icon resets all values to the defaults. Blue values differ from the default. Save template to keep your changes.'),'Machine tolerances help');
+    const button=infoPopup(el('p',{},'Editing the default Baseline, Warning, or Action updates every machine. The sync icon resets all values to the defaults. Blue values differ from the default. Save template to keep your changes.'),'Machine tolerances help');
     button.textContent='(!)';button.classList.add('small','machine-tolerances-button');return button;
   };
   const showMachineTolerances=(test,item)=>{
@@ -2455,7 +2455,7 @@ async function renderQueueEditor(id) {
         if(aid)paint(control,target[k],base[k]);
         const update=()=>{
           target[k]=control.value;changed(aid);
-          if(!aid&&k==='warn')for(const schedule of q.schedules||[]){machineValues[schedule.id][item.test_id].warn=null;changed(schedule.id);}
+          if(!aid&&['expected','warn','fail'].includes(k))for(const schedule of q.schedules||[]){machineValues[schedule.id][item.test_id][k]=null;changed(schedule.id);}
           const latest=defaults();
           for(const field of body.querySelectorAll('[data-inherit-key]')){
             const key=field.dataset.inheritKey;
