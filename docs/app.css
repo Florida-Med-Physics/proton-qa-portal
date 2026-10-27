@@ -1597,8 +1597,8 @@ td, .measure-table td { font-size: 21px; }
 .tolerance-mode-actions button { white-space:nowrap; flex:none; padding:5px 8px; font-size:14px; }
 .machine-tolerances-dialog { width:min(920px, calc(100vw - 32px)); max-width:calc(100vw - 32px); }
 .machine-tolerances-dialog table { width:100%; }
-.machine-tolerances-dialog .machine-limit-different { color:#6d28d9; font-weight:600; }
-:root[data-theme="dark"] .machine-tolerances-dialog .machine-limit-different { color:#c4b5fd; }
+.machine-tolerances-dialog .machine-limit-different { color:#1d4ed8; font-weight:600; }
+:root[data-theme="dark"] .machine-tolerances-dialog .machine-limit-different { color:#93c5fd; }
 .machine-tolerances-dialog td input { width:100%; min-width:70px; }
 .machine-tolerances-dialog td select { min-width:120px; max-width:100%; }
 .machine-tolerances-dialog th .row { gap:8px; flex-wrap:nowrap; }
