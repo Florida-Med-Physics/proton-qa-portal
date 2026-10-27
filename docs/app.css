@@ -1497,3 +1497,7 @@ td, .measure-table td { font-size: 21px; }
   .measure-table.axis-table td.qa-label,
   .measure-table.axis-table th:nth-child(2) { text-align: right; padding-right: 24px; }
 }
+
+.qa-test-title { display:flex; align-items:flex-start; gap:8px; }
+.qa-test-name { flex:1; min-width:0; }
+.qa-test-title > button { flex:0 0 auto; margin-top:0; }

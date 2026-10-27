@@ -1703,7 +1703,7 @@ async function renderPerform(assignmentId) {
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           numberCell(it),
-          el("td", { class: "qa-label" }, firstCell(it), firstHeader === "Test" ? limitsLine(it, unit) : null, derivedExplanation(it,t.items,numbers)?infoPopup(derivedExplanation(it,t.items,numbers),'Calculation details'):null, note),
+          el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),derivedExplanation(it,t.items,numbers)?infoPopup(derivedExplanation(it,t.items,numbers),'Calculation details'):null), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
           el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
