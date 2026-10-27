@@ -1598,3 +1598,7 @@ td, .measure-table td { font-size: 21px; }
 .machine-tolerances-dialog { width:min(920px, calc(100vw - 32px)); max-width:calc(100vw - 32px); }
 .machine-tolerances-dialog table { width:100%; }
 .machine-limit-custom { display:block; color:var(--link); font-weight:600; }
+.machine-tolerances-dialog td input { width:100%; min-width:70px; }
+.machine-tolerances-dialog td select { min-width:120px; max-width:100%; }
+.machine-tolerances-dialog th .row { gap:8px; flex-wrap:nowrap; }
+.sync-machine-defaults { font-size:24px; line-height:1; flex:none; }

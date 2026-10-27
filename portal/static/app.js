@@ -2354,7 +2354,10 @@ async function renderQueueEditor(id) {
   let searchTerm = "";
   const searchCount = el("span", { class: "muted small", role: "status" });
   let saveBtn = null;
+  let saveTemplateChanges=null;
   const machineValues = {};
+  const modifiedMachineValues=new Set();
+  let defaultLimitsDirty=false;
   const machineSelections = {};
   await Promise.all((q.schedules||[]).map(async schedule=>{
     const template=await api('GET',`/api/assignments/${schedule.id}/template`);
@@ -2431,24 +2434,55 @@ async function renderQueueEditor(id) {
   } }, "Customize tests");
   const showMachineTolerances=(test,item)=>{
     const blank=v=>v===null||v===undefined||v==='';
-    const defaults=Object.fromEntries(['expected','warn','fail','tol_mode'].map(k=>[k,!blank(item[k])?item[k]:test[k]??(k==='tol_mode'?'absolute':null)]));
-    const cells=(values,own={})=>['expected','warn','fail','tol_mode'].map(k=>{
-      const value=values[k],text=blank(value)?'Not set':k==='tol_mode'?(value==='percent'?'Percent':'Absolute'):`${k==='expected'?'':'± '}${fmt(value)}${k!=='expected'&&values.tol_mode==='percent'?' %':test.unit?' '+test.unit:''}`;
-      return el('td',{},text,!blank(own[k])?el('span',{class:'small machine-limit-custom'},'Machine-specific'):null);
-    });
-    const rows=[el('tr',{},el('th',{scope:'row'},'Default template'),...cells(defaults))];
-    for(const schedule of q.schedules||[]){
-      const own=machineValues[schedule.id]?.[item.test_id]||{},values={...defaults};
-      for(const k of Object.keys(defaults))if(!blank(own[k]))values[k]=own[k];
-      rows.push(el('tr',{},el('th',{scope:'row'},schedule.machine),...cells(values,own)));
-    }
+    const keys=['expected','warn','fail','tol_mode'],labels={expected:'Baseline',warn:'Warning',fail:'Action',tol_mode:'Mode'};
+    const defaults=()=>Object.fromEntries(keys.map(k=>[k,!blank(item[k])?item[k]:test[k]??(k==='tol_mode'?'absolute':null)]));
+    const body=el('tbody');
+    const changed=aid=>{if(aid)modifiedMachineValues.add(String(aid));else defaultLimitsDirty=true;markDirty();};
+    const drawRows=()=>{
+      const base=defaults();
+      const cells=(name,target,aid)=>keys.map(k=>{
+        const own=aid&&!blank(target[k]);
+        const control=k==='tol_mode'?select('',[...(aid?[['',`Use default (${base.tol_mode==='percent'?'Percent':'Absolute'})`]]:[]),['absolute','Absolute'],['percent','Percent']],aid?(target[k]||''):base[k],{'aria-label':`${name} ${labels[k]}`,disabled:!editable}):el('input',{type:'number',step:'any',...(k==='warn'||k==='fail'?{min:0}:{}),value:aid?(target[k]??''):(base[k]??''),placeholder:blank(base[k])?'Not set':String(base[k]),'aria-label':`${name} ${labels[k]}`,disabled:!editable});
+        if(aid)control.dataset.inheritKey=k;
+        const hint=aid?el('span',{class:own?'small machine-limit-custom':'small muted'},own?'Machine-specific':'Uses default'):null;
+        const update=()=>{
+          target[k]=control.value;changed(aid);
+          if(hint){hint.textContent=blank(target[k])?'Uses default':'Machine-specific';hint.className=blank(target[k])?'small muted':'small machine-limit-custom';}
+          const latest=defaults();
+          for(const field of body.querySelectorAll('[data-inherit-key]')){
+            const key=field.dataset.inheritKey;
+            if(key==='tol_mode')field.options[0].textContent=`Use default (${latest.tol_mode==='percent'?'Percent':'Absolute'})`;
+            else field.placeholder=blank(latest[key])?'Not set':String(latest[key]);
+          }
+        };
+        control.addEventListener('input',update);control.addEventListener('change',update);
+        return el('td',{},control,hint);
+      });
+      const sync=el('button',{type:'button',class:'icon-btn sync-machine-defaults',title:'Sync all machines to this default','aria-label':'Sync all machines to default',disabled:!editable||!(q.schedules||[]).length,onclick:()=>{
+        for(const schedule of q.schedules||[]){
+          const own=machineValues[schedule.id][item.test_id] ||= {};
+          for(const k of keys)own[k]=null;
+          changed(schedule.id);
+        }
+        drawRows();toast('All machines now use this test’s defaults. Save template to keep these changes.');
+      }},'↻');
+      body.replaceChildren(el('tr',{},el('th',{scope:'row'},el('div',{class:'row'},'Default template',sync)),...cells('Default template',item,null)),...(q.schedules||[]).map(schedule=>{
+        const own=machineValues[schedule.id][item.test_id] ||= {};
+        return el('tr',{},el('th',{scope:'row'},schedule.machine),...cells(schedule.machine,own,schedule.id));
+      }));
+    };
+    const popupError=el('p',{class:'error',role:'alert'});
     const dialog=el('dialog',{class:'machine-tolerances-dialog','aria-label':'Machine-Specific Tolerances'},
       el('h2',{},'Machine-Specific Tolerances'),el('p',{},el('strong',{},test.name)),
-      el('p',{class:'muted small'},'Values without a machine-specific label use the default template. This comparison includes your current unsaved changes.'),
-      el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine','Baseline','Warning','Action','Mode'].map(h=>el('th',{},h)))),el('tbody',{},rows))),
+      el('p',{class:'muted small'},'Blank machine values use the default template. The sync icon resets all machines to these defaults. Save template to keep your changes.'),
+      el('div',{class:'table-wrap'},el('table',{},el('thead',{},el('tr',{},['Machine',`Baseline${test.unit?' ('+test.unit+')':''}`,'Warning ±','Action ±','Mode'].map(h=>el('th',{},h)))),body)),
       !(q.schedules||[]).length?el('p',{},'Schedule this QA template on a machine to compare its limits.'):null,
-      el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close')));
-    dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+      popupError,el('div',{class:'buttons'},el('button',{type:'button',onclick:()=>dialog.close()},'Close'),
+        editable?el('button',{type:'button',class:'primary',onclick:async event=>{
+          const button=event.currentTarget;button.disabled=true;popupError.textContent='';
+          try{await saveTemplateChanges();dialog.close();}catch(err){popupError.textContent=err.message;button.disabled=false;}
+        }},'Save template'):null));
+    dialog.addEventListener('close',()=>{dialog.remove();draw();});drawRows();document.body.append(dialog);dialog.showModal();
   };
   const differenceFlags=(test,item,base=true)=>{
     const schedules=(q.schedules||[]).filter(x=>!valuesFor||String(x.id)===String(valuesFor));
@@ -2651,23 +2685,21 @@ async function renderQueueEditor(id) {
     const error = el("p", { class: "error" });
     const save = async () => {
       error.textContent = "";
-      if (valuesFor) {
-        const overrides = Object.entries(machineValues[valuesFor]).map(([tid, o]) => ({ test_id: Number(tid), expected: o.expected ?? "", warn: o.warn ?? "",
-          fail: o.fail ?? "", tol_mode: o.tol_mode || "" }));
-        await api("PUT", `/api/assignments/${valuesFor}/overrides`, { overrides });
-        toast(`${machineName(valuesFor)} values saved`);
-        dirty = false;
-        unsaved.hidden = true;
-        return;
+      let result;
+      if(!valuesFor||defaultLimitsDirty){
+        const payload = { ...formData(info), items, test_updates: [...testUpdates].map(([test_id, fields]) => ({ test_id, ...fields })) };
+        result=isNew?await api('POST','/api/queues',payload):await api('PUT',`/api/queues/${id}`,payload);
       }
-      const payload = { ...formData(info), items, test_updates: [...testUpdates].map(([test_id, fields]) => ({ test_id, ...fields })) };
-      const result = isNew ? await api("POST", "/api/queues", payload) : await api("PUT", `/api/queues/${id}`, payload);
-      dirty = false;
-      unsaved.hidden = true;
-      toast("QA list saved");
-      location.hash = `#/queues/${result.id}`;
-      if (!isNew) route();
+      if(valuesFor)modifiedMachineValues.add(String(valuesFor));
+      for(const aid of modifiedMachineValues){
+        const overrides=Object.entries(machineValues[aid]).map(([tid,o])=>({test_id:Number(tid),expected:o.expected??'',warn:o.warn??'',fail:o.fail??'',tol_mode:o.tol_mode||''}));
+        await api('PUT',`/api/assignments/${aid}/overrides`,{overrides});
+      }
+      modifiedMachineValues.clear();defaultLimitsDirty=false;dirty=false;unsaved.hidden=true;
+      toast('QA list and machine values saved');
+      if(result){location.hash=`#/queues/${result.id}`;if(!isNew)route();}else draw();
     };
+    saveTemplateChanges=save;
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
     app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/queues" }, "Back"),
       saveBtn = el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
