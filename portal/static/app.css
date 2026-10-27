@@ -1555,3 +1555,22 @@ td, .measure-table td { font-size: 21px; }
   #app .hdr-qa-table input, #app .hdr-qa-table button { min-height:44px; }
 }
 #app .submit-bar .phone-details-body { max-height:none; overflow:visible; }
+
+/* Desktop navigation gets its own row: account controls cannot squeeze tabs off screen. */
+@media (min-width: 768px) {
+  .topbar { display:flex; flex-wrap:wrap; overflow:visible; gap:6px 16px; padding:8px 20px 0; }
+  .topbar .brand-title { order:0; flex:0 1 auto; max-width:100%; margin:0; }
+  .topbar .phone-menu-toggle { display:none; }
+  .topbar .who, .topbar.phone-menu-open .who {
+    display:flex; order:1; flex:1 1 600px; width:auto; min-width:0; max-width:100%;
+    flex-wrap:wrap; justify-content:flex-end; gap:8px 12px; margin-left:auto; white-space:normal;
+  }
+  .topbar .who .person { display:inline-flex; max-width:100%; overflow-wrap:anywhere; }
+  .topbar .who .topbar-search { display:block; flex:0 1 180px; min-width:100px; max-width:100%; }
+  .topbar .who .view-as-control { flex-wrap:wrap; max-width:100%; }
+  .topbar #nav, .topbar.phone-menu-open #nav {
+    display:flex; order:2; flex:1 0 100%; width:100%; min-width:0; max-width:100%;
+    flex-wrap:wrap; justify-content:flex-start; overflow:visible; gap:0 4px;
+  }
+  .topbar #nav a { flex:0 0 auto; white-space:nowrap; min-height:44px; padding:12px 14px; font-size:15px; }
+}
