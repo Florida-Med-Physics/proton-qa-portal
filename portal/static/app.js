@@ -1322,10 +1322,14 @@ function infoDisclosure(content,label='Test information',open=false) {
 }
 
 function helpText(description, { inline = false } = {}) {
-  if (!description || description.startsWith("Measured by Sphinx") || QADerived.read(description) || /\[calc: workbook\]/.test(description)) return null;
+  if (!description || description.startsWith("Measured by Sphinx")) return null;
   const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
-  return infoDisclosure(el('div',{class:'directions pre'},text),'Instructions');
+  if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
+    const one = text.replace(/\s+/g, " ");
+    return el("span", { class: "qa-sub", title: text }, one.length > 150 ? `${one.slice(0, 148)}…` : one);
+  }
+  return el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text);
 }
 
 // Which numbered section a test belongs to: the template number in its directions ("Template 2.03.") when
@@ -1425,18 +1429,17 @@ function checkNumber(description) {
 // the signed-in user, a 3D offset from the X, Y, Z fields above it, kTP, a product, or the daily output dose.
 function derivedExplanation(item,items,numbers) {
   const rule=QADerived.read(item.description);
-  const notes=(item.description||'').replace(TEMPLATE_NUMBER,'').replace(SECTION_NAME,'').replace(MARKER,'').replace(/\[(?:derived|excel|rule): [^\]]+\]\s*/g,'').trim();
   if(rule){
     const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name};});
     const equation=rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
-    return infoDisclosure(el('div',{class:'derived-explanation'},notes?el('p',{},notes):null,el('div',{},el('strong',{},'Equation: '),equation),el('ul',{class:'derived-input-reference'},refs.map(r=>el('li',{},`${r.letter} = Test ${r.number} · ${r.name}`)))),'Calculation details');
+    return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Calculated: '),equation),el('div',{class:'derived-input-reference'},refs.map(r=>`${r.letter} = Test ${r.number} · ${r.name}`).join('; ')));
   }
   if(/\[calc: workbook\]/.test(item.description||'')&&window.QAExcel){
     const key=QAExcel.keyOf(item),split=key?.lastIndexOf('!');if(!key||split<0)return null;
     const sheet=key.slice(0,split),cell=key.slice(split+1),formula=QAExcel.data().model[sheet]?.[cell]?.f;
     if(!formula)return null;
     const refs=items.filter(t=>{const k=QAExcel.keyOf(t);return k&&k.startsWith(sheet+'!')&&new RegExp('\\b'+k.slice(sheet.length+1)+'\\b').test(formula);});
-    return infoDisclosure(el('div',{class:'derived-explanation'},notes?el('p',{},notes):null,el('div',{},el('strong',{},'Excel equation: '),formula),el('ul',{class:'derived-input-reference'},refs.map(t=>el('li',{},`Test ${numbers.get(t.test_id)||checkNumber(t.description)||'?'} · ${t.name}`)))),'Calculation details');
+    return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Excel equation: '),formula),el('div',{class:'derived-input-reference'},refs.map(t=>`Test ${numbers.get(t.test_id)||checkNumber(t.description)||'?'} · ${t.name}`).join('; ')));
   }
   return null;
 }
@@ -2519,15 +2522,34 @@ function derivedEditor(rule,prior,onChange,formMode=false) {
   const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
   const inputNumbers=blockNumbers(prior.map(t=>({...t,test_id:t.test_id||t.id})));
   const inputLabel=t=>{const n=inputNumbers.get(t.test_id||t.id)||checkNumber(t.description);return n?`Test ${n} · ${t.name}`:t.name;};
-  const picked=new Set(rule.inputs.map(x=>JSON.stringify([x.name,x.category||''])));
+  const key=t=>JSON.stringify([t.name,t.category||'']);
+  const selected=rule.inputs.map(x=>key(x));
+  if(!selected.length)selected.push('');
   const hidden=el('input',{type:'hidden',name:formMode?'derived':null,value:JSON.stringify(rule)});
-  const formula=el('input',{'aria-label':'Derived formula',value:rule.formula,placeholder:'e.g. 100 * (A - B) / A'});
-  const mapping=el('p',{class:'small muted'});
-  const controls=numeric.map(t=>({t,input:el('input',{type:'checkbox',checked:picked.has(JSON.stringify([t.name,t.category||''])),'aria-label':`Use input: ${t.name}`})}));
-  const update=()=>{rule={inputs:controls.filter(x=>x.input.checked).map(x=>({name:x.t.name,category:x.t.category||''})),formula:formula.value};hidden.value=JSON.stringify(rule);mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');if(onChange)onChange(rule);};
-  controls.forEach(x=>x.input.addEventListener('change',update));formula.addEventListener('input',update);
-  mapping.textContent=rule.inputs.map((x,i)=>`${String.fromCharCode(65+i)}: ${x.name}`).join(' · ');
-  return infoDisclosure(el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Inputs from earlier tests'),numeric.length?el('div',{class:'derived-inputs'},...controls.map(({t,input})=>el('label',{class:'check'},input,inputLabel(t)))):el('p',{class:'muted small'},'Add earlier numeric tests in this template first.'),mapping,field('Formula',formula),el('p',{class:'muted small'},'Use A, B, C in input order, numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), mean(). Missing inputs leave the result blank.')),'Configure calculation',!rule.inputs.length);
+  const formula=el('input',{'aria-label':'Derived formula',value:rule.formula,placeholder:'Example: 100 * (A - B) / A'});
+  const rows=el('div',{class:'derived-variable-rows'}),status=el('p',{class:'small derived-formula-status','aria-live':'polite'});
+  const update=()=>{
+    rule={inputs:selected.map(k=>{const t=numeric.find(x=>key(x)===k);return {name:t?.name||'',category:t?.category||''};}),formula:formula.value};
+    hidden.value=JSON.stringify(rule);
+    try{if(selected.some(x=>!x))throw Error('Choose a prior test for each variable.');QADerived.validate(rule);status.textContent='';}
+    catch(err){status.textContent=err.message;}
+    if(onChange)onChange(rule);
+  };
+  const draw=()=>{
+    rows.replaceChildren(...selected.map((k,i)=>{
+      const letter=String.fromCharCode(65+i);
+      const pick=select('',[['','Choose a prior test…'],...numeric.map(t=>[key(t),inputLabel(t)])],k,{'aria-label':`Prior test for ${letter}`,onchange:e=>{selected[i]=e.target.value;update();}});
+      const insert=el('button',{type:'button',class:'small',title:`Insert ${letter} into equation`,'aria-label':`Insert variable ${letter}`,onclick:()=>{const start=formula.selectionStart??formula.value.length,end=formula.selectionEnd??start;formula.setRangeText(letter,start,end,'end');formula.focus();update();}},`Insert ${letter}`);
+      const remove=i===selected.length-1&&selected.length>1?el('button',{type:'button',class:'small','aria-label':`Remove variable ${letter}`,onclick:()=>{selected.pop();draw();update();}},'Remove'):null;
+      return el('div',{class:'derived-variable-row'},el('strong',{class:'derived-variable-letter'},letter),pick,insert,...(remove?[remove]:[]));
+    }));
+    add.disabled=selected.length>=26||!numeric.length;
+  };
+  const add=el('button',{type:'button',class:'small',onclick:()=>{selected.push('');draw();update();rows.lastElementChild?.querySelector('select')?.focus();}},'+ Add input');
+  formula.addEventListener('input',update);draw();
+  return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Calculation inputs'),rows,add,
+    el('div',{class:'derived-formula-heading'},el('strong',{},'Equation'),infoDisclosure(el('div',{},el('p',{},'Each letter represents the prior test selected beside it. Use Insert A, Insert B, etc. to put that variable into your equation.'),el('p',{},'Use numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), or mean(). Example: 100 * (A - B) / A. Missing inputs leave the result blank.')),'Equation help')),
+    formula,status);
 }
 
 function testForm(test,prior=[]) {

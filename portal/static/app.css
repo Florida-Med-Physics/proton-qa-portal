@@ -1407,3 +1407,14 @@ td, .measure-table td { font-size: 21px; }
 .qa-info-content .derived-explanation { margin:0; padding:0; border:0; }
 .qa-info-content ul { padding-left:22px; margin:8px 0 0; }
 .qa-info-content li { margin:6px 0; }
+
+.derived-variable-rows { display:flex; flex-direction:column; gap:10px; margin:10px 0; }
+.derived-variable-row { display:grid; grid-template-columns:28px minmax(0,1fr); gap:6px; align-items:center; }
+.derived-variable-row select { width:100%; min-width:0; }
+.derived-variable-row button { justify-self:start; grid-column:2; }
+.derived-variable-letter { align-self:start; padding-top:8px; }
+.derived-formula-heading { display:flex; align-items:center; gap:8px; margin-top:14px; }
+.derived-formula-heading .qa-info { margin:0; }
+.derived-formula-heading .qa-info[open] { flex:1; }
+.derived-editor > input[aria-label="Derived formula"] { width:100%; }
+.derived-formula-status { color:var(--fail); margin:6px 0; }
