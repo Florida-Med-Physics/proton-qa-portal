@@ -1344,17 +1344,49 @@ function infoPopup(content,label='Calculation details') {
     dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }},'ⓘ');
 }
+function qaDisplayName(item) {
+  if(item.category!=='HDR treatment-day QA')return item.name;
+  return ({
+    'Emergency and operating procedures, emergency equipment, and TCS self-test':'Safety setup & TCS self-test',
+    'Video system operational':'Video system', 'Intercom operational':'Intercom',
+    'Survey meter operational':'Survey meter', 'Survey meter Cs-137 check source reading':'Cs-137 check reading',
+    'Battery check OK':'Battery check',
+    'Source air kerma strength and proper decay verification':'Source strength & decay',
+    'Source air kerma strength — TCS Sk':'TCS Sk',
+    'Source air kerma strength — decay table Sk':'Decay-table Sk',
+    'Source air kerma strength — difference':'Source strength difference',
+    'Position verification — console distance':'Position — console',
+    'Position verification — ruler reading':'Position — ruler',
+    'Position verification — console minus ruler':'Position difference',
+    'Emergency stop test':'Emergency stop', 'Console stop test':'Console stop',
+    'Catheter misconnect test':'Catheter misconnect', 'Catheter misconnect — channel':'Catheter channel',
+    'Door open test':'Door interlock', 'Radiation monitor test':'Radiation monitor',
+    'Dwell time test':'Dwell time check', 'Dwell time — set time':'Dwell time — set',
+    'Dwell time — measured time':'Dwell time — measured', 'Dwell time — difference':'Dwell time difference',
+    'Radiation warning light test':'Radiation warning light', 'Position indicator light test':'Position indicator light'
+  })[item.name]||item.name;
+}
+function qaHeaders(first='Test') {
+  return ['#',first,'Measured','Deviation','Unit','Result','Baseline','History','Comment','Trends'].map(label=>
+    el('th',{scope:'col',title:label,'aria-label':label},label==='Comment'?'Note':label==='Trends'?'Trend':label));
+}
+function testDetailsButton(item,items,numbers) {
+  const calculation=derivedExplanation(item,items,numbers);
+  const directions=calculation?null:helpText(item.description);
+  return calculation||directions?infoPopup(calculation||el('div',{},el('strong',{},item.name),directions),calculation?'Calculation details':'Test details'):null;
+}
 function fitQaTable(table) {
   requestAnimationFrame(()=>{
     if(!table?.isConnected)return;
     const wrap=table.parentElement;
     const adapt=()=>{
       const compact=matchMedia('(max-width: 1200px)').matches;
-      const count=compact?3:Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-822-280)/144)));
+      const maxHistory=Math.max(0,...[...table.querySelectorAll('.hist-row')].map(row=>row.children.length));
+      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-856-320)/144))));
       table.querySelectorAll('.hist-row').forEach(row=>[...row.children].forEach((cell,i)=>cell.hidden=i>=count));
       let cols=table.querySelector('colgroup');
       if(!cols){cols=el('colgroup',{},Array.from({length:10},()=>el('col')));table.prepend(cols);}
-      const widths=['72px','auto','156px','130px','76px','128px','132px',`${count*136+(count-1)*8+16}px`,'64px','64px'];
+      const widths=['72px','auto','156px','140px','76px','128px','132px',`${count?count*136+(count-1)*8+16:112}px`,'72px','80px'];
       [...cols.children].forEach((col,i)=>col.style.width=widths[i]);
     };
     const observer=new ResizeObserver(adapt);qaTableObservers.add(observer);observer.observe(wrap);adapt();
@@ -1594,7 +1626,7 @@ async function renderPerform(assignmentId) {
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions", open: !matchMedia("(max-width: 1200px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, t.queue.description)));
+    app.append(el("details", { class: "card instructions", open: !QAHdrDaily.supported(t)&&!matchMedia("(max-width: 1200px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description)));
   }
   const inputs = [];
   const sections = [];
@@ -1726,7 +1758,7 @@ async function renderPerform(assignmentId) {
         control.addEventListener("input", showDelta);
         const row = el("tr", {},
           numberCell(it),
-          el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),derivedExplanation(it,t.items,numbers)?infoPopup(derivedExplanation(it,t.items,numbers),'Calculation details'):null), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
+          el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
           el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
@@ -1751,12 +1783,12 @@ async function renderPerform(assignmentId) {
         return [row, chart];
       });
       const widths = ["100px", "auto", "190px", "150px", "100px", "130px", "150px", "424px", "130px", "100px"];
-      const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
+      const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["#", firstHeader, "Measured", "Deviation", "Unit", "Result", "Baseline", "History", "Comment", "Trends"].map((h) => el("th", {}, h))),
+          el("thead", {}, el("tr", {}, qaHeaders(firstHeader)),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
-          el("tbody", {}, trRows.flat())));
+          el("tbody", {}, trRows.flat()));
       fitQaTable(tableEl);
       // Axis and energy tables carry the shared limits in their title rather than on every row.
       if (title && firstHeader !== "Test") {
@@ -1766,7 +1798,7 @@ async function renderPerform(assignmentId) {
       }
       return el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
     };
-    const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : it.name;
+    const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : qaDisplayName(it);
     // Single measurements that follow one another share one table; the row carries the number, name and directions.
     let pending = [];
     const foldAxes = (list) => {
@@ -1787,7 +1819,7 @@ async function renderPerform(assignmentId) {
       let plain = [];
       const emitPlain = () => {
         if (plain.length) rows.push(measureTable(plain, { firstHeader: "Test", title: null, directions: null, label: shortName,
-          firstCell: (it) => [el("strong", {}, shortName(it)), performDirections(it)] }));
+          firstCell: (it) => el("strong", {}, shortName(it)) }));
         plain = [];
       };
       for (const m of foldAxes(pending)) {
@@ -3022,7 +3054,7 @@ async function renderReviewMeasurements(run) {
       const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
       const row=el('tr',{'data-test-id':r.test_id},
         el('td',{class:'qa-n'},numberFor(r)),
-        el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},r.name)),derivedExplanation(r,run.results,numbers)?infoPopup(derivedExplanation(r,run.results,numbers),'Calculation details'):null),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null,performDirections(r)),
+        el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
         el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?'Pass / Fail':unit),
         el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'?'Pass':r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         el('td',{class:'qa-measured','data-label':'Measured'},measured),
@@ -3034,8 +3066,7 @@ async function renderReviewMeasurements(run) {
       orderMeasurementRow(row);
       tbody.append(row,chart);
     }
-    const headers=['#','Test','Measured','Deviation','Unit','Result','Baseline','History','Comment','Trends'];
-    app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'},el('thead',{},el('tr',{},headers.map(h=>el('th',{},h)))),tbody))));
+    app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'+(category==='HDR treatment-day QA'?' hdr-qa-table':'')},el('thead',{},el('tr',{},qaHeaders())),tbody))));
     fitQaTable(tbody.closest('table'));
   }
 }

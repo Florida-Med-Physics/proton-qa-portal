@@ -1538,3 +1538,20 @@ td, .measure-table td { font-size: 21px; }
 .trend-result-link > .small { flex-basis:100%; }
 .measure-table tr.selected-qa-result { outline:3px solid var(--accent); outline-offset:-3px; scroll-margin:100px; }
 .measure-table tr.selected-qa-result td { background:color-mix(in srgb,var(--accent) 9%,var(--surface)); }
+
+/* Submission controls belong after the form and never cover test rows. */
+#app .submit-bar { position:static; inset:auto; margin-top:16px; width:100%; box-sizing:border-box; border-radius:10px; box-shadow:none; }
+@media(max-width:1200px) { main { padding-bottom:24px; } }
+
+/* Execution tables keep their prescribed test order and unbroken headings. */
+@media(min-width:1201px) {
+  #app .measure-table th { white-space:nowrap; overflow-wrap:normal; word-break:normal; letter-spacing:0.01em; padding:10px 6px; }
+  #app .measure-table td { padding-top:10px; padding-bottom:10px; }
+}
+
+@media(min-width:1201px) {
+  #app .hdr-qa-table td { padding-top:6px; padding-bottom:6px; line-height:1.3; }
+  #app .hdr-qa-table .qa-label strong { line-height:1.3; }
+  #app .hdr-qa-table input, #app .hdr-qa-table button { min-height:44px; }
+}
+#app .submit-bar .phone-details-body { max-height:none; overflow:visible; }
