@@ -2564,6 +2564,17 @@ function defaultDerivedRule(prior=[]) {
   return {inputs,formula:`(273.15 + A) / 295.15 * ${pressure&&/hpa/i.test(pressure.unit||'')?'1013.25':'101.325'} / B`};
 }
 
+function derivedPresetFormula(preset,count,pressureUnit='kPa') {
+  const letters=Array.from({length:count},(_,i)=>String.fromCharCode(65+i));
+  if(preset==='ptp')return `(273.15 + A) / 295.15 * ${/hpa/i.test(pressureUnit)?'1013.25':'101.325'} / B`;
+  if(!letters.length)throw Error('Add at least one input.');
+  const squares=letters.map(x=>`${x} * ${x}`).join(' + ');
+  if(preset==='rms')return `sqrt((${squares}) / ${letters.length})`;
+  if(preset==='rss')return `sqrt(${squares})`;
+  if(preset==='mean')return `mean(${letters.join(', ')})`;
+  throw Error('Choose an equation preset.');
+}
+
 function derivedEditor(rule,prior,onChange,formMode=false) {
   rule=rule||defaultDerivedRule(prior);
   const numeric=prior.length?prior.filter(t=>t.type==='numeric'):rule.inputs.map(x=>({...x,type:'numeric'}));
@@ -2597,11 +2608,26 @@ function derivedEditor(rule,prior,onChange,formMode=false) {
     add.disabled=selected.length>=26||!numeric.length;
   };
   const add=el('button',{type:'button',class:'small',onclick:()=>{selected.push('');draw();update();rows.lastElementChild?.querySelector('select')?.focus();}},'+ Add input');
-  formula.addEventListener('input',()=>{formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';update();});draw();
+  const preset=select('',[['custom','Custom equation'],['ptp','PTP — temperature / pressure correction'],['rms','RMS — root mean square'],['rss','RSS — distance / magnitude'],['mean','Average — arithmetic mean']],rule.formula.replace(/\s/g,'')===defaultDerivedRule(prior).formula.replace(/\s/g,'')?'ptp':'custom',{'aria-label':'Equation preset'});
+  const presetNote=el('p',{class:'muted small'});
+  const describePreset=()=>{presetNote.textContent=({ptp:'A: temperature in °C · B: pressure. Reference: 22 °C and 101.325 kPa.',rms:'Square each selected input, average the squares, then take the square root.',rss:'Square each selected input, add the squares, then take the square root. Use this for a 3D offset.',mean:'Average all selected inputs.',custom:''})[preset.value];applyPreset.disabled=preset.value==='custom';};
+  const applyPreset=el('button',{type:'button',class:'small',onclick:()=>{
+    try{
+      if(preset.value==='ptp'){
+        const defaults=defaultDerivedRule(prior);selected.splice(0,selected.length,...(defaults.inputs.length?defaults.inputs.map(key):selected.slice(0,2)));
+        while(selected.length<2)selected.push('');
+      }
+      const pressure=numeric.find(x=>key(x)===selected[1]);
+      formula.value=derivedPresetFormula(preset.value,selected.length,pressure?.unit||'kPa');
+      draw();update();formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';
+    }catch(err){status.textContent=err.message;}
+  }},'Apply equation');
+  preset.addEventListener('change',describePreset);describePreset();
+  formula.addEventListener('input',()=>{preset.value='custom';describePreset();formula.style.height='auto';formula.style.height=Math.max(120,formula.scrollHeight)+'px';update();});draw();
   requestAnimationFrame(()=>{if(formula.clientWidth)formula.style.height=Math.max(120,formula.scrollHeight)+'px';});
   return el('div',{class:'derived-editor wide'},hidden,el('strong',{},'Calculation inputs'),rows,add,
     el('div',{class:'derived-formula-heading'},el('strong',{},'Equation'),infoDisclosure(el('div',{},el('p',{},'Each letter represents the prior test selected beside it. Type that letter in the equation. + Add input creates another variable; × removes it. Replace any ? left by a removed variable before saving.'),el('p',{},'Use numbers, + − * /, parentheses, sqrt(), abs(), min(), max(), or mean(). Example: 100 * (A - B) / A. Missing inputs leave the result blank.')),'Equation help')),
-    formula,status);
+    el('div',{class:'derived-preset-bar'},field('Equation preset',preset),applyPreset),presetNote,formula,status);
 }
 
 function testForm(test,prior=[]) {

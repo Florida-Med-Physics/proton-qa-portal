@@ -1435,3 +1435,7 @@ td, .measure-table td { font-size: 21px; }
 .test-difference-content { margin-top:6px; padding:10px; border-left:3px solid var(--warn); background:var(--surface-2); line-height:1.6; }
 .machine-only-difference-row td { border-left:3px solid var(--warn); }
 .test-machine-only-label { margin:4px; cursor:default; }
+
+.derived-preset-bar { display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin:8px 0; }
+.derived-preset-bar label { flex:1; min-width:220px; }
+.derived-preset-bar select { width:100%; }
