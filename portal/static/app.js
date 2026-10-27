@@ -1343,7 +1343,7 @@ function infoPopup(content,label='Calculation details') {
   }},'ⓘ');
 }
 function orderMeasurementRow(row) {
-  for(const name of ['qa-n','qa-label','qa-measured','qa-result','qa-baseline','qa-unit','qa-dev','qa-comment','history-cell','qa-trends']) {
+  for(const name of ['qa-n','qa-label','qa-measured','qa-unit','qa-result','qa-dev','qa-baseline','qa-comment','history-cell','qa-trends']) {
     const cell=[...row.children].find(c=>c.classList.contains(name));if(cell)row.append(cell);
   }
 }
@@ -1732,10 +1732,10 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "190px", "130px", "150px", "100px", "150px", "130px", "424px", "100px"];
+      const widths = ["100px", "auto", "190px", "100px", "130px", "150px", "150px", "130px", "424px", "100px"];
       const tableEl = sortable(el("table", { class: `measure-table${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, ["#", firstHeader, "Measured", "Result", "Baseline", "Unit", "Deviation", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
+          el("thead", {}, el("tr", {}, ["#", firstHeader, "Measured", "Unit", "Result", "Deviation", "Baseline", "Comment", "History", "Trends"].map((h) => el("th", {}, h))),
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 8 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {})) : null),
           el("tbody", {}, trRows.flat())));
@@ -2985,7 +2985,7 @@ async function renderReviewMeasurements(run) {
       orderMeasurementRow(row);
       tbody.append(row,chart);
     }
-    const headers=['#','Test','Measured','Result','Baseline','Unit','Deviation','Comment','History','Trends'];
+    const headers=['#','Test','Measured','Unit','Result','Deviation','Baseline','Comment','History','Trends'];
     app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'},el('thead',{},el('tr',{},headers.map(h=>el('th',{},h)))),tbody))));
   }
 }
