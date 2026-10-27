@@ -2437,28 +2437,32 @@ async function renderQueueEditor(id) {
     const keys=['expected','warn','fail','tol_mode'],labels={expected:'Baseline',warn:'Warning',fail:'Action',tol_mode:'Mode'};
     const defaults=()=>Object.fromEntries(keys.map(k=>[k,!blank(item[k])?item[k]:test[k]??(k==='tol_mode'?'absolute':null)]));
     const body=el('tbody');
+    const paint=(field,custom,base)=>{
+      const differs=!blank(custom)&&(field.dataset.inheritKey==='tol_mode'?custom!==base:blank(base)||Number(custom)!==Number(base));
+      field.classList.toggle('machine-limit-different',differs);
+      field.title=differs?`Different from default (${blank(base)?'not set':base})`:'';
+    };
     const changed=aid=>{if(aid)modifiedMachineValues.add(String(aid));else defaultLimitsDirty=true;markDirty();};
     const drawRows=()=>{
       const base=defaults();
       const cells=(name,target,aid)=>keys.map(k=>{
-        const own=aid&&!blank(target[k]);
         const control=k==='tol_mode'?select('',[['absolute','Absolute'],['percent','Percent']],aid?(target[k]||base[k]):base[k],{'aria-label':`${name} ${labels[k]}`,disabled:!editable}):el('input',{type:'number',step:'any',...(k==='warn'||k==='fail'?{min:0}:{}),value:aid?(target[k]??base[k]??''):(base[k]??''),placeholder:blank(base[k])?'Not set':String(base[k]),'aria-label':`${name} ${labels[k]}`,disabled:!editable});
         if(aid){control.dataset.inheritKey=k;control.dataset.machineId=aid;}
-        const hint=aid?el('span',{class:own?'small machine-limit-custom':'small muted'},own?'Machine-specific':''):null;
+        if(aid)paint(control,target[k],base[k]);
         const update=()=>{
           target[k]=control.value;changed(aid);
           if(!aid&&k==='warn')for(const schedule of q.schedules||[]){machineValues[schedule.id][item.test_id].warn=null;changed(schedule.id);}
-          if(hint){hint.textContent=blank(target[k])?'':'Machine-specific';hint.className=blank(target[k])?'small muted':'small machine-limit-custom';}
           const latest=defaults();
           for(const field of body.querySelectorAll('[data-inherit-key]')){
             const key=field.dataset.inheritKey;
             const custom=machineValues[field.dataset.machineId]?.[item.test_id]?.[key];
-            if(blank(custom)){field.value=latest[key]??'';if(field.nextElementSibling)field.nextElementSibling.textContent='';}
+            if(blank(custom))field.value=latest[key]??'';
+            paint(field,custom,latest[key]);
             if(key!=='tol_mode')field.placeholder=blank(latest[key])?'Not set':String(latest[key]);
           }
         };
         control.addEventListener('input',update);control.addEventListener('change',update);
-        return el('td',{},control,hint);
+        return el('td',{},control);
       });
       const sync=el('button',{type:'button',class:'icon-btn sync-machine-defaults',title:'Sync all machines to this default','aria-label':'Sync all machines to default',disabled:!editable||!(q.schedules||[]).length,onclick:()=>{
         for(const schedule of q.schedules||[]){
