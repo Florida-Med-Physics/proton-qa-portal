@@ -3700,7 +3700,7 @@ function trendGroups(items) {
 }
 
 async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = []) {
-  const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (!listId || String(a.id) === String(listId)));
+  const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (activeRole()!=='therapist'||a.frequency!=='monthly') && (!listId || String(a.id) === String(listId)));
   const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
   const numberPoint=trendSourceNumberer(sourceTemplates.length?sourceTemplates:templates);
   const sections = [], insights = [];
@@ -4035,10 +4035,11 @@ async function renderTrends() {
   const fallback = machines.find(m => m.name === 'GTR1') || machines[0];
   const machineId = machines.some(m => String(m.id) === requested) ? requested : fallback?.id;
   const range = params.get("range") || "90";
-  const testIds = (params.get("test_id") || "").split(",").filter(Boolean);
+  let testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
-  const lists = machineId ? (await api("GET", `/api/machines/${machineId}/assignments`)).filter((a) => a.active) : [];
+  const lists = machineId ? (await api("GET", `/api/machines/${machineId}/assignments`)).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
   const templates=await Promise.all(lists.map(a=>api('GET',`/api/assignments/${a.id}/template`)));
+  if(activeRole()==='therapist'){const visible=new Set(templates.flatMap(t=>t.items.map(i=>String(i.test_id))));testIds=testIds.filter(id=>visible.has(id));}
   const numberPoint=trendSourceNumberer(templates);
   let listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
   if(testIds.length){
