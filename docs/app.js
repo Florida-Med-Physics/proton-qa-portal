@@ -1813,29 +1813,14 @@ async function renderPerform(assignmentId) {
           el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
           el("td", {class:"qa-trends"}, trend));
         entry.row=row;entry.chart=chart;
-        const extras = el('td', {class:'qa-phone-extras', colspan:10});
-        orderMeasurementRow(row);
-        row.append(extras);
-        const secondary = ['qa-dev','qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
-        secondary.forEach((cell,index) => {
-          cell.classList.add('qa-secondary');
-          const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Deviation','Comment','History','Trends'][index]));
-          const content = el('div', {class:'qa-phone-field-content'});
-          while (cell.firstChild) content.append(cell.firstChild);
-          field.append(content);
-          cell.append(field);
-        });
-        phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
+        const nameCell=row.querySelector('.qa-label');
+        nameCell.prepend(el('span',{class:'qa-test-number'},numbers.get(it.test_id)||''));
+        row.replaceChildren(nameCell,row.querySelector('.qa-measured'),row.querySelector('.qa-result'));
         return [row, chart];
       });
-      const widths = ["100px", "auto", "190px", "150px", "100px", "130px", "150px", "424px", "130px", "100px"];
-      const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
-          el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, qaHeaders(firstHeader)),
-            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
-              el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
-          el("tbody", {}, trRows.flat()));
-      fitQaTable(tableEl);
+      const tableEl=el('table',{class:`measure-table simple-qa-table${firstHeader==='Axis'?' axis-table':''}${firstHeader==='Energy'?' energy-table':''}`},
+        el('colgroup',{},el('col',{style:'width:55%'}),el('col',{style:'width:28%'}),el('col',{style:'width:17%'})),
+        el('thead',{},el('tr',{},['Test name','Measured','Result'].map(label=>el('th',{},label)))),el('tbody',{},trRows.flat()));
       // Axis and energy tables carry the shared limits in their title rather than on every row.
       if (title && firstHeader !== "Test") {
         const withLimits = members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null));
