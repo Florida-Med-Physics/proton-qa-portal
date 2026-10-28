@@ -6,3 +6,5 @@ GatorQA — Quick User Guide
 4. Submit for review when ready. Unanswered tests are not passes. Reports download only when requested.
 5. In Review QA, complete the therapist review or the physicist approval for your role. Review notes are optional.
 6. Use Machine Trends for measurements over time. In Setup QA, open Machines to edit machine limits, then Save template.
+
+Import setup: In Setup QA, choose Add import block. Select a reader preset or map Excel cells, CSV/TXT columns, or report labels to tests. Preview a sample, choose Use mapping, then Save template. During Perform QA, review imported values before filling answers. PDF scans use OCR; check recognized values carefully.

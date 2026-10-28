@@ -2021,7 +2021,9 @@ async function renderPerform(assignmentId) {
       can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
   }
   // Sphinx reports belong beside the measurement section they fill.
-  if(!sphinxSection)app.append(fileCard);
+  const customBlocks=(t.queue.import_blocks||[]).filter(b=>!(b.reader==='sphinx'&&sphinxSection)&&!(b.reader==='hdr'&&QAHdrDaily.supported(t)));
+  if(!sphinxSection&&(!customBlocks.length||QAHdrDaily.supported(t)||t.items.some(i=>(i.description||'').includes('[rule: wl-max-delta]'))))app.append(fileCard);
+  app.append(...customBlocks.map(block=>mappedImportCard(block,t,inputs,qaDate,refresh)));
   app.append(finishedMessage);
   app.append(...sections.flatMap((x) => [x.heading,x===sphinxSection?fileCard:null,x.box]).filter(Boolean));   // a null would append as the text "null"
   const error = el("p", { class: "error" });
@@ -2379,6 +2381,83 @@ function machineTestDifferences(test,item,override={},selection={},base=true) {
   return differences;
 }
 
+const IMPORT_READERS=[['excel','Excel cells'],['columns','CSV / delimited TXT columns'],['labels','TXT labeled values'],['pdf','PDF labels + OCR'],['proton-monthly','Proton Monthly QA workbook'],['sphinx','Sphinx report'],['hdr','HDR Daily QA PDF'],['dqa3','DQA3 TXT labels']];
+function importBlockPreset(reader,items){
+  const names=Object.fromEntries(IMPORT_READERS),block={id:crypto.randomUUID(),name:names[reader],reader,sheet:'',header_row:1,mappings:[]};
+  const plain=items.filter(t=>!QADerived.read(t.description)&&!/\[calc: workbook/.test(t.description||''));
+  if(reader==='proton-monthly'){
+    block.sheet=QAMappedImports.protonDefaults.sheet;
+    block.mappings=plain.filter(t=>QAMappedImports.protonDefaults.cells[t.name]).map(t=>({test:{name:t.name,category:t.category||''},source:QAMappedImports.protonDefaults.cells[t.name],row:1}));
+  }else if(reader==='dqa3')block.mappings=plain.filter(t=>t.type==='numeric').map(t=>({test:{name:t.name,category:t.category||''},source:t.name,row:1}));
+  return block;
+}
+async function previewImportBlock(file,block,items,assignmentId,progress=()=>{}){
+  if(block.reader==='sphinx'){
+    if(!assignmentId)throw Error('Schedule this template on a machine before previewing the Sphinx reader.');
+    const preview=await api('POST',`/api/assignments/${assignmentId}/sphinx/preview`,{file:await readFileBase64(file)});
+    return {qa_date:preview.qa_date,rows:preview.matched.map(m=>({item:items.find(t=>(t.test_id||t.id)===m.test_id),value:m.value,source:'Sphinx Result'})).filter(r=>r.item)};
+  }
+  if(block.reader==='hdr'){
+    const parsed=await QAHdrDaily.parse(new Uint8Array(await file.arrayBuffer()),file.name,progress);
+    return {qa_date:parsed.qa_date,rows:items.filter(t=>Object.hasOwn(parsed.values,t.name)&&!QADerived.read(t.description)).map(item=>({item,source:'HDR PDF',value:QAMappedImports.convert(parsed.values[item.name],item)}))};
+  }
+  return {rows:await QAMappedImports.read(file,block,items,progress)};
+}
+function importMappingEditor(existing,getItems,onSave,assignmentId,defaultReader='excel'){
+  let block=JSON.parse(JSON.stringify(existing||importBlockPreset(defaultReader,getItems())));
+  const name=el('input',{value:block.name,'aria-label':'Import block name',required:true});
+  const reader=select('',IMPORT_READERS,block.reader,{'aria-label':'Import reader'});
+  const settings=el('div'),mappingRows=el('div'),sample=el('input',{type:'file',accept:'.xlsx,.xls,.csv,.txt,.pdf','aria-label':'Sample import file'}),preview=el('div'),feedback=el('p',{class:'muted small',role:'status'});
+  const sync=()=>{block.name=name.value.trim();block.reader=reader.value;return block;};
+  const draw=()=>{
+    const native=['sphinx','hdr'].includes(block.reader),excel=['excel','proton-monthly'].includes(block.reader),columns=block.reader==='columns';
+    settings.replaceChildren();
+    if(excel)settings.append(field('Worksheet (blank = first sheet)',el('input',{value:block.sheet||'','aria-label':'Import worksheet',oninput:e=>block.sheet=e.target.value})));
+    if(columns)settings.append(field('Header row',el('input',{type:'number',min:1,value:block.header_row||1,'aria-label':'CSV header row',oninput:e=>block.header_row=Number(e.target.value)})));
+    if(native)settings.append(el('p',{class:'muted'},block.reader==='sphinx'?'Uses the existing Sphinx report labels and Result values.':'Uses the existing HDR form reader, including OCR and checkbox review.'));
+    if(block.reader==='proton-monthly')settings.append(el('p',{class:'muted small'},'Starts with verified cells from the supplied GTR5 workbook. Review and extend these mappings for your workbook; unlisted tests stay unanswered.'));
+    if(block.reader==='dqa3')settings.append(el('p',{class:'muted small'},'Starts with the template’s test names as TXT labels. Load a sample and adjust labels to match the export. Device-specific DQA3 layout has not been verified.'));
+    if(block.reader==='pdf')settings.append(el('p',{class:'muted small'},'Uses selectable PDF text, or local OCR for scanned pages. Set the exact label before each value and review the preview.'));
+    const targets=getItems().filter(t=>!QADerived.read(t.description)&&!/\[calc: workbook/.test(t.description||''));
+    mappingRows.replaceChildren(...(native?[]:block.mappings.map((m,index)=>el('div',{class:'import-mapping-row'},
+      field('Test',select('',[['','Choose a test…'],...targets.map(t=>[QAMappedImports.key(t),`${checkNumber(t.description)||''} ${t.name}`.trim()])],m.test?.name?QAMappedImports.key(m.test):'',{'aria-label':`Mapped test ${index+1}`,onchange:e=>{const t=targets.find(t=>QAMappedImports.key(t)===e.target.value);m.test={name:t?.name||'',category:t?.category||''};}})),
+      field(excel?'Excel cell':columns?'CSV / TXT column (header or letter)':'Report label',el('input',{value:m.source||'',placeholder:excel?'F17':columns?'Measured':'Dose','aria-label':`Import source ${index+1}`,oninput:e=>m.source=e.target.value})),
+      excel?null:field(columns?'Data row':'Value number',el('input',{type:'number',min:1,value:m.row||1,'aria-label':`Import row ${index+1}`,oninput:e=>m.row=Number(e.target.value)})),
+      el('button',{type:'button',class:'icon-btn danger','aria-label':`Remove import mapping ${index+1}`,onclick:()=>{block.mappings.splice(index,1);draw();}},'×')))));
+    if(!native)mappingRows.append(el('button',{type:'button',onclick:()=>{block.mappings.push({test:{name:'',category:''},source:'',row:columns?(block.header_row||1)+1:1});draw();}},'Add mapping'));
+  };
+  reader.addEventListener('change',()=>{const id=block.id;block=importBlockPreset(reader.value,getItems());block.id=id;name.value=block.name;preview.replaceChildren();draw();});
+  const button=el('button',{type:'button',onclick:async()=>{
+    preview.replaceChildren();feedback.textContent='';button.disabled=true;
+    try{if(!sample.files[0])throw Error('Choose a sample file first.');QAMappedImports.validate([sync()],getItems());const p=await previewImportBlock(sample.files[0],block,getItems(),assignmentId,m=>feedback.textContent=m);preview.append(importPreviewTable(p.rows));feedback.textContent=`${p.rows.filter(r=>r.value!==null&&r.value!==undefined&&!r.error).length} readable values · ${p.rows.filter(r=>r.error).length} errors`;}
+    catch(err){feedback.textContent=err.message;}finally{button.disabled=false;}
+  }},'Preview mapping');
+  draw();
+  const dialog=modal('Import block',el('div',{class:'import-block-editor'},field('Block name',name),field('Reader / preset',reader),settings,mappingRows,field('Preview with a sample file',sample),button,feedback,preview,el('p',{class:'muted small'},'Use mapping, then Save template to keep your changes. Original files are not modified.')),async()=>{QAMappedImports.validate([sync()],getItems());onSave(block);},'Use mapping');
+  dialog.classList.add('import-editor-dialog');return dialog;
+}
+function importPreviewTable(rows){return table(['Test','Source','Recognized value'],rows.map(r=>el('tr',{},el('td',{},r.item?.name||'Unknown test'),el('td',{},r.source||''),el('td',{class:r.error?'error':''},r.error||r.message||(r.value===null||r.value===undefined?'Blank — stays unanswered':String(r.value))))),'No matching measurements.');}
+function mappedImportCard(block,template,entries,dateInput,onApplied){
+  const info=el('div',{class:'small',role:'status'}),picker=el('input',{type:'file',accept:block.reader==='pdf'||block.reader==='hdr'?'.pdf':block.reader==='sphinx'?'.xls,.csv':block.reader==='excel'||block.reader==='proton-monthly'?'.xls,.xlsx':'.csv,.txt,.pdf','aria-label':`Measurement file: ${block.name}`});
+  picker.addEventListener('change',async()=>{
+    const file=picker.files[0];if(!file)return;info.textContent=`Reading ${file.name}…`;
+    try{
+      const p=await previewImportBlock(file,block,template.items,template.assignment.id,text=>info.textContent=text);
+      const date=el('input',{type:'date',value:p.qa_date||dateInput.value,max:today(),required:true,'aria-label':'Mapped import QA date'});
+      const show=()=>modal('Review imported measurements',el('div',{},el('p',{},file.name),field(p.qa_date?'Report date':'QA date (selected for this import)',date),importPreviewTable(p.rows)),async()=>{
+        if(p.rows.some(r=>r.error))throw Error('Correct the mapping errors before filling measurements.');
+        const readable=p.rows.filter(r=>r.value!==null&&r.value!==undefined&&!r.error);if(!readable.length)throw Error('No readable values match this QA list.');
+        if(!date.value||date.value>today())throw Error('Choose a valid QA date.');
+        for(const row of readable){const entry=entries.find(e=>QAMappedImports.key(e.item)===QAMappedImports.key(row.item));if(entry){entry.input.value=String(row.value);entry.input.dispatchEvent(new Event('input'));}}
+        dateInput.value=date.value;dateInput.dispatchEvent(new Event('change'));
+        info.replaceChildren(el('strong',{},`${readable.length} values filled`),el('div',{},`${file.name} · QA date ${date.value}`));onApplied();
+      },'Fill matching values');
+      info.replaceChildren(el('span',{},`Report ready: ${file.name}. `),el('button',{type:'button',onclick:show},'Review values'));show();
+    }catch(err){info.replaceChildren(el('span',{class:'error'},err.message));}
+  });
+  return el('div',{class:'card step mapped-import-card'},el('strong',{},block.name),el('p',{class:'muted small'},'Choose a file, review the recognized values, then fill the matching tests.'),picker,info);
+}
+
 async function renderQueueEditor(id) {
   const isNew = id === "new";
   if (isNew) return renderNewTemplate();
@@ -2411,6 +2490,15 @@ async function renderQueueEditor(id) {
   const machineValues = {};
   const modifiedMachineValues=new Set();
   let defaultLimitsDirty=false;
+  let importBlocks=JSON.parse(JSON.stringify(q.import_blocks||[])),importBlocksDirty=false;
+  const importBlocksBox=el('section',{class:'card import-blocks-setup'});
+  const importItems=()=>items.map(i=>byId[i.test_id]);
+  const drawImportBlocks=()=>{
+    const inferred=/PBS.*Sphinx/i.test(q.name)?'sphinx':/Monthly.*Proton|Proton.*Monthly/i.test(q.name)?'proton-monthly':/HDR|Flexitron/i.test(q.name)?'hdr':'excel';
+    const edit=block=>importMappingEditor(block,importItems,value=>{const index=importBlocks.findIndex(b=>b.id===value.id);if(index<0)importBlocks.push(value);else importBlocks[index]=value;importBlocksDirty=true;markDirty();drawImportBlocks();},q.schedules?.[0]?.id,inferred);
+    importBlocksBox.replaceChildren(el('h2',{},'Import blocks'),el('p',{class:'muted small'},'Map workbook cells, CSV/TXT columns, or PDF/TXT labels to tests. Values are reviewed before filling answers; machine limits remain unchanged.'),...importBlocks.map(block=>el('div',{class:'row import-block-summary'},el('strong',{},block.name),el('span',{class:'muted small'},IMPORT_READERS.find(r=>r[0]===block.reader)?.[1]),editable?el('button',{type:'button',onclick:()=>edit(block)},'Edit mapping'):null,editable?el('button',{type:'button',onclick:()=>{importBlocks=importBlocks.filter(b=>b.id!==block.id);importBlocksDirty=true;markDirty();drawImportBlocks();}},'Remove'):null)),editable?el('button',{type:'button',onclick:()=>edit(null)},'Add import block'):null);
+  };
+  drawImportBlocks();app.append(importBlocksBox);
   const machineSelections = {};
   await Promise.all((q.schedules||[]).map(async schedule=>{
     const template=await api('GET',`/api/assignments/${schedule.id}/template`);
@@ -2749,8 +2837,8 @@ async function renderQueueEditor(id) {
     const save = async () => {
       error.textContent = "";
       let result;
-      if(!valuesFor||defaultLimitsDirty){
-        const payload = { ...formData(info), items, test_updates: [...testUpdates].map(([test_id, fields]) => ({ test_id, ...fields })) };
+      if(!valuesFor||defaultLimitsDirty||importBlocksDirty){
+        const payload = { ...formData(info), items, import_blocks:importBlocks, test_updates: [...testUpdates].map(([test_id, fields]) => ({ test_id, ...fields })) };
         result=isNew?await api('POST','/api/queues',payload):await api('PUT',`/api/queues/${id}`,payload);
       }
       if(valuesFor)modifiedMachineValues.add(String(valuesFor));
@@ -2758,7 +2846,7 @@ async function renderQueueEditor(id) {
         const overrides=Object.entries(machineValues[aid]).map(([tid,o])=>({test_id:Number(tid),expected:o.expected??'',warn:o.warn??'',fail:o.fail??'',tol_mode:o.tol_mode||''}));
         await api('PUT',`/api/assignments/${aid}/overrides`,{overrides});
       }
-      modifiedMachineValues.clear();defaultLimitsDirty=false;dirty=false;unsaved.hidden=true;
+      modifiedMachineValues.clear();defaultLimitsDirty=false;importBlocksDirty=false;dirty=false;unsaved.hidden=true;
       toast('QA list and machine values saved');
       if(result){location.hash=`#/queues/${result.id}`;if(!isNew)route();}else draw();
     };

@@ -160,6 +160,8 @@ class Database:
                                "Delete it and start again (for the demo, rerun seed_demo.py).")
         self._migrate()
         self.conn.executescript(SCHEMA)
+        if "import_blocks" not in {r[1] for r in self.conn.execute("PRAGMA table_info(queues)")}:
+            self.run("ALTER TABLE queues ADD COLUMN import_blocks TEXT NOT NULL DEFAULT '[]'")
         self._approval_migrations()
         run_fields={r[1] for r in self.conn.execute('PRAGMA table_info(runs)')}
         for name,kind in [('trashed_at','TEXT'),('trashed_by','INTEGER REFERENCES users(id)'),('trash_reason','TEXT')]:

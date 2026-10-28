@@ -1704,3 +1704,9 @@ td, .measure-table td { font-size: 21px; }
   #app[data-page^="perform/"] .measure-table td::before,
   #app[data-page^="runs/"] .review-measure-table td::before { display:none !important; }
 }
+.import-editor-dialog { width:min(1050px,calc(100vw - 32px)); max-width:calc(100vw - 32px); }
+.import-block-editor { display:grid; gap:12px; }
+.import-mapping-row { display:grid; grid-template-columns:minmax(200px,2fr) minmax(100px,1fr) auto auto; gap:10px; align-items:end; margin-bottom:10px; }
+.import-mapping-row input, .import-mapping-row select { min-width:0; width:100%; }
+.import-block-summary { padding:8px 0; border-bottom:1px solid var(--border); margin-bottom:8px; }
+@media(max-width:767px) { .import-mapping-row { grid-template-columns:1fr; padding:10px 0; border-bottom:1px solid var(--border); } }

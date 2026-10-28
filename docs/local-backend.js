@@ -637,7 +637,8 @@
     if (new Set(items.map((i) => i.test_id)).size !== items.length) throw new Error("A check can only appear once in a QA list.");
     const existing = queueId ? get("queues", queueId, "QA list") : null;
     const isTemplate = flag(data, "is_template", existing ? !!existing.is_template : false);
-    const fields = { name, description: text(data, "description"), active: flag(data, "active"), is_template: isTemplate };
+    const blocks=QAMappedImports.validate(data.import_blocks??existing?.import_blocks??[],items.map(i=>get("tests",i.test_id)));
+    const fields = { name, description: text(data, "description"), active: flag(data, "active"), is_template: isTemplate, import_blocks:blocks };
     let id;
     if (!existing) {
       id = insert("queues", { ...fields, template_id: null });
@@ -749,7 +750,7 @@
     const name = required(data, "name");
     if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase())) throw new Error(`A QA list named '${name}' already exists.`);
     const asTemplate = !!flag(data, "as_template", false);
-    const id = insert("queues", { name, description: source.description, active: 1, is_template: asTemplate ? 1 : 0, template_id: null });
+    const id = insert("queues", { name, description: source.description, import_blocks:JSON.parse(JSON.stringify(source.import_blocks||[])), active: 1, is_template: asTemplate ? 1 : 0, template_id: null });
     for (const item of source.items) {
       const test = byId("tests", item.test_id);
       const limits = resolveLimits(test, item);
@@ -824,7 +825,7 @@
     require(user, "configure");
     const t = runTemplate(assignmentId), name = required(data, "name");
     if (S.queues.some((q) => q.name.toLowerCase() === name.toLowerCase())) throw new Error("A QA list with that name already exists.");
-    const id = insert("queues", { name, description: t.queue.description, active: 1, is_template: 0, template_id: null });
+    const id = insert("queues", { name, description: t.queue.description, import_blocks:JSON.parse(JSON.stringify(t.queue.import_blocks||[])), active: 1, is_template: 0, template_id: null });
     t.items.forEach((item, position) => {
       const testId = insert("tests", { name: item.name, category: item.category, type: item.type, unit: item.unit, description: item.description, ...item.limits, active: 1, owner_queue_id: id });
       insert("queue_items", { queue_id: id, test_id: testId, position, expected: null, warn: null, fail: null, tol_mode: null });
@@ -915,7 +916,7 @@
           .filter((x) => x.run && !x.run.trashed_at && x.run.machine_id === a.machine_id)                      // this machine's last entry
           .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
     });
-    return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description, active: queue.active }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
+    return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description, active: queue.active, import_blocks:queue.import_blocks||[] }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
   }
   function saveOverrides(user, assignmentId, data) {
     require(user, "configure");

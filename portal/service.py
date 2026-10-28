@@ -349,6 +349,7 @@ def _list_queues(db):
 
 def get_queue(db, user, queue_id):
     queue = _get(db, "queues", queue_id)
+    queue["import_blocks"]=json.loads(queue.get("import_blocks") or "[]")
     queue["items"] = db.all(
         "SELECT qi.test_id, qi.position, qi.expected, qi.warn, qi.fail, qi.tol_mode, t.name, t.category, t.type, t.unit, "
         "t.expected AS default_expected, t.warn AS default_warn, t.fail AS default_fail, t.tol_mode AS default_tol_mode "
@@ -406,6 +407,9 @@ def save_queue(db, user, data, queue_id=None, _within_transaction=False):
     if len({i[0] for i in items}) != len(items):
         raise PortalError("A check can only appear once in a QA list.")
     existing = _get(db, "queues", queue_id) if queue_id is not None else None
+    from . import import_blocks
+    try: blocks=import_blocks.validate(data.get('import_blocks',json.loads(existing.get('import_blocks') or '[]') if existing else []),prior)
+    except (ValueError,TypeError,KeyError) as exc: raise PortalError(str(exc))
     is_template = _flag(data, "is_template", bool(existing["is_template"]) if existing else False)
     from contextlib import nullcontext
     with (nullcontext() if _within_transaction else db.transaction()):
@@ -419,6 +423,7 @@ def save_queue(db, user, data, queue_id=None, _within_transaction=False):
             before = {r["test_id"]: r for r in db.all("SELECT * FROM queue_items WHERE queue_id = ?", (queue_id,))}
             db.run("DELETE FROM queue_items WHERE queue_id = ?", (queue_id,))
             action = "update"
+        db.run('UPDATE queues SET import_blocks=? WHERE id=?',(json.dumps(blocks),queue_id))
         for test_id, position, limits in items:
             db.run("INSERT INTO queue_items (queue_id, test_id, position, expected, warn, fail, tol_mode) VALUES (?, ?, ?, ?, ?, ?, ?)",
                    (queue_id, test_id, position, limits["expected"], limits["warn"], limits["fail"], limits["tol_mode"]))
@@ -515,6 +520,7 @@ def duplicate_queue(db, user, source_id, data):
         as_template = _flag(data, "as_template", default=False)
         queue_id = db.run("INSERT INTO queues (name, description, active, is_template, template_id) VALUES (?, ?, 1, ?, ?)",
                           (name, source["description"], 1 if as_template else 0, None))
+        db.run("UPDATE queues SET import_blocks=? WHERE id=?",(json.dumps(source.get("import_blocks",[])),queue_id))
         for item in source["items"]:
             test = _get(db, "tests", item["test_id"])
             limits = qa.resolve_limits(test, item)
@@ -685,6 +691,7 @@ def duplicate_assignment(db, user, assignment_id, data):
     a = source["assignment"]
     with db.transaction():
         qid = db.run("INSERT INTO queues (name, description, active, is_template) VALUES (?, ?, 1, 0)", (name, source["queue"]["description"]))
+        db.run("UPDATE queues SET import_blocks=? WHERE id=?",(json.dumps(source["queue"].get("import_blocks",[])),qid))
         for position, item in enumerate(source["items"]):
             l = item["limits"]
             tid = db.run("INSERT INTO tests (name, category, type, unit, description, expected, warn, fail, tol_mode, active, owner_queue_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
@@ -852,7 +859,7 @@ def run_template(db, user, assignment_id):
                                  "ORDER BY r.qa_date DESC, r.id DESC LIMIT 1", (test["id"], machine["id"])) or {}).get("value_text") if test["type"] == "text" else None,
         })
     assignment["schedule"] = qa.describe_schedule(assignment)
-    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"], "active": queue["active"]}, "items": [i for i in all_items if not i["excluded"]], "all_items": all_items, "test_selection": selection}
+    return {"assignment": assignment, "machine": machine, "queue": {"id": queue["id"], "name": queue["name"], "description": queue["description"], "active": queue["active"], "import_blocks": queue.get("import_blocks",[])}, "items": [i for i in all_items if not i["excluded"]], "all_items": all_items, "test_selection": selection}
 
 
 def save_overrides(db, user, assignment_id, data):
