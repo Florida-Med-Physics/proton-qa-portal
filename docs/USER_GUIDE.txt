@@ -1,0 +1,8 @@
+GatorQA — Quick User Guide
+
+1. Sign in and choose a QA list from Dashboard or Perform QA.
+2. Check the QA date. Use the matching report found in your import folder, or choose a measurement file. Check the import summary; HDR PDFs require review before filling values.
+3. Enter the remaining measurements or Pass/Fail answers. Next unanswered jumps to the next missing answer. Show unfinished only hides answered tests; switch it off to review all results.
+4. Submit for review when ready. Unanswered tests are not passes. Reports download only when requested.
+5. In Review QA, complete the therapist review or the physicist approval for your role. Review notes are optional.
+6. Use Machine Trends for measurements over time. In Setup QA, open Machines to edit machine limits, then Save template.

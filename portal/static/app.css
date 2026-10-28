@@ -1642,3 +1642,12 @@ td, .measure-table td { font-size: 21px; }
 .machine-tolerances-dialog .machine-limit-changed-cell input,
 .machine-tolerances-dialog .machine-limit-changed-cell select { background:transparent; }
 :root[data-theme="dark"] .machine-tolerances-dialog td.machine-limit-changed-cell { background:#493b13; }
+
+.qa-completion-tools { display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; }
+.qa-completion-tools .check { margin:0; }
+.qa-completion-tools button { min-height:44px; }
+.qa-next-unanswered { outline:3px solid var(--accent); outline-offset:-3px; }
+#app .measure-table tr[data-qa-entry][hidden], #app .measure-block[hidden], #app .section[hidden], #app .qa-finished-message[hidden], #app .section-head[hidden] { display:none !important; }
+.import-summary { margin-top:12px; padding:12px; border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:6px; background:var(--surface-2); overflow-wrap:anywhere; }
+.import-summary strong { display:block; margin-bottom:4px; }
+.import-remaining { margin-top:6px; }

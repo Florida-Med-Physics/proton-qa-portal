@@ -1646,6 +1646,23 @@ async function renderPerform(assignmentId) {
   const sections = [];
   const progress = el("span");
   const overallChip = el("span");
+  const importRemaining=el('div',{class:'import-remaining'});
+  const unfinishedCount=el('span',{class:'muted small',role:'status'});
+  const finishedMessage=el('div',{class:'card qa-finished-message',hidden:true},'All required tests are answered. Turn off “Show unfinished only” to review everything.');
+  let unfinishedOnly=false,nextIndex=-1;
+  const nextUnanswered=el('button',{type:'button',class:'primary',onclick:()=>{
+    const remaining=inputs.filter(e=>e.required&&!e.status());
+    const entry=remaining.find(e=>inputs.indexOf(e)>nextIndex)||remaining[0];
+    if(!entry){toast('All required tests are answered.');return;}
+    nextIndex=inputs.indexOf(entry);
+    for(let parent=entry.row.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+    app.querySelectorAll('.qa-next-unanswered').forEach(row=>row.classList.remove('qa-next-unanswered'));
+    entry.row.classList.add('qa-next-unanswered');entry.row.scrollIntoView({block:'center',behavior:'smooth'});
+    const focus=entry.row.querySelector('.qa-measured button:not(:disabled), .qa-measured select:not(:disabled), .qa-measured input:not([readonly]):not([type=hidden])');
+    if(focus)focus.focus({preventScroll:true});else{entry.row.tabIndex=-1;entry.row.focus({preventScroll:true});}
+  }},'Next unanswered');
+  const unfinishedToggle=el('input',{type:'checkbox','aria-label':'Show unfinished only',onchange:event=>{unfinishedOnly=event.target.checked;refresh();if(unfinishedOnly)for(const section of sections)if(!section.box.hidden)section.box.open=true;}});
+  app.append(el('div',{class:'card qa-completion-tools'},nextUnanswered,el('label',{class:'check'},unfinishedToggle,'Show unfinished only'),unfinishedCount));
   const refresh = () => {
     const statuses = inputs.map((i) => i.status());
     const worst = statuses.filter(Boolean).reduce((w, s) => (STATUS_RANK[s] > STATUS_RANK[w] ? s : w), "pass");
@@ -1653,7 +1670,21 @@ async function renderPerform(assignmentId) {
     const done = required.filter((i) => i.status()).length;
     progress.textContent = `${done} of ${required.length} done`;
     overallChip.replaceChildren(done && done === required.length ? chip(worst) : statuses.some((s) => s === "fail" || s === "warn") ? chip(worst, `${STATUS_LABEL[worst] || capitalize(worst)} so far`) : "");
-    for (const s of sections) s.refresh();
+    const left=required.length-done;
+    unfinishedCount.textContent=left?`${left} unanswered`:'All required tests answered';
+    importRemaining.textContent=left?`${left} tests still need an answer.`:'All required tests are answered.';
+    nextUnanswered.disabled=left===0;
+    finishedMessage.hidden=!unfinishedOnly||left!==0;
+    for(const entry of inputs){if(!entry.row)continue;entry.row.hidden=unfinishedOnly&&(!entry.required||!!entry.status());if(entry.row.hidden)entry.chart.hidden=true;}
+    for (const s of sections){
+      s.refresh();const hide=unfinishedOnly&&!s.entries.some(e=>e.required&&!e.status());s.box.hidden=hide;if(s.heading)s.heading.hidden=hide;
+      for(const block of s.box.querySelectorAll('.measure-block')){
+        const rows=[...block.querySelectorAll('tr[data-qa-entry]')],visible=rows.filter(row=>!row.hidden);
+        block.hidden=unfinishedOnly&&!visible.length;
+        const number=block.querySelector('.qa-n-span');
+        if(number&&visible.length){visible[0].prepend(number);number.rowSpan=visible.length*2;}
+      }
+    }
   };
   const named = t.items.some((i) => sectionNameOf(i));
   const numbers = blockNumbers(t.items);
@@ -1755,7 +1786,7 @@ async function renderPerform(assignmentId) {
       const trRows = members.map((it) => {
         drawn.add(it.test_id);
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
-        const { control, comment, noteToggle, note, statusCell } = buildEntry(it);
+        const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(it);
         noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
@@ -1770,7 +1801,7 @@ async function renderPerform(assignmentId) {
         const dlt = el("div", { class: "delta-slot" });
         const showDelta = () => { const v = Number(QADerived.value(control)); dlt.replaceChildren(...present([control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : null])); };
         control.addEventListener("input", showDelta);
-        const row = el("tr", {},
+        const row = el("tr", {'data-qa-entry':it.test_id},
           numberCell(it),
           el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
@@ -1781,6 +1812,7 @@ async function renderPerform(assignmentId) {
           el("td", { class: "qa-comment" }, noteToggle, comment),
           el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
           el("td", {class:"qa-trends"}, trend));
+        entry.row=row;entry.chart=chart;
         const extras = el('td', {class:'qa-phone-extras', colspan:10});
         orderMeasurementRow(row);
         row.append(extras);
@@ -1892,10 +1924,13 @@ async function renderPerform(assignmentId) {
   const qaDate = el("input", { type: "date", value: today(), max: today(), "aria-label": "QA date" });
   const runComment = el("textarea", { placeholder: "Anything the reviewer should know" });
   let sourceRef = null;
-  const sphinxInfo = el("div", { class: "small" });
+  const sphinxInfo = el("div", { class: "small", role:"status", "aria-live":"polite" });
   const applySphinx = async (preview = null, automatic = false) => {
     const p = preview || await api("POST", `/api/assignments/${assignmentId}/sphinx/preview`, { file: state.sphinxFile });
-    if (automatic && p.matched.some(m=>inputs.find(e=>e.item.test_id===m.test_id)?.input.value.trim())) return false;
+    if (automatic && p.matched.some(m=>inputs.find(e=>e.item.test_id===m.test_id)?.input.value.trim())) {
+      sphinxInfo.replaceChildren(el('div',{class:'import-summary'},el('strong',{},'Report ready'),el('div',{},p.filename),el('div',{},`Report date: ${p.qa_date} · ${p.matched.length} matching values`),el('p',{},'Your existing measurements have been kept.'),el('button',{type:'button',onclick:()=>applySphinx(p,false)},'Use measurements')));
+      return false;
+    }
     sourceRef = p.source_ref;
     if (!automatic) qaDate.value = p.qa_date;
     // Fields marked [auto: sphinx-finished] take the export's acquisition date and time.
@@ -1913,7 +1948,7 @@ async function renderPerform(assignmentId) {
     // Fold away sections where everything passed so only what needs attention stays open.
     for (const s of sections) s.box.open = !s.settled();
     sphinxInfo.replaceChildren(el("div", {},
-      el("div", {}, `Filled ${p.matched.length} values from ${p.filename}.`),
+      el('div',{class:'import-summary'},el('strong',{},'Measurements imported'),el('div',{},p.filename),el('div',{},`Report date: ${p.qa_date} · ${p.matched.length} values filled`),importRemaining),
       p.duplicate_run ? el("div", { class: "error" }, "This file is already recorded as ", el("a", { href: `#/runs/${p.duplicate_run}` }, `run #${p.duplicate_run}`), ".") : null,
       p.unmatched.length ? el("div", { class: "row" }, `${p.unmatched.length} values in the file are not in this list.`,
         can("configure") ? el("button", { onclick: async () => {
@@ -1953,14 +1988,16 @@ async function renderPerform(assignmentId) {
       if(!date.value||date.value>today())throw Error('Choose a valid QA date.');
       for(const m of p.matched){const e=inputs.find(x=>x.item.test_id===m.test_id);if(automatic&&e.input.value.trim())continue;e.input.value=m.type==='boolean'?(m.value?'pass':'fail'):String(m.value);e.input.dispatchEvent(new Event('input'));}
       qaDate.value=date.value;qaDate.dispatchEvent(new Event('change'));sourceRef=p.source_ref;
-      sphinxInfo.textContent=`Filled ${p.matched.length} values from ${upload.name}. Review the results, then submit.`;
+      sphinxInfo.replaceChildren(el('div',{class:'import-summary'},el('strong',{},'Measurements imported'),el('div',{},upload.name),el('div',{},`Report date: ${date.value} · ${p.matched.length} values filled`),importRemaining));
       toast('HDR Daily QA values filled');
     },'Fill recognized values');
     if(automatic){sphinxInfo.replaceChildren(el('span',{},`HDR report ready: ${upload.name}. `),el('button',{type:'button',onclick:show},'Review PDF values'));return false;}
+    sphinxInfo.replaceChildren(el('span',{},`Report ready: ${upload.name} · ${p.qa_date}. `),el('button',{type:'button',onclick:show},'Review PDF values'));
     show();return true;
   };
   const useUpload = async (upload, preview = null, automatic = false) => {
     try {
+      sphinxInfo.textContent=`Reading ${upload.name}…`;
       if(QAHdrDaily.supported(t))return await reviewHdr(upload,preview,automatic);
       if(/\.pdf$/i.test(upload.name)&&!t.items.some(i=>(i.description||'').includes('[rule: wl-max-delta]')))throw Error('This QA list does not use a Winston–Lutz PDF. Choose a file supported by this list.');
       state.sphinxFile = upload;
@@ -1971,17 +2008,16 @@ async function renderPerform(assignmentId) {
   };
   const autoLine = t.assignment.import_folder ? el("div") : null;
   if (window.QAExcel?.supported(t)) app.append(monthlyWorkbookTools(t, inputs, qaDate));
-  const fileCard = el("div", { class: "card step" }, el("strong", {}, "Measurement file"),
-    el("span", { class: "muted small" }, QAHdrDaily.supported(t)?" Import the HDR Daily QA PDF and review its values.":" Import a supported measurement file to fill in matching results."),
+  const fileCard = el("div", { class: "card step" }, el("strong", {}, "Import measurements"),
+    el("span", { class: "muted small" }, QAHdrDaily.supported(t)?" Import the HDR Daily QA PDF and review its values.":" Choose a report to fill matching measurements. Any remaining tests can be completed below."),
     autoLine, el("div", {}, sphinxFile), sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
       can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
   }
-  // The file goes first in the Sphinx Measurements section (or at the top of a list that has no such section).
-  const sphinxSection = sections.find((x) => /sphinx measurements/i.test(x.section)) || null;
-  if (!sphinxSection) app.append(fileCard);
-  app.append(...sections.flatMap((x) => [x.heading, x === sphinxSection && x.heading ? fileCard : null, x.box]).filter(Boolean));   // a null would append as the text "null"
+  // Keep file import visible before the test sections.
+  app.append(fileCard,finishedMessage);
+  app.append(...sections.flatMap((x) => [x.heading, x.box]).filter(Boolean));   // a null would append as the text "null"
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
