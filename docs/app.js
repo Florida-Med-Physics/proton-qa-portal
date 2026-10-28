@@ -2634,7 +2634,7 @@ async function renderQueueEditor(id) {
             route();
           }) }, "✎") : null,
           editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
-            el("textarea", { rows: 2, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => editDefinition('name', e.target.value) }))
+            el("textarea", { rows: 1, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => { editDefinition('name', e.target.value); e.target.style.height='auto';e.target.style.height=`${e.target.scrollHeight}px`; } }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item))),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
@@ -2667,6 +2667,7 @@ async function renderQueueEditor(id) {
       el("thead", {}, el("tr", {}, ["Test Name", "Category", "Result Type", valuesFor ? `Baseline · ${machineName(valuesFor)}` : "Baseline",
         valuesFor ? `Warning / Action · ${machineName(valuesFor)}` : "Default Warning / Default Action", ""].map((h) => el("th", {}, h)))), body))
       : el("div", { class: "card empty" }, valuesFor ? "No tests included for this machine. Use Customize tests to include tests." : "No tests in this list yet."));
+    requestAnimationFrame(()=>{for(const name of holder.querySelectorAll('.inline-test-name textarea')){name.style.height='auto';name.style.height=`${name.scrollHeight}px`;}});
     if (saveBtn) saveBtn.textContent = valuesFor ? `Save ${machineName(valuesFor)} limits` : "Save template";
     holder.classList.toggle("machine-mode", !!valuesFor);
     // Only this list's own tests (or shared library tests) can be added here.
