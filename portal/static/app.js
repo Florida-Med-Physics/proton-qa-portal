@@ -801,7 +801,7 @@ async function renderSetup() {
       ["Re-evaluate", reevaluate(q), "Re-judge every recorded result against the current limits (logged)"],
       ["Archive", () => archiveList(q, true), "Hide this template and its scheduled lists; keep results and machine settings"],
       ["Delete", () => deleteList(q), "Delete only if it has no results"],
-    ]) : null, editableName(q, editable))),
+    ]) : null, el("a", {href:`#/queues/${q.id}`,title:"Open template tests and defaults"},el("strong",{},q.name)))),
     el("td", {}, schedulesOf(q).length
       ? el("div", { class: "sched-chips" }, schedulesOf(q).sort((a, b) => String(machineOf(a).name).localeCompare(String(machineOf(b).name))).map((a) =>
         el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: `#/queues/${q.id}?assignment=${a.id}`, title: `Edit ${machineOf(a).name} tests and tolerances${a.active ? "" : " · inactive"}` },
