@@ -3725,7 +3725,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       chart.addEventListener('toggle', () => {
         if (!chart.open || drawn) return;
         drawn = true;
-        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Yellow: warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }), el('a', { href, class: 'button small' }, 'View values and details'));
+        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }), el('a', { href, class: 'button small' }, 'View values and details'));
       });
       categories.get(category).push(chart);
     }
