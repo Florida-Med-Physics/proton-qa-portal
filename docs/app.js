@@ -369,8 +369,13 @@ function frequentQaAssignments(data,runs,userId) {
     .filter(q=>q.use_count).sort((a,b)=>b.use_count-a.use_count||b.last_used.localeCompare(a.last_used)||a.queue_name.localeCompare(b.queue_name)).slice(0,4);
 }
 
+function applyDashboardRoleView(data) {
+  if(activeRole()==='therapist')for(const machine of data.machines)machine.queues=machine.queues.filter(q=>q.frequency!=='monthly');
+  return data;
+}
+
 async function renderHome() {
-  const data = await api('GET', '/api/dashboard');
+  const data = applyDashboardRoleView(await api('GET', '/api/dashboard'));
   page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
   const runs=await api('GET','/api/runs?limit=400');
   const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
@@ -628,7 +633,7 @@ function historyRing(counts={}, href, label="") {
 }
 
 async function renderDashboard() {
-  const data = await api("GET", "/api/dashboard");
+  const data = applyDashboardRoleView(await api("GET", "/api/dashboard"));
   const queues = data.machines.flatMap((m) => m.queues);
   const todo = queues.filter((q) => q.state === "due" || q.state === "overdue").length;
   const toReview = data.machines.reduce((n, m) => n + m.pending_review, 0);
