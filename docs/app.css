@@ -1669,3 +1669,38 @@ td, .measure-table td { font-size: 21px; }
   #app .measure-table > tbody > tr:not(.quick-trend) { padding:10px; margin-bottom:8px; gap:6px; }
   #app .measure-block { padding:8px; }
 }
+
+/* Phones show only the test, answer and verdict; desktop keeps the full table. */
+@media(max-width:767px) {
+  #app[data-page^="perform/"] .measure-table > tbody > tr:not(.quick-trend),
+  #app[data-page^="runs/"] .review-measure-table > tbody > tr:not(.quick-trend) {
+    grid-template-columns:minmax(0,1fr) minmax(130px,1fr); gap:5px 8px; padding:9px; margin-bottom:6px;
+  }
+  #app[data-page^="perform/"] .measure-table td.qa-n,
+  #app[data-page^="runs/"] .review-measure-table td.qa-n,
+  #app[data-page^="perform/"] .measure-table td.qa-unit,
+  #app[data-page^="runs/"] .review-measure-table td.qa-unit,
+  #app[data-page^="perform/"] .measure-table td.qa-baseline,
+  #app[data-page^="runs/"] .review-measure-table td.qa-baseline,
+  #app[data-page^="perform/"] .measure-table td.qa-secondary,
+  #app[data-page^="runs/"] .review-measure-table td.qa-secondary,
+  #app[data-page^="perform/"] .measure-table td.qa-phone-extras,
+  #app[data-page^="runs/"] .review-measure-table td.qa-phone-extras,
+  #app[data-page^="runs/"] .review-measure-table td.qa-dev,
+  #app[data-page^="runs/"] .review-measure-table td.qa-comment,
+  #app[data-page^="runs/"] .review-measure-table td.history-cell,
+  #app[data-page^="runs/"] .review-measure-table td.qa-trends,
+  #app[data-page^="perform/"] .measure-table .qa-label > .muted,
+  #app[data-page^="perform/"] .measure-table .qa-limits,
+  #app[data-page^="runs/"] .review-measure-table .qa-limits,
+  #app[data-page^="perform/"] .measure-table .qa-calculation-info,
+  #app[data-page^="runs/"] .review-measure-table .qa-calculation-info { display:none !important; }
+  #app[data-page^="perform/"] .measure-table td.qa-label,
+  #app[data-page^="runs/"] .review-measure-table td.qa-label { grid-column:1; grid-row:1 / span 2; }
+  #app[data-page^="perform/"] .measure-table td.qa-measured,
+  #app[data-page^="runs/"] .review-measure-table td.qa-measured { grid-column:2; grid-row:1; }
+  #app[data-page^="perform/"] .measure-table td.qa-result,
+  #app[data-page^="runs/"] .review-measure-table td.qa-result { grid-column:2; grid-row:2; }
+  #app[data-page^="perform/"] .measure-table td::before,
+  #app[data-page^="runs/"] .review-measure-table td::before { display:none !important; }
+}
