@@ -2008,16 +2008,22 @@ async function renderPerform(assignmentId) {
   };
   const autoLine = t.assignment.import_folder ? el("div") : null;
   if (window.QAExcel?.supported(t)) app.append(monthlyWorkbookTools(t, inputs, qaDate));
-  const fileCard = el("div", { class: "card step" }, el("strong", {}, "Import measurements"),
+  const sphinxSection=sections.find(section=>/sphinx measurements/i.test(section.section))||null;
+  const importHelp=sphinxSection?infoDisclosure(el('div',{},
+    el('p',{},'Use a Sphinx report export (.xls or Sphinx-format .csv). This reader expects the report’s Setup headings and measurement rows; it does not accept arbitrary CSV column layouts.'),
+    el('p',{},'For each row, it identifies the measurement name, energy/spot, warning/action limits, reference, and measured Result. Only the Result fills the answer. Matching uses the measurement and nominal energy, so small energy-label differences and uniquely matched spot renumbering do not create new tests.'),
+    el('p',{},'The selected machine’s saved baseline and limits determine pass/fail. Imported reference values and the file’s own verdict do not replace them. Only matching template tests are filled; the remaining answers stay for you to complete.')),'How Sphinx imports work'):null;
+  const fileCard = el("div", { class: "card step" }, el('div',{class:'row'},el("strong", {}, "Import measurements"),importHelp),
     el("span", { class: "muted small" }, QAHdrDaily.supported(t)?" Import the HDR Daily QA PDF and review its values.":" Choose a report to fill matching measurements. Any remaining tests can be completed below."),
     autoLine, el("div", {}, sphinxFile), sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
       can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
   }
-  // Keep file import visible before the test sections.
-  app.append(fileCard,finishedMessage);
-  app.append(...sections.flatMap((x) => [x.heading, x.box]).filter(Boolean));   // a null would append as the text "null"
+  // Sphinx reports belong beside the measurement section they fill.
+  if(!sphinxSection)app.append(fileCard);
+  app.append(finishedMessage);
+  app.append(...sections.flatMap((x) => [x.heading,x===sphinxSection?fileCard:null,x.box]).filter(Boolean));   // a null would append as the text "null"
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
