@@ -804,9 +804,9 @@ async function renderSetup() {
     ]) : null, el("a", {href:`#/queues/${q.id}`,title:"Open template tests and defaults"},el("strong",{},q.name)))),
     el("td", {}, schedulesOf(q).length
       ? el("div", { class: "sched-chips" }, schedulesOf(q).sort((a, b) => String(machineOf(a).name).localeCompare(String(machineOf(b).name))).map((a) =>
-        el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: `#/queues/${q.id}?assignment=${a.id}`, title: `Edit ${machineOf(a).name} tests and tolerances${a.active ? "" : " · inactive"}` },
+        el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: "#", title: "Schedule on machines", onclick: (event) => { event.preventDefault(); scheduleDialog(q, machines, schedules); } },
           machineOf(a).name, a.active ? null : " (Inactive)")))
-      : el("a", { class: "small", href: `#/queues/${q.id}`, title: "Open template tests and defaults" }, "Not scheduled")),
+      : el("a", { class: "small", href: "#", title: "Schedule on machines", onclick: (event) => { event.preventDefault(); scheduleDialog(q, machines, schedules); } }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
 
     );
