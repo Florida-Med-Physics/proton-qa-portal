@@ -804,7 +804,7 @@ async function renderSetup() {
     ]) : null, editableName(q, editable))),
     el("td", {}, schedulesOf(q).length
       ? el("div", { class: "sched-chips" }, schedulesOf(q).sort((a, b) => String(machineOf(a).name).localeCompare(String(machineOf(b).name))).map((a) =>
-        el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: `#/machines/${a.machine_id}`, title: `${a.schedule}${a.active ? "" : " · inactive"}` },
+        el("a", { class: `sched-chip${a.active ? "" : " off"}`, href: `#/queues/${q.id}?assignment=${a.id}`, title: `Edit ${machineOf(a).name} tests and tolerances${a.active ? "" : " · inactive"}` },
           machineOf(a).name, a.active ? null : " (Inactive)")))
       : el("span", { class: "muted small" }, "Not scheduled")),
     el("td", { class: "center" }, q.item_count),
@@ -2359,7 +2359,7 @@ async function renderQueueEditor(id) {
   let items = q.items.map((i) => ({ test_id: i.test_id, expected: i.expected, warn: i.warn, fail: i.fail, tol_mode: i.tol_mode }));
   // "Values for": the list's default baseline / Warning / Action (every machine), or one machine's own values,
   // which override the default on that machine only (blank = use the default, shown in grey).
-  let valuesFor = "";
+  let valuesFor = (q.schedules||[]).some(a=>String(a.id)===queryParams().get('assignment'))?queryParams().get('assignment'):"";
   let dirty = false;
   const markDirty = () => { dirty = true; unsaved.hidden = false; };
   let searchTerm = "";
@@ -2378,7 +2378,7 @@ async function renderQueueEditor(id) {
   const machineName = (aid) => ((q.schedules || []).find((x) => String(x.id) === String(aid)) || {}).machine || "";
   const valuesPick = (q.schedules || []).length ? el("div", { class: "row", role: "radiogroup", "aria-label": "Tests and limits for" },
     [["", "Default template"], ...q.schedules.map((x) => [String(x.id), x.machine])].map(([value, label]) =>
-      el("label", { class: "check" }, el("input", { type: "radio", name: "values_for", value, checked: value === "",
+      el("label", { class: "check" }, el("input", { type: "radio", name: "values_for", value, checked: value === valuesFor,
         onchange: async (e) => {
           const controls = [...valuesPick.querySelectorAll("input")];
           if (dirty) {
