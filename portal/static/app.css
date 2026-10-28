@@ -1669,23 +1669,3 @@ td, .measure-table td { font-size: 21px; }
   #app .measure-table > tbody > tr:not(.quick-trend) { padding:10px; margin-bottom:8px; gap:6px; }
   #app .measure-block { padding:8px; }
 }
-
-/* Perform QA keeps only the information needed to enter an answer. */
-#app[data-page^="perform/"] .simple-qa-table { width:100%; min-width:0; table-layout:fixed; }
-#app[data-page^="perform/"] .simple-qa-table .qa-label { min-width:0; }
-#app[data-page^="perform/"] .simple-qa-table .qa-label > :not(.qa-test-title):not(.qa-test-number),
-#app[data-page^="perform/"] .simple-qa-table .qa-test-title > .qa-calculation-info,
-#app[data-page^="perform/"] .simple-qa-table .qa-test-title > .qa-info,
-#app[data-page^="perform/"] .measure-title .qa-limits,
-#app[data-page^="perform/"] .measure-title .qa-calculation-info { display:none !important; }
-#app[data-page^="perform/"] .simple-qa-table .qa-test-number { display:inline; font-size:13px; color:var(--muted); margin-right:8px; }
-#app[data-page^="perform/"] .simple-qa-table td { padding:6px 8px; }
-#app[data-page^="perform/"] .simple-qa-table .qa-test-title { display:inline; }
-#app[data-page^="perform/"] .simple-qa-table .qa-test-name { display:inline; }
-@media(max-width:1200px) {
-  #app[data-page^="perform/"] .simple-qa-table > tbody > tr:not(.quick-trend) { grid-template-columns:minmax(0,1fr) minmax(140px,1fr); padding:8px; margin-bottom:4px; gap:4px 8px; border-radius:6px; }
-  #app[data-page^="perform/"] .simple-qa-table td.qa-label { grid-column:1; grid-row:1 / span 2; padding:0; }
-  #app[data-page^="perform/"] .simple-qa-table td.qa-measured { grid-column:2; grid-row:1; padding:0; }
-  #app[data-page^="perform/"] .simple-qa-table td.qa-result { grid-column:2; grid-row:2; padding:0; }
-  #app[data-page^="perform/"] .simple-qa-table td::before { display:none; }
-}
