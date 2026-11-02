@@ -79,7 +79,8 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(schedules["Daily QA template – TrueBeam (TG-142 / TG-198)"]["frequency"], "daily")
         items = service.run_template(db, users["admin"], schedules["Daily QA template – TrueBeam (TG-142 / TG-198)"]["id"])["items"]
         self.assertEqual(len(items), 25)
-        self.assertEqual(items[0]["type"], "status")
+        self.assertEqual(items[0]["type"], "boolean")              # Pass / Fail only, no Warning
+        self.assertEqual({i["type"] for i in items}, {"boolean"})
         with self.assertRaisesRegex(PortalError, "already has machines"):
             service.seed_defaults(db, users["admin"])
         with self.assertRaisesRegex(PortalError, "permission"):
