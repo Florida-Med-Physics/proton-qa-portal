@@ -416,6 +416,9 @@ tr.after-directions td { border-top: 0; }
 .directions-edit { display: block; }
 .directions-edit textarea { display: block; width: 100%; min-height: 38px; resize: vertical; font: inherit; font-size: 14px; line-height: 1.4; padding: 6px 8px; background: var(--surface); }
 .add-directions { white-space: nowrap; margin-left: 4px; align-self: center; }
+/* Each test's Edit button leads its row's actions, labelled, at the row's end. */
+.row-actions { gap: 6px; align-items: center; }
+.row-actions .edit-test { white-space: nowrap; font-weight: 600; }
 .item-cell strong { font-size: 15px; }
 
 /* Perform: section headings stand out more than the items in them. */

@@ -862,182 +862,194 @@
    "kind": "Linac",
    "list": "Daily QA",
    "frequency": "daily",
-   "setup": "Same items and order as the Penn TrueBeam daily list: 1.xx Safety, 2.xx Dosimetry on the daily QA device per energy, 3.0 Physics Review. Each item is marked Pass / Fail. Numeric tolerances (TG-142 Table III / Table IV) are not entered in this draft.",
+   "setup": "TrueBeam daily QA. 1.xx Output: each energy's percent difference from baseline, read from the daily QA device's TXT file. 2.xx CBCT correction: the couch correction after the daily CBCT match (X, Y, Z in mm; roll, pitch, yaw in degrees), baseline 0. Limits: output ±3% and X/Y/Z ±1 mm (TG-142 daily, SRS/SBRT); roll, pitch and yaw ±1° (department choice: TG-142 gives no daily rotation limit). Warnings at half the action level. Draft limits for physicist review.",
    "checks": [
     {
-     "category": "Safety",
-     "name": "Safety – Water level",
-     "type": "boolean",
-     "description": "Template 1.00.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 6X",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.01."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Water pressure",
-     "type": "boolean",
-     "description": "Template 1.01.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 10X",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.02."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Gas pressure",
-     "type": "boolean",
-     "description": "Template 1.02.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 10X FFF",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.03."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Intercom",
-     "type": "boolean",
-     "description": "Template 1.03.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 15X",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.04."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Video monitor",
-     "type": "boolean",
-     "description": "Template 1.04.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 6X EDW 30 IN",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.05."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Door warning light",
-     "type": "boolean",
-     "description": "Template 1.05.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 6E",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.06."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Beam off functionality",
-     "type": "boolean",
-     "description": "Template 1.06.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 9E",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.07."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Door interlock",
-     "type": "boolean",
-     "description": "Template 1.07.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 12E",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.08."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Primealert",
-     "type": "boolean",
-     "description": "Template 1.08.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 16E",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.09."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Backup MU counter accuracy",
-     "type": "boolean",
-     "description": "Template 1.09.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 18E",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.10."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Laser alignment",
-     "type": "boolean",
-     "description": "Template 1.10.",
-     "unit": "Pass/Fail"
+     "category": "Output",
+     "name": "Output – 20E",
+     "type": "numeric",
+     "unit": "%",
+     "expected": 0,
+     "warn": 1.5,
+     "fail": 3,
+     "tol_mode": "absolute",
+     "description": "Template 1.11."
     },
     {
-     "category": "Safety",
-     "name": "Safety – ODI accuracy",
-     "type": "boolean",
-     "description": "Template 1.11.",
-     "unit": "Pass/Fail"
+     "category": "CBCT correction",
+     "name": "CBCT correction — X [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.5,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.01."
     },
     {
-     "category": "Safety",
-     "name": "Safety – Light field size",
-     "type": "boolean",
-     "description": "Template 1.12.",
-     "unit": "Pass/Fail"
+     "category": "CBCT correction",
+     "name": "CBCT correction — Y [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.5,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.02."
     },
     {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 6X daily QA device",
-     "type": "boolean",
-     "description": "Template 2.01.",
-     "unit": "Pass/Fail"
+     "category": "CBCT correction",
+     "name": "CBCT correction — Z [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.5,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.03."
     },
     {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 10X daily QA device",
-     "type": "boolean",
-     "description": "Template 2.02.",
-     "unit": "Pass/Fail"
+     "category": "CBCT correction",
+     "name": "CBCT correction — Roll [°]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 0,
+     "warn": 0.5,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.04."
     },
     {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 10X FFF daily QA device",
-     "type": "boolean",
-     "description": "Template 2.03.",
-     "unit": "Pass/Fail"
+     "category": "CBCT correction",
+     "name": "CBCT correction — Pitch [°]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 0,
+     "warn": 0.5,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.05."
     },
     {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 15X daily QA device",
-     "type": "boolean",
-     "description": "Template 2.04.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 6X EDW 30 IN daily QA device",
-     "type": "boolean",
-     "description": "Template 2.05.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 6E daily QA device",
-     "type": "boolean",
-     "description": "Template 2.07.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 9E daily QA device",
-     "type": "boolean",
-     "description": "Template 2.08.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 12E daily QA device",
-     "type": "boolean",
-     "description": "Template 2.09.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 16E daily QA device",
-     "type": "boolean",
-     "description": "Template 2.10.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 18E daily QA device",
-     "type": "boolean",
-     "description": "Template 2.11.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Dosimetry",
-     "name": "Dosimetry – 20E daily QA device",
-     "type": "boolean",
-     "description": "Template 2.12.",
-     "unit": "Pass/Fail"
-    },
-    {
-     "category": "Physics Review",
-     "name": "Physics Review – Physics Review",
-     "type": "boolean",
-     "description": "Template 3.00.",
-     "unit": "Pass/Fail"
+     "category": "CBCT correction",
+     "name": "CBCT correction — Yaw [°]",
+     "type": "numeric",
+     "unit": "deg",
+     "expected": 0,
+     "warn": 0.5,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.06."
     }
    ]
   },
