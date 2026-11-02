@@ -410,6 +410,12 @@ tr.section-row td {
 tr.directions-row td { padding: 0 12px 10px; max-width: none; }
 tr.directions-row .directions { margin: 0; }
 tr.before-directions td { border-bottom: 0; }
+/* In the list editor, directions sit above their test and are edited in place. */
+tr.directions-above td { padding: 10px 12px 0; border-bottom: 0; }
+tr.after-directions td { border-top: 0; }
+.directions-edit { display: block; }
+.directions-edit textarea { display: block; width: 100%; min-height: 38px; resize: vertical; font: inherit; font-size: 14px; line-height: 1.4; padding: 6px 8px; background: var(--surface); }
+.add-directions { white-space: nowrap; margin-left: 4px; align-self: center; }
 .item-cell strong { font-size: 15px; }
 
 /* Perform: section headings stand out more than the items in them. */

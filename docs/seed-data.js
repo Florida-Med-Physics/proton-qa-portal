@@ -941,21 +941,21 @@ window.PORTAL_SEED = {
      "category": "Safety",
      "name": "Safety – Laser alignment",
      "type": "boolean",
-     "description": "Template 1.10. TG-142 daily tolerance.",
+     "description": "Template 1.10.",
      "unit": "Pass/Fail"
     },
     {
      "category": "Safety",
      "name": "Safety – ODI accuracy",
      "type": "boolean",
-     "description": "Template 1.11. TG-142 daily tolerance.",
+     "description": "Template 1.11.",
      "unit": "Pass/Fail"
     },
     {
      "category": "Safety",
      "name": "Safety – Light field size",
      "type": "boolean",
-     "description": "Template 1.12. TG-142 daily tolerance.",
+     "description": "Template 1.12.",
      "unit": "Pass/Fail"
     },
     {
@@ -1055,13 +1055,13 @@ window.PORTAL_SEED = {
      "category": "Mechanical and Safety",
      "name": "Mechanical and Safety – \"X-Ray ON\" indicator",
      "type": "boolean",
-     "description": "Template 1.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged."
+     "description": "Template 1.01."
     },
     {
      "category": "CT HU constancy",
      "name": "CT HU constancy – Head CT Number (HU)",
      "type": "numeric",
-     "description": "Template 2.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 2.01.",
      "unit": "HU",
      "expected": 0,
      "tol_mode": "absolute"
@@ -1070,7 +1070,7 @@ window.PORTAL_SEED = {
      "category": "CT HU constancy",
      "name": "CT HU constancy – Head Uniformity (HU)",
      "type": "numeric",
-     "description": "Template 2.02. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 2.02.",
      "unit": "HU",
      "expected": 0,
      "tol_mode": "absolute"
@@ -1079,7 +1079,7 @@ window.PORTAL_SEED = {
      "category": "CT HU constancy",
      "name": "CT HU constancy – Head Noise (HU)",
      "type": "numeric",
-     "description": "Template 2.03. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 2.03.",
      "unit": "HU",
      "expected": 2.7,
      "tol_mode": "absolute"
@@ -1088,7 +1088,7 @@ window.PORTAL_SEED = {
      "category": "Quality",
      "name": "Quality – Head Low Contrast (mm)",
      "type": "numeric",
-     "description": "Template 3.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 3.01.",
      "unit": "mm",
      "expected": 4,
      "tol_mode": "absolute"
@@ -1097,7 +1097,7 @@ window.PORTAL_SEED = {
      "category": "CT HU constancy",
      "name": "CT HU constancy – Body CT Number (HU)",
      "type": "numeric",
-     "description": "Template 2.04. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 2.04.",
      "unit": "HU",
      "expected": 0,
      "tol_mode": "absolute"
@@ -1106,7 +1106,7 @@ window.PORTAL_SEED = {
      "category": "CT HU constancy",
      "name": "CT HU constancy – Body Uniformity (HU)",
      "type": "numeric",
-     "description": "Template 2.05. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 2.05.",
      "unit": "HU",
      "expected": 0,
      "tol_mode": "absolute"
@@ -1115,7 +1115,7 @@ window.PORTAL_SEED = {
      "category": "CT HU constancy",
      "name": "CT HU constancy – Body Noise (HU)",
      "type": "numeric",
-     "description": "Template 2.06. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 2.06.",
      "unit": "HU",
      "expected": 7.65,
      "tol_mode": "absolute"
@@ -1124,7 +1124,7 @@ window.PORTAL_SEED = {
      "category": "CT Geometry",
      "name": "CT Geometry – CT BB position x (BB)",
      "type": "numeric",
-     "description": "Template 4.01. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 4.01.",
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute"
@@ -1133,7 +1133,7 @@ window.PORTAL_SEED = {
      "category": "CT Geometry",
      "name": "CT Geometry – CT BB position y (BB)",
      "type": "numeric",
-     "description": "Template 4.02. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 4.02.",
      "unit": "mm",
      "expected": 101.5,
      "tol_mode": "absolute"
@@ -1142,7 +1142,7 @@ window.PORTAL_SEED = {
      "category": "CT Geometry",
      "name": "CT Geometry – CT BB distance Left-Right (BB)",
      "type": "numeric",
-     "description": "Template 4.03. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 4.03.",
      "unit": "mm",
      "expected": 203.5,
      "tol_mode": "absolute"
@@ -1151,7 +1151,7 @@ window.PORTAL_SEED = {
      "category": "CT Geometry",
      "name": "CT Geometry – CT BB distance Left-Top (BB)",
      "type": "numeric",
-     "description": "Template 4.04. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 4.04.",
      "unit": "mm",
      "expected": 144.5,
      "tol_mode": "absolute"
@@ -1160,7 +1160,7 @@ window.PORTAL_SEED = {
      "category": "CT Geometry",
      "name": "CT Geometry – CT BB distance Top-Right (BB)",
      "type": "numeric",
-     "description": "Template 4.05. Reference from RadMachine 'Bigbore CT Daily'. Tolerances not entered yet: recorded, not judged.",
+     "description": "Template 4.05.",
      "unit": "mm",
      "expected": 144.5,
      "tol_mode": "absolute"
@@ -1203,7 +1203,7 @@ window.PORTAL_SEED = {
      "category": "Image quality",
      "name": "Image quality – Daily phantom scan acquired and free of artifacts",
      "type": "status",
-     "description": "Template 2.01. Items to add once the daily collection is known."
+     "description": "Template 2.01."
     },
     {
      "category": "Physics review",

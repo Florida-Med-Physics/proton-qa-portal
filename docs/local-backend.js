@@ -619,7 +619,7 @@
         for (const update of data.test_updates) {
           const test = get('tests', update.test_id, 'Check');
           if (!members.has(test.id) || (test.owner_queue_id && test.owner_queue_id !== queueId)) throw new Error("Only this template's tests can be edited here.");
-          const fields = Object.fromEntries(['name','category','type','choices','derived'].filter(key => key in update).map(key => [key,update[key]]));
+          const fields = Object.fromEntries(['name','category','type','choices','derived','description'].filter(key => key in update).map(key => [key,update[key]]));
           saveTest(user, {...test,...fields}, test.id);
         }
         return saveQueue(user, {...data,test_updates:[]}, queueId);

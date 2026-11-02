@@ -14,6 +14,11 @@ class InlineTemplateTests(unittest.TestCase):
         test=self.db.one('SELECT * FROM tests WHERE id=?',(self.t,))
         self.assertEqual((test['name'],test['category'],test['type']),('Edited','Safety','boolean'))
         self.assertIsNone(self.db.one('SELECT expected FROM queue_items WHERE test_id=?',(self.t,))['expected'])
+    def test_directions_save_with_the_list(self):
+        # The list editor sends the whole field: the edited directions with the markers it kept.
+        described='Template 1.04. [Section: Safety] Synthetic: check the door light. [excel: Sheet!B4]'
+        service.save_queue(self.db,self.user,{**self.payload,'test_updates':[{'test_id':self.t,'description':described}]},self.q)
+        self.assertEqual(self.db.one('SELECT description FROM tests WHERE id=?',(self.t,))['description'],described)
     def test_bad_definition_rolls_back_all_edits(self):
         with self.assertRaises(service.PortalError):
             service.save_queue(self.db,self.user,{**self.payload,'items':[{'test_id':self.t,'warn':-1}],'test_updates':[{'test_id':self.t,'name':'Should roll back'}]},self.q)

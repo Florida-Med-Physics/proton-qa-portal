@@ -382,7 +382,7 @@ def save_queue(db, user, data, queue_id=None, _within_transaction=False):
                 existing = _get(db, "tests", tid)
                 if tid not in member_ids or (existing["owner_queue_id"] is not None and existing["owner_queue_id"] != queue_id):
                     raise PortalError("Only this template's tests can be edited here.")
-                fields = {key: update[key] for key in ("name", "category", "type", "choices", "derived") if key in update}
+                fields = {key: update[key] for key in ("name", "category", "type", "choices", "derived", "description") if key in update}
                 save_test(db, user, {**existing, **fields}, tid)
             return save_queue(db, user, {**data, "test_updates": []}, queue_id, _within_transaction=True)
     name = _text(data, "name", required=True)

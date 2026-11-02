@@ -1425,6 +1425,26 @@ function helpText(description, { inline = false } = {}) {
   return el("div", { class: "directions pre" }, el("div", { class: "directions-label" }, "Directions"), text);
 }
 
+// Directions as people read and edit them, apart from the markers GatorQA keeps in the same field: the template
+// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device: …] and Source lines.
+// Editing the text in the list editor keeps every marker exactly as it was.
+function directionsParts(description) {
+  let d = description || "";
+  const num = TEMPLATE_NUMBER.exec(d);
+  const prefix = num ? num[0].trim() : "";
+  if (num) d = d.slice(num[0].length);
+  const tags = [], sources = [];
+  for (const re of [new RegExp(SECTION_NAME.source, "g"), new RegExp(MARKER.source, "g"), new RegExp(DEFAULT_MARK.source, "g"), /\[(?:choices|excel|rule|derived|device): [^\]]+\]/g])
+    d = d.replace(re, (m) => { tags.push(m.trim()); return " "; });
+  d = d.replace(/(?:^|\n)\s*Source:[^\n]*/g, (m) => { sources.push(m.trim()); return ""; });
+  return { prefix, tags, sources, text: d.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim() };
+}
+function joinDirections(parts, text) {
+  const section = parts.tags.filter((t) => t.startsWith("[Section:")), other = parts.tags.filter((t) => !t.startsWith("[Section:"));
+  return [parts.prefix, ...section, (text || "").trim(), ...other].filter(Boolean).join(" ") + (parts.sources.length ? "\n" + parts.sources.join("\n") : "");
+}
+function fitTextarea(box) { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; }
+
 // Which numbered section a test belongs to: the template number in its directions ("Template 2.03.") when
 // it has one, otherwise by category. Sphinx measurements have no number and all belong to the dosimetry section.
 function sectionNumber(item) {
@@ -2476,6 +2496,7 @@ async function renderQueueEditor(id) {
   app.append(info);
 
   const testUpdates = new Map();
+  const addingDirections = new Set();     // tests given an empty directions box with "+ Directions"
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));
   let items = q.items.map((i) => ({ test_id: i.test_id, expected: i.expected, warn: i.warn, fail: i.fail, tol_mode: i.tol_mode }));
   // "Values for": the list's default baseline / Warning / Action (every machine), or one machine's own values,
@@ -2712,14 +2733,34 @@ async function renderQueueEditor(id) {
       const firstInFamily = family && family[0].item === item;
       const lastInFamily = family && family[family.length - 1].item === item;
       const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
-      const directions = family
-        ? (lastInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
-        : helpText(t.description);
-      const dirRow = directions ? el("tr", { class: "directions-row", ...dragProps(index) }, el("td", { colspan: 6 }, directions)) : null;
+      const familyDirections = family
+        ? (firstInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        : null;
+      // Directions sit above their test. In the editor they are edited in place, like the name and category;
+      // the markers kept in the same field are not shown and are kept as they were. Sphinx-measured tests keep
+      // their marker text, so their directions are not edited here.
+      const sphinxTest = /^Measured by Sphinx/.test(t.description || "");
+      const inlineDirections = editable && !valuesFor && !family && !sphinxTest;
+      const directionText = directionsParts(t.description).text;
+      let dirRow = null;
+      if (family) {
+        dirRow = familyDirections && familyDirections.some(Boolean) ? el("tr", { class: "directions-row directions-above", ...dragProps(index) }, el("td", { colspan: 6 }, familyDirections)) : null;
+      } else if (inlineDirections && (directionText || addingDirections.has(t.id))) {
+        const box = el("textarea", { rows: 1, value: directionText, placeholder: "Shown with this test when performing it", "aria-label": `Directions: ${t.id}`,
+          oninput: (e) => { editDefinition("description", joinDirections(directionsParts(t.description), e.target.value)); fitTextarea(e.target); } });
+        requestAnimationFrame(() => fitTextarea(box));
+        dirRow = el("tr", { class: "directions-row directions-above", ...dragProps(index) },
+          el("td", { colspan: 6 }, el("label", { class: "directions directions-edit" }, el("span", { class: "directions-label" }, "Directions"), box)));
+      } else {
+        const shown = helpText(t.description);
+        dirRow = shown ? el("tr", { class: "directions-row directions-above", ...dragProps(index) }, el("td", { colspan: 6 }, shown)) : null;
+      }
+      const addDirections = inlineDirections && !dirRow ? el("button", { type: "button", class: "link small add-directions", title: "Add directions shown with this test",
+        onclick: () => { addingDirections.add(t.id); draw(); requestAnimationFrame(() => body.querySelector(`textarea[aria-label="Directions: ${t.id}"]`)?.focus()); } }, "+ Directions") : null;
       lastSection = n;
       const number = numbers.get(item.test_id);
       const derivedRow=editable&&!valuesFor&&QADerived.read(t.description)?el('tr',{class:'derived-definition-row'},el('td',{colspan:6},QADerived.read(t.description)?derivedEditor(QADerived.read(t.description),items.slice(0,index).map(x=>byId[x.test_id]),rule=>{t.description=(t.description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}):null)):null;
-      return [head, groupHead, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow ? " before-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
+      return [head, family ? dirRow : null, groupHead, family ? null : dirRow, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow && !family ? " after-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
           editable ? el("button", { class: "icon-btn", title: "Edit test", onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t,items.slice(0,index).map(x=>byId[x.test_id])), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
@@ -2729,7 +2770,7 @@ async function renderQueueEditor(id) {
           }) }, "✎") : null,
           editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
             el("textarea", { rows: 1, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => { editDefinition('name', e.target.value); e.target.style.height='auto';e.target.style.height=`${e.target.scrollHeight}px`; } }))
-            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item))),
+            : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item), addDirections)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
@@ -2742,7 +2783,7 @@ async function renderQueueEditor(id) {
         el("td", {}, editable && !valuesFor ? el("div", { class: "row nowrap" },
           el("button", { class: "icon-btn", title: "Move up", disabled: index === 0, onclick: () => { [items[index - 1], items[index]] = [items[index], items[index - 1]]; unsaved.hidden = false; draw(); } }, "↑"),
           el("button", { class: "icon-btn", title: "Move down", disabled: index === items.length - 1, onclick: () => { [items[index + 1], items[index]] = [items[index], items[index + 1]]; unsaved.hidden = false; draw(); } }, "↓"),
-          el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), derivedRow, dirRow];
+          el("button", { class: "icon-btn danger", title: "Remove", onclick: () => { items.splice(index, 1); draw(); } }, "✕")) : null)), derivedRow];
     }).filter(Boolean));
     if(valuesFor){
       for(const tid of selection.excluded||[]){const test=byId[tid],item=items.find(x=>x.test_id===tid);if(!test||!item)continue;if(searchTerm&&!`${test.name} ${test.category||''}`.toLowerCase().includes(searchTerm))continue;
