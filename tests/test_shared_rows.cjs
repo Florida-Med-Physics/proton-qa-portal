@@ -1,8 +1,10 @@
 // Synthetic checks of "Same row as the test above" ([row: with above] in a test's directions): Setup QA's box adds and
 // removes the tag and leaves the rest of the field byte for byte; the tag never shows as directions; numbering
 // (blockNumbers) gives a joined test the number of the test above it and the next row the next number, and ignores the
-// tag on the first test of a list or section, across categories and after an X/Y/Z block; the PDF report numbers alike;
-// a list without the tag numbers and prints as before; the shared cell names each input with its unit.
+// tag on the first test of a list or section, across categories and after an X/Y/Z block, and Setup QA offers the box
+// only where it can join; the PDF report numbers alike; a calculation whose inputs share a row number keeps its letters;
+// a list without the tag numbers and prints as before; the shared cell lays out each test as a row of its own (name
+// and unit with its details button, input, result, baseline and limits, note).
 // The QA form and a saved run are checked in a browser by tests/test_shared_rows_page.cjs.
 // Run with node tests/test_shared_rows.cjs from the repository root.
 const assert = require('node:assert/strict');
@@ -18,14 +20,14 @@ function el(tag, props, ...kids) {
   Object.defineProperty(node, 'text', { get() { return this.kids.map((k) => (typeof k === 'object' ? k.text : String(k))).join(''); } });
   return node;
 }
-const context = { el, Blob, QADerived: { read: () => null } };
+const context = { el, Blob, QADerived: { read: (d) => { const m = /\[derived: ([^\]]+)\]/.exec(d || ''); return m ? JSON.parse(decodeURIComponent(m[1])) : null; } } };
 vm.createContext(context);
 for (const part of [between('const REVIEW_LABEL', 'function reviewChip('), between('function capitalize(', 'function decimalsOf('),
   between('// Directions are shown with the test', 'function infoDisclosure('), between('function helpText(', 'function fitTextarea('),
-  between('function sectionNumber(', 'function checkNumber('), between('const AXIS_NAME', '// Rotations of one thing'),
+  between('function sectionNumber(', 'function checkNumber('), between('function checkNumber(', 'function wireCalculations('), between('const AXIS_NAME', '// Rotations of one thing'),
   between('function qaReportPdf(', 'function downloadWorkbookBlob(')])
   vm.runInContext(part, context);
-const { withRowMark, helpText, directionsParts, joinDirections, blockNumbers, sharedRows, sharedCell, qaReportPdf } = context;
+const { withRowMark, helpText, directionsParts, joinDirections, blockNumbers, sharedRows, sharedCell, qaReportPdf, derivedExplanation } = context;
 const TAG = '[row: with above]';
 const J = (x) => JSON.parse(JSON.stringify(x));   // answers from node:vm, compared as plain values
 
@@ -87,9 +89,22 @@ const en = blockNumbers(edge);
 assert.deepEqual(edge.map((x) => en.get(x.test_id)), ['2.01', '2.02', '2.02', '2.03', '2.03', '2.04', '2.04', '2.04', '2.05', '3.01', '3.01', '4.01', '4.02']);
 assert.deepEqual(J(sharedRows(edge, en).map((r) => r.map((x) => x.test_id))),
   [[1], [2, 3], [4, 5], [6], [7], [8], [9], [10, 11], [12], [13]], 'X/Y/Z rows stay one per axis');
+// Setup QA shows the box only where the tag can join (a single test right below another in the same section card).
+assert.deepEqual(J([...en.joinable]), [2, 3, 5, 11]);
+assert.deepEqual(J([...blockNumbers(items).joinable]), items.slice(1).map((i) => i.test_id), 'HDR: every test but the first');
 const family = [t(1, 'Energy [100 MeV] – Distal Depth'), tagged(t(2, 'Energy [150 MeV] – Distal Depth')), tagged(t(3, 'Plain after'))];
 assert.deepEqual([...blockNumbers(family).values()], ['2.01', '2.01', '2.02']);
 assert.deepEqual(J(sharedRows(family, blockNumbers(family)).map((r) => r.length)), [1, 1, 1]);
+assert.deepEqual(J([...blockNumbers(family).joinable]), []);
+
+// A calculation's details: inputs on one row share its number, so the equation keeps its letters ("[1.08]-[1.08]" would
+// not say which is which); with their own numbers, as before.
+const equation = (list, nums) => derivedExplanation(list.find((i) => i.name === 'Source air kerma strength — difference'), list, nums).text;
+assert.equal(equation(items, plain), 'Calculated: 100*([1.08]-[1.09])/[1.09]A = Test 1.08 · Source air kerma strength — TCS Sk; B = Test 1.09 · Source air kerma strength — decay table Sk');
+assert.equal(equation(joined, numbers), 'Calculated: 100*(A-B)/BA = Test 1.08 · Source air kerma strength — TCS Sk; B = Test 1.08 · Source air kerma strength — decay table Sk');
+// Without the tag nothing changes, even where inputs already share a number (an X/Y/Z set's 3D offset).
+const offset = { test_id: 20, name: 'Couch offset', type: 'numeric', category: 'Mechanical', description: '[derived: ' + encodeURIComponent(JSON.stringify({ inputs: ['X', 'Y', 'Z'].map((a) => ({ name: `Couch ${a}`, category: 'Mechanical' })), formula: 'sqrt(A*A+B*B+C*C)' })) + ']' };
+assert.match(derivedExplanation(offset, [...edge, offset], en).text, /^Calculated: sqrt\(\[2\.04\]\*\[2\.04\]\+\[2\.04\]\*\[2\.04\]\+\[2\.04\]\*\[2\.04\]\)A = Test 2\.04 · Couch X;/);
 
 // 3. The PDF report numbers a shared row's tests alike; without the tag it is 1, 2, 3, … as before.
 const titles = async (results) => [...(await qaReportPdf({ id: 9, queue_name: 'Synthetic HDR', machine_name: 'Synthetic', qa_date: '2026-11-04', overall: 'pass', review_status: 'pending', results }).text())
@@ -102,14 +117,20 @@ const asResults = (list) => list.map((i) => ({ ...i, value_num: i.type === 'nume
   assert.deepEqual(after.slice(7, 11), ['8. Source air kerma strength - TCS Sk', '8. Source air kerma strength - decay table Sk', '8. Source air kerma strength - difference', '9. Position verification']);
   assert.equal(after.at(-1), '20. Position indicator light test');
 
-  // 4. The shared cell: one cell over Test, Measured and Unit; each input named with its unit, in list order.
-  const cell = sharedCell([[{ test_id: 1 }, 'TCS Sk', 'mGy·m²·h⁻¹', el('input')], [{ test_id: 2 }, 'Decay-table Sk', 'mGy·m²·h⁻¹', el('input')], [{ test_id: 3 }, 'Source strength difference', '%', el('input')]],
-    (x) => (x.test_id === 3 ? el('button', {}, 'ⓘ') : null), el('span', { class: 'qa-limits' }, 'ACTION ±1 %'));
-  assert.equal(cell.tag, 'td'); assert.equal(cell.props.colspan, 3); assert.equal(cell.props.class, 'qa-measured qa-shared-cell');
-  const [shared] = cell.kids, fields = shared.kids.filter((k) => k.props.class === 'qa-shared-field');
-  assert.deepEqual(fields.map((f) => [f.props['data-test-id'], f.kids[0].text, f.kids[1].tag]),
-    [[1, 'TCS Sk (mGy·m²·h⁻¹)', 'input'], [2, 'Decay-table Sk (mGy·m²·h⁻¹)', 'input'], [3, 'Source strength difference (%)', 'input']]);
-  assert.equal(shared.kids.at(-1).text, 'ⓘACTION ±1 %');
+  // 4. The shared cell: one cell over Test, Measured, Unit, Result and Baseline; each test as a row of its own, in list
+  // order: name and unit with its details button (named for it), its input, then its result, baseline and limits, note.
+  const info = (title) => { const b = el('button', { title, 'aria-label': title }, 'ⓘ'); b.getAttribute = (k) => b.props[k]; b.setAttribute = (k, v) => { b.props[k] = v; }; return b; };
+  const cell = sharedCell([
+    [{ test_id: 1 }, 'TCS Sk', 'mGy·m²·h⁻¹', null, el('input'), el('div', { class: 'status-cell' }, '(Δ +0.20)'), el('span', { class: 'qa-limits' }, 'Baseline 12.000'), el('input', { class: 'note-input' })],
+    [{ test_id: 2 }, 'Decay-table Sk', 'mGy·m²·h⁻¹', null, el('input'), null, null, el('input', { class: 'note-input' })],
+    [{ test_id: 3 }, 'Source strength difference', '%', info('Calculation details'), el('input'), el('div', { class: 'status-cell' }, 'PASS'), el('span', { class: 'qa-limits' }, 'Baseline 0.000 · ACTION ±1 %'), el('input', { class: 'note-input' })]]);
+  assert.equal(cell.tag, 'td'); assert.equal(cell.props.colspan, 5); assert.equal(cell.props.class, 'qa-measured qa-shared-cell');
+  const fields = cell.kids[0].kids;
+  assert.deepEqual(fields.map((f) => [f.props['data-test-id'], f.kids.map((k) => k.props.class || k.tag)]), [1, 2, 3].map((id) => [id, ['qa-shared-name', 'input', 'qa-shared-more']]));
+  assert.deepEqual(fields.map((f) => f.kids[0].text), ['TCS Sk (mGy·m²·h⁻¹)', 'Decay-table Sk (mGy·m²·h⁻¹)', 'Source strength difference (%)ⓘ']);
+  assert.deepEqual(fields.map((f) => f.kids[2].kids.map((k) => `${k.props.class || k.tag}:${k.text}`)),
+    [['status-cell:(Δ +0.20)', 'qa-shared-info:Baseline 12.000', 'note-input:'], ['note-input:'], ['status-cell:PASS', 'qa-shared-info:Baseline 0.000 · ACTION ±1 %', 'note-input:']]);
+  assert.deepEqual([fields[2].kids[0].kids[1].props.title, fields[2].kids[0].kids[1].props['aria-label']], Array(2).fill('Calculation details: Source strength difference'));
   assert.ok(!/null|undefined|\[object/.test(cell.text));
-  console.log('Row tag: round trip, hidden in directions; numbering with joined rows and edge cases; PDF numbers; shared cell labels.');
+  console.log('Row tag: round trip, hidden in directions; numbering with joined rows and edge cases; where the box is offered; equation letters; PDF numbers; shared cell layout.');
 })().catch((e) => { console.error(e); process.exit(1); });

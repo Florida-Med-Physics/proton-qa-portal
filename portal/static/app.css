@@ -1751,24 +1751,38 @@ td, .measure-table td { font-size: 21px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block { padding:0; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block > h3 { padding:6px 7px; margin:0; font-size:15px; }
 }
-/* Tests that share one row ("Same row as the test above"): one cell over Test, Measured and Unit with each test's name
-   and unit over its input or value, side by side (wrapping when narrow), then the limits; stacked in the card on phones.
-   The text keeps the form's one reading size. */
+/* Tests that share one row ("Same row as the test above"): one cell over Test, Measured, Unit, Result and Baseline with
+   the tests side by side (wrapping when narrow), each laid out as in a row of its own: name, unit and details, input
+   or value, result, then baseline, limits and comment. Names, inputs and the rest line up across the tests (subgrid);
+   on phones each test is one line of the card. The text keeps the form's one reading size. */
 #app .measure-table td.qa-shared-cell { text-align:left; white-space:normal; }
-.qa-shared { display:flex; flex-wrap:wrap; align-items:flex-end; gap:6px 12px; }
-.qa-shared-field { display:flex; flex-direction:column; flex:1 1 0; min-width:5.75em; max-width:11em; }
-.qa-shared-name { color:var(--muted); font-weight:400; line-height:1.2; }
+.qa-shared { display:grid; grid-template-columns:repeat(auto-fit, minmax(9em, 1fr)); column-gap:16px; }
+.qa-shared-field { display:grid; grid-row:span 3; grid-template-rows:subgrid; row-gap:0; min-width:0; max-width:15em; }
+.qa-shared-field > .segmented, .qa-shared-field > .chip { justify-self:start; }
+.qa-shared-name { display:flex; align-items:flex-end; gap:6px; align-self:end; color:var(--muted); font-weight:400; line-height:1.2; }
 .qa-shared-unit { white-space:nowrap; }
-.qa-shared-info { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; }
-.qa-shared-info .qa-calculation-info { margin-top:0; }
+.qa-shared-more { padding-bottom:6px; }
+.qa-shared-more > div:empty { display:none; }
+.qa-shared-more .chip.recorded { display:none; }   /* no verdict to show: the deviation alone */
+.qa-shared-more .chip.recorded + .result-dev { margin-left:0; }
+.qa-shared-more > *, .qa-shared-field .note-input { margin-top:4px; }
+.qa-shared-note { color:var(--muted); }   /* a note, not a value */
+.qa-shared-name .qa-calculation-info { flex:0 0 auto; margin-top:0; }
 #app .measure-table .qa-shared-field input:not([type="hidden"]), #app .measure-table .qa-shared-field select { width:100%; }
-.qa-shared-line { display:flex; flex-wrap:wrap; justify-content:center; align-items:baseline; gap:2px 8px; }
+#app .measure-table .qa-shared-field .review-measured { align-items:flex-start; }
+.history-cell .qa-shared-name { display:block; margin-bottom:4px; white-space:normal; overflow-wrap:normal; }   /* whose history it is */
 .list-editor .same-row { display:inline-flex; margin:0 0 2px 12px; font-size:13px; color:var(--muted); }   /* on the number's line */
 .list-editor .same-row:first-child { margin-left:0; }
 .list-editor .same-row input { min-width:0; }
-@media(max-width:1200px) { #app .measure-table td.qa-shared-cell { grid-column:1/-1; grid-row:2; } }
-@media(max-width:767px) {   /* each test on its own line of the card: name left, answer right, as in the other cards */
+@media(max-width:1200px) {
+  #app .measure-table td.qa-shared-cell { grid-column:1/-1; grid-row:2; }
+  #app[data-page] .review-measure-table td.qa-comment:empty { display:none; }   /* a shared row's comments are with its tests */
+}
+@media(max-width:767px) {   /* each test on its own line of the card: name left, answer and result right, as in the other cards */
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table td.qa-shared-cell { grid-column:1/-1; grid-row:1; }
-  #app .measure-table .qa-shared { flex-direction:column; align-items:stretch; }
-  #app .measure-table .qa-shared-field { display:grid; grid-template-columns:minmax(0,1fr) minmax(130px,1fr); align-items:center; gap:8px; max-width:none; }
+  #app .measure-table .qa-shared { grid-template-columns:minmax(0,1fr); row-gap:4px; }
+  #app .measure-table .qa-shared-field { grid-row:auto; grid-template-columns:minmax(0,1fr) minmax(130px,1fr); grid-template-rows:auto; align-items:center; column-gap:8px; max-width:none; }
+  #app .measure-table .qa-shared-name { grid-row:1 / span 2; align-self:center; }
+  #app .measure-table .qa-shared-more { grid-column:2; padding:0; }
+  #app .measure-table .qa-shared-info, #app .measure-table .qa-shared-note, #app .measure-table .qa-shared-field .note-input { display:none; }   /* as in the other cards */
 }

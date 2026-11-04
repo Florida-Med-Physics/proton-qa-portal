@@ -1481,6 +1481,7 @@ function measureParts(name) {
 function blockNumbers(items) {
   const out = new Map();
   out.joined = new Set();                                                 // tests on the row of the test above (sharedRows)
+  out.joinable = new Set();                                               // tests the tag would join (Setup QA's box)
   const counter = {};
   const next = (item) => { const n = sectionNumber(item); counter[n] = (counter[n] || 0) + 1; return `${n}.${String(counter[n]).padStart(2, "0")}`; };
   const box = (item) => sectionNameOf(item) || item.category || "";      // the section card a test is drawn in
@@ -1514,7 +1515,8 @@ function blockNumbers(items) {
         continue;
       }
       // [row: with above]: the number of the single test just above it, when that one is in the same section.
-      if (prev && ROW_MARK.test(it.description || "") && box(prev) === box(it)) { out.set(it.test_id, out.get(prev.test_id)); out.joined.add(it.test_id); }
+      if (prev && box(prev) === box(it)) out.joinable.add(it.test_id);
+      if (out.joinable.has(it.test_id) && ROW_MARK.test(it.description || "")) { out.set(it.test_id, out.get(prev.test_id)); out.joined.add(it.test_id); }
       else out.set(it.test_id, next(it));
       above = it;
     }
@@ -1529,12 +1531,17 @@ function sharedRows(list, numbers) {
   list.forEach((it, i) => (i && numbers.joined?.has(it.test_id) && numbers.get(it.test_id) === numbers.get(list[i - 1].test_id) ? rows.at(-1).push(it) : rows.push([it])));
   return rows;
 }
-// A shared row is one cell over the Test, Measured and Unit columns: each test's name and unit ("TCS Sk (mGy·m²·h⁻¹)")
-// over its input or value, side by side, then the details buttons, limits and notes. `fields` are [test, name, unit, answer].
-function sharedCell(fields, details, more) {
-  return el("td", { class: "qa-measured qa-shared-cell", colspan: 3 }, el("div", { class: "qa-shared" },
-    fields.map(([test, name, unit, answer]) => el("div", { class: "qa-shared-field", "data-test-id": test.test_id }, el("div", { class: "qa-shared-name" }, name, unit ? [" ", el("span", { class: "qa-shared-unit" }, `(${unit})`)] : null), answer)),
-    el("div", { class: "qa-shared-info" }, fields.map(([test]) => details(test)), more)));
+// A shared row is one cell over the Test, Measured, Unit, Result and Baseline columns, its tests side by side as in a
+// row of their own: each one's name and unit ("TCS Sk (mGy·m²·h⁻¹)") with its details button (named for it), its input
+// or value, its result, baseline and limits, and its notes. `fields` are [test, name, unit, details, answer, result, limits, ...notes].
+function sharedCell(fields) {
+  return el("td", { class: "qa-measured qa-shared-cell", colspan: 5 }, el("div", { class: "qa-shared" },
+    fields.map(([test, name, unit, details, answer, result, limits, ...notes]) => {
+      if (details) for (const key of ["title", "aria-label"]) details.setAttribute(key, `${details.getAttribute(key)}: ${name}`);
+      return el("div", { class: "qa-shared-field", "data-test-id": test.test_id },
+        el("div", { class: "qa-shared-name" }, el("span", {}, name, unit ? [" ", el("span", { class: "qa-shared-unit" }, `(${unit})`)] : null), details), answer,
+        el("div", { class: "qa-shared-more" }, result, limits ? el("div", { class: "qa-shared-info" }, limits) : null, notes));
+    })));
 }
 
 function checkNumber(description) {
@@ -1547,9 +1554,10 @@ function checkNumber(description) {
 function derivedExplanation(item,items,numbers) {
   const rule=QADerived.read(item.description);
   if(rule){
-    const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name};});
+    const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name,joined:!!input&&!!numbers.joined?.has(input.test_id)};});
     if(rule.kind==='lookup')return el('div',{class:'derived-explanation'},el('strong',{},'Device calibration lookup'),el('p',{},`Uses the selected device from Test ${refs[0].number} · ${refs[0].name}. Unconfigured factors stay blank.`));
-    const equation=rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
+    // Inputs on one row ("Same row as the test above") share its number; "[1.08]-[1.08]" would not say which is which, so the letters stay.
+    const equation=refs.some(r=>r.joined)&&new Set(refs.map(r=>r.number)).size<refs.length?rule.formula:rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
     return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Calculated: '),equation),el('div',{class:'derived-input-reference'},refs.map(r=>`${r.letter} = Test ${r.number} · ${r.name}`).join('; ')));
   }
   if(/\[calc: workbook\]/.test(item.description||'')&&window.QAExcel){
@@ -1683,7 +1691,7 @@ async function renderPerform(assignmentId) {
     for(let parent=entry.row.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
     app.querySelectorAll('.qa-next-unanswered').forEach(row=>row.classList.remove('qa-next-unanswered'));
     entry.row.classList.add('qa-next-unanswered');entry.row.scrollIntoView({block:'center',behavior:'smooth'});
-    const focus=(entry.field||entry.row).querySelector('.qa-measured button:not(:disabled), .qa-measured select:not(:disabled), .qa-measured input:not([readonly]):not([type=hidden])');
+    const focus=(entry.field||entry.row).querySelector('.qa-measured button:not(:disabled):not(.qa-calculation-info), .qa-measured select:not(:disabled), .qa-measured input:not([readonly]):not([type=hidden]):not(.note-input)');   // a shared row's field also holds its details and note
     if(focus)focus.focus({preventScroll:true});else{entry.row.tabIndex=-1;entry.row.focus({preventScroll:true});}
   }},'Next unanswered');
   const unfinishedToggle=el('input',{type:'checkbox','aria-label':'Show unfinished only',onchange:event=>{unfinishedOnly=event.target.checked;refresh();if(unfinishedOnly)for(const section of sections)if(!section.box.hidden)section.box.open=true;}});
@@ -1813,19 +1821,18 @@ async function renderPerform(assignmentId) {
       const numberCell = (it) => (firstHeader !== "Test"
         ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
-      // Tests marked "Same row as the test above" share one row (sharedCell): Result, Baseline and limits for those judged
-      // by limits, named when there are several; the + opens every one's comment; History and Trend follow the first judged
-      // one (each test keeps its own on Machine Trends).
+      // Tests marked "Same row as the test above" share one row (sharedCell), each laid out as in a row of its own: its
+      // result and deviation (when it has a baseline or limits), baseline and limits under its input, then its comment
+      // (the + opens every one); History and Trend follow the first judged one, named (each keeps its own on Machine Trends).
       const sharedCells = (parts) => {
-        const judged = parts.filter((p) => p.it.type === "numeric" && ((p.it.limits || {}).warn != null || (p.it.limits || {}).fail != null));
-        const named = (p, node) => (node && judged.length > 1 ? el("div", { class: "qa-shared-line" }, el("span", { class: "qa-shared-name" }, shortName(p.it)), node) : node);
+        const has = (p, ...keys) => p.it.type === "numeric" && keys.some((k) => (p.it.limits || {})[k] != null);
+        const main = parts.find((p) => has(p, "warn", "fail")) || parts.find((p) => p.it.type === "numeric") || parts[0];
+        const limits = (p) => { const line = limitsLine(p.it, p.unit); return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line; };   // the unit is in the name
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
-        for (const p of parts) p.comment.placeholder = shortName(p.it);
-        const cell = sharedCell(parts.map((p) => [p.it, shortName(p.it), p.it.type === "numeric" ? p.unit : "", p.control]), (it) => testDetailsButton(it, t.items, numbers),
-          [judged.map((p) => named(p, limitsLine(p.it, p.unit))), parts.map((p) => p.note)]);
+        const cell = sharedCell(parts.map((p) => [p.it, shortName(p.it), p.it.type === "numeric" ? p.unit : "", testDetailsButton(p.it, t.items, numbers), p.control,
+          has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
         parts.forEach((p, i) => { p.entry.field = cell.firstChild.children[i]; });
-        return { main: judged[0] || parts.find((p) => p.it.type === "numeric") || parts[0], cell,
-          baseline: judged.map((p) => named(p, refCell(p.it, p.unit))), result: judged.map((p) => named(p, p.statusCell)) };
+        return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
       const trRows = (firstHeader === "Test" ? sharedRows(members, numbers) : members.map((it) => [it])).map((group) => {
         const parts = group.map((it) => { drawn.add(it.test_id); return { it, unit: it.unit && it.unit !== "unitless" ? it.unit : "", ...buildEntry(it) }; });
@@ -1848,11 +1855,11 @@ async function renderPerform(assignmentId) {
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
           // null, not "": an empty cell must stay :empty so the card layout drops its label too.
           shared ? null : el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
-          el("td", { class: "num qa-baseline", "data-label":"Baseline" }, shared ? shared.baseline : it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
+          shared ? null : el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
           shared ? null : el("td", { class: "qa-measured" }, control),
-          el("td", {class:"qa-result", "data-label":"Result"}, shared ? shared.result : statusCell),
-          el("td", { class: "qa-comment" }, noteToggle, shared ? parts.map((p) => p.comment) : comment),
-          el("td", { class: "history-cell" }, dates.length ? histChips(main.it, main.unit) : el("span", { class: "muted small" }, "—")),
+          shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
+          el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
+          el("td", { class: "history-cell" }, dates.length ? [shared?.history, histChips(main.it, main.unit)] : el("span", { class: "muted small" }, "—")),
           el("td", {class:"qa-trends"}, trend));
         for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
         const extras = el('td', {class:'qa-phone-extras', colspan:9});
@@ -2781,7 +2788,8 @@ async function renderQueueEditor(id) {
         onclick: () => { addingDirections.add(t.id); draw(); requestAnimationFrame(() => body.querySelector(`textarea[aria-label="Directions: ${t.id}"]`)?.focus()); } }, "+ Directions") : null;
       lastSection = n;
       const number = numbers.joined.has(item.test_id) ? null : numbers.get(item.test_id);   // on the row above: no number of its own
-      const sameRow = editable && !valuesFor && !family && (index > 0 || ROW_MARK.test(t.description || "")) ? el("label", { class: "check small same-row" },
+      // Offered only where it can join (a single test right below another in the same section), or to clear it.
+      const sameRow = editable && !valuesFor && !family && (numbers.joinable.has(item.test_id) || ROW_MARK.test(t.description || "")) ? el("label", { class: "check small same-row" },
         el("input", { type: "checkbox", checked: ROW_MARK.test(t.description || ""), onchange: (e) => { editDefinition("description", withRowMark(t.description, e.target.checked)); draw(); } }), "Same row as the test above") : null;
       const derivedRow=editable&&!valuesFor&&QADerived.read(t.description)?el('tr',{class:'derived-definition-row'},el('td',{colspan:6},QADerived.read(t.description)?derivedEditor(QADerived.read(t.description),items.slice(0,index).map(x=>byId[x.test_id]),rule=>{t.description=(t.description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}):null)):null;
       return [head, family ? dirRow : null, groupHead, family ? null : dirRow, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow && !family ? " after-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
@@ -3309,17 +3317,17 @@ async function renderReviewMeasurements(run) {
   const groups=new Map();
   for(const r of run.results){const n=sectionNumber(r),named=sectionNameOf(r);const key=`${n}|${named||r.category||'General'}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
   // Tests marked "Same row as the test above" share one row, as on the QA form (measureTable's sharedCells): their values in
-  // one cell (sharedCell; a Pass / Fail answer as its chip); Result, Baseline and limits for those judged by limits, named
-  // when there are several; every comment, named; History and Trend of the first judged one.
+  // one cell (sharedCell; a Pass / Fail answer as its chip), each with its details, its result and deviation when it has a
+  // baseline or limits, its baseline and limits, and its comment; History and Trend of the first judged one, named.
   const sharedCells=parts=>{
-    const judged=parts.filter(p=>p.r.type==='numeric'&&(p.r.warn!=null||p.r.fail!=null));
-    const named=(p,node)=>node&&judged.length>1?el('div',{class:'qa-shared-line'},el('span',{class:'qa-shared-name'},qaDisplayName(p.r)),node):node;
-    const comments=parts.filter(p=>p.r.comment).map(p=>el('div',{},`${qaDisplayName(p.r)}: ${p.r.comment}`));
-    return {main:judged[0]||parts.find(p=>p.r.type==='numeric')||parts[0],
-      cell:sharedCell(parts.map(p=>[p.r,qaDisplayName(p.r),p.r.type==='numeric'?p.unit:'',p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('div',{class:'review-measured'},p.amount)]),
-        r=>testDetailsButton(r,run.results,numbers),judged.map(p=>named(p,el('div',{class:'qa-limits'},limitsText(p.limits,p.unit))))),
-      baseline:judged.map(p=>named(p,p.r.expected==null?'—':`${fmt(p.r.expected)} ${p.unit}`.trim())),
-      result:judged.map(p=>named(p,p.result)),comment:comments.length?comments:'—'};
+    const has=(p,...keys)=>p.r.type==='numeric'&&keys.some(k=>p.r[k]!=null);
+    const main=parts.find(p=>has(p,'warn','fail'))||parts.find(p=>p.r.type==='numeric')||parts[0];
+    return {main,history:parts.filter(p=>p.r.type==='numeric').length>1?el('div',{class:'qa-shared-name'},qaDisplayName(main.r)):null,
+      cell:sharedCell(parts.map(p=>[p.r,qaDisplayName(p.r),p.r.type==='numeric'?p.unit:'',testDetailsButton(p.r,run.results,numbers),
+        p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('div',{class:'review-measured'},p.amount),
+        has(p,'expected','warn','fail')&&!p.missing?p.result:null,
+        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},p.r.expected!=null?'Baseline ':null,limitsText(p.limits,p.unit)):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
+      comment:parts.some(p=>p.r.comment)?null:'—'};
   };
   let last=null;
   for(const[key,results]of [...groups].sort(([a],[b])=>Number(a.split('|')[0])-Number(b.split('|')[0]))){
@@ -3372,11 +3380,11 @@ async function renderReviewMeasurements(run) {
         el('td',{class:'qa-n'},numberFor(lead)),
         shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
         shared?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
-        el('td',{class:'qa-baseline num','data-label':'Baseline'},shared?shared.baseline:r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
+        shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
-        el('td',{class:'qa-result','data-label':'Result'},shared?shared.result:result),
+        shared?null:el('td',{class:'qa-result','data-label':'Result'},result),
         el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment||'—'),
-        el('td',{class:'history-cell','data-label':'History'},hist),
+        el('td',{class:'history-cell','data-label':'History'},recent.length?shared?.history:null,hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
       orderMeasurementRow(row);
       tbody.append(row,chart);
