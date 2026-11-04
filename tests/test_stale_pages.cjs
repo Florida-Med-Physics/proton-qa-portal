@@ -1,7 +1,8 @@
 // Synthetic checks that a page left while it is still loading stops drawing. On a slow site Setup QA showed Review QA's
 // "Awaiting Physics Review" and "Recently reviewed" tables under its own heading: Review QA's late replies were still
 // drawn into the one page container. The real route(), api(), page(), logout(), Review QA, Setup QA, Machine Trends
-// and draft-saving code run in node:vm with a tiny DOM stand-in and a server whose replies the test releases one by one.
+// and draft-saving code (and the real "Add them", list editor "New test" and Import Folder steps) run in node:vm with a
+// tiny DOM stand-in and a server whose replies the test releases one by one.
 // Run with node tests/test_stale_pages.cjs from the repository root.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -55,14 +56,24 @@ function reply({ method, path, body }) {
     'PUT /api/assignments/5/draft': () => ({ saved_at: '2026-11-04T09:30:00' }),
     'POST /api/logout': () => ({}),
     'POST /api/password': () => ({}),
+    'POST /api/tests': () => ({ id: 99 }),
+    'GET /api/tests': () => [{ id: 99, name: 'Synthetic test', active: 1 }],
+    'PUT /api/assignments/21/tests': () => ({}),
+    'POST /api/assignments/21/sphinx/tests': () => ({ added: [11, 12] }),
+    'POST /api/assignments/21/sphinx/preview': () => ({ matched: [] }),
+    'GET /api/assignments/21/files': () => ({ permission: 'granted', files: [{ path: 'synthetic-1.xls' }] }),
+    'GET /api/assignments/21/file?path=synthetic-1.xls': () => ({ name: 'synthetic-1.xls', data: 'c3ludGhldGlj' }),
+    'POST /api/assignments/21/sphinx/import': () => ({ imported: [{ id: 501, overall: 'pass' }], skipped: [] }),
   }[key]();
 }
-const toasts = [];
+const toasts = [], dialogs = [];
 let signIns = 0;
 const context = {
   app, Promise, URLSearchParams, Date, Number, String, Object, Set, Map, setTimeout, clearTimeout,
   window: {}, location: { hash: '#/' }, state: { user: { id: 1, username: 'synthetic', role: 'physicist' }, actingRole: null },
   sessionStorage: { removeItem() {} }, document: { addEventListener() {}, getElementById: () => null }, requestAnimationFrame: (fn) => fn(),
+  localStorage: { getItem: () => null, setItem() {} }, browserFolders: () => true, trendExportFolders: { get: async () => null },
+  modal: (title) => { dialogs.push(title); },
   fetch: (path, init) => serve(init.method, path, init.body === undefined ? undefined : JSON.parse(init.body)).then(([status, data]) => ({ status, ok: status < 400, json: async () => data })),
   el: node, renderShell() {}, renderLogin() { signIns++; app.replaceChildren(node('form', {}, 'Sign in')); }, toast: (message) => toasts.push(message),
   can: (right) => ['perform', 'review', 'configure'].includes(right), activeRole: () => 'physicist', confirm: () => true,
@@ -77,19 +88,32 @@ const context = {
     const { histories } = await historyRequest;
     app.append(node('section', {}, `Overview from ${[...new Set(Object.values(histories).flat().map((p) => p.qa_date))].join(', ')}`));
   },
-  // Stand-in for the QA form: the real draft-saving code (Mark in Progress) under a page heading.
+  // Stand-in for the QA form: its real first lines (they take the "Add them" request to apply the Sphinx file again), the
+  // real draft-saving code (Mark in Progress) under a page heading, the real "Add them" button, and a copy of its last line.
   async renderPerform(assignmentId) {
+    const applySphinxOnLoad = context.takeSphinxFlag(assignmentId);
     context.page('Synthetic Gantry A · Synthetic daily list', 'Daily');
     const draftNote = node('span', { class: 'muted small' });
     app.append(node('div', { class: 'submit-bar' }, draftNote));
     context.form = context.draftForm(assignmentId, draftNote);
+    context.addThem = context.addThemButton(assignmentId);
+    if (applySphinxOnLoad && context.state.sphinxFile) await context.api('POST', `/api/assignments/${assignmentId}/sphinx/preview`, { file: context.state.sphinxFile });
   },
   // A page whose last step is a write that fails after the person has left it.
   async renderAccount() { context.page('My account'); await context.api('POST', '/api/password', {}); },
+  // Stand-in for a run's page: like its measurements, two reads at once, drawn without either one if it fails.
+  async renderRun(id) {
+    context.page(`Synthetic run ${id}`);
+    await Promise.all([context.api('GET', '/api/machines/7/trends?tests=5&until=2026-11-03&last=61').catch(() => ({})),
+      context.api('GET', '/api/assignments/21/template').catch(() => null)]);
+    app.append(node('section', {}, 'Synthetic measurements'));
+  },
 };
 for (const name of ['renderHome', 'renderDashboard', 'renderAdmin', 'renderMachines', 'renderMachine', 'renderLimits', 'renderQueues', 'renderQueueEditor', 'renderTests',
-  'renderRuns', 'renderRun', 'renderSearch', 'renderUsers', 'renderAudit', 'recordHistoryDialog', 'modal', 'machineForm', 'scheduleDialog', 'copyDialog', 'archiveList', 'deleteList', 'scheduleForm', 'scheduleData']) context[name] = async () => {};
+  'renderRuns', 'renderSearch', 'renderUsers', 'renderAudit', 'recordHistoryDialog', 'machineForm', 'scheduleDialog', 'copyDialog', 'archiveList', 'deleteList', 'scheduleForm', 'scheduleData']) context[name] = async () => {};
 vm.createContext(context);
+const addThem = between('can("configure") ? el("button", { onclick: async () => {', '} }, "Add them")');
+const newTest = between('const newCheck = el("button"', 'const error = el("p", { class: "error" });');
 vm.runInContext([
   between('// route() numbers each page it draws', '// A site that hosts these pages'),
   between('const qaTableObservers = new Set();', 'function table('),
@@ -104,14 +128,17 @@ vm.runInContext([
     ${between('  let autosaveTimer, autosaveStopped', '  const saveDraft = el(')}
     return { persistDraft, draftNote };
   };`,
+  `this.takeSphinxFlag = (assignmentId) => {\n${between('  const applySphinxOnLoad = state.applySphinxOnLoad', '  const t = await api(')}  return applySphinxOnLoad;\n};`,
+  `this.addThemButton = (assignmentId) => ${addThem.slice(addThem.indexOf('async () => {'))}};`,
+  // The list editor's "New test" save for one machine, with the editor's own state reduced to what it uses.
+  `this.newTestSave = (valuesFor) => {
+    const id = '1', tests = [], byId = {}, items = [], machineSelections = {}, machineValues = {};
+    const draw = () => {}, machineName = () => 'Synthetic Gantry A', save = async () => {};
+    ${between('  const reloadMachine = async () => {', '  const customizeButton = el(')}
+    return ${newTest.slice(newTest.indexOf('async (data) => {'), newTest.indexOf('}); } }, "New test");') + 1)};
+  };`,
+  `this.realTrendFileTools = (() => {\n${between('function trendFileTools(', 'function trendPattern(')}\nreturn trendFileTools;\n})();`,
 ].join('\n'), context);
-
-// "Add them" (adds a Sphinx file's other tests, then redraws the QA form to apply the file again) is taken by that redraw
-// before it waits for anything, so a redraw the person leaves cannot hand the file to the next QA list they open.
-const perform = between('async function renderPerform(', 'function importSphinxDialog(');
-assert.match(perform, /^async function renderPerform\(assignmentId\) \{\r?\n  \/\/[^\n]*\n  const applySphinxOnLoad = state\.applySphinxOnLoad;\r?\n  state\.applySphinxOnLoad = false;\r?\n  const t = await api\(/);
-assert.deepEqual(perform.match(/state\.applySphinxOnLoad[^;]*;/g), ['state.applySphinxOnLoad;', 'state.applySphinxOnLoad = false;', 'state.applySphinxOnLoad = true;']);
-assert.match(perform, /\n  if \(applySphinxOnLoad && state\.sphinxFile\) await applySphinx\(\);\r?\n\}/);
 
 const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve)); };
 // What a click on a link does: the hash changes and the hashchange listener calls route() (never awaited).
@@ -261,7 +288,13 @@ const reviewOnly = (label) => {
   assert.equal(shown(), 'Sign in', 'the page left at sign-out draws nothing on the sign-in form');
   assert.equal(pending.length, 0);
   context.state.user = { id: 1, username: 'synthetic', role: 'physicist' };
-  console.log('A 401 still shows the sign-in form; signing in again loads the page; signing out mid-load leaves the form alone.');
+  // The session ends while a page waits on reads it would draw without (.catch): that page stops at the sign-in form too.
+  await go('#/runs/3');
+  release('GET /api/machines/7/trends?tests=5&until=2026-11-03&last=61', { status: 401 });
+  release('GET /api/assignments/21/template', { status: 401 }); await settle();
+  assert.deepEqual([context.state.user, shown()], [null, 'Sign in'], 'nothing drawn under the sign-in form');
+  context.state.user = { id: 1, username: 'synthetic', role: 'physicist' };
+  console.log('A 401 still shows the sign-in form, with nothing of the page under it; signing in again loads the page; signing out mid-load leaves the form alone.');
 
   // 9. The browser-only build and a host's bridge (window.localApi) answer through the same rule.
   context.window.localApi = (method, path, body) => serve(method, path, body).then(([status, data]) => (status === 200 ? data : Promise.reject(new Error(data.error))));
@@ -273,4 +306,67 @@ const reviewOnly = (label) => {
   setupOnly('window.localApi');
   assert.equal(pending.length, 0);
   console.log('window.localApi: Review QA, then Setup QA while Review QA loads: Setup QA shows only its own content.');
+
+  // 10. The list editor's "New test" for one machine creates the test, reads it back, adds it to the machine and reads
+  // the machine's list again. A page drawn meanwhile (Back, say) does not stop that save half-way.
+  await go('#/queues/1');
+  let saved = false;
+  context.newTestSave('21')({ name: 'Synthetic test', type: 'numeric' }).then(() => { saved = true; }); await settle();
+  release('POST /api/tests'); await settle();
+  await go('#/queues');                                                       // while the new test is read back
+  release('GET /api/tests'); await settle();
+  release('PUT /api/assignments/21/tests'); await settle();
+  await go('#/queues/1');                                                     // while the machine's list is read again
+  release('GET /api/assignments/21/template'); await settle();
+  assert.ok(saved, 'the save finished, so its dialog closes');
+  assert.deepEqual(JSON.parse(JSON.stringify(sent['PUT /api/assignments/21/tests'])), { excluded: [], added: [99] });
+  assert.equal(toasts.at(-1), 'Synthetic Gantry A-only test added');
+  assert.equal(pending.length, 0);
+  console.log('List editor "New test" for one machine: a page drawn mid-save does not stop the save.');
+
+  // 11. "Add them" on one list's QA form adds the file's other tests, then redraws that form to apply the file again.
+  // If the person has opened another list's form meanwhile, that form does not apply the first list's file.
+  context.state.sphinxFile = { name: 'synthetic-gantry-A.xls', data: 'c3ludGhldGlj' };
+  await go('#/perform/21');
+  context.addThem(); await settle();
+  await go('#/perform/35');
+  release('POST /api/assignments/21/sphinx/tests'); await settle();          // its redraw is of list 35's form
+  assert.ok(!received.includes('POST /api/assignments/35/sphinx/preview'), "list 35's form applies no file of list 21");
+  await go('#/perform/21');
+  context.addThem(); await settle();
+  release('POST /api/assignments/21/sphinx/tests'); await settle();
+  release('POST /api/assignments/21/sphinx/preview'); await settle();         // on its own form it is applied again
+  assert.deepEqual(toasts.slice(-2), ['Added 2 tests to the list', 'Added 2 tests to the list']);
+  assert.equal(pending.length, 0);
+  context.state.sphinxFile = null;
+  console.log('"Add them": another list\'s form opened meanwhile does not apply the file; its own form does.');
+
+  // 12. Machine Trends "Import Folder" (browser build), left while a file is read: every file is still imported, the
+  // summary opens, and the page opened meanwhile is not drawn again. On Machine Trends, the import redraws it.
+  context.window.showDirectoryPicker = () => {};
+  context.window.localFolders = { choose: async () => 'Synthetic folder' };
+  const importFolder = async () => {
+    const tools = context.realTrendFileTools({ id: 7, name: 'Synthetic Gantry A' }, [{ id: 21, queue_name: 'Synthetic daily list', import_folder: '' }], '21', '90', []);
+    tools.kids.find((k) => text(k) === 'Import Folder').props.onclick(); await settle();
+    release('GET /api/assignments/21/files'); await settle();
+  };
+  await go('#/trends?machine_id=7&list=21&range=90');
+  await importFolder();
+  await go('#/setup');                                                        // left while the file is read
+  release('GET /api/machines'); await settle();                               // Machine Trends' late reply
+  await loadSetup();
+  release('GET /api/assignments/21/file?path=synthetic-1.xls'); await settle();
+  const before = received.length;
+  release('POST /api/assignments/21/sphinx/import'); await settle();
+  assert.equal(received.length, before, 'Setup QA is not drawn again');
+  setupOnly('after a folder import ended');
+  assert.deepEqual(dialogs, ['Folder import complete']);
+  await go('#/trends?machine_id=7&list=21&range=90');
+  await importFolder();
+  release('GET /api/assignments/21/file?path=synthetic-1.xls'); await settle();
+  release('POST /api/assignments/21/sphinx/import'); await settle();
+  assert.equal(pending.filter((r) => `${r.method} ${r.path}` === 'GET /api/machines').length, 2, 'Machine Trends drawn again');
+  await go('#/queues'); release('GET /api/machines'); release('GET /api/machines'); await settle();
+  assert.equal(pending.length, 0);
+  console.log('Import Folder left mid-import: all files imported, summary shown, the other page not redrawn; on Machine Trends it redraws.');
 })().catch((e) => { console.error(e); process.exit(1); });

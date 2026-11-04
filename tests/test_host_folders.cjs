@@ -58,6 +58,7 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
     filterRange: (points) => points, judgedByList: (item, points) => points.map((p) => ({ ...p, status: 'pass' })), sig: String, trendRunHref: () => '#',
     readFileBase64: async (file) => ({ name: file.name, data: '' }), logout() {}, importUserSpreadsheet() {}, userForm() {},
     databaseLocationCard: () => new Node('section'), dbSwitchForm: () => new Node('form') };
+  context.request = context.api;   // Import Folder reads its files with request() (see api() in app.js)
   vm.createContext(context);
   for (const code of [part('const ROLE_LABEL', 'const STATE_LABEL'), part('function el(', 'function svg('), part('function activeRole(', 'let toastTimer;'),
     part('function browserFolders(', 'function formData('), part('function field(', 'function modal('), part('function importFolderField(', 'function scheduleData('),
