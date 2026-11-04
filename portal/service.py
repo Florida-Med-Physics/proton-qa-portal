@@ -848,6 +848,8 @@ def run_template(db, user, assignment_id):
     for item in queue["items"] + [{"test_id": tid} for tid in added_ids]:
         test = _get(db, "tests", item["test_id"])
         override = overrides.get(test["id"])
+        # last_text: newest by qa_date then numeric run id. Known difference, kept until a physicist chooses the rule:
+        # local-backend.js compares the (qa_date + run id) strings, so same-date runs 9999 and 10000 can disagree.
         all_items.append({
             "excluded": test["id"] in selection.get("excluded", []) or (machine['name'] in ('GTR1','GTR2') and 'PBS DailyQA' in queue['name'] and (test['name'].startswith('[OBs]') or "OB's DR image" in test['name'])), "machine_only": test["id"] not in base_ids,
             "test_id": test["id"], "name": test["name"], "category": test["category"], "type": test["type"],
@@ -1357,11 +1359,37 @@ def _history_key(test):
 
 def trend(db, user, machine_id, test_id):
     test=_get(db,'tests',test_id)
-    return {'test':test,'points':machine_trends(db,user,machine_id).get(str(test_id),[])}
+    return {'test':test,'points':machine_trends(db,user,machine_id,tests={int(test_id)}).get(str(test_id),[])}
 
 
-def machine_trends(db, user, machine_id):
-    """Same-machine measurements across list copies, matched by type, units and identity."""
+def trend_window(q):
+    """Optional window on machine_trends, as in local-backend.js trendWindow. With none given the whole history comes
+    back (Trends page, CSV export, PDF report). tests: only these tests' series (each still built from every test that
+    shares its history key); until: only QA dates up to this one; last: the newest N points of each series."""
+    def given(name):
+        v=q.get(name)
+        return v is not None and v!=''
+    def whole(text):
+        # ASCII digits only, as local-backend.js trendWindow does (float() and \d would also take '1_0' or other scripts' digits).
+        return int(text) if re.fullmatch(r'[0-9]+',str(text)) else None
+    window={}
+    if given('tests'):
+        ids=[whole(x) for x in str(q['tests']).split(',')]
+        if any(n is None or n<1 for n in ids): raise PortalError('tests: give test ids separated by commas.')
+        window['tests']=set(ids)
+    if given('last'):
+        n=whole(q['last'])
+        if n is None or n<1: raise PortalError('last: give a whole number of points, 1 or more.')
+        window['last']=n
+    if given('until'):
+        if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}',str(q['until'])): raise PortalError('until: give a date as YYYY-MM-DD.')
+        window['until']=str(q['until'])
+    return window
+
+
+def machine_trends(db, user, machine_id, tests=None, last=None, until=None):
+    """Same-machine measurements across list copies, matched by type, units and identity. tests / last / until: see trend_window."""
+    wanted=tests
     tests=db.all('SELECT * FROM tests');by_id={t['id']:t for t in tests}
     aliases={}
     for q in db.all('SELECT id,name FROM queues'):
@@ -1372,17 +1400,25 @@ def machine_trends(db, user, machine_id):
             if t.get('owner_queue_id')==q['id'] and t['id'] not in base_ids:
                 target=sphinx.template_match(base,t['name'])
                 if target: aliases[t['id']]=target
-    def key(t): return _history_key(aliases.get(t['id'],t))
-    rows=db.all('SELECT res.test_id,res.id AS source_order,r.source,r.id AS run_id,r.assignment_id,r.qa_date,res.value_num AS value,res.expected,res.warn,res.fail,res.tol_mode,res.status FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.machine_id=? AND res.value_num IS NOT NULL ORDER BY r.qa_date,r.id,res.id',(machine_id,))
+    keys={}
+    def key(t):
+        if t['id'] not in keys: keys[t['id']]=_history_key(aliases.get(t['id'],t))
+        return keys[t['id']]
+    wanted_keys={key(t) for t in tests if t['id'] in wanted} if wanted is not None else None
+    rows=db.all('SELECT res.test_id,res.id AS source_order,r.source,r.id AS run_id,r.assignment_id,r.qa_date,res.value_num AS value,res.expected,res.warn,res.fail,res.tol_mode,res.status FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.machine_id=? AND res.value_num IS NOT NULL'
+                +(' AND r.qa_date<=?' if until else '')+' ORDER BY r.qa_date,r.id,res.id',(machine_id,until) if until else (machine_id,))
     groups={}
     for row in rows:
         test=by_id.get(row.pop('test_id'))
         if test:
+            if wanted_keys is not None and key(test) not in wanted_keys: continue
             row['source_test_id']=test['id']
             number=re.search(r'Template\s+(\d+\.\d+)',test.get('description') or '')
             row['source_test_number']=number.group(1) if number else None
             groups.setdefault(key(test),[]).append(row)
-    return {str(t['id']):groups[key(t)] for t in tests if key(t) in groups}
+    if last:
+        groups={k:v[-last:] for k,v in groups.items()}
+    return {str(t['id']):groups[key(t)] for t in tests if (wanted is None or t['id'] in wanted) and key(t) in groups}
 
 
 def list_audit(db, user, limit=300):

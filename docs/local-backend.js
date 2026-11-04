@@ -186,7 +186,11 @@
   }
   const fromIso = (s) => new Date(s + "T00:00");
   const insert = (table, row) => { row.id = ++S.seq[table]; S[table].push(row); save(); return row.id; };
-  const byId = (table, id) => S[table].find((r) => r.id === Number(id));
+  const byId = (table, id) => { const n = Number(id); return S[table].find((r) => r.id === n); };
+  // Lookups for one call that would otherwise rescan a whole table per row. Built inside the function that uses them
+  // and dropped when it returns, so they never outlive a change. idMap keeps the first row per id, as byId does.
+  function idMap(rows) { const m = new Map(); for (const r of rows) if (!m.has(r.id)) m.set(r.id, r); return m; }
+  function groupBy(rows, key) { const m = new Map(); for (const r of rows) { const k = r[key]; let l = m.get(k); if (!l) m.set(k, l = []); l.push(r); } return m; }
   function get(table, id, label) {
     const row = byId(table, id);
     if (!row) throw new Error(`${label || table.slice(0, -1)} not found.`);
@@ -679,11 +683,14 @@
     const runs = new Set();
     let changed = 0;
     const own = new Map(S.overrides.map((o) => { const a = byId("assignments", o.assignment_id); return a && a.queue_id === q.id ? [`${a.machine_id}|${o.test_id}`, o] : null; }).filter(Boolean));
+    const runById = idMap(S.runs), mine = [];
+    for (const r of S.results) if ((runById.get(Number(r.run_id)) || {}).queue_id === q.id) mine.push(r);
+    const byTest = groupBy(mine, "test_id");   // this list's results per test, in recorded order
     for (const item of S.queue_items.filter((i) => i.queue_id === q.id)) {
       const test = byId("tests", item.test_id);
       if (!test) continue;
-      for (const res of S.results.filter((r) => r.test_id === test.id && (byId("runs", r.run_id) || {}).queue_id === q.id)) {
-        const limits = resolveLimits(test, item, own.get(`${byId("runs", res.run_id).machine_id}|${test.id}`));   // that machine's own values
+      for (const res of byTest.get(test.id) || []) {
+        const limits = resolveLimits(test, item, own.get(`${runById.get(Number(res.run_id)).machine_id}|${test.id}`));   // that machine's own values
         const value = test.type === "text" ? res.value_text : res.value_num;
         if (value === null || value === undefined) continue;
         const status = evaluate(test.type, test.type === "boolean" ? (res.value_num ? "pass" : "fail") : value, limits);
@@ -692,9 +699,10 @@
         runs.add(res.run_id);
       }
     }
+    const byRun = groupBy(S.results, "run_id");
     for (const runId of runs) {
-      const run = byId("runs", runId);
-      if (run) run.overall = resultOverall(S.results.filter((r) => r.run_id === runId));
+      const run = runById.get(Number(runId));
+      if (run) run.overall = resultOverall(byRun.get(runId) || []);
     }
     save();
     audit(user.id, "reevaluate", "queue", q.id, { name: q.name, runs: runs.size, verdicts_changed: changed });
@@ -796,10 +804,11 @@
     const dates = S.runs.filter((r) => !r.trashed_at && r.assignment_id === assignmentId).map((r) => r.qa_date).sort();
     return dates.length ? fromIso(dates[dates.length - 1]) : null;
   };
-  function listAssignments(machineId, today) {
+  // lastOf: optional per-call replacement for lastDone (the dashboard passes one built from a single pass over runs).
+  function listAssignments(machineId, today, lastOf) {
     today = today || new Date();
     return S.assignments.filter((a) => a.machine_id === Number(machineId) && byId("queues", a.queue_id).active).map((a) => ({
-      ...a, archived: !!testSelection(a).archived, active: testSelection(a).archived ? 0 : a.active, queue_name: byId("queues", a.queue_id).name, schedule: describeSchedule(a), ...dueState(a, lastDone(a.id), today),
+      ...a, archived: !!testSelection(a).archived, active: testSelection(a).archived ? 0 : a.active, queue_name: byId("queues", a.queue_id).name, schedule: describeSchedule(a), ...dueState(a, (lastOf || lastDone)(a.id), today),
       override_count: S.overrides.filter((o) => o.assignment_id === a.id).length,
     })).sort((a, b) => (b.active - a.active) || a.queue_name.localeCompare(b.queue_name));
   }
@@ -839,16 +848,20 @@
   function reevaluateAssignment(user, assignmentId) {
     require(user, "configure");
     const a = get("assignments", assignmentId, "Schedule"), q = getQueue(a.queue_id), runs = new Set(); let changed = 0;
-    for (const r of S.results.filter((r) => (byId("runs", r.run_id) || {}).assignment_id === a.id)) {
-      const test = get("tests", r.test_id), item = q.items.find((i) => i.test_id === test.id) || {};
-      const own = S.overrides.find((o) => o.assignment_id === a.id && o.test_id === test.id), limits = resolveLimits(test, item, own);
+    const runById = idMap(S.runs), testById = idMap(S.tests), itemByTest = new Map(), ownByTest = new Map();
+    for (const i of q.items) if (!itemByTest.has(i.test_id)) itemByTest.set(i.test_id, i);
+    for (const o of S.overrides) if (o.assignment_id === a.id && !ownByTest.has(o.test_id)) ownByTest.set(o.test_id, o);
+    for (const r of S.results.filter((r) => (runById.get(Number(r.run_id)) || {}).assignment_id === a.id)) {
+      const test = testById.get(Number(r.test_id)) || get("tests", r.test_id), item = itemByTest.get(test.id) || {};
+      const own = ownByTest.get(test.id), limits = resolveLimits(test, item, own);
       const value = ["numeric", "boolean"].includes(test.type) ? r.value_num : r.value_text;
       if (value === null || value === undefined) continue;
       const status = evaluate(test.type, test.type === "boolean" ? (value ? "pass" : "fail") : value, limits);
       if (status !== r.status) changed++;
       Object.assign(r, { ...limits, status }); runs.add(r.run_id);
     }
-    for (const id of runs) byId("runs", id).overall = resultOverall(S.results.filter((r) => r.run_id === id));
+    const byRun = groupBy(S.results, "run_id");
+    for (const id of runs) runById.get(Number(id)).overall = resultOverall(byRun.get(id) || []);
     save(); audit(user.id, "reevaluate", "assignment", a.id, { runs: runs.size, verdicts_changed: changed });
     return { runs: runs.size, changed };
   }
@@ -906,15 +919,35 @@
     const overrides = Object.fromEntries(S.overrides.filter((o) => o.assignment_id === a.id).map((o) => [o.test_id, o]));
     const selection = testSelection(a), base = new Set(queue.items.map((i) => i.test_id));
     const extra = (selection.added || []).filter((tid) => !base.has(tid)).map((test_id) => ({ test_id }));
+    // This machine's last entry for each text check, from one pass over the results (built on first use, this call only).
+    // Newest is the largest (qa_date + run id) string under localeCompare, and the first such result in S.results on a
+    // tie, exactly as the earlier sort-per-check chose it. Known difference, kept until a physicist chooses the rule:
+    // service.py run_template orders by qa_date then numeric run id, so two runs on one date whose ids differ in digit
+    // count (9999 and 10000) can carry forward different text in the two builds.
+    let lastText = null;
+    const lastTextOf = (testId) => {
+      if (!lastText) {
+        lastText = new Map();
+        const want = new Set([...queue.items, ...extra].map((i) => byId("tests", i.test_id)).filter((t) => t && t.type === "text").map((t) => t.id));
+        const runById = idMap(S.runs), best = new Map();
+        if (want.size) for (const r of S.results) {
+          if (!r.value_text || !want.has(r.test_id)) continue;
+          const run = runById.get(Number(r.run_id));
+          if (!run || run.trashed_at || run.machine_id !== a.machine_id) continue;
+          const key = run.qa_date + run.id, cur = best.get(r.test_id);
+          if (!cur || key.localeCompare(cur.key) > 0) best.set(r.test_id, { key, r });
+        }
+        for (const [id, v] of best) lastText.set(id, v.r.value_text);
+      }
+      return lastText.get(testId) || null;
+    };
     const allItems = [...queue.items, ...extra].map((item) => {
       const test = byId("tests", item.test_id);
       const o = overrides[test.id];
       return { excluded: (selection.excluded || []).includes(test.id)||(['GTR1','GTR2'].includes(machine.name)&&isPbsTemplate(queue.name)&&(test.name.startsWith('[OBs]')||test.name.includes("OB's DR image"))), machine_only: !base.has(test.id), test_id: test.id, name: test.name, category: test.category, type: test.type, unit: test.unit, description: test.description,
         limits: resolveLimits(test, item, o), queue_limits: resolveLimits(test, item),
         override: o ? { expected: o.expected, warn: o.warn, fail: o.fail, tol_mode: o.tol_mode } : null,
-        last_text: test.type === "text" ? (S.results.filter((r) => r.test_id === test.id && r.value_text).map((r) => ({ r, run: byId("runs", r.run_id) }))
-          .filter((x) => x.run && !x.run.trashed_at && x.run.machine_id === a.machine_id)                      // this machine's last entry
-          .sort((x, y) => (y.run.qa_date + y.run.id).localeCompare(x.run.qa_date + x.run.id))[0] || {}).r?.value_text || null : null };
+        last_text: test.type === "text" ? lastTextOf(test.id) : null };
     });
     return { assignment: { ...a, schedule: describeSchedule(a) }, machine, queue: { id: queue.id, name: queue.name, description: queue.description, active: queue.active, import_blocks:queue.import_blocks||[] }, items: allItems.filter((i) => !i.excluded), all_items: allItems, test_selection: selection };
   }
@@ -932,15 +965,29 @@
   }
   function dashboard() {
     const today = new Date();
+    // One pass over runs and one over results for every schedule at once (same answers as a scan per schedule):
+    // each schedule's live runs, the schedules that a run id belongs to, the newest QA date, and result counts.
+    const liveRuns = new Map(), schedulesOfRun = new Map(), newest = new Map(), counts = new Map(), ix = reviewIndex();
+    for (const r of S.runs) if (!r.trashed_at) {
+      let l = liveRuns.get(r.assignment_id); if (!l) liveRuns.set(r.assignment_id, l = []); l.push(r);
+      let s = schedulesOfRun.get(r.id); if (!s) schedulesOfRun.set(r.id, s = new Set()); s.add(r.assignment_id);
+      if (!newest.has(r.assignment_id)) newest.set(r.assignment_id, r.qa_date);
+      else { const d = newest.get(r.assignment_id); if (d !== undefined && (r.qa_date === undefined || String(r.qa_date) > String(d))) newest.set(r.assignment_id, r.qa_date); }   // as lastDone's sort()
+    }
+    for (const res of S.results) {
+      const s = schedulesOfRun.get(res.run_id); if (!s) continue;
+      for (const id of s) { let c = counts.get(id); if (!c) counts.set(id, c = {}); c[res.status] = (c[res.status] || 0) + 1; }
+    }
+    const lastOf = (id) => newest.has(id) ? fromIso(newest.get(id)) : null;
     const machines = S.machines.filter((m) => m.active).sort((a, b) => a.name.localeCompare(b.name)).map((m) => {
-      const queues = listAssignments(m.id, today).filter((a) => a.active).map((a) => {
-        const runs = S.runs.filter((r) => !r.trashed_at && r.assignment_id === a.id).sort((x, y) => (y.qa_date.localeCompare(x.qa_date)) || (y.id - x.id));
-        const ids=new Set(runs.map(r=>r.id)),history_counts={};
-        for(const res of S.results.filter(r=>ids.has(r.run_id)))history_counts[res.status]=(history_counts[res.status]||0)+1;
-        return { ...a, history_counts, last_run: runs[0] ? { id: runs[0].id, overall: runs[0].overall, review_status: runs[0].review_status, qa_date: runs[0].qa_date } : null };
+      const queues = listAssignments(m.id, today, lastOf).filter((a) => a.active).map((a) => {
+        let top = null;   // newest run: latest qa_date, then highest id; the first such run in S.runs on a tie
+        for (const r of liveRuns.get(a.id) || []) if (!top || ((r.qa_date.localeCompare(top.qa_date)) || (r.id - top.id)) > 0) top = r;
+        const history_counts = { ...(counts.get(a.id) || {}) };
+        return { ...a, history_counts, last_run: top ? { id: top.id, overall: top.overall, review_status: top.review_status, qa_date: top.qa_date } : null };
       });
       const history_counts={};for(const q of queues)for(const [key,count]of Object.entries(q.history_counts))history_counts[key]=(history_counts[key]||0)+count;
-      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => !r.trashed_at && r.machine_id === m.id && r.review_status === "pending" && reviewReady(r)).length };
+      return { ...m, queues, history_counts, pending_review: S.runs.filter((r) => !r.trashed_at && r.machine_id === m.id && r.review_status === "pending" && reviewReady(r, ix)).length };
     });
     return { today: localIso(today), machines };
   }
@@ -996,23 +1043,35 @@
     checkNotImported(ref);
     return insertRun(user, t, qaDate, rows, text(data, "comment"), ref?.startsWith("hdrpdf:")?"hdr-pdf":ref ? "sphinx" : "manual", ref, "pending");
   }
-  function pbsTherapistResults(run) {
-    if(!/PBS\s*Daily\s*QA.*Sphinx/i.test(byId('queues',run.queue_id)?.name||''))return null;
-    return S.results.filter(r=>{const t=byId('tests',r.test_id);return r.run_id===run.id && (t?.name?.trim().toLowerCase()==='qa reviewed by therapist?' || /Template 4\.06\./.test(t?.description||''));});
+  const therapistCheck = (t) => t?.name?.trim().toLowerCase()==='qa reviewed by therapist?' || /Template 4\.06\./.test(t?.description||'');
+  // For calls that judge review readiness for many runs (runs list, worklist, dashboard): results grouped by run and the
+  // ids of the therapist sign-off checks, built on first use inside that one call and never kept.
+  function reviewIndex() {
+    let byRun = null, checks = null;
+    return {
+      results(runId) { if (!byRun) byRun = groupBy(S.results, "run_id"); return byRun.get(runId) || []; },
+      isCheck(testId) { if (!checks) { checks = new Set(); for (const t of idMap(S.tests).values()) if (therapistCheck(t)) checks.add(t.id); } return checks.has(Number(testId)); },
+    };
   }
-  function reviewReady(run) {if(run.trashed_at||run.therapist_approval_required&&!run.therapist_approved_by)return false;const checks=pbsTherapistResults(run);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
-  function runRow(r) {
+  function pbsTherapistResults(run, ix) {
+    if(!/PBS\s*Daily\s*QA.*Sphinx/i.test(byId('queues',run.queue_id)?.name||''))return null;
+    if(ix)return ix.results(run.id).filter(r=>ix.isCheck(r.test_id));
+    return S.results.filter(r=>r.run_id===run.id && therapistCheck(byId('tests',r.test_id)));
+  }
+  function reviewReady(run, ix) {if(run.trashed_at||run.therapist_approval_required&&!run.therapist_approved_by)return false;const checks=pbsTherapistResults(run, ix);return checks===null || checks.length>0&&checks.every(r=>r.status==='pass');}
+  function runRow(r, ix) {
     const m = byId("machines", r.machine_id), q = byId("queues", r.queue_id), p = byId("users", r.performed_by) || {}, rv = r.reviewed_by ? byId("users", r.reviewed_by) : null;
-    return { ...r, review_ready:reviewReady(r), therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
+    return { ...r, review_ready:reviewReady(r, ix), therapist_approver_name: r.therapist_approved_by ? (byId('users',r.therapist_approved_by)||{}).full_name : null, machine_name: m.name, queue_name: q.name, performer_name: p.full_name, performer: p.username,
       reviewer_name: rv ? rv.full_name : null, reviewer: rv ? rv.username : null };
   }
   function listRuns(q) {
     let runs = S.runs.filter(r=>String(q.trashed||'')==='1'?!!r.trashed_at:!r.trashed_at);
     if (q.machine_id) runs = runs.filter((r) => r.machine_id === Number(q.machine_id));
     if (q.queue_id) runs = runs.filter((r) => r.queue_id === Number(q.queue_id));
-    if (q.review_status) runs = runs.filter((r) => r.review_status === q.review_status && (q.review_status!=="pending" || reviewReady(r)));
+    const ix = reviewIndex();
+    if (q.review_status) runs = runs.filter((r) => r.review_status === q.review_status && (q.review_status!=="pending" || reviewReady(r, ix)));
     const limit = Math.min(Number(q.limit || 200), 1000);
-    return runs.slice().sort((a, b) => b.qa_date.localeCompare(a.qa_date) || b.id - a.id).slice(0, limit).map(runRow);
+    return runs.slice().sort((a, b) => b.qa_date.localeCompare(a.qa_date) || b.id - a.id).slice(0, limit).map((r) => runRow(r, ix));
   }
   function getRun(id) {
     const r = get("runs", id);
@@ -1085,8 +1144,19 @@
     const semantic=test.type==='numeric'?canonicalKey(test.name):null;
     return JSON.stringify([test.type,test.unit||'',semantic||`${test.category||''}|${test.name.toLowerCase().trim()}`]);
   }
-  function trend(machineId,testId) {const test=get('tests',testId,'Check');return {test,points:machineTrends(machineId)[testId]||[]};}
-  function machineTrends(machineId) {
+  function trend(machineId,testId) {const test=get('tests',testId,'Check');return {test,points:machineTrends(machineId,{tests:new Set([Number(testId)])})[testId]||[]};}
+  // Optional window on a machine's trends, for screens that show only part of the history. With none of them the
+  // whole history comes back (Trends page, CSV export, PDF report). tests: only these tests' series (each still built
+  // from every test that shares its history key); until: only QA dates up to this one; last: the newest N points of each.
+  function trendWindow(q) {
+    // ASCII digits only, as service.py trend_window does, so both servers accept and refuse the same text.
+    const w={tests:null,last:0,until:''},given=(v)=>v!==undefined&&v!==null&&v!=='',whole=(x)=>/^[0-9]+$/.test(x)?Number(x):NaN;
+    if(given(q.tests)){const ids=String(q.tests).split(',').map(whole);if(ids.some(n=>!Number.isInteger(n)||n<1))throw Error('tests: give test ids separated by commas.');w.tests=new Set(ids);}
+    if(given(q.last)){w.last=whole(String(q.last));if(!Number.isInteger(w.last)||w.last<1)throw Error('last: give a whole number of points, 1 or more.');}
+    if(given(q.until)){if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(q.until)))throw Error('until: give a date as YYYY-MM-DD.');w.until=String(q.until);}
+    return w;
+  }
+  function machineTrends(machineId,{tests:wanted=null,last=0,until=''}={}) {
     const runs=Object.fromEntries(S.runs.filter(r=>!r.trashed_at&&r.machine_id===Number(machineId)).map(r=>[r.id,r]));
     const aliases=new Map();
     for(const q of S.queues.filter(q=>isPbsTemplate(q.name))){
@@ -1094,16 +1164,22 @@
       const ids=new Set(base.map(t=>t.id));
       for(const t of S.tests.filter(t=>t.owner_queue_id===q.id&&!ids.has(t.id))){const target=templateMatch(base,t.name);if(target)aliases.set(t.id,target);}
     }
-    const keyFor=t=>historyKey(aliases.get(t.id)||t);
+    // Worked out once per test for this call (not once per result).
+    const testById=idMap(S.tests),keys=new Map(),numbers=new Map();
+    const keyFor=t=>{let k=keys.get(t);if(k===undefined)keys.set(t,k=historyKey(aliases.get(t.id)||t));return k;};
+    const numberOf=t=>{let n=numbers.get(t);if(n===undefined)numbers.set(t,n=/Template\s+(\d+\.\d+)/.exec(t.description||'')?.[1]||null);return n;};
+    const wantedKeys=wanted&&new Set(S.tests.filter(t=>wanted.has(t.id)).map(keyFor));
     const groups=new Map();
     for(const x of S.results){
-      if(!runs[x.run_id] || x.value_num==null)continue;
-      const test=byId('tests',x.test_id);if(!test)continue;
-      const key=keyFor(test);if(!groups.has(key))groups.set(key,[]);
-      groups.get(key).push({source_test_id:x.test_id,source_test_number:/Template\s+(\d+\.\d+)/.exec(test.description||'')?.[1]||null,run_id:x.run_id,source:runs[x.run_id].source,source_order:x.id,assignment_id:runs[x.run_id].assignment_id,qa_date:runs[x.run_id].qa_date,value:x.value_num,expected:x.expected,warn:x.warn,fail:x.fail,tol_mode:x.tol_mode,status:x.status});
+      const run=runs[x.run_id];
+      if(!run || x.value_num==null || until&&run.qa_date>until)continue;
+      const test=testById.get(Number(x.test_id));if(!test)continue;
+      const key=keyFor(test);if(wantedKeys&&!wantedKeys.has(key))continue;
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push({source_test_id:x.test_id,source_test_number:numberOf(test),run_id:x.run_id,source:run.source,source_order:x.id,assignment_id:run.assignment_id,qa_date:run.qa_date,value:x.value_num,expected:x.expected,warn:x.warn,fail:x.fail,tol_mode:x.tol_mode,status:x.status});
     }
-    for(const pts of groups.values())pts.sort((a,b)=>a.qa_date.localeCompare(b.qa_date)||a.run_id-b.run_id||a.source_order-b.source_order);
-    const out={};for(const test of S.tests){const pts=groups.get(keyFor(test));if(pts)out[test.id]=pts;}
+    for(const [key,pts] of groups){pts.sort((a,b)=>a.qa_date.localeCompare(b.qa_date)||a.run_id-b.run_id||a.source_order-b.source_order);if(last&&pts.length>last)groups.set(key,pts.slice(-last));}
+    const out={};for(const test of S.tests){if(wanted&&!wanted.has(test.id))continue;const pts=groups.get(keyFor(test));if(pts)out[test.id]=pts;}
     return out;
   }
 
@@ -1287,7 +1363,12 @@
     installDerivedCalculations();
     unifyPbsSelections();
     installPbsDailyProtocol();
-    for (const run of S.runs) if (run.review_status === 'pending' && S.results.some(res => res.run_id === run.id && /therapist/i.test((byId('tests',res.test_id)||{}).name||'') && /review|approv/i.test((byId('tests',res.test_id)||{}).name||''))) run.therapist_approval_required = true;
+    let resultsByRun = null, testById = null;   // built on the first pending run, used only by this loop
+    const signOff = (res) => { const name = (testById.get(Number(res.test_id)) || {}).name || ''; return /therapist/i.test(name) && /review|approv/i.test(name); };
+    for (const run of S.runs) if (run.review_status === 'pending') {
+      if (!resultsByRun) { resultsByRun = groupBy(S.results, 'run_id'); testById = idMap(S.tests); }
+      if ((resultsByRun.get(run.id) || []).some(signOff)) run.therapist_approval_required = true;
+    }
   })();
 
   function installPbsDailyProtocol(){
@@ -1869,7 +1950,7 @@
   route("POST", "/api/runs/(\\d+)/therapist-review",(u,m,body)=>setTherapistReview(u,Number(m[1]),body));
   route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
-  route("GET", "/api/machines/(\\d+)/trends", (u, m) => machineTrends(Number(m[1])));
+  route("GET", "/api/machines/(\\d+)/trends", (u, m, body, q) => machineTrends(Number(m[1]), trendWindow(q)));
   route("GET", "/api/trend", (u, m, body, q) => {
     if (!q.machine_id || !q.test_id) throw new Error("Choose a machine and a test.");
     return trend(q.machine_id, q.test_id);

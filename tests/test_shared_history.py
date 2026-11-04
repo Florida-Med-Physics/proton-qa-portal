@@ -44,3 +44,30 @@ class SharedHistoryTests(unittest.TestCase):
         self.assertEqual([p['status'] for p in points],['fail','pass'])
         self.assertTrue(all(p['source_test_id']==t and p['source_test_number']=='3.15' and p['expected']==158.5 for p in points))
         db.close()
+
+    def test_trend_window_keeps_shared_history_and_cuts_by_date_and_count(self):
+        db=Database(':memory:');admin=make_users(db)['admin']
+        m=service.save_machine(db,admin,{'name':'Synthetic window machine'})['id']
+        def make(name):
+            q=service.save_queue(db,admin,{'name':name,'items':[]})['id']
+            t=service.save_test(db,admin,{'name':'Energy [100 MeV] – Distal Depth' if 'A' in name or 'B' in name else 'Energy [150 MeV] – Distal Depth','type':'numeric','unit':'mm','expected':10,'fail':1,'owner_queue_id':q})['id']
+            service.save_queue(db,admin,{'name':name,'items':[{'test_id':t}]},q)
+            return t,service.save_assignment(db,admin,{'machine_id':m,'queue_id':q,'frequency':'asneeded'})['id']
+        t1,a1=make('Synthetic list A');t2,a2=make('Synthetic list B');t3,a3=make('Synthetic list C')
+        for day,(t,a) in enumerate([(t1,a1),(t2,a2),(t1,a1),(t3,a3),(t2,a2)],start=1):
+            service.submit_run(db,admin,a,{'qa_date':f'2026-10-0{day}','results':[{'test_id':t,'value':10+day/10}]})
+        full=service.machine_trends(db,admin,m)
+        # tests= keeps the whole shared series (t1 and t2 share one history) but returns only the tests asked for
+        only=service.machine_trends(db,admin,m,**service.trend_window({'tests':str(t1)}))
+        self.assertEqual(only,{str(t1):full[str(t1)]})
+        self.assertEqual(len(only[str(t1)]),4)
+        cut=service.machine_trends(db,admin,m,**service.trend_window({'tests':f'{t1},{t3}','until':'2026-10-03','last':'2'}))
+        self.assertEqual(cut,{str(t1):[p for p in full[str(t1)] if p['qa_date']<='2026-10-03'][-2:]})
+        self.assertEqual(service.trend(db,admin,m,t2)['points'],full[str(t2)])
+        # ASCII digits only, the same grammar as local-backend.js trendWindow (tests/test_backend_windows.cjs).
+        for bad in ({'tests':'x'},{'last':'0'},{'last':'2.5'},{'until':'03/10/2026'},{'tests':'0x10'},{'last':'0x3C'},{'tests':'1_0'},{'last':'6_0'},
+                    {'tests':'٥'},{'last':'٥'},{'until':'٢٠٢٦-01-01'},{'tests':'1e1'},{'last':'+5'},{'last':'5.0'},{'tests':'1,,2'},{'until':'2026-1-01'}):
+            with self.assertRaises(service.PortalError):service.trend_window(bad)
+        self.assertEqual(service.trend_window({}),{})
+        self.assertEqual(service.trend_window({'tests':'007,12','last':'60','until':'2026-10-03'}),{'tests':{7,12},'last':60,'until':'2026-10-03'})
+        db.close()

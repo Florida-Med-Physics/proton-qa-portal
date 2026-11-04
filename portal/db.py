@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS drafts (
 );
 CREATE INDEX IF NOT EXISTS runs_by_assignment ON runs (assignment_id, qa_date);
 CREATE INDEX IF NOT EXISTS results_by_test ON results (test_id);
+CREATE INDEX IF NOT EXISTS results_by_run ON results (run_id);
 CREATE UNIQUE INDEX IF NOT EXISTS runs_by_source ON runs (source_ref) WHERE source_ref IS NOT NULL;
 """
 

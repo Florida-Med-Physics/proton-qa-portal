@@ -1655,7 +1655,8 @@ async function renderPerform(assignmentId) {
     page(t.queue.name, "This template is archived.", [el("a", { class: "button", href: "#/setup" }, "Back to Setup QA")]);
     return;
   }
-  const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends`).catch(() => ({})) : {};
+  // The form shows at most the newest 60 points of each of its own tests (History: newest 3 dates; quick trend: 60).
+  const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends?tests=${t.items.map((i) => i.test_id).join(",")}&last=60`).catch(() => ({})) : {};
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
@@ -3273,8 +3274,11 @@ function therapistReviewCheck(test) {
   return /^qa reviewed by therapist\?$/i.test((test.name||'').trim()) || /Template 4\.06\./.test(test.description||'');
 }
 async function renderReviewMeasurements(run) {
+  // History column: this run's own tests up to its own date; the 3 results before it are among the newest 61 points
+  // (a margin for several runs on one date). The quick trend fetches its own points when clicked.
+  const runTests=[...new Set(run.results.map(r=>r.test_id))].join(',');
   const [history,template]=await Promise.all([
-    api('GET',`/api/machines/${run.machine_id}/trends`).catch(()=>({})),
+    runTests?api('GET',`/api/machines/${run.machine_id}/trends?tests=${runTests}&until=${run.qa_date}&last=61`).catch(()=>({})):{},
     api('GET',`/api/assignments/${run.assignment_id}/template`).catch(()=>null)
   ]);
   const numbers=blockNumbers(template?.items||run.results), fallback=blockNumbers(run.results);
@@ -3310,11 +3314,17 @@ async function renderReviewMeasurements(run) {
         measured.replaceChildren(control);
       }
       const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:10}));
-      const trend=el('button',{class:'icon-btn',type:'button',title:'Show the trend here','aria-label':`Show trend for ${r.name}`,onclick:()=>{
-        const pts=(history[r.test_id]||[]).slice(-60);
+      // The quick trend shows the newest 60 points of this test, fetched on the first click: the page's own history
+      // stops at this run's date, which would leave an early or trashed run's chart empty.
+      let quick=null;
+      const trend=el('button',{class:'icon-btn',type:'button',title:'Show the trend here','aria-label':`Show trend for ${r.name}`,onclick:async()=>{
+        if(!chart.hidden){chart.hidden=true;return;}
+        // A failed fetch counts as no points, as the page's own history request always has.
+        if(!quick)quick=await api('GET',`/api/trend?machine_id=${run.machine_id}&test_id=${r.test_id}`).then(x=>x.points||[],()=>[]);
+        const pts=quick.slice(-60);
         if(!pts.length)return toast('No numeric results yet for this test.',true);
-        if(chart.hidden)chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
-        chart.hidden=!chart.hidden;
+        chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
+        chart.hidden=false;
       }},trendIcon(16));
       const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
       const row=el('tr',{'data-test-id':r.test_id},

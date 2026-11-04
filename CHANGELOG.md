@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Speed up history-wide work without changing any answer: the runs list, physicist worklist, Dashboard and a PBS run no longer scan every result per run to check the therapist sign-off; form templates, Dashboard counts, Re-evaluate and startup use one pass per call; the Perform form and a saved run's review ask the trends endpoint only for their own tests and the points they show (`tests`, `last`, `until`; without them the full history is returned, as Machine Trends, the CSV export and the PDF report use). A saved run's quick trend fetches its test's newest 60 points when clicked, as before. The trends options accept plain digits only, the same in both builds. The server build gets the same trends options and an index on results by run.
+
 - **[Physics review]** Judge new Sphinx imports that await review (the automatic folder scan in Data Administration, `import-sphinx --pending`) by the list's own baseline and tolerances, not the file's; the result's comment notes when Sphinx's verdict differs. Historical imports still keep their file's limits and verdict.
 
 - Show a Pass / Fail answer once: no PASS chip under the selected button, and no "Pass / Fail" unit or "Pass" baseline on those tests (or their empty labels on tablet-width cards), on the QA form and on a saved run.
