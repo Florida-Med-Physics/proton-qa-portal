@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA form: the Save draft button is now Mark in Progress (it still saves what you have entered without submitting). QA form and saved runs: no Deviation column; the Result shows the difference after PASS / WARNING / ACTION in plain brackets, e.g. PASS (Δ +0.30 mm), and on the form it follows the value as you type. The PDF report is unchanged. Machine Trends shows one QA list at a time (no All QA lists): it opens the machine's list with the most recorded runs unless a link names a list, and Export CSV exports that list.
+
 - Speed up history-wide work without changing any answer: the runs list, physicist worklist, Dashboard and a PBS run no longer scan every result per run to check the therapist sign-off; form templates, Dashboard counts, Re-evaluate and startup use one pass per call; the Perform form and a saved run's review ask the trends endpoint only for their own tests and the points they show (`tests`, `last`, `until`; without them the full history is returned, as Machine Trends, the CSV export and the PDF report use). A saved run's quick trend fetches its test's newest 60 points when clicked, as before. The trends options accept plain digits only, the same in both builds. The server build gets the same trends options and an index on results by run.
 
 - **[Physics review]** Judge new Sphinx imports that await review (the automatic folder scan in Data Administration, `import-sphinx --pending`) by the list's own baseline and tolerances, not the file's; the result's comment notes when Sphinx's verdict differs. Historical imports still keep their file's limits and verdict.

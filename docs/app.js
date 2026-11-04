@@ -294,16 +294,16 @@ function limitsText(limits, unit) {
 
 const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived" };
 
-// Mirrors portal/qa.py evaluate(); the server re-checks on submit.
-// "Δ +0.30 mm" badge beside a numeric result, green / yellow / red by its status against the limits.
-function deltaBadge(value, limits, unit, status) {
+// "(Δ +0.30 mm)" in plain text after the Result chip (the chip carries the colour): the difference from the reference,
+// sign always shown, unit after the number. Nothing when there is no reference or no value.
+function deviationText(value, limits, unit) {
   if (!Number.isFinite(value) || !limits || limits.expected === null || limits.expected === undefined) return null;
   const d = value - limits.expected;
-  const st = status || evaluate("numeric", value, limits);
-  const pct = limits.tol_mode === "percent" && limits.expected ? ` (${signed((100 * d) / limits.expected, 2)} %)` : "";
-  return el("span", { class: `delta st-${st}`, title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, `Δ ${signed(d)} ${unit || ""}`.trim() + pct);
+  const pct = limits.tol_mode === "percent" && limits.expected ? `, ${signed((100 * d) / limits.expected, 2)} %` : "";
+  return el("span", { class: "result-dev", title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, `(Δ ${signed(d)}${unit ? ` ${unit}` : ""}${pct})`);
 }
 
+// Mirrors portal/qa.py evaluate(); the server re-checks on submit.
 function evaluate(type, value, limits) {
   if (limits.criterion === "wl-max-delta") return Number(value) >= 0 && Number(value) < 1 ? "pass" : "fail";
   if (type === "boolean") return value === "pass" ? "pass" : "fail";
@@ -1380,7 +1380,7 @@ function qaDisplayName(item) {
   })[item.name]||item.name;
 }
 function qaHeaders(first='Test') {
-  return ['#',first,'Measured','Deviation','Unit','Result','Baseline','History','Comment','Trends'].map(label=>
+  return ['#',first,'Measured','Unit','Result','Baseline','History','Comment','Trends'].map(label=>
     el('th',{scope:'col',title:label,'aria-label':label},label==='Comment'?'Note':label==='Trends'?'Trend':label));
 }
 function testDetailsButton(item,items,numbers) {
@@ -1395,18 +1395,20 @@ function fitQaTable(table) {
     const adapt=()=>{
       const compact=matchMedia('(max-width: 1200px)').matches;
       const maxHistory=Math.max(0,...[...table.querySelectorAll('.hist-row')].map(row=>row.children.length));
-      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-856-320)/144))));
+      // 828 px: the fixed columns below (#, Measured, Unit, Result, Baseline, Note, Trend); the test name keeps 320 px or more.
+      // Result is wide enough for "WARNING (Δ −12.35 mm)" on one line; the old Deviation + Result pair took 268 px.
+      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-828-320)/144))));
       table.querySelectorAll('.hist-row').forEach(row=>[...row.children].forEach((cell,i)=>cell.hidden=i>=count));
       let cols=table.querySelector('colgroup');
-      if(!cols){cols=el('colgroup',{},Array.from({length:10},()=>el('col')));table.prepend(cols);}
-      const widths=['72px','auto','156px','140px','76px','128px','132px',`${count?count*136+(count-1)*8+16:112}px`,'72px','80px'];
+      if(!cols){cols=el('colgroup',{},Array.from({length:9},()=>el('col')));table.prepend(cols);}
+      const widths=['72px','auto','156px','76px','240px','132px',`${count?count*136+(count-1)*8+16:112}px`,'72px','80px'];
       [...cols.children].forEach((col,i)=>col.style.width=widths[i]);
     };
     const observer=new ResizeObserver(adapt);qaTableObservers.add(observer);observer.observe(wrap);adapt();
   });
 }
 function orderMeasurementRow(row) {
-  for(const name of ['qa-n','qa-label','qa-measured','qa-dev','qa-unit','qa-result','qa-baseline','history-cell','qa-comment','qa-trends']) {
+  for(const name of ['qa-n','qa-label','qa-measured','qa-unit','qa-result','qa-baseline','history-cell','qa-comment','qa-trends']) {
     const cell=[...row.children].find(c=>c.classList.contains(name));if(cell)row.append(cell);
   }
 }
@@ -1754,10 +1756,13 @@ async function renderPerform(assignmentId) {
       };
       // Pass / Fail buttons already show the answer in its colour; a chip under them would repeat it.
       const answeredByButton = item.type === "boolean" || item.type === "status";
+      const unit = item.unit && item.unit !== "unitless" ? item.unit : "";
+      // The chip and "(Δ +0.30 mm)" after it follow the value as it is typed.
       const update = () => {
         if(input.readOnly&&input.dataset.derivedValue!==undefined) QADerived.setInput(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
         const s = entry.status();
-        statusCell.replaceChildren(s && !answeredByButton ? chip(s) : "");
+        statusCell.replaceChildren(...present([s && !answeredByButton ? chip(s) : null,
+          s && item.type === "numeric" ? deviationText(Number(QADerived.value(input)), item.limits, unit) : null]));
         refresh();
       };
       input.addEventListener("input", update);
@@ -1810,7 +1815,7 @@ async function renderPerform(assignmentId) {
         const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
         const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(it);
         noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
-        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 10 }));
+        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
           const pts = (history[it.test_id] || []).slice(-60);
           if (!pts.length) return toast("No results yet for this test.", true);
@@ -1820,9 +1825,6 @@ async function renderPerform(assignmentId) {
             seriesChart([{ label: it.name, points: pts }], unit, { small: true, yLabel: yAxisLabel([it.name]) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
-        const dlt = el("div", { class: "delta-slot" });
-        const showDelta = () => { const v = Number(QADerived.value(control)); dlt.replaceChildren(...present([control.value.trim() !== "" ? deltaBadge(v, it.limits, unit) : null])); };
-        control.addEventListener("input", showDelta);
         const row = el("tr", {'data-qa-entry':it.test_id},
           numberCell(it),
           el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
@@ -1831,19 +1833,18 @@ async function renderPerform(assignmentId) {
           el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
           el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
-          el("td", { class: "qa-dev" }, dlt),
           el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, comment),
           el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
           el("td", {class:"qa-trends"}, trend));
         entry.row=row;entry.chart=chart;
-        const extras = el('td', {class:'qa-phone-extras', colspan:10});
+        const extras = el('td', {class:'qa-phone-extras', colspan:9});
         orderMeasurementRow(row);
         row.append(extras);
-        const secondary = ['qa-dev','qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
+        const secondary = ['qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
         secondary.forEach((cell,index) => {
           cell.classList.add('qa-secondary');
-          const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Deviation','Comment','History','Trends'][index]));
+          const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Comment','History','Trends'][index]));
           const content = el('div', {class:'qa-phone-field-content'});
           while (cell.firstChild) content.append(cell.firstChild);
           field.append(content);
@@ -1852,11 +1853,11 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "190px", "150px", "100px", "130px", "150px", "424px", "130px", "100px"];
+      const widths = ["100px", "auto", "190px", "100px", "240px", "150px", "424px", "130px", "100px"];
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, qaHeaders(firstHeader)),
-            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 7 }, () => el("th", {})),
+            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 6 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
           el("tbody", {}, trRows.flat()));
       fitQaTable(tableEl);
@@ -2071,7 +2072,7 @@ async function renderPerform(assignmentId) {
     }
   } }, "Submit for review");
   app.append(el("details", { class: "card" }, el("summary", {}, "Notes for the reviewer"), runComment), error);
-  // Save keeps what has been entered so far (per user and list) without submitting; it is restored when the page is opened again.
+  // Mark in Progress saves what has been entered so far (per user and list) without submitting; it is restored when the page is opened again.
   const draftNote = el("span", { class: "muted small" });
   let autosaveTimer, autosaveStopped = false;
   let draftWrites = Promise.resolve();
@@ -2083,7 +2084,7 @@ async function renderPerform(assignmentId) {
     draftWrites = draftWrites.catch(() => {}).then(async () => {
       const saved = await api("PUT", `/api/assignments/${assignmentId}/draft`, data);
       draftNote.textContent = `Saved ${saved.saved_at.slice(11, 19)}`;
-    }).catch((err) => { draftNote.textContent = "Not saved - use Save draft"; toast(err.message, true); });
+    }).catch((err) => { draftNote.textContent = "Not saved - use Mark in Progress"; toast(err.message, true); });
     return draftWrites;
   };
   const queueAutosave = () => {
@@ -2097,7 +2098,7 @@ async function renderPerform(assignmentId) {
     saveDraft.disabled = true;
     await persistDraft();
     saveDraft.disabled = false;
-  } }, "Save draft");
+  } }, "Mark in Progress");
   const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
   app.append(footer);
@@ -3313,7 +3314,7 @@ async function renderReviewMeasurements(run) {
         });
         measured.replaceChildren(control);
       }
-      const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:10}));
+      const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:9}));
       // The quick trend shows the newest 60 points of this test, fetched on the first click: the page's own history
       // stops at this run's date, which would leave an early or trashed run's chart empty.
       let quick=null;
@@ -3333,8 +3334,7 @@ async function renderReviewMeasurements(run) {
         el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
         el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         el('td',{class:'qa-measured','data-label':'Measured'},measured),
-        el('td',{class:'qa-dev','data-label':'Deviation'},r.type==='numeric'&&!missing?deltaBadge(r.value_num,limits,unit,r.status):'—'),
-        el('td',{class:'qa-result','data-label':'Result'},el('div',{class:'status-cell'},chip(r.status))),
+        el('td',{class:'qa-result','data-label':'Result'},el('div',{class:'status-cell'},chip(r.status),r.type==='numeric'&&!missing?deviationText(r.value_num,limits,unit):null)),
         el('td',{class:'qa-comment','data-label':'Comment'},r.comment||'—'),
         el('td',{class:'history-cell','data-label':'History'},hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
@@ -3885,9 +3885,9 @@ function trendGroups(items) {
   return [...axisGroups(plain), ...families.values()].sort((a,b) => Math.min(...a.members.map(m => order.get(m.test_id))) - Math.min(...b.members.map(m => order.get(m.test_id))));
 }
 
-async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = []) {
+async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = [], historyRequest = null) {
   const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (activeRole()!=='therapist'||a.frequency!=='monthly') && (!listId || String(a.id) === String(listId)));
-  const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
+  const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), historyRequest || api('GET', `/api/machines/${machineId}/trends`)]);
   const numberPoint=trendSourceNumberer(sourceTemplates.length?sourceTemplates:templates);
   const sections = [], insights = [];
   for (const template of templates) {
@@ -4149,7 +4149,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
     try {
       // Read permissions while the export button still has browser user activation.
       if (exportHandle && await exportHandle.queryPermission({ mode: 'readwrite' }) !== 'granted' && await exportHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Allow the export folder or select Use Downloads in Folder settings.');
-      const targets = lists.filter((a) => !listId || String(a.id) === String(listId));
+      const targets = lists.filter((a) => String(a.id) === String(listId));   // the one list on screen
       const [templates, histories] = await Promise.all([Promise.all(targets.map((a) => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machine.id}/trends`)]);
       const rows = trendCsvRows(machine, templates, histories, range, testIds);
       if (rows.length < 2) return toast('No numeric results in the selected list and period.');
@@ -4214,6 +4214,18 @@ function trendInsightsCard(series) {
     el('details', {}, el('summary', { class: 'small' }, 'How trends are checked'),
       el('p', { class: 'muted small' }, 'Each measurement is checked separately against its current baseline and limits. A least-squares line checks for steady change using up to 20 results across at least 5 QA dates. Suggested patterns are prompts to inspect the graph.')));
 }
+// The machine's QA list with the most recorded runs, counted in the machine's trend history (every point names its run
+// and list, so a run counts once however many measurements it holds). On a tie the earlier list in the menu wins.
+function busiestList(lists, histories) {
+  const runs = new Map();
+  for (const points of Object.values(histories || {})) for (const p of points) {
+    const id = String(p.assignment_id);
+    if (!runs.has(id)) runs.set(id, new Set());
+    runs.get(id).add(p.run_id);
+  }
+  const count = (a) => runs.get(String(a.id))?.size || 0;
+  return lists.reduce((best, a) => (count(a) > count(best) ? a : best), lists[0]);
+}
 async function renderTrends() {
   const params = queryParams();
   const machines = (await api("GET", "/api/machines")).filter((m) => m.active);
@@ -4224,6 +4236,8 @@ async function renderTrends() {
   let testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
   const lists = machineId ? (await api("GET", `/api/machines/${machineId}/assignments`)).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
+  // The overview reads the machine's whole history; asking for it beside the templates saves a round trip.
+  let historyRequest = machineId && !testIds.length ? api("GET", `/api/machines/${machineId}/trends`) : null;
   const templates=await Promise.all(lists.map(a=>api('GET',`/api/assignments/${a.id}/template`)));
   if(activeRole()==='therapist'){const visible=new Set(templates.flatMap(t=>t.items.map(i=>String(i.test_id))));testIds=testIds.filter(id=>visible.has(id));}
   const numberPoint=trendSourceNumberer(templates);
@@ -4233,17 +4247,22 @@ async function renderTrends() {
     const selected=templates.find(t=>String(t.assignment.id)===listId&&matches(t))||templates.find(matches);
     if(selected)listId=String(selected.assignment.id);
   }
+  // One QA list at a time. With none named (or one not on this machine), open the list with the most recorded runs here.
+  if (!listId && lists.length) {
+    historyRequest = historyRequest || api("GET", `/api/machines/${machineId}/trends`);
+    listId = String(busiestList(lists, await historyRequest).id);
+  }
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
     select('machine_id', machines.map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
-    select("list", [["", "All QA lists"], ...lists.map((a) => [a.id, a.queue_name])], listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }),
+    lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
     testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds));
   app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
-  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates);
+  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
   const listItems = new Map(templates.filter(t=>!listId||String(t.assignment.id)===listId).flatMap(t=>t.items).map(i=>[String(i.test_id),i]));
   const items = data.map((d) => {

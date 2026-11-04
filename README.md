@@ -126,7 +126,7 @@ HDR Flexitron starts with **Daily QA** and **Source Exchange QA**, both **as nee
 
 ### Trends dashboard and file defaults
 
-Machine Trends shows one machine at a time, defaulting to GTR1 when available. Choose a machine, QA list, and period, then expand measurements organized by list and category. Spot numbers are omitted from display labels; same-energy X/Y measurements share a graph. Saved test identities are unchanged. Each insight opens its grouped graph and values. Insights are calculated locally (documented straight-line fit, minimum five distinct dates), not an external AI or clinical assessment.
+Machine Trends shows one machine and one QA list at a time: GTR1 when available, and that machine's list with the most recorded runs unless a link names another list. Choose a machine, QA list, and period, then expand measurements organized by list and category. Spot numbers are omitted from display labels; same-energy X/Y measurements share a graph. Saved test identities are unchanged. Each insight opens its grouped graph and values. Insights are calculated locally (documented straight-line fit, minimum five distinct dates), not an external AI or clinical assessment.
 
 Use **Import**, **Export CSV**, and the folder-settings gear. Import reuses that machine's QA-list folder and supports Sphinx `.xls`/`.csv` history. Export uses the current list/period/test selection and includes both recorded and current limits/verdicts. Export directories are remembered per machine/user in this browser; Downloads is the fallback. Directory permissions may need reconnecting after a browser restart.
 
