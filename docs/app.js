@@ -168,6 +168,11 @@ async function api(method, path, body) {
   return data;
 }
 
+// A site that hosts these pages may set window.QA_HOST = { browserFolders: false } before this script loads. Then no
+// page opens a folder (no folder picker, folder listing, folder reading, Import Folder or export folder): a list's import
+// folder is typed text, read by a scheduled import elsewhere. Left out, everything works as before.
+function browserFolders() { return window.QA_HOST?.browserFolders !== false; }
+
 function formData(form) {
   const data = {};
   for (const node of form.elements) {
@@ -1109,9 +1114,13 @@ function scheduleForm(assignment, queues) {
 }
 
 // Where this list's export files (Sphinx, DQA3, ...) appear, so the Perform page can offer them without a file dialog.
+// Without browser folders (browserFolders()) it is a typed path that the scheduled import reads instead, typed on a
+// saved list only: "Schedule on machines" creates several lists at once, and each needs a folder of its own.
 function importFolderField(a) {
-  if (!window.localApi) {
-    return field("Default import folder", el("input", { name: "import_folder", value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\ProtonDaily\\G1 Sphinx" }), "wide");
+  if (!a.id && !browserFolders()) return field("Default import folder", el("span", { class: "muted small" }, "Save this list first, then type its folder under Change schedule or in Data Administration."), "wide");
+  if (!window.localApi || !browserFolders()) {
+    const input = el("input", { name: "import_folder", value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\ProtonDaily\\G1 Sphinx" });
+    return field("Default import folder", browserFolders() ? input : [input, el("div", { class: "muted small" }, "The scheduled import on a UFHPTI computer reads this folder.")], "wide");
   }
   // Browser-only build: the folder is chosen with the browser's folder picker and remembered on this computer.
   const label = el("span", { class: "muted small" }, a.import_folder ? `Folder: ${a.import_folder}` : "No folder chosen.");
@@ -1172,50 +1181,6 @@ function autoReadLine(assignmentId, onPick, dateInput, previewBuilder=null) {
   const timer=setInterval(()=>{if(!line.isConnected)clearInterval(timer);else scan();},30000);
   setTimeout(scan,0);
   return line;
-}
-
-function importFolderCard(assignmentId, onPick) {
-  const body = el("div", { class: "small" }, "Looking in the folder…");
-  const card = el("div", { class: "card step" }, el("strong", {}, "Files in the default folder"), body);
-  const load = async () => {
-    try {
-      const r = await api("GET", `/api/assignments/${assignmentId}/files`);
-      if (r.permission === "prompt" || r.permission === "denied") {
-        body.replaceChildren(el("div", { class: "row" }, `Allow this page to read "${r.folder}" again.`,
-          el("button", { onclick: async () => { await window.localFolders.request(assignmentId); load(); } }, "Allow access")));
-        return;
-      }
-      if (r.permission === "none" && window.localApi) {
-        body.replaceChildren(el("span", { class: "muted" }, `The folder "${r.folder}" was chosen on another computer. Choose it again under Change schedule.`));
-        return;
-      }
-      if (!r.files.length) {
-        body.replaceChildren(el("span", { class: "muted" }, `No export files in ${r.folder}.`));
-        return;
-      }
-      const newest = r.files.find((f) => !f.run_id);
-      if (newest && !card.dataset.autoRead) {
-        card.dataset.autoRead = "1";
-        api("GET", `/api/assignments/${assignmentId}/file?path=${encodeURIComponent(newest.path)}`)
-          .then((file) => { onPick(file); toast(`Read in ${newest.name} automatically`); })
-          .catch((err) => toast(err.message, true));
-      }
-      body.replaceChildren(
-        el("div", { class: "muted small" }, `${r.folder} · newest first`),
-        el("table", { class: "compact" }, el("tbody", {}, r.files.map((f) => el("tr", {},
-          el("td", {}, f === newest ? el("strong", {}, f.path) : f.path),
-          el("td", { class: "muted small" }, f.modified.replace("T", " ")),
-          el("td", { class: "small" }, f.run_id ? el("span", { class: "muted" }, "Recorded as ", el("a", { href: `#/runs/${f.run_id}` }, `run #${f.run_id}`), ` (${f.qa_date})`) : ""),
-          el("td", {}, el("button", { class: f === newest ? "primary small" : "small", onclick: async () => {
-            try { onPick(await api("GET", `/api/assignments/${assignmentId}/file?path=${encodeURIComponent(f.path)}`)); }
-            catch (err) { toast(err.message, true); }
-          } }, f === newest ? "Use newest" : "Use")))))));
-    } catch (err) {
-      body.replaceChildren(el("span", { class: "error" }, err.message));
-    }
-  };
-  load();
-  return card;
 }
 
 function scheduleData(data, form) {
@@ -2030,7 +1995,7 @@ async function renderPerform(assignmentId) {
       sphinxInfo.replaceChildren(el("span", { class: "error" }, err.message));
     }
   };
-  const autoLine = t.assignment.import_folder ? el("div") : null;
+  const autoLine = t.assignment.import_folder && browserFolders() ? el("div") : null;
   if (window.QAExcel?.supported(t)) app.append(monthlyWorkbookTools(t, inputs, qaDate));
   const sphinxSection=sections.find(section=>/sphinx measurements/i.test(section.section))||null;
   const importHelp=sphinxSection?infoDisclosure(el('div',{},
@@ -4043,15 +4008,6 @@ const trendExportFolders = {
     try { return await new Promise((resolve, reject) => { const request = db.transaction('folders').objectStore('folders').get(this.key(machineId)); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.error); }); }
     finally { db.close(); }
   },
-  async set(machineId, handle) {
-    const db = await this.database();
-    try { await new Promise((resolve, reject) => { const tx = db.transaction('folders', 'readwrite'); const store = tx.objectStore('folders'); if (handle) store.put(handle, this.key(machineId)); else store.delete(this.key(machineId)); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('Folder could not be remembered')); }); }
-    finally { db.close(); }
-  },
-  async choose(machineId) {
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'qa-trends-export' });
-    await this.set(machineId, handle); return handle;
-  },
 };
 function trendCsvCell(value) {
   let text = String(value ?? '');
@@ -4101,44 +4057,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
   const selected = () => lists.find((a) => String(a.id) === selectedId);
   const remember = () => { if (selectedId) localStorage.setItem(storageKey, selectedId); };
   const refreshStatus = () => { const a = selected(); status.textContent = `Import: ${a?.import_folder || 'Choose a folder'} · Export: ${exportHandle?.name || 'Downloads'}`; };
-  trendExportFolders.get(machine.id).then((handle) => { exportHandle = handle; refreshStatus(); }).catch(() => { refreshStatus(); });
-  const folderSettings = () => {
-    const importStatus = el('span', { class: 'muted small' });
-    const exportStatus = el('span', { class: 'muted small' }, exportHandle?.name || 'Browser downloads');
-    const path = el('input', { placeholder: 'Folder on the portal host', 'aria-label': 'Default import folder' });
-    const updateImport = () => { importStatus.textContent = selected()?.import_folder || 'No import folder chosen'; path.value = selected()?.import_folder || ''; };
-    const picker = select('import_list', lists.map((a) => [a.id, a.queue_name]), selectedId, { 'aria-label': 'Default import QA list', onchange: (e) => { selectedId = e.target.value; remember(); updateImport(); refreshStatus(); } });
-    const chooseImport = el('button', { type: 'button', onclick: async () => {
-      try { const name = await window.localFolders.choose(selectedId); selected().import_folder = name; remember(); updateImport(); refreshStatus(); }
-      catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
-    } }, 'Choose import folder');
-    const clearImport = el('button', { type: 'button', class: 'small link', onclick: async () => {
-      try { await window.localFolders.clear(selectedId); selected().import_folder = ''; updateImport(); refreshStatus(); }
-      catch (err) { toast(err.message, true); }
-    } }, 'Clear');
-    const chooseExport = el('button', { type: 'button', onclick: async () => {
-      try { exportHandle = await trendExportFolders.choose(machine.id); exportStatus.textContent = exportHandle.name; refreshStatus(); }
-      catch (err) { if (err.name !== 'AbortError') toast(err.message, true); }
-    } }, 'Choose export folder');
-    const clearExport = el('button', { type: 'button', class: 'small link', onclick: async () => {
-      try { await trendExportFolders.set(machine.id, null); exportHandle = null; exportStatus.textContent = 'Browser downloads'; refreshStatus(); }
-      catch (err) { toast(err.message, true); }
-    } }, 'Use Downloads');
-    updateImport();
-    modal(`${machine.name} folders`, el('div', { class: 'trend-folder-settings' },
-      can('configure') && lists.length ? el('div', {}, el('h3', {}, 'Default import'), picker,
-        window.localApi ? el('div', { class: 'row' }, 'showDirectoryPicker' in window ? chooseImport : el('span', { class: 'muted small' }, 'Choose a saved Sphinx file with Import.'), clearImport, importStatus) : path) : null,
-      el('div', {}, el('h3', {}, 'Default export'), el('div', { class: 'row' }, 'showDirectoryPicker' in window ? chooseExport : null, clearExport, exportStatus)),
-      el('p', { class: 'muted small' }, 'Import folders belong to the selected QA list. Export folders are remembered for this machine on this browser and computer.')),
-    async () => {
-      if (!window.localApi && can('configure') && selected()) {
-        const a = selected();
-        await api('PUT', `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(',').filter(Boolean).map(Number), start_date: a.start_date, active: !!a.active, import_folder: path.value.trim() });
-        a.import_folder = path.value.trim();
-      }
-      remember(); refreshStatus();
-    }, 'Done');
-  };
+  if (browserFolders()) trendExportFolders.get(machine.id).then((handle) => { exportHandle = handle; refreshStatus(); }).catch(() => { refreshStatus(); });
   const importFromFolder = async (initialFiles = []) => {
     const a = selected();
     if (!a) return toast('Schedule a QA list on this machine first.', true);
@@ -4193,7 +4112,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
   } }, 'Export CSV');
   refreshStatus();
   return el('div', { class: 'row trend-file-tools' },
-    can('perform') ? el('button', { type: 'button', disabled: !lists.length, onclick: async () => {
+    can('perform') && browserFolders() ? el('button', { type: 'button', disabled: !lists.length, onclick: async () => {
       try {
         if (window.localApi && 'showDirectoryPicker' in window) {
           const a = selected();
@@ -4237,7 +4156,7 @@ function trendInsightsCard(series) {
   messages.sort((a,b) => b.priority-a.priority);
   const populated=series.filter(s=>s.points.length);
   const enough=populated.some(s=>new Set(s.points.map(p=>p.qa_date)).size>=5);
-  const emptyText=!populated.length?'No measurements in this period. Choose another period or use Import Folder.':!enough?'More history is needed to check for a trend: at least 5 different QA dates per measurement.':'No warning, action, or steady drift found in the selected period.';
+  const emptyText=!populated.length?`No measurements in this period. Choose another period${browserFolders()?' or use Import Folder':''}.`:!enough?'More history is needed to check for a trend: at least 5 different QA dates per measurement.':'No warning, action, or steady drift found in the selected period.';
   return el('section', { class: 'card trend-insights', 'aria-label': 'Automatic trend insights' },
     el('h3', {}, 'Trend summary'),
     messages.length ? el('ul', {}, messages.slice(0,6).map((m) => el('li', {}, m.href ? el('a', { href: m.href, class: 'trend-insight-link' }, m.text, ' → View graph') : m.text))) : el('p', { class: 'muted small' }, emptyText),
@@ -4364,9 +4283,11 @@ async function renderAdmin() {
     }) }, "Edit"))))));
 
   // 2. Import folders: one per scheduled QA list. When a list has a folder, its newest unrecorded export
-  // is read automatically when someone starts that list's QA (no file dialog).
-  app.append(el("h2", { class: "section-head" }, "Import folders (auto-read)"),
-    el("p", { class: "muted" }, window.localApi
+  // is read automatically when someone starts that list's QA (no file dialog). Without browser folders
+  // (browserFolders()) the paths are only typed here, by a Physicist or Admin; the scheduled import reads the folders.
+  const scans = browserFolders();
+  app.append(el("h2", { class: "section-head" }, scans ? "Import folders (auto-read)" : "Import folders"),
+    el("p", { class: "muted" }, !scans ? "New files in these folders are imported by the scheduled import on a UFHPTI computer." : window.localApi
       ? "Choose the folder each list's Sphinx exports (.xls or .csv) are saved to. All new files are scanned and imported when you open this page or choose a folder, then every minute while this page is open. Imported results await review. Folders are remembered in this browser on this computer (Chrome or Edge)."
       : "The folder (on this PC or a network share it can read) each list's Sphinx exports (.xls or .csv) are saved to. All new files are scanned and imported when you open this page or choose a folder, then every minute while this page is open. Imported results await review."));
   const rows = [];
@@ -4376,7 +4297,7 @@ async function renderAdmin() {
       let scanning = false;
       const rejected = new Map();
       const check = async () => {
-        if (scanning) return;
+        if (scanning || !scans) return;
         scanning = true;
         if (!a.import_folder && !window.localApi) { status.textContent = "No folder"; scanning = false; return; }
         try {
@@ -4400,14 +4321,18 @@ async function renderAdmin() {
         } finally { scanning = false; }
       };
       const onFolderChange = (event) => { if (Number(event.detail) === Number(a.id)) check(); };
-      window.addEventListener("import-folder-changed", onFolderChange);
-      const timer = setInterval(() => {
-        if (!status.isConnected) { clearInterval(timer); window.removeEventListener("import-folder-changed", onFolderChange); return; }
-        if (!document.hidden) check();
-      }, 60000);
+      if (scans) {
+        window.addEventListener("import-folder-changed", onFolderChange);
+        const timer = setInterval(() => {
+          if (!status.isConnected) { clearInterval(timer); window.removeEventListener("import-folder-changed", onFolderChange); return; }
+          if (!document.hidden) check();
+        }, 60000);
+      }
       let pathCell;
-      if (window.localApi) {
+      if (window.localApi && scans) {
         pathCell = importFolderField(a);
+      } else if (!scans && !can("configure")) {
+        pathCell = a.import_folder || "No folder";
       } else {
         const input = el("input", { value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\…\\ProtonDaily\\G1 Sphinx" });
         const save = el("button", { class: "small primary", onclick: async () => {
@@ -4423,11 +4348,11 @@ async function renderAdmin() {
         } }, "Save");
         pathCell = el("div", { class: "row nowrap" }, input, save);
       }
-      rows.push(el("tr", {}, el("td", {}, el("strong", {}, m.name)), el("td", {}, a.queue_name), el("td", { class: "folder-cell" }, pathCell), el("td", {}, status)));
+      rows.push(el("tr", {}, el("td", {}, el("strong", {}, m.name)), el("td", {}, a.queue_name), el("td", { class: "folder-cell" }, pathCell), scans ? el("td", {}, status) : null));
       check();
     }
   }
-  app.append(table(["Machine", "QA list", "Folder", "Status"], rows, "No QA lists are scheduled yet."));
+  app.append(table(["Machine", "QA list", "Folder", ...(scans ? ["Status"] : [])], rows, "No QA lists are scheduled yet."));
 
   // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
   if (!window.localApi) {
