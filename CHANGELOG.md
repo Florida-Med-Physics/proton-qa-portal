@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Show several tests on one row: each test in Setup QA's list editor has a **Same row as the test above** box (Physicist or Admin), kept as `[row: with above]` in the test's directions, so no database or server change. On the QA form and a saved run those tests share one numbered row, each input named with its unit (for example 1.08 holds TCS Sk, decay-table Sk and their difference, and the old 1.11 becomes 1.09); Result and Baseline show the test with limits, one + opens every test's comment, and History and the quick trend follow the test with limits. Setup QA, the PDF report and Machine Trends number alike. Display only: values, verdicts, limits, history, Machine Trends and the CSV export are unchanged, and each test is still its own result.
+
 - Machine Trends and Export CSV on the server build load long periods much faster: the server now works out the chosen period once and keeps it while the parts arrive (and for the next person who asks), instead of working the whole history out again for every part. Any change to the database, by the portal or by another program using the same file, makes it start afresh. Nothing shown, exported or sent changes. On three years of synthetic records for one gantry, all history went from about 6.3 s to about 0.9 s.
 
 - Machine Trends and Export CSV now download only the chosen period, in parts, so machines with long histories load instead of failing on the shared site; nothing shown or exported changes (chart order still follows the newest Sphinx import, even when it is older than the period). The trends endpoint takes `from=` and `page=` in both builds; see the README's Trends API paragraph.

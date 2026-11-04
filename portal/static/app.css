@@ -1751,3 +1751,24 @@ td, .measure-table td { font-size: 21px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block { padding:0; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block > h3 { padding:6px 7px; margin:0; font-size:15px; }
 }
+/* Tests that share one row ("Same row as the test above"): one cell over Test, Measured and Unit with each test's name
+   and unit over its input or value, side by side (wrapping when narrow), then the limits; stacked in the card on phones.
+   The text keeps the form's one reading size. */
+#app .measure-table td.qa-shared-cell { text-align:left; white-space:normal; }
+.qa-shared { display:flex; flex-wrap:wrap; align-items:flex-end; gap:6px 12px; }
+.qa-shared-field { display:flex; flex-direction:column; flex:1 1 0; min-width:5.75em; max-width:11em; }
+.qa-shared-name { color:var(--muted); font-weight:400; line-height:1.2; }
+.qa-shared-unit { white-space:nowrap; }
+.qa-shared-info { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; }
+.qa-shared-info .qa-calculation-info { margin-top:0; }
+#app .measure-table .qa-shared-field input:not([type="hidden"]), #app .measure-table .qa-shared-field select { width:100%; }
+.qa-shared-line { display:flex; flex-wrap:wrap; justify-content:center; align-items:baseline; gap:2px 8px; }
+.list-editor .same-row { display:inline-flex; margin:0 0 2px 12px; font-size:13px; color:var(--muted); }   /* on the number's line */
+.list-editor .same-row:first-child { margin-left:0; }
+.list-editor .same-row input { min-width:0; }
+@media(max-width:1200px) { #app .measure-table td.qa-shared-cell { grid-column:1/-1; grid-row:2; } }
+@media(max-width:767px) {   /* each test on its own line of the card: name left, answer right, as in the other cards */
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table td.qa-shared-cell { grid-column:1/-1; grid-row:1; }
+  #app .measure-table .qa-shared { flex-direction:column; align-items:stretch; }
+  #app .measure-table .qa-shared-field { display:grid; grid-template-columns:minmax(0,1fr) minmax(130px,1fr); align-items:center; gap:8px; max-width:none; }
+}
