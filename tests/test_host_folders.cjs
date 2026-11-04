@@ -35,10 +35,14 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
   if (localApi) window.localApi = () => {};
   if (picker) window.showDirectoryPicker = async () => { calls.push('showDirectoryPicker'); return { name: 'G1 Sphinx' }; };
   const context = { window, document, Node, app, URLSearchParams, state: { user: { id: 1, role }, actingRole: null },
-    api: async (method, path, body) => {
+    api: async function api(method, path, body) {
+      // Several GETs in one request (apiBatch): each answered as on its own, recorded as one request.
+      const batch = /^\/api\/batch\?paths=(.*)$/.exec(path);
+      if (batch) { calls.push(`GET /api/batch`); const each = []; for (const p of JSON.parse(decodeURIComponent(batch[1]))) each.push({ ok: true, value: await api('GET', p) }); return each; }
       calls.push(`${method} ${path}`); bodies.push(body);
       if (path === '/api/machines') return [{ id: 1, name: 'G1', active: 1 }];
       if (path === '/api/machines/1/assignments') return [{ ...LIST }];
+      if (path === '/api/assignments') return [{ ...LIST, machine_id: 1 }];   // every machine's lists at once (Data Administration)
       if (path.endsWith('/files')) return { folder: 'G1 Sphinx', permission: 'granted', files: [{ name: 'G1_11022026.xls', path: 'G1_11022026.xls', modified: '2026-11-02T06:10:00', size: 10 }] };
       if (path.includes('/file?')) return { name: 'G1_11022026.xls', data: '' };
       if (path.endsWith('/sphinx/import')) return { imported: [], skipped: [] };
@@ -61,7 +65,7 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
   context.request = context.api;   // Import Folder reads its files with request() (see api() in app.js)
   vm.createContext(context);
   for (const code of [part('const ROLE_LABEL', 'const STATE_LABEL'), part('function el(', 'function svg('), part('function activeRole(', 'let toastTimer;'),
-    part('function browserFolders(', 'function formData('), part('function field(', 'function modal('), part('function importFolderField(', 'function scheduleData('),
+    part('function machineSchedules(', '// A site that hosts'), part('function browserFolders(', 'function formData('), part('function field(', 'function modal('), part('function importFolderField(', 'function scheduleData('),
     part('const trendExportFolders', 'function trendPattern('), part('function trendPattern(', 'async function renderTrends('),
     part('function rangeStart(', 'function stats('),
     part('const RIGHTS = [', 'function importUserSpreadsheet('), part('async function renderAdmin(', 'async function renderUsers('),

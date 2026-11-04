@@ -1,8 +1,8 @@
 // Synthetic checks that a page left while it is still loading stops drawing. On a slow site Setup QA showed Review QA's
 // "Awaiting Physics Review" and "Recently reviewed" tables under its own heading: Review QA's late replies were still
-// drawn into the one page container. The real route(), api(), page(), logout(), Review QA, Setup QA, Machine Trends
-// and draft-saving code (and the real "Add them", list editor "New test" and Import Folder steps) run in node:vm with a
-// tiny DOM stand-in and a server whose replies the test releases one by one.
+// drawn into the one page container. The real route(), api(), apiBatch(), page(), logout(), Review QA, Setup QA, Machine
+// Trends and draft-saving code (and the real "Add them", list editor "New test", Import Folder and run measurements
+// reads) run in node:vm with a tiny DOM stand-in and a server whose replies the test releases one by one.
 // Run with node tests/test_stale_pages.cjs from the repository root.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -30,12 +30,33 @@ const count = (pattern) => (shown().match(pattern) || []).length;
 
 // The synthetic server: every request waits until the test answers it.
 const pending = [], received = [], sent = {};
-const serve = (method, path, body) => new Promise((resolve) => { pending.push({ method, path, body, resolve }); received.push(`${method} ${path}`); sent[`${method} ${path}`] = body; });
+// A GET /api/batch (apiBatch) waits as one entry per path it asks for; the test answers each path as if it had been
+// asked alone, and the batch replies once every one of its paths is answered (a 401 on any path answers it at once).
+const BATCH = /^\/api\/batch\?paths=(.*)$/;
+const serve = (method, path, body) => new Promise((resolve) => {
+  const batch = method === 'GET' && BATCH.exec(path);
+  if (batch) {
+    const paths = JSON.parse(decodeURIComponent(batch[1]));
+    const group = { resolve, left: paths.length, results: [] };
+    paths.forEach((p, index) => { pending.push({ method: 'GET', path: p, group, index }); received.push(`GET ${p}`); });
+    return;
+  }
+  pending.push({ method, path, body, resolve }); received.push(`${method} ${path}`); sent[`${method} ${path}`] = body;
+});
 function release(key, { status = 200, last = false } = {}) {
   const matches = pending.filter((r) => `${r.method} ${r.path}` === key);
   assert.ok(matches.length, `nothing waits for ${key}; waiting: ${pending.map((r) => `${r.method} ${r.path}`).join(', ')}`);
   const r = last ? matches.at(-1) : matches[0];
   pending.splice(pending.indexOf(r), 1);
+  if (r.group) {
+    if (status === 401) {
+      for (const other of pending.filter((p) => p.group === r.group)) pending.splice(pending.indexOf(other), 1);
+      return r.group.resolve([401, { error: 'Synthetic 401' }]);
+    }
+    r.group.results[r.index] = status === 200 ? { ok: true, value: reply(r) } : { ok: false, error: `Synthetic ${status}` };
+    if (--r.group.left === 0) r.group.resolve([200, r.group.results]);
+    return;
+  }
   r.resolve(status === 200 ? [200, reply(r)] : [status, { error: `Synthetic ${status}` }]);
 }
 const run = (id, review_status) => ({ id, review_status, review_ready: true, qa_date: '2026-11-03', machine_name: 'Synthetic Gantry A', queue_name: 'Synthetic daily list', overall: 'pass', performer: 'synthetic' });
@@ -50,7 +71,7 @@ function reply({ method, path, body }) {
     'GET /api/runs?trashed=1&limit=200': () => [run(3, 'pending')],
     'GET /api/queues': () => [{ id: 1, name: 'Synthetic daily list', active: 1, item_count: 3 }],
     'GET /api/machines': () => [{ id: 7, name: 'Synthetic Gantry A', kind: 'Proton gantry', active: 1 }],
-    'GET /api/machines/7/assignments': () => [schedule],
+    'GET /api/assignments': () => [schedule],   // every machine's lists (machineSchedules picks machine 7's)
     'GET /api/assignments/21/template': () => ({ assignment: { id: 21 }, queue: { name: 'Synthetic daily list' }, items: [] }),
     'PUT /api/assignments/21': () => ({ ...schedule, active: body.active ? 1 : 0 }),
     'PUT /api/assignments/5/draft': () => ({ saved_at: '2026-11-04T09:30:00' }),
@@ -82,10 +103,10 @@ const context = {
   table: (heads, rows) => node('table', {}, rows), filterBox: () => node('input'), select: (name, options, value) => node('select', { name, value }),
   MODALITIES: ['Proton', 'Photon'], modalityOf: () => 'Proton', FREQ_ORDER: { daily: 0, monthly: 2 }, QADerived: { value: (input) => input.value },
   trendSourceNumberer: () => (p) => p, trendFileTools: () => node('div', {}, 'Import Folder', 'Export CSV'),
-  // Stand-in for the chart overview: it asks for what the real one asks for (the machine's lists, the period's history).
+  // Stand-in for the chart overview: it waits for what the real one waits for (the period's history, which renderTrends
+  // has already asked for; the lists and templates come from renderTrends).
   async renderTrendOverview(machines, machineId, range, listId, templates, historyRequest) {
-    await context.api('GET', `/api/machines/${machineId}/assignments`);
-    const { histories } = await historyRequest;
+    const { histories } = await (historyRequest || context.machineHistory(machineId, { from: context.rangeStart(range) }));
     app.append(node('section', {}, `Overview from ${[...new Set(Object.values(histories).flat().map((p) => p.qa_date))].join(', ')}`));
   },
   // Stand-in for the QA form: its real first lines (they take the "Add them" request to apply the Sphinx file again), the
@@ -101,11 +122,11 @@ const context = {
   },
   // A page whose last step is a write that fails after the person has left it.
   async renderAccount() { context.page('My account'); await context.api('POST', '/api/password', {}); },
-  // Stand-in for a run's page: like its measurements, two reads at once, drawn without either one if it fails.
+  // Stand-in for a run's page: its heading, then the real read for its measurements (the list's template and the run's
+  // history in one batch, drawn without whatever failed), then the measurements.
   async renderRun(id) {
     context.page(`Synthetic run ${id}`);
-    await Promise.all([context.api('GET', '/api/machines/7/trends?tests=5&until=2026-11-03&last=61').catch(() => ({})),
-      context.api('GET', '/api/assignments/21/template').catch(() => null)]);
+    await context.runMeasurementsRead({ id: Number(id), assignment_id: 21, machine_id: 7, qa_date: '2026-11-03', results: [{ test_id: 5 }] });
     app.append(node('section', {}, 'Synthetic measurements'));
   },
 };
@@ -138,13 +159,19 @@ vm.runInContext([
     return ${newTest.slice(newTest.indexOf('async (data) => {'), newTest.indexOf('}); } }, "New test");') + 1)};
   };`,
   `this.realTrendFileTools = (() => {\n${between('function trendFileTools(', 'function trendPattern(')}\nreturn trendFileTools;\n})();`,
+  `this.runMeasurementsRead = async (run) => {\n${between('  const runTests=[...new Set(run.results', '  const numbers=blockNumbers(')}  return { template, history };\n};`,
 ].join('\n'), context);
 
 const settle = async () => { for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve)); };
 // What a click on a link does: the hash changes and the hashchange listener calls route() (never awaited).
 const go = async (hash) => { context.location.hash = hash; context.route(); await settle(); };
 const trends = (days, part) => `GET /api/machines/7/trends?from=${context.rangeStart(String(days))}&page=${part}`;
-const loadSetup = async () => { release('GET /api/queues'); release('GET /api/machines'); await settle(); release('GET /api/machines/7/assignments'); await settle(); };
+// Setup QA asks once: its lists, the machines and every machine's schedules, in one batch.
+const loadSetup = async () => { release('GET /api/queues'); release('GET /api/machines'); release('GET /api/assignments'); await settle(); };
+// Machine Trends asks one step at a time: the machines and every machine's lists (one batch), then the list's template
+// (a batch of one), and only then the period's history in parts (start, p2). loadTrendLists answers the first two steps;
+// each scenario answers the history itself.
+const loadTrendLists = async () => { release('GET /api/machines'); release('GET /api/assignments'); await settle(); release('GET /api/assignments/21/template'); await settle(); };
 const setupOnly = (label) => {
   assert.match(shown(), /Setup QA[\s\S]*QA Template Lists[\s\S]*Machine Schedules/, label);
   assert.doesNotMatch(shown(), /Review QA|Awaiting Physics Review|Recently reviewed|Awaiting Therapy Review|Trash/, label);
@@ -157,10 +184,10 @@ const reviewOnly = (label) => {
 };
 
 (async () => {
-  // 1. Review QA, then Setup QA before Review QA has its trash list: Review's late reply draws nothing under Setup QA.
+  // 1. Review QA, then Setup QA before Review QA has its runs and trash (one batch): Review's late reply draws nothing
+  //    under Setup QA.
   await go('#/review');
   release('GET /api/runs?limit=400'); await settle();
-  assert.match(shown(), /Review QA[\s\S]*Awaiting Therapy Review/);
   await go('#/setup');
   assert.match(shown(), /Setup QA/);
   release('GET /api/runs?trashed=1&limit=200'); await settle();
@@ -170,22 +197,26 @@ const reviewOnly = (label) => {
   assert.equal(pending.length, 0);
   console.log('Review QA, then Setup QA while Review QA loads: Setup QA shows only its own lists and schedules.');
 
-  // 2. The reverse: Setup QA's late lists and machines arrive once Review QA has drawn its heading.
+  // 2. The reverse: Setup QA's lists, machines and schedules (one batch) arrive late, once Review QA is drawn (Review QA
+  //    draws its heading and tables together, when its own batch is answered).
   await go('#/setup');
   await go('#/review');
-  release('GET /api/runs?limit=400'); await settle();
-  release('GET /api/queues'); release('GET /api/machines'); await settle();
-  assert.ok(!pending.some((r) => r.path.endsWith('/assignments')), 'Setup QA stopped: it asks for no machine schedules');
-  release('GET /api/runs?trashed=1&limit=200'); await settle();
+  release('GET /api/runs?limit=400'); release('GET /api/runs?trashed=1&limit=200'); await settle();
+  reviewOnly('Review QA drawn');
+  await loadSetup();                                                          // Setup QA's batch, late
   reviewOnly('Setup QA, then Review QA');
   assert.equal(pending.length, 0);
   console.log('Setup QA, then Review QA while Setup QA loads: Review QA shows only its own tables.');
 
-  // 3. The same page opened again with another query while the first is loading (Review QA, then its physics link).
+  // 3. The same page opened again with another query while the first is loading (Review QA, then its physics link). The
+  //    physics link's batch is answered first; the first opening's batch, answered after it, draws nothing over it.
   await go('#/review');
   await go('#/review?stage=physics');
-  release('GET /api/runs?limit=400'); release('GET /api/runs?limit=400'); await settle();
-  release('GET /api/runs?trashed=1&limit=200'); await settle();
+  release('GET /api/runs?limit=400', { last: true }); release('GET /api/runs?trashed=1&limit=200', { last: true }); await settle();
+  reviewOnly('Review QA, physics link');
+  const drawn = app.kids[0];
+  release('GET /api/runs?limit=400'); release('GET /api/runs?trashed=1&limit=200'); await settle();
+  assert.equal(app.kids[0], drawn, 'the first opening, answered late, does not draw the page again');
   reviewOnly('Review QA opened twice');
   assert.equal(count(/Review QA/g), 1);
   assert.equal(pending.length, 0);
@@ -193,34 +224,30 @@ const reviewOnly = (label) => {
 
   // 4. Machine Trends: the period changes while the old period's history is still arriving.
   await go('#/trends?machine_id=7&range=90');
-  release('GET /api/machines'); await settle();
-  release('GET /api/machines/7/assignments'); await settle();
-  release(trends(90, 'start')); release('GET /api/assignments/21/template'); await settle();   // still waits for part 2 to pick the list
+  await loadTrendLists();
+  release(trends(90, 'start')); await settle();                                                  // still waits for part 2 to pick the list
   await go('#/trends?machine_id=7&list=21&range=30');
-  release('GET /api/machines'); await settle();
-  release('GET /api/machines/7/assignments'); await settle();
-  release(trends(30, 'start')); release('GET /api/assignments/21/template'); await settle();
+  await loadTrendLists();                                                                        // 30 days drawn, its overview waits
+  release(trends(30, 'start')); await settle();
   assert.match(shown(), /Machine Trends/);
   const asked = received.length;
   release(trends(90, 'p2')); await settle();                                                     // the old period's last part, late
   assert.equal(received.length, asked, 'the old period asks for nothing more');
-  release('GET /api/machines/7/assignments'); release(trends(30, 'p2')); await settle();
+  release(trends(30, 'p2')); await settle();
   assert.match(shown(), new RegExp(`Overview from ${context.rangeStart('30')}$`));
   assert.doesNotMatch(shown(), new RegExp(context.rangeStart('90')));
   assert.equal(count(/Machine Trends/g), 1);
   // … and while the old period's page is drawn and its overview is still loading.
   await go('#/trends?machine_id=7&list=21&range=90');
-  release('GET /api/machines'); await settle();
-  release('GET /api/machines/7/assignments'); await settle();
-  release(trends(90, 'start')); release('GET /api/assignments/21/template'); await settle();
-  assert.match(shown(), /Machine Trends/);                                                       // 90 days drawn, its overview waits
+  await loadTrendLists();
+  release(trends(90, 'start')); await settle();
+  assert.match(shown(), /Machine Trends/);                                                       // 90 days drawn, its overview waits for part 2
   await go('#/trends?machine_id=7&list=21&range=365');
-  release('GET /api/machines'); await settle();
-  release('GET /api/machines/7/assignments', { last: true }); await settle();
-  release(trends(365, 'start')); release('GET /api/assignments/21/template'); await settle();    // 365 days drawn, its overview waits
-  release('GET /api/machines/7/assignments'); release(trends(90, 'p2')); await settle();          // the 90-day overview's late replies
+  await loadTrendLists();
+  release(trends(365, 'start')); await settle();                                                 // 365 days drawn, its overview waits
+  release(trends(90, 'p2')); await settle();                                                     // the 90-day overview's late reply
   assert.doesNotMatch(shown(), /Overview/);
-  release('GET /api/machines/7/assignments'); release(trends(365, 'p2')); await settle();
+  release(trends(365, 'p2')); await settle();
   assert.match(shown(), new RegExp(`Overview from ${context.rangeStart('365')}$`));
   assert.equal(count(/Overview/g), 1);
   assert.equal(count(/Machine Trends/g), 1);
@@ -252,8 +279,7 @@ const reviewOnly = (label) => {
   setupOnly('redrawn after a save');
   // Redrawn twice in a row (a save and a hash change together): one copy, loaded.
   context.route(); context.route(); await settle();
-  release('GET /api/queues'); release('GET /api/machines'); release('GET /api/queues'); release('GET /api/machines'); await settle();
-  release('GET /api/machines/7/assignments'); await settle();
+  await loadSetup(); await loadSetup();                                       // the first redraw's batch (left), then the second's
   setupOnly('redrawn twice');
   assert.equal(pending.length, 0);
   console.log('A save that redraws its page with route() still redraws it, once.');
@@ -261,7 +287,7 @@ const reviewOnly = (label) => {
   // 7. A late failure on a page that was left draws no error on the next page.
   await go('#/review');
   await go('#/setup');
-  release('GET /api/runs?limit=400', { status: 500 }); await settle();
+  release('GET /api/runs?limit=400', { status: 500 }); release('GET /api/runs?trashed=1&limit=200'); await settle();
   await loadSetup();
   setupOnly('after a late failure');
   await go('#/account');
@@ -284,15 +310,16 @@ const reviewOnly = (label) => {
   const out = context.logout(); await settle();
   release('POST /api/logout'); await out; context.route(); await settle();
   assert.equal(shown(), 'Sign in');
-  release('GET /api/queues'); release('GET /api/machines'); await settle();
+  await loadSetup();                                                          // Setup QA's batch, late
   assert.equal(shown(), 'Sign in', 'the page left at sign-out draws nothing on the sign-in form');
   assert.equal(pending.length, 0);
   context.state.user = { id: 1, username: 'synthetic', role: 'physicist' };
-  // The session ends while a page waits on reads it would draw without (.catch): that page stops at the sign-in form too.
+  // The session ends while a page waits on a read it would draw without (.catch: a run's template and history, one
+  // batch): that page stops at the sign-in form too. The 401 answers the whole batch.
   await go('#/runs/3');
-  release('GET /api/machines/7/trends?tests=5&until=2026-11-03&last=61', { status: 401 });
-  release('GET /api/assignments/21/template', { status: 401 }); await settle();
+  release('GET /api/machines/7/trends?tests=5&until=2026-11-03&last=61', { status: 401 }); await settle();
   assert.deepEqual([context.state.user, shown()], [null, 'Sign in'], 'nothing drawn under the sign-in form');
+  assert.equal(pending.length, 0);
   context.state.user = { id: 1, username: 'synthetic', role: 'physicist' };
   console.log('A 401 still shows the sign-in form, with nothing of the page under it; signing in again loads the page; signing out mid-load leaves the form alone.');
 
@@ -353,7 +380,7 @@ const reviewOnly = (label) => {
   await go('#/trends?machine_id=7&list=21&range=90');
   await importFolder();
   await go('#/setup');                                                        // left while the file is read
-  release('GET /api/machines'); await settle();                               // Machine Trends' late reply
+  release('GET /api/machines'); release('GET /api/assignments'); await settle();   // Machine Trends' late batch
   await loadSetup();
   release('GET /api/assignments/21/file?path=synthetic-1.xls'); await settle();
   const before = received.length;
@@ -366,7 +393,8 @@ const reviewOnly = (label) => {
   release('GET /api/assignments/21/file?path=synthetic-1.xls'); await settle();
   release('POST /api/assignments/21/sphinx/import'); await settle();
   assert.equal(pending.filter((r) => `${r.method} ${r.path}` === 'GET /api/machines').length, 2, 'Machine Trends drawn again');
-  await go('#/queues'); release('GET /api/machines'); release('GET /api/machines'); await settle();
+  await go('#/queues');
+  for (let i = 0; i < 2; i++) { release('GET /api/machines'); release('GET /api/assignments'); } await settle();
   assert.equal(pending.length, 0);
   console.log('Import Folder left mid-import: all files imported, summary shown, the other page not redrawn; on Machine Trends it redraws.');
 })().catch((e) => { console.error(e); process.exit(1); });

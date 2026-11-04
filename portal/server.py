@@ -85,6 +85,11 @@ def machine_assignments(db, user, m, body, q):
     return service.list_assignments(db, user, int(m[1]))
 
 
+@route("GET", "/api/assignments")
+def all_assignments(db, user, m, body, q):
+    return service.list_all_assignments(db, user)
+
+
 @route("GET", "/api/tests")
 def tests(db, user, m, body, q):
     return service.list_tests(db, user)
@@ -352,6 +357,38 @@ def trend(db, user, m, body, q):
 @route("GET", "/api/audit")
 def audit(db, user, m, body, q):
     return service.list_audit(db, user)
+
+
+BATCH_MAX = 20
+BATCH_REFUSED = re.compile(r"^/api/(me|batch|backup|dbfile|dbinfo|assignments/\d+/(draft|files?))$")
+
+
+@route("GET", "/api/batch")
+def batch(db, user, m, body, q):
+    """GET /api/batch?paths=<JSON list of GET paths>: several GETs in one reply, in order, each {ok: true, value} or
+    {ok: false, error} with the error it would have had on its own; the same as docs/local-backend.js, which explains
+    what it is for and what is refused."""
+    try:
+        paths = json.loads(q.get("paths") or "")
+    except ValueError:
+        paths = None
+    if not isinstance(paths, list) or not 1 <= len(paths) <= BATCH_MAX or not all(isinstance(p, str) and p.startswith("/api/") for p in paths):
+        raise PortalError(f"paths: give a JSON list of 1 to {BATCH_MAX} paths, each starting /api/.")
+    out = []
+    for p in paths:
+        url = urlsplit(p)
+        try:
+            if BATCH_REFUSED.match(url.path):
+                raise PortalError(f"{url.path} cannot be asked for in a batch.")
+            found = next(((pattern.match(url.path), handler) for method, pattern, handler, public in ROUTES
+                          if method == "GET" and pattern.match(url.path)), None)
+            if not found:
+                raise PortalError("Not found.", 404)   # as the request on its own
+            value = found[1](db, user, found[0], {}, {k: v[-1] for k, v in parse_qs(url.query).items()})
+            out.append({"ok": True, "value": json.loads(value) if isinstance(value, bytes) else value})
+        except PortalError as exc:
+            out.append({"ok": False, "error": str(exc)})
+    return out
 
 
 class PortalServer(ThreadingHTTPServer):

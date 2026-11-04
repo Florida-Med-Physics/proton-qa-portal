@@ -655,6 +655,13 @@ def list_assignments(db, user, machine_id, today=None):
     return rows
 
 
+def list_all_assignments(db, user, today=None):
+    """Every machine's schedules in one reply (GET /api/assignments), for pages that show several machines: machine by
+    machine in list_machines order, so one machine's rows are exactly its list_assignments."""
+    today = today or date.today()
+    return [row for machine in list_machines(db, user) for row in list_assignments(db, user, machine["id"], today)]
+
+
 def archive_assignment(db, user, assignment_id, data):
     require(user, "configure")
     a = _get(db, "assignments", assignment_id)
@@ -963,8 +970,11 @@ def submit_run(db, user, assignment_id, data):
     rows = [{"test_id": item["test_id"], "value_num": float(value) if value is not None and item["type"] in ("numeric", "boolean") else None,
              "value_text": value if item["type"] in ("text", "status", "choice") else None, "limits": item["limits"], "status": status, "comment": comment}
             for item, value, status, comment in results]
+    # clear_draft: true (the QA form's Submit) clears this person's draft of the list in the same transaction, instead of a
+    # second request (POST .../draft/clear) after it; draft_cleared says so. Without it nothing else changes.
     return _insert_run(db, user, template, qa_date.isoformat(), rows, _text(data, "comment"),
-                       "hdr-pdf" if source_ref and source_ref.startswith("hdrpdf:") else "sphinx" if source_ref else "manual", source_ref, "pending")
+                       "hdr-pdf" if source_ref and source_ref.startswith("hdrpdf:") else "sphinx" if source_ref else "manual", source_ref, "pending",
+                       clear_draft=data.get("clear_draft") is True)
 
 
 def _check_not_imported(db, source_ref):
@@ -988,7 +998,7 @@ def _results_overall(rows):
     return verdict
 
 
-def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, review_status):
+def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, review_status, clear_draft=False):
     result_overall = _results_overall(rows)
     with db.transaction():
         run_id = db.run(
@@ -1006,7 +1016,9 @@ def _insert_run(db, user, template, qa_date, rows, comment, source, source_ref, 
                     limits["tol_mode"], r["status"], r["comment"]))
         db.audit(user["id"], "import" if review_status == "imported" else "submit", "run", run_id,
                  machine=template["machine"]["name"], queue=template["queue"]["name"], overall=result_overall, source=source)
-    return {"id": run_id, "overall": result_overall}
+        if clear_draft:   # delete_draft's statement, in this transaction: the run and the cleared draft commit together
+            db.run("DELETE FROM drafts WHERE assignment_id = ? AND user_id = ?", (template["assignment"]["id"], user["id"]))
+    return {"id": run_id, "overall": result_overall, **({"draft_cleared": True} if clear_draft else {})}
 
 
 # ---- Sphinx exports ------------------------------------------------------------

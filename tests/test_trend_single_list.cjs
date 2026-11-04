@@ -29,7 +29,7 @@ assert.match(trends, /\.filter\(\(a\) => a\.active && \(activeRole\(\)!=='therap
 assert.match(trends, /let listId = lists\.some\(\(a\) => String\(a\.id\) === params\.get\("list"\)\) \? params\.get\("list"\) : "";/);
 assert.match(trends, /if \(!listId && lists\.length\) \{[\s\S]{0,200}?listId = String\(busiestList\(lists, \(await historyRequest\)\.histories\)\.id\);/);
 assert.match(trends, /let historyRequest = machineId && !testIds\.length \? machineHistory\(machineId, \{ from: rangeStart\(range\) \}\) : null;/);
-assert.match(trends, /renderTrendOverview\(machines, machineId, range, listId, templates, historyRequest\)/);
+assert.match(trends, /renderTrendOverview\(machines, machineId, range, listId, templates, historyRequest, lists\)/);
 assert.match(between('async function renderTrendOverview(', 'function renderTrendDetail('), /historyRequest \|\| machineHistory\(machineId, \{ from: rangeStart\(range\) \}\)/);
 assert.doesNotMatch(source, /api\(['"]GET['"], `\/api\/machines\/\$\{[a-zA-Z.]+\}\/trends`\)/);   // never the whole history in one reply
 assert.match(between('function trendFileTools(', 'function trendPattern('), /const targets = lists\.filter\(\(a\) => String\(a\.id\) === String\(listId\)\);/);
