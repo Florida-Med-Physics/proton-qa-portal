@@ -34,12 +34,14 @@ assert.equal(text(context.deviationText(100, ref, 'mm')), '(Δ +0.00 mm)');
 assert.equal(text(context.deviationText(100.3, ref, '')), '(Δ +0.30)');
 for (const v of [100.004, 100.005, 99.995, 112.345, 87.6549, 0, -3.21]) for (const unit of ['mm', 'MU', ''])
   assert.equal(text(context.deviationText(v, ref, unit)), `(${oldBadge(v, ref, unit)})`);
-assert.equal(text(context.deviationText(101.2, { ...ref, tol_mode: 'percent' }, 'MU')), '(Δ +1.20 MU, +1.20 %)');
+// A percent limit: just the percent, the number it is judged on (Brook: "Just one").
+assert.equal(text(context.deviationText(101.2, { ...ref, tol_mode: 'percent' }, 'MU')), '(Δ +1.20 %)');
+assert.equal(text(context.deviationText(0.3, { ...ref, expected: 0, tol_mode: 'percent' }, 'MU')), '(Δ +0.30 MU)');   // no percent of 0
 assert.equal(context.deviationText(100.3, ref, 'mm').props.class, 'result-dev');   // plain; the chip carries the colour
-// Pieces that never break inside: one for a plain limit, two for a percent limit (the line may break after the comma).
+// One piece that never breaks inside a number and its unit.
 const pieces = (node) => node.kids.map((k) => (typeof k === 'object' ? [k.tag, k.text] : k));
 assert.deepEqual(pieces(context.deviationText(99.7, ref, 'mm')), [['span', '(Δ −0.30 mm)']]);
-assert.deepEqual(pieces(context.deviationText(97.4, { ...ref, tol_mode: 'percent' }, 'cGy')), [['span', '(Δ −2.60 cGy,'], ' ', ['span', '−2.60 %)']]);
+assert.deepEqual(pieces(context.deviationText(97.4, { ...ref, tol_mode: 'percent' }, 'cGy')), [['span', '(Δ −2.60 %)']]);
 // Nothing without a reference or a value.
 for (const [v, limits] of [[100.3, { ...ref, expected: null }], [100.3, { ...ref, expected: undefined }], [100.3, null], [null, ref], [NaN, ref], [undefined, ref]])
   assert.equal(context.deviationText(v, limits, 'mm'), null);

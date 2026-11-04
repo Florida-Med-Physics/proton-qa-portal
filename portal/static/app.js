@@ -312,15 +312,14 @@ const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass 
 
 // "(Δ +0.30 mm)" in plain text after the Result chip (the chip carries the colour): the difference from the reference,
 // sign always shown, unit after the number. Nothing when there is no reference or no value.
-// A percent limit adds the percent after a comma; the text may break there, never inside a number and its unit.
+// One number only (Brook, 2026-11-04): a percent limit shows the percent, "(Δ +1.20 %)", the number it is judged on.
 function deviationText(value, limits, unit) {
   if (!Number.isFinite(value) || !limits || limits.expected === null || limits.expected === undefined) return null;
   const d = value - limits.expected;
-  const first = `(Δ ${signed(d)}${unit ? ` ${unit}` : ""}`;
-  const parts = limits.tol_mode === "percent" && limits.expected
-    ? [el("span", {}, `${first},`), " ", el("span", {}, `${signed((100 * d) / limits.expected, 2)} %)`)]
-    : [el("span", {}, `${first})`)];
-  return el("span", { class: "result-dev", title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, parts);
+  const text = limits.tol_mode === "percent" && limits.expected
+    ? `(Δ ${signed((100 * d) / limits.expected, 2)} %)`
+    : `(Δ ${signed(d)}${unit ? ` ${unit}` : ""})`;
+  return el("span", { class: "result-dev", title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, [el("span", {}, text)]);
 }
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
