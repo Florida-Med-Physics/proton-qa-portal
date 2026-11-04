@@ -285,6 +285,11 @@ def review(db, user, m, body, q):
     return service.review_run(db, user, int(m[1]), body)
 
 
+@route("POST", "/api/runs/record-history")
+def record_history(db, user, m, body, q):
+    return service.record_history(db, user, body)
+
+
 @route("POST", "/api/dbswitch")
 def dbswitch(db, user, m, body, q):
     """Admin: point the portal at another SQLite file (created empty if new; the admin's account is copied in)."""

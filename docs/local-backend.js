@@ -1326,11 +1326,31 @@
     const [, added] = sphinxTestIds(user, runTemplate(assignmentId), parsed.measurements, true);
     return { added };
   }
+  // A day written YYYY-MM-DD in ASCII digits that is on the calendar; the same rule and words as service.py _iso_day.
+  function isoDay(value, key) {
+    const m = typeof value === "string" ? /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(value) : null;
+    if (m) {
+      const y = Number(m[1]), month = Number(m[2]), day = Number(m[3]);
+      const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
+      if (y >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]) return value;
+    }
+    throw new Error(`${key}: give a date as YYYY-MM-DD.`);
+  }
+  // An optional id in a request body: absent or null means none; anything else must be a whole number naming a row.
+  function optionalRow(data, key, table, missing) {
+    const value = data[key];
+    if (value === undefined || value === null) return null;
+    const row = Number.isSafeInteger(value) && value > 0 ? byId(table, value) : null;
+    if (!row) throw new Error(missing);
+    return row;
+  }
   async function importSphinx(user, assignmentId, data) {
     require(user, "configure");
+    // history_before: files dated before it come in as history, the rest await review (historical is then ignored).
+    const historyBefore = data.history_before === undefined || data.history_before === null ? null : isoDay(data.history_before, "history_before");
     const uploads = data.files || [];
     if (!uploads.length) throw new Error("Choose one or more Sphinx .xls files.");
-    const historical = data.historical !== false;
+    const asHistory = (qaDate) => historyBefore ? qaDate < historyBefore : data.historical !== false;
     let t = runTemplate(assignmentId);
     const imported = [], skipped = [];
     for (const u of uploads) {
@@ -1347,6 +1367,7 @@
       }
       if (added.length) t = runTemplate(assignmentId);
       const listItems = Object.fromEntries(t.items.map((i) => [i.test_id, i]));
+      const historical = asHistory(parsed.qa_date);
       const rows = parsed.measurements.filter((m) => ids[`${m.category}|${m.name}`]).map((m) => {
         const testId = ids[`${m.category}|${m.name}`];
         // New results are judged by the list's limits, as when the QA is done on the form; the file's own verdict
@@ -1367,6 +1388,30 @@
       imported.push({ file: parsed.filename, run_id: run.id, qa_date: parsed.qa_date, overall: run.overall });
     }
     return { imported, skipped };
+  }
+  // A run made by a Sphinx file import (importSphinx above, or a folder import that sends each file through the form
+  // with the same opening words), never one someone performed on the Perform form, even when a file filled it in.
+  const importedFromFile = (run) => run.source === "sphinx" && String(run.comment || "").startsWith("Imported from ");
+  // Past Sphinx imports still waiting for review become history, as if imported as history in the first place: results,
+  // limits, verdicts, comments and any therapist sign-off stay as they are. Mirrors service.py record_history.
+  function recordHistory(user, data) {
+    require(user, "review");
+    const until = isoDay(data.until, "until");
+    const machine = optionalRow(data, "machine_id", "machines", "Machine not found.");
+    const assignment = optionalRow(data, "assignment_id", "assignments", "Schedule not found.");
+    if (data.dry_run !== undefined && data.dry_run !== null && typeof data.dry_run !== "boolean") throw new Error("dry_run: give true or false.");
+    if (machine && assignment && assignment.machine_id !== machine.id) throw new Error("That schedule is not on that machine.");
+    const runs = S.runs.filter((r) => !r.trashed_at && r.review_status === "pending" && importedFromFile(r) && r.qa_date <= until
+      && (!machine || r.machine_id === machine.id) && (!assignment || r.assignment_id === assignment.id)).sort((a, b) => a.id - b.id);
+    if (data.dry_run === true) return { count: runs.length, runs: runs.map((r) => r.id) };
+    for (const r of runs) {
+      const previous = { review_status: r.review_status, therapist_approval_required: !!r.therapist_approval_required,
+        therapist_approved_by: r.therapist_approved_by ?? null, therapist_approved_at: r.therapist_approved_at ?? null };
+      Object.assign(r, { review_status: "imported", therapist_approval_required: false });
+      audit(user.id, "record_history", "run", r.id, { previous, until });
+    }
+    save();
+    return { count: runs.length };
   }
 
   // ---- seed ---------------------------------------------------------------------
@@ -2036,6 +2081,7 @@
   route("POST", "/api/runs/(\\d+)/therapist-review",(u,m,body)=>setTherapistReview(u,Number(m[1]),body));
   route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
+  route("POST", "/api/runs/record-history", (u, m, body) => recordHistory(u, body));
   route("GET", "/api/machines/(\\d+)/trends", (u, m, body, q) => { const w = trendWindow(q); return w.page ? trendPage(Number(m[1]), w) : machineTrends(Number(m[1]), w); });
   route("GET", "/api/trend", (u, m, body, q) => {
     if (!q.machine_id || !q.test_id) throw new Error("Choose a machine and a test.");

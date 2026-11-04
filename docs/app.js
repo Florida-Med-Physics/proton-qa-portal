@@ -3106,9 +3106,52 @@ function qaTrashButton(run) {
 }
 function reviewRowActions(run) {return el('div',{class:'row qa-review-actions'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at||can('therapist_approve')&&!can('review')?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
 
+// Past Sphinx imports that still wait for review can be recorded as history (POST /api/runs/record-history): their
+// results, limits and verdicts stay, and they leave the review queues. Physicist or Admin only.
+async function recordHistoryDialog() {
+  const machines = await api('GET', '/api/machines');
+  const d = new Date(); d.setDate(d.getDate() - 1);
+  const until = el('input', { type: 'date', name: 'until', required: true, value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` });
+  const machine = select('machine_id', [['', 'All'], ...machines.map((m) => [m.id, m.name])], '');
+  const list = select('assignment_id', [['', 'All']], '');
+  const count = el('p', { role: 'status' });
+  const body = () => ({ until: until.value, machine_id: machine.value ? Number(machine.value) : null, assignment_id: list.value ? Number(list.value) : null });
+  let asked = 0, confirmButton = null;
+  const refresh = async () => {
+    const ask = ++asked;
+    confirmButton.disabled = true;
+    if (!until.value) { count.textContent = 'Choose a date.'; return; }
+    count.textContent = 'Counting…';
+    try {
+      const { count: n } = await api('POST', '/api/runs/record-history', { ...body(), dry_run: true });
+      if (ask !== asked) return;
+      count.textContent = n ? `${n} imported Sphinx run${n === 1 ? '' : 's'} will be recorded as history. Their results and verdicts are kept; they will no longer wait for review.`
+        : 'No imported Sphinx runs up to that date are waiting for review.';
+      confirmButton.disabled = !n;
+    } catch (err) { if (ask === asked) count.textContent = err.message; }
+  };
+  machine.addEventListener('change', async () => {
+    const chosen = machine.value;
+    const schedules = chosen ? await api('GET', `/api/machines/${chosen}/assignments`).catch(() => []) : [];
+    if (chosen !== machine.value) return;
+    list.replaceChildren(...[['', 'All'], ...schedules.map((a) => [a.id, a.queue_name])].map(([v, label]) => el('option', { value: v }, label)));
+    refresh();
+  });
+  list.addEventListener('change', refresh);
+  until.addEventListener('change', refresh);
+  const dialog = modal('Record past imports as history', el('div', {}, field('Machine', machine), field('QA list', list), field('QA dates up to', until), count), async () => {
+    const { count: n } = await api('POST', '/api/runs/record-history', body());
+    toast(`${n} run${n === 1 ? '' : 's'} recorded as history`);
+    route();
+  }, 'Confirm');
+  confirmButton = dialog.querySelector('button[type=submit]');
+  refresh();
+}
+
 async function renderReview() {
   const runs = await api("GET", "/api/runs?limit=400");
-  page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
+  page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results"),
+    can("review") ? el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…") : null]);
   const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
     el("td", {}, el("a", { href: `#/runs/${r.id}` }, shortDate(r.qa_date))),
     el("td", {}, el("strong", {}, machineLabel(r.machine_name))),

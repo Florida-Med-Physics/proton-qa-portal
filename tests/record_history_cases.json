@@ -1,0 +1,30 @@
+{
+  "about": "Synthetic request bodies shared word for word by tests/test_record_history.py (service.py) and tests/test_record_history.cjs (local-backend.js), so both servers refuse them with the same text.",
+  "bad_dates": ["", "2026-11-4", "11/04/2026", "2026/11/04", "2026-02-30", "2026-02-29", "1900-02-29", "2026-13-01", "2026-00-10",
+    "2026-11-00", "2026-11-31", "0000-01-01", "٢٠٢٦-11-04", "2026-11-04T00:00", "2026-11-04\n", " 2026-11-04",
+    "+2026-11-04", "20261104", 20261104, true, false, ["2026-11-04"], {"date": "2026-11-04"}],
+  "good_dates": ["2024-02-29", "2000-02-29", "0001-01-01", "9999-12-31"],
+  "refused": [
+    [{}, "until: give a date as YYYY-MM-DD."],
+    [{"until": null}, "until: give a date as YYYY-MM-DD."],
+    [{"until": "2026-10-03", "machine_id": "1"}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": 999999}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": 1.5}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": 0}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": -1}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": true}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": ""}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": 1e300}, "Machine not found."],
+    [{"until": "2026-10-03", "machine_id": [1]}, "Machine not found."],
+    [{"until": "2026-10-03", "assignment_id": "x"}, "Schedule not found."],
+    [{"until": "2026-10-03", "assignment_id": 999999}, "Schedule not found."],
+    [{"until": "2026-10-03", "assignment_id": false}, "Schedule not found."],
+    [{"until": "2026-10-03", "dry_run": "true"}, "dry_run: give true or false."],
+    [{"until": "2026-10-03", "dry_run": 1}, "dry_run: give true or false."],
+    [{"until": "2026-10-03", "dry_run": 0}, "dry_run: give true or false."],
+    [{"until": "2026-10-03", "dry_run": "yes"}, "dry_run: give true or false."],
+    [{"until": "2026-13-03", "machine_id": 999999, "dry_run": "yes"}, "until: give a date as YYYY-MM-DD."],
+    [{"until": "2026-10-03", "machine_id": 999999, "assignment_id": 999999}, "Machine not found."],
+    [{"until": "2026-10-03", "assignment_id": 999999, "dry_run": "yes"}, "Schedule not found."]
+  ]
+}

@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- **[Physics review]** Past Sphinx imports that wait for review can be recorded as history: on Review QA a Physicist or Admin chooses **Record past imports as history…**, picks a machine, QA list and last QA date, sees how many runs will change, and confirms (`POST /api/runs/record-history`, with a dry run). Only runs made by a Sphinx file import that still wait for review change, never runs performed on the Perform page or trashed, approved or rejected runs; their values, limits, verdicts, comments and therapist sign-offs stay, and each gets an audit entry. A Sphinx import also takes `history_before` (a date): files dated before it come in as history, files on or after it wait for review. Both builds; see the README.
+
 - Machine Trends and Export CSV on the server build load long periods much faster: the server now works out the chosen period once and keeps it while the parts arrive (and for the next person who asks), instead of working the whole history out again for every part. Any change to the database, by the portal or by another program using the same file, makes it start afresh. Nothing shown, exported or sent changes. On three years of synthetic records for one gantry, all history went from about 6.3 s to about 0.9 s.
 
 - Machine Trends and Export CSV now download only the chosen period, in parts, so machines with long histories load instead of failing on the shared site; nothing shown or exported changes (chart order still follows the newest Sphinx import, even when it is older than the period). The trends endpoint takes `from=` and `page=` in both builds; see the README's Trends API paragraph.
