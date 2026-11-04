@@ -138,7 +138,7 @@ The server build works out a paged answer once and keeps it in memory for the fo
 
 Choose an existing departmental starter (including TG-142/TG-224 and CT simulation references), a blank template, or an Excel/MyQA checklist export. Spreadsheet import supports `.xlsx`, `.xls`, and `.csv`, with worksheet choice, adjustable column mapping and a test preview before creation. Numeric limits are read only from explicit mapped cells; unsupported text criteria remain instructions. Review every imported test and limit before use. Native MyQA `.pld` parsing is not implemented; export the checklist to Excel first. Creation is unscheduled and atomic, so an invalid import does not leave a partial template.
 
-Client regression checks: `node tests/test_trend_tools.cjs`, `node tests/test_autosave.cjs`, `node tests/test_report.cjs`, and `node tests/test_host_folders.cjs`.
+Client regression checks: `node tests/test_trend_tools.cjs`, `node tests/test_autosave.cjs`, `node tests/test_report.cjs`, `node tests/test_host_folders.cjs`, and `node tests/test_page_requests.cjs`.
 
 ### Responsive home and machine management
 
@@ -155,6 +155,27 @@ window.QA_HOST = { browserFolders: false };
 ```
 
 Then no page opens a folder: no folder picker, no `window.localFolders`, no `GET /api/assignments/:id/files` or `/file`, no folder `<input webkitdirectory>` and no export folder. Each list's **Default import folder** is a typed path (in the schedule editor, and in Data Administration for a Physicist or Admin), saved with its schedule by `PUT /api/assignments/:id`. It is typed once the list is saved: adding a list, or scheduling one on several machines at once, offers no folder, so one folder is never set on several lists. The scheduled import on a UFHPTI computer reads those folders. Perform QA keeps its single-file import, Machine Trends has **Export CSV** only (a browser download), and Data Administration does not scan. Without `QA_HOST`, or with any other value, both builds work as before; `tests/test_host_folders.cjs` checks both.
+
+## Fewer requests per page
+
+Every request a page makes costs a round trip, and on a site that runs the backend once per request (floridaphysics.com runs the browser build's `local-backend.js` on AWS Lambda) each one also starts the backend on a whole copy of the records. So the pages ask for what they need in as few requests as they can, and in as few steps one after another. The same in both builds:
+
+- **`GET /api/assignments`**: every machine's schedules in one reply, machine by machine in `GET /api/machines` order, each machine's rows exactly as `GET /api/machines/<id>/assignments` gives them. Setup QA, Machines, Machine Trends, Data Administration and "Schedule on machines" use it instead of one request per machine.
+- **`GET /api/batch?paths=<JSON list of GET paths>`**: several GETs answered in one reply, in order, each `{ok: true, value}` or `{ok: false, error}` with the error that path would have had on its own; at most 20 paths (the page sends more as several batches side by side). Never `/api/me`, a draft, the folder or database answers (a hosting page may answer or screen those itself), `/api/backup` or another batch. The Dashboard, Review QA, Setup QA, Machines, Machine Trends and Data Administration use it.
+- **`clear_draft: true`** on `POST /api/assignments/<id>/runs` (the QA form's **Submit for review**): the run is recorded and that person's draft of the list cleared in the same save, and the reply says `draft_cleared: true`. Without it nothing else changes. Against a server that does not say so (an older build) the page sends `POST .../draft/clear` afterwards, as before.
+
+What the pages now ask for (synthetic records; `tests/test_page_requests.cjs` runs the pages against the browser build and checks these, `tests/test_page_requests.py` the server build):
+
+| Page | Before | Now |
+| --- | --- | --- |
+| Dashboard | 2 requests, one after the other | 1 |
+| Review QA | 2, one after the other | 1 |
+| Machine Trends (overview) | machines, then the machine's lists, then the period's history beside each list's template, then the lists and the chosen list's template again: 5 steps | 2 steps: machines and lists; then the history beside one request for the templates |
+| Data Administration | users and machines, then each active machine's lists, one machine after another (11 requests, 10 in a row) | 1 |
+| Setup QA, Machines | 11 requests in 2 or 3 steps, one for each machine's lists | 1 |
+| Submit for review | two saves: the run, then clearing the draft | one save |
+
+The QA form still asks for its template, then the history of its tests, then the draft, one after another: the history needs the template's tests, and a hosting page that screens the draft reply when it arrives (floridaphysics.com holds back a draft from an earlier day and says so on the form) needs the form drawn first. A site that hosts these pages should update its backend copy before, or with, these pages: the pages need the new requests.
 
 ## Shared UFHPTI deployment
 

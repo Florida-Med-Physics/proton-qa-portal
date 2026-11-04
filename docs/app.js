@@ -179,6 +179,19 @@ async function api(method, path, body) {
   return data;
 }
 
+// GET /api/assignments answers for every machine at once what GET /api/machines/:id/assignments answers for one, so a page
+// showing several machines asks once, not once per machine. machineSchedules picks one machine's rows, in their own order.
+function machineSchedules(schedules, machineId) { return schedules.filter((a) => Number(a.machine_id) === Number(machineId)); }
+
+// Several GETs a page needs at once, in one request (GET /api/batch, at most 20 paths each): one round trip, and on a
+// site that runs the backend once per request, one server call instead of several side by side. The answers come back
+// in order; the first that failed is thrown, with the error it would have had on its own.
+async function apiBatch(paths) {
+  const parts = [];
+  for (let i = 0; i < paths.length; i += 20) parts.push(api("GET", `/api/batch?paths=${encodeURIComponent(JSON.stringify(paths.slice(i, i + 20)))}`));
+  return (await Promise.all(parts)).flat().map((r) => { if (!r.ok) throw new Error(r.error); return r.value; });
+}
+
 // A site that hosts these pages may set window.QA_HOST = { browserFolders: false } before this script loads. Then no
 // page opens a folder (no folder picker, folder listing, folder reading, Import Folder or export folder): a list's import
 // folder is typed text, read by a scheduled import elsewhere. Left out, everything works as before.
@@ -393,9 +406,10 @@ function applyDashboardRoleView(data) {
 }
 
 async function renderHome() {
-  const data = applyDashboardRoleView(await api('GET', '/api/dashboard'));
+  // The dashboard and the recent runs in one request: one round trip, not two in a row.
+  const [dashboard, runs] = await apiBatch(['/api/dashboard', '/api/runs?limit=400']);
+  const data = applyDashboardRoleView(dashboard);
   page('Dashboard', new Date(data.today + 'T00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
-  const runs=await api('GET','/api/runs?limit=400');
   const due = data.machines.flatMap((m)=>m.queues).filter((q)=>['due','overdue'].includes(q.state)).length;
   const pendingTherapy=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false)).length;
   const pendingPhysics=runs.filter(r=>r.review_status==='pending'&&r.review_ready!==false).length;
@@ -755,8 +769,8 @@ async function renderSetup() {
         toast("Machine added. Choose the QA lists it runs.");
         location.hash = `#/machines/${machine.id}`;
       }, "Add machine") }, "Add machine")] : []);
-  const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
-  const schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
+  const [queues, machines, all] = await apiBatch(["/api/queues", "/api/machines", "/api/assignments"]);
+  const schedules = machines.flatMap((m) => machineSchedules(all, m.id));
   const setActive = async (a, active) => {
     try {
       await api("PUT", `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(",").map(Number),
@@ -1047,9 +1061,9 @@ async function renderMachines() {
       route();
     }),
   }, "Add machine")] : []);
-  const machines = await api("GET", "/api/machines");
-  const assignments = Object.fromEntries(await Promise.all(machines.map(async (m) => [m.id, await api("GET", `/api/machines/${m.id}/assignments`)])));
-  const queues = Object.fromEntries((await api("GET", "/api/queues")).map((q) => [q.id, q]));
+  const [machines, all, queueList] = await apiBatch(["/api/machines", "/api/assignments", "/api/queues"]);
+  const assignments = Object.fromEntries(machines.map((m) => [m.id, machineSchedules(all, m.id)]));
+  const queues = Object.fromEntries(queueList.map((q) => [q.id, q]));
   const active = machines.filter((m) => m.active);
   const scheduled = active.reduce((n, m) => n + assignments[m.id].filter((a) => a.active).length, 0);
   app.append(el("p", { class: "lead" }, `${active.length} machines · ${scheduled} scheduled QA ${scheduled === 1 ? "list" : "lists"}.`));
@@ -2034,8 +2048,10 @@ async function renderPerform(assignmentId) {
       autosaveStopped = true;
       clearTimeout(autosaveTimer);
       await draftWrites;
-      const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef });
-      await api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
+      // The submit clears this form's draft in the same save (clear_draft); a server that does not say it did
+      // (draft_cleared) is asked separately, as before.
+      const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef, clear_draft: true });
+      if (result.draft_cleared !== true) await api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
       toast(`Submitted. Overall: ${capitalize(result.overall)}`);
       location.hash = `#/runs/${result.id}`;
     } catch (err) {
@@ -2144,7 +2160,7 @@ function importSphinxDialog(a) {
 // Save a machine's list back as a template: a new master copy; the machine keeps its own list untouched.
 // Schedule one list on machines: every ticked machine runs this same list (no copies).
 async function scheduleDialog(list, machines, schedules) {
-  if (!schedules) schedules = (await Promise.all(machines.map((m) => api("GET", `/api/machines/${m.id}/assignments`)))).flat();
+  if (!schedules) { const all = await api("GET", "/api/assignments"); schedules = machines.flatMap((m) => machineSchedules(all, m.id)); }
   const existing = new Map(schedules.filter((a) => a.queue_id === list.id).map((a) => [a.machine_id, a]));
   const on = new Set([...existing.values()].filter((a) => a.active).map((a) => a.machine_id));
   const body = el("div", {},
@@ -3107,7 +3123,8 @@ function qaTrashButton(run) {
 function reviewRowActions(run) {return el('div',{class:'row qa-review-actions'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at||can('therapist_approve')&&!can('review')?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
 
 async function renderReview() {
-  const runs = await api("GET", "/api/runs?limit=400");
+  // Submitted runs and the trash in one request: one round trip, not two in a row.
+  const [runs, trashed] = await apiBatch(["/api/runs?limit=400", "/api/runs?trashed=1&limit=200"]);
   page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
   const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
     el("td", {}, el("a", { href: `#/runs/${r.id}` }, shortDate(r.qa_date))),
@@ -3122,7 +3139,6 @@ async function renderReview() {
   const therapyMode=can('therapist_approve')&&!can('review');
   const waitingTherapist=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false));
   app.append(el('h2',{class:'section-head',id:'therapy-review-queue'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
-  const trashed=await api('GET','/api/runs?trashed=1&limit=200');
   if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
   app.append(el("h2", { class: "section-head modality-head", id: "physics-review-queue" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
@@ -4003,10 +4019,12 @@ function trendGroupChart(group) {
     yLabel: yAxisLabel(group.members.map((m) => m.name)), trends: true, deltaOnly: spot, axisPanels: spot || (split && /skewness/i.test(group.base)) });
 }
 
-async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = [], historyRequest = null) {
-  const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (activeRole()!=='therapist'||a.frequency!=='monthly') && (!listId || String(a.id) === String(listId)));
+async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = [], historyRequest = null, lists = []) {
+  // renderTrends has already read this machine's lists (active, as this role sees them) and their templates
+  // (sourceTemplates[i] is lists[i]'s), so neither is asked for again: the chosen list's template is picked out.
+  const templates = sourceTemplates.filter((t, i) => !lists[i].archived && (!listId || String(lists[i].id) === String(listId)));
   // The period's history, in parts (machineHistory); renderTrends may already have asked for it to pick the busiest list.
-  const [templates, { histories, order: sphinxOrder }] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), historyRequest || machineHistory(machineId, { from: rangeStart(range) })]);
+  const { histories, order: sphinxOrder } = await (historyRequest || machineHistory(machineId, { from: rangeStart(range) }));
   const numberPoint=trendSourceNumberer(sourceTemplates.length?sourceTemplates:templates);
   const sections = [], insights = [];
   for (const template of templates) {
@@ -4312,17 +4330,19 @@ function busiestList(lists, histories) {
 }
 async function renderTrends() {
   const params = queryParams();
-  const machines = (await api("GET", "/api/machines")).filter((m) => m.active);
+  // The machines and every machine's lists in one request; the lists of the machine shown are picked out below.
+  const [allMachines, schedules] = await apiBatch(["/api/machines", "/api/assignments"]);
+  const machines = allMachines.filter((m) => m.active);
   const requested = (params.get('machine_id') || params.get('machine_ids') || '').split(',')[0];
   const fallback = machines.find(m => m.name === 'GTR1') || machines[0];
   const machineId = machines.some(m => String(m.id) === requested) ? requested : fallback?.id;
   const range = params.get("range") || "90";
   let testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
-  const lists = machineId ? (await api("GET", `/api/machines/${machineId}/assignments`)).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
+  const lists = machineId ? machineSchedules(schedules, machineId).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
   // The overview reads the chosen period's history (in parts); asking for it beside the templates saves a round trip.
   let historyRequest = machineId && !testIds.length ? machineHistory(machineId, { from: rangeStart(range) }) : null;
-  const templates=await Promise.all(lists.map(a=>api('GET',`/api/assignments/${a.id}/template`)));
+  const templates=lists.length?await apiBatch(lists.map(a=>`/api/assignments/${a.id}/template`)):[];   // every list's template, in one request
   if(activeRole()==='therapist'){const visible=new Set(templates.flatMap(t=>t.items.map(i=>String(i.test_id))));testIds=testIds.filter(id=>visible.has(id));}
   const numberPoint=trendSourceNumberer(templates);
   let listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
@@ -4347,7 +4367,7 @@ async function renderTrends() {
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));
   app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
-  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest);
+  if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest, lists);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
   const listItems = new Map(templates.filter(t=>!listId||String(t.assignment.id)===listId).flatMap(t=>t.items).map(i=>[String(i.test_id),i]));
   const items = data.map((d) => {
@@ -4414,7 +4434,11 @@ async function renderAdmin() {
     can('manage_users') ? 'Use Add user above to create Admin, Physicist, Therapist or MPA accounts.'
       : ['Adding users requires an Admin account. ', el('button', { class: 'small', onclick: logout }, 'Sign in as Admin'),
         window.localApi ? ' This browser demo requires the Admin test account and password. The shared server requires an existing Admin account and password.' : ' Ask the portal administrator if you need Admin access.']));
-  const [users, machines] = await Promise.all([can("manage_users") ? api("GET", "/api/users") : null, api("GET", "/api/machines")]);
+  // Users, machines and every machine's lists in one request (not one request per machine, one after another), beside
+  // the database file on the server build.
+  const [answers, info] = await Promise.all([apiBatch([...(can("manage_users") ? ["/api/users"] : []), "/api/machines", "/api/assignments"]),
+    window.localApi ? null : api("GET", "/api/dbinfo").catch(() => null)]);
+  const users = can("manage_users") ? answers.shift() : null, [machines, schedules] = answers;
 
   // 1. Users and rights (admins only; others see what each role may do).
   app.append(el("h2", { class: "section-head" }, "Users and rights"));
@@ -4447,7 +4471,7 @@ async function renderAdmin() {
       : "The folder (on this PC or a network share it can read) each list's Sphinx exports (.xls or .csv) are saved to. All new files are scanned and imported when you open this page or choose a folder, then every minute while this page is open. Imported results await review."));
   const rows = [];
   for (const m of machines.filter((x) => x.active)) {
-    for (const a of await api("GET", `/api/machines/${m.id}/assignments`)) {
+    for (const a of machineSchedules(schedules, m.id)) {
       const status = el("span", { class: "muted small" }, a.import_folder ? "Checking…" : "No folder");
       let scanning = false;
       const rejected = new Map();
@@ -4511,7 +4535,6 @@ async function renderAdmin() {
 
   // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
   if (!window.localApi) {
-    const info = await api("GET", "/api/dbinfo").catch(() => null);
     if (info) {
       app.append(el("h2", { class: "section-head" }, "Database"), el("div", { class: "card" },
         el("p", {}, el("strong", {}, info.path), el("span", { class: "muted small" }, ` · ${(info.size / 1048576).toFixed(1)} MB`)),
