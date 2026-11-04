@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Both builds answer three new requests, for pages that make fewer of them (next change): `GET /api/assignments` (every machine's QA lists in one reply, each machine's exactly as `GET /api/machines/<id>/assignments` gives them), `GET /api/batch?paths=<JSON list of GET paths>` (several GETs in one reply, each with the answer or error it would have had on its own; at most 20; not `/api/me`, drafts, folders, the database answers, backup or another batch) and `clear_draft: true` when submitting a run (the run and clearing that person's draft of the list in one save; the reply says `draft_cleared: true`). Nothing else changes.
+
 - Machine Trends and Export CSV on the server build load long periods much faster: the server now works out the chosen period once and keeps it while the parts arrive (and for the next person who asks), instead of working the whole history out again for every part. Any change to the database, by the portal or by another program using the same file, makes it start afresh. Nothing shown, exported or sent changes. On three years of synthetic records for one gantry, all history went from about 6.3 s to about 0.9 s.
 
 - Machine Trends and Export CSV now download only the chosen period, in parts, so machines with long histories load instead of failing on the shared site; nothing shown or exported changes (chart order still follows the newest Sphinx import, even when it is older than the period). The trends endpoint takes `from=` and `page=` in both builds; see the README's Trends API paragraph.

@@ -812,6 +812,14 @@
       override_count: S.overrides.filter((o) => o.assignment_id === a.id).length,
     })).sort((a, b) => (b.active - a.active) || a.queue_name.localeCompare(b.queue_name));
   }
+  // GET /api/machines order: active machines first, then by name.
+  const machineList = () => S.machines.slice().sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name));
+  // Every machine's schedules in one reply (GET /api/assignments), for pages that show several machines: machine by
+  // machine in GET /api/machines order, so one machine's rows are exactly its GET /api/machines/:id/assignments.
+  function listAllAssignments() {
+    const today = new Date();
+    return machineList().flatMap((m) => listAssignments(m.id, today));
+  }
   function archiveAssignment(user, assignmentId, data) {
     require(user, "configure");
     const a = get("assignments", assignmentId, "Schedule"), selection = testSelection(a), archived = data.archived !== false;
@@ -1041,7 +1049,15 @@
     }
     const ref = text(data, "source_ref") || null;
     checkNotImported(ref);
-    return insertRun(user, t, qaDate, rows, text(data, "comment"), ref?.startsWith("hdrpdf:")?"hdr-pdf":ref ? "sphinx" : "manual", ref, "pending");
+    const run = insertRun(user, t, qaDate, rows, text(data, "comment"), ref?.startsWith("hdrpdf:")?"hdr-pdf":ref ? "sphinx" : "manual", ref, "pending");
+    // clear_draft: true (the QA form's Submit) clears this person's draft of the list in the same save, instead of a
+    // second request (POST .../draft/clear) after it; draft_cleared says so. Without it nothing else changes.
+    if (data.clear_draft === true) { clearDraft(user, assignmentId); run.draft_cleared = true; }
+    return run;
+  }
+  function clearDraft(user, assignmentId) {
+    S.drafts = (S.drafts || []).filter((x) => !(x.assignment_id === assignmentId && x.user_id === user.id));
+    save();
   }
   const therapistCheck = (t) => t?.name?.trim().toLowerCase()==='qa reviewed by therapist?' || /Template 4\.06\./.test(t?.description||'');
   // For calls that judge review readiness for many runs (runs list, worklist, dashboard): results grouped by run and the
@@ -1980,7 +1996,7 @@
     audit(u.id, "update", "user", target.id, { role, active });
     return { ok: true };
   });
-  route("GET", "/api/machines", () => S.machines.slice().sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name)));
+  route("GET", "/api/machines", () => machineList());
   route("POST", "/api/machines", (u, m, body) => saveMachine(u, body));
   route("POST", "/api/machines/(\\d+)/delete", (u,m)=>deleteMachine(u,Number(m[1])));
   route("PUT", "/api/machines/(\\d+)", (u, m, body) => saveMachine(u, body, Number(m[1])));
@@ -2002,6 +2018,7 @@
   route("POST", "/api/queues/(\\d+)/reevaluate", (u, m) => reevaluateQueue(u, Number(m[1])));
   route("POST", "/api/queues/(\\d+)/archive", (u, m, body) => archiveQueue(u, Number(m[1]), body));
   route("POST", "/api/queues/(\\d+)/delete", (u, m) => deleteQueue(u, Number(m[1])));
+  route("GET", "/api/assignments", () => listAllAssignments());
   route("POST", "/api/assignments", (u, m, body) => saveAssignment(u, body));
   route("PUT", "/api/assignments/(\\d+)", (u, m, body) => saveAssignment(u, body, Number(m[1])));
   route("GET", "/api/assignments/(\\d+)/draft", (u, m) => { const d = (S.drafts || []).find((x) => x.assignment_id === Number(m[1]) && x.user_id === u.id); return d ? { ...d.data, saved_at: d.saved_at } : null; });
@@ -2013,7 +2030,7 @@
     save();
     return { saved_at };
   });
-  route("POST", "/api/assignments/(\\d+)/draft/clear", (u, m) => { S.drafts = (S.drafts || []).filter((x) => !(x.assignment_id === Number(m[1]) && x.user_id === u.id)); save(); return { ok: true }; });
+  route("POST", "/api/assignments/(\\d+)/draft/clear", (u, m) => { clearDraft(u, Number(m[1])); return { ok: true }; });
   route("GET", "/api/assignments/(\\d+)/template", (u, m) => runTemplate(Number(m[1])));
   route("POST", "/api/assignments/(\\d+)/archive", (u, m, body) => archiveAssignment(u, Number(m[1]), body));
   route("POST", "/api/assignments/(\\d+)/delete", (u, m, body) => deleteAssignment(u, Number(m[1])));
@@ -2052,6 +2069,30 @@
     save();
     audit(u.id, "restore", "portal", null, { exported_at: body.exported_at });
     return { ok: true };
+  });
+  // GET /api/batch?paths=<JSON list of GET paths, each with its own query>: several GETs answered in one reply, in
+  // order, each { ok: true, value } or { ok: false, error } with the error it would have had on its own. One round trip
+  // for a page that needs them all (and, on a site that runs this backend once per request, one start-up). Not
+  // /api/me, a draft, the folder or database answers (a hosting page may answer or screen those itself),
+  // /api/backup, or another batch. The same in the server build (portal/server.py).
+  const BATCH_MAX = 20, BATCH_REFUSED = /^\/api\/(me|batch|backup|dbfile|dbinfo|assignments\/\d+\/(draft|files?))$/;
+  route("GET", "/api/batch", async (u, m, body, q) => {
+    let paths = null;
+    try { paths = JSON.parse(q.paths ?? ""); } catch { paths = null; }
+    if (!Array.isArray(paths) || !paths.length || paths.length > BATCH_MAX || !paths.every((p) => typeof p === "string" && p.startsWith("/api/")))
+      throw new Error(`paths: give a JSON list of 1 to ${BATCH_MAX} paths, each starting /api/.`);
+    const out = [];
+    for (const p of paths) {
+      const [pathname, query = ""] = p.split("?");
+      try {
+        if (BATCH_REFUSED.test(pathname)) throw new Error(`${pathname} cannot be asked for in a batch.`);
+        const r = routes.find((x) => x.method === "GET" && x.pattern.test(pathname));
+        if (!r) throw new Error(`Not found: GET ${pathname}`);
+        // Copied at once, as a reply on its own would be, so nothing a later path does can change it.
+        out.push({ ok: true, value: JSON.parse(JSON.stringify((await r.handler(u, r.pattern.exec(pathname), {}, Object.fromEntries(new URLSearchParams(query)))) ?? null)) });
+      } catch (err) { out.push({ ok: false, error: err.message }); }
+    }
+    return out;
   });
 
   // Called by the interface from a click (the pickers need a user gesture).
