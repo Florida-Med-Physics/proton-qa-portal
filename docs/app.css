@@ -635,13 +635,10 @@ th { overflow-wrap: normal; word-break: normal; }
 .measure-table .directions.in-cell .directions-label { font-size: 11px; }
 .measure-table td:first-child .category-tag { margin: 2px 0 0; }
 
-/* Δ from reference: green within tolerance, yellow at tolerance, red at action. */
-.delta { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.delta.st-pass { background: var(--pass-bg); color: var(--pass); }
-.delta.st-warn { background: var(--warn-bg); color: var(--warn); }
-.delta.st-fail { background: var(--fail-bg); color: var(--fail); }
-.delta.st-recorded { background: var(--surface-2); color: var(--muted); }
-.delta-slot { margin-top: 3px; min-height: 0; }
+/* "(Δ +0.30 mm)" after the Result chip: plain, quiet text in the form's one reading size; the chip carries the colour.
+   It breaks only between its parts (after the comma of a percent limit), never inside a number and its unit. */
+.result-dev { margin-left: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.result-dev > span { white-space: nowrap; }
 
 /* X, Y and Z of one offset on one row. */
 .axis-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -706,7 +703,6 @@ th { overflow-wrap: normal; word-break: normal; }
 .qa-limits { display: block; font-size: 13px; color: var(--uf-navy); margin-top: 2px; }
 .measure-table td.qa-unit { color: var(--muted); font-size: 14px; }
 .measure-table td.qa-measured .pass-fail { flex-wrap: wrap; }
-.measure-table td.qa-dev { font-variant-numeric: tabular-nums; }
 .chip { text-transform: none; }
 .chip.pass, .chip.warn, .chip.fail { font-size: 13px; letter-spacing: 0.03em; font-weight: 700; }
 
@@ -859,7 +855,7 @@ td.ring-cell, th.ring-cell { text-align: center; padding: 2px 4px; }
 .home-stat-label { max-width: 90%; }
 
 /* Numbers sit centred in their columns. */
-td.num, th.num, .measure-table td.qa-n, .measure-table td.qa-unit, .measure-table td.qa-dev, .measure-table td.qa-measured, .measure-table td:has(> .chip), .measure-table th { text-align: center; }
+td.num, th.num, .measure-table td.qa-n, .measure-table td.qa-unit, .measure-table td.qa-measured, .measure-table td:has(> .chip), .measure-table th { text-align: center; }
 .measure-table th:nth-child(2), .measure-table td.qa-label { text-align: left; }
 .measure-table td.qa-measured .result-input, .measure-table td.qa-measured .text-input { text-align: center; }
 .fixed-table td.center { text-align: center; }
@@ -1488,7 +1484,7 @@ td, .measure-table td { font-size: 21px; }
   #app .measure-table td.qa-unit { grid-column:1; grid-row:3; }
   #app .measure-table td.qa-baseline { grid-column:1; grid-row:4; }
   #app .measure-table td.qa-phone-extras { grid-column:1/-1; grid-row:5; }
-  #app .review-measure-table td.qa-dev, #app .review-measure-table td.qa-comment, #app .review-measure-table td.history-cell, #app .review-measure-table td[data-label="Trends"] { grid-column:1/-1; }
+  #app .review-measure-table td.qa-comment, #app .review-measure-table td.history-cell, #app .review-measure-table td[data-label="Trends"] { grid-column:1/-1; }
   #app .measure-table .segmented { flex-wrap:wrap; }
   #app .measure-table .segmented button { min-width:0; padding:8px 6px; }
   #app .measure-table input, #app .measure-table select, #app .measure-table textarea { max-width:100%; min-width:0; }
@@ -1697,7 +1693,6 @@ td, .measure-table td { font-size: 21px; }
   #app[data-page^="runs/"] .review-measure-table td.qa-secondary,
   #app[data-page^="perform/"] .measure-table td.qa-phone-extras,
   #app[data-page^="runs/"] .review-measure-table td.qa-phone-extras,
-  #app[data-page^="runs/"] .review-measure-table td.qa-dev,
   #app[data-page^="runs/"] .review-measure-table td.qa-comment,
   #app[data-page^="runs/"] .review-measure-table td.history-cell,
   #app[data-page^="runs/"] .review-measure-table td.qa-trends,
@@ -1735,6 +1730,7 @@ td, .measure-table td { font-size: 21px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table select { min-height:44px; padding:5px 7px; font-size:16px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .segmented button { min-height:44px; padding:6px 9px; font-size:16px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .chip { font-size:13px; padding:2px 6px; }
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .result-dev { display:none; }   /* as the Deviation column was */
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block { padding:0; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block > h3 { padding:6px 7px; margin:0; font-size:15px; }
 }

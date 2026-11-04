@@ -90,7 +90,7 @@ const OFF = { browserFolders: false };
     // Perform QA: no folder line, so autoReadLine never runs (its only call is behind autoLine).
     assert.equal(context.autoLine({ assignment: LIST }), null);
     // Machine Trends: Export CSV only, saved by the browser's download; no remembered export folder is looked up.
-    const tools = context.trendFileTools({ id: 1, name: 'G1' }, [{ ...LIST }], '', '90', []);
+    const tools = context.trendFileTools({ id: 1, name: 'G1' }, [{ ...LIST }], String(LIST.id), '90', []);
     assert.deepEqual(buttons(tools), ['Export CSV']);
     await tools.find((n) => n.tagName === 'button')[0].click();
     assert(document.created.some((n) => n.tagName === 'a' && n.download)); assert(calls.includes('toast Exported 1 results to Downloads'));
@@ -122,7 +122,7 @@ const OFF = { browserFolders: false };
       const field = context.importFolderField(LIST);
       assert.deepEqual(buttons(field), localApi ? ['Choose folder…', 'Clear'] : []); assert(!field.textContent.includes('scheduled import'));
       assert.notEqual(context.autoLine({ assignment: LIST }), null);
-      const tools = context.trendFileTools({ id: 1, name: 'G1' }, [{ ...LIST }], '', '90', []);
+      const tools = context.trendFileTools({ id: 1, name: 'G1' }, [{ ...LIST }], String(LIST.id), '90', []);
       assert.deepEqual(buttons(tools), ['Import Folder', 'Export CSV']); assert(calls.includes('indexedDB qa-trend-export-folders'));
       await tools.find((n) => n.tagName === 'button')[0].click(); await settle();
       if (localApi) assert.deepEqual(calls.filter((c) => FOLDER_USE.test(c)).slice(1), ['localFolders.choose', 'GET /api/assignments/7/files', 'GET /api/assignments/7/file?path=G1_11022026.xls']);
