@@ -5,6 +5,7 @@ import binascii
 import hashlib
 import json
 import re
+import zlib
 from urllib.parse import unquote, quote
 from datetime import date, datetime
 from pathlib import Path
@@ -1364,8 +1365,10 @@ def trend(db, user, machine_id, test_id):
 
 def trend_window(q):
     """Optional window on machine_trends, as in local-backend.js trendWindow. With none given the whole history comes
-    back (Trends page, CSV export, PDF report). tests: only these tests' series (each still built from every test that
-    shares its history key); until: only QA dates up to this one; last: the newest N points of each series."""
+    back in one reply. tests: only these tests' series (each still built from every test that shares its history key);
+    until: only QA dates up to this one; from (returned as since): only QA dates from this one on; last: the newest N
+    points of each series. page: the same answer in parts (trend_page); Machine Trends and the CSV export use it
+    (app.js machineHistory). The PDF report and a saved run's quick trend do not read this endpoint's whole history."""
     def given(name):
         v=q.get(name)
         return v is not None and v!=''
@@ -1384,11 +1387,118 @@ def trend_window(q):
     if given('until'):
         if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}',str(q['until'])): raise PortalError('until: give a date as YYYY-MM-DD.')
         window['until']=str(q['until'])
+    if given('from'):
+        if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}',str(q['from'])): raise PortalError('from: give a date as YYYY-MM-DD.')
+        window['since']=str(q['from'])
+    if given('page'):
+        if str(q['page'])!='start' and not _TREND_CURSOR.fullmatch(str(q['page'])):
+            raise PortalError('page: give start, or the next value from the previous page.')
+        if window.get('last'): raise PortalError('page: cannot be combined with last.')
+        window['page']=str(q['page'])
     return window
 
 
-def machine_trends(db, user, machine_id, tests=None, last=None, until=None):
-    """Same-machine measurements across list copies, matched by type, units and identity. tests / last / until: see trend_window."""
+# A paged reply holds whole points until the next one would take its JSON (compact, UTF-8, measured as local-backend.js
+# JSON.stringify writes it, so both servers split the same answer at the same points) past this many bytes; it always
+# holds at least one, so paging always moves on. On the site the reply goes back through a Lambda (synchronous response
+# limit recalled as 6 MB; check AWS quotas), whose wrapping adds to it, so the budget is well under half of that.
+TREND_PAGE_BYTES=2500000
+# Cursor: how many points of the answer, in the order trend_page sends them, the earlier parts held (a whole number from
+# 1, ASCII digits), as in local-backend.js. It counts places, not stored values; the token tells the caller when they changed.
+_TREND_CURSOR=re.compile(r'[1-9][0-9]{0,14}')
+_POINT_KEYS=('source_test_id','source_test_number','run_id','source','source_order','assignment_id','qa_date','value','expected','warn','fail','tol_mode','status')
+
+
+def _js_number(v):
+    """A float as JavaScript's JSON.stringify writes it (shortest round-trip digits, JavaScript's exponent rules)."""
+    if v!=v or v in (float('inf'),float('-inf')): return 'null'
+    if v==0: return '0'
+    text=repr(v);sign=''
+    if text[0]=='-': sign,text='-',text[1:]
+    mantissa,_,exponent=text.partition('e');whole,_,fraction=mantissa.partition('.')
+    every=whole+fraction;digits=every.lstrip('0')
+    n=len(whole)+int(exponent or 0)-(len(every)-len(digits))   # value = 0.<digits> x 10^n
+    digits=digits.rstrip('0');k=len(digits)
+    if k<=n<=21: out=digits+'0'*(n-k)
+    elif 0<n<=21: out=digits[:n]+'.'+digits[n:]
+    elif -6<n<=0: out='0.'+'0'*(-n)+digits
+    else:
+        e=n-1;out=digits[0]+('.'+digits[1:] if k>1 else '')+'e'+('+' if e>=0 else '-')+str(abs(e))
+    return sign+out
+
+
+def _js_json(v):
+    if v is None: return 'null'
+    if v is True: return 'true'
+    if v is False: return 'false'
+    if isinstance(v,int): return str(v)
+    if isinstance(v,float): return _js_number(v)
+    return json.dumps(v,ensure_ascii=False,separators=(',',':'),default=str)
+
+
+def _point_bytes(p):
+    """Size of one point's JSON as local-backend.js writes it (compact, UTF-8); key order does not change the size."""
+    text='{'+','.join(f'"{k}":{_js_json(p[k])}' for k in _POINT_KEYS)+'}'
+    return len(text) if text.isascii() else len(text.encode('utf-8'))
+
+
+def _point_key(p):
+    return (p['qa_date'],p['run_id'],p['source_order'])
+
+
+def trend_page(db, user, machine_id, tests=None, until=None, since=None, page='start'):
+    """One part of a machine's trends, as local-backend.js trendPage (see there for the reply and its rules). Joining
+    every part's series per test id, in order, gives exactly machine_trends for the same tests/until/since. The token is
+    a checksum of the whole answer (each series with points in it, the tests sharing it, and order), this server's own
+    (the browser build's differs); it is compared only between parts."""
+    whole=machine_trends(db,user,machine_id,tests=tests,until=until)
+    series,members=[],{}   # each distinct series once, in order of its first (lowest) test id
+    for test_id in sorted(whole,key=int):
+        points=whole[test_id]
+        if id(points) not in members: members[id(points)]=[];series.append(points)
+        members[id(points)].append(test_id)
+    newest,order={},{}
+    for points in series:
+        for p in points:
+            # Math.max from 0, as local-backend.js and the overview did: a run with id 0 still counts.
+            if p['source']=='sphinx' and p['assignment_id'] is not None: newest[p['assignment_id']]=max(newest.get(p['assignment_id'],0),p['run_id'])
+    for points in series:
+        for p in points:
+            if p['source']=='sphinx' and p['assignment_id'] is not None and newest.get(p['assignment_id'])==p['run_id']:
+                o=order.setdefault(str(p['assignment_id']),{})
+                for test_id in members[id(points)]: o[test_id]=p['source_order']
+    kept=[[p for p in points if p['qa_date']>=since] for points in series] if since else series
+    flat=sorted(((p,s) for s,points in enumerate(kept) for p in points),key=lambda x:_point_key(x[0]))   # stable
+    taken=[iter(points) for points in kept]   # each series keeps its own order (see local-backend.js trendPage)
+    flat=[(next(taken[s]),s) for _,s in flat]
+    text=json.dumps([[[members[id(series[s])],points] for s,points in enumerate(kept) if points],order],default=str).encode('utf-8')
+    token=f'{zlib.crc32(text):08x}{zlib.adler32(text):08x}-{len(flat)}'   # as long as local-backend.js's, so parts split alike
+    start=0 if page=='start' else min(int(page),len(flat))
+    out={'series':[],'tests':{},'next':None,'token':token}
+    if page=='start': out['order']=order
+    size=len(json.dumps(out,ensure_ascii=False,separators=(',',':')).encode('utf-8'))
+    entries,end,index=0,start,{}
+    for i in range(start,len(flat)):
+        p,s=flat[i]
+        add,ids=_point_bytes(p),None
+        if s in index: add+=1
+        else:
+            k=str(len(index));ids=members[id(series[s])];add+=(1 if index else 0)+2
+            for test_id in ids: add+=(1 if entries or test_id!=ids[0] else 0)+len(test_id)+len(k)+3
+        next_bytes=len(str(i+1))-2 if i+1<len(flat) else 0   # "cursor" in place of null
+        if i>start and size+add+next_bytes>TREND_PAGE_BYTES: break
+        size+=add;end=i+1
+        if ids:
+            index[s]=len(out['series'])
+            for test_id in ids: out['tests'][test_id]=len(out['series'])
+            entries+=len(ids);out['series'].append([])
+        out['series'][index[s]].append(p)
+    if end<len(flat): out['next']=str(end)
+    return out
+
+
+def machine_trends(db, user, machine_id, tests=None, last=None, until=None, since=None):
+    """Same-machine measurements across list copies, matched by type, units and identity. tests / last / until / since: see trend_window."""
     wanted=tests
     tests=db.all('SELECT * FROM tests');by_id={t['id']:t for t in tests}
     aliases={}
@@ -1406,7 +1516,8 @@ def machine_trends(db, user, machine_id, tests=None, last=None, until=None):
         return keys[t['id']]
     wanted_keys={key(t) for t in tests if t['id'] in wanted} if wanted is not None else None
     rows=db.all('SELECT res.test_id,res.id AS source_order,r.source,r.id AS run_id,r.assignment_id,r.qa_date,res.value_num AS value,res.expected,res.warn,res.fail,res.tol_mode,res.status FROM results res JOIN runs r ON r.id=res.run_id WHERE r.trashed_at IS NULL AND r.machine_id=? AND res.value_num IS NOT NULL'
-                +(' AND r.qa_date<=?' if until else '')+' ORDER BY r.qa_date,r.id,res.id',(machine_id,until) if until else (machine_id,))
+                +(' AND r.qa_date<=?' if until else '')+(' AND r.qa_date>=?' if since else '')+' ORDER BY r.qa_date,r.id,res.id',
+                (machine_id,)+((until,) if until else ())+((since,) if since else ()))
     groups={}
     for row in rows:
         test=by_id.get(row.pop('test_id'))

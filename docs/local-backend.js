@@ -1146,17 +1146,103 @@
   }
   function trend(machineId,testId) {const test=get('tests',testId,'Check');return {test,points:machineTrends(machineId,{tests:new Set([Number(testId)])})[testId]||[]};}
   // Optional window on a machine's trends, for screens that show only part of the history. With none of them the
-  // whole history comes back (Trends page, CSV export, PDF report). tests: only these tests' series (each still built
-  // from every test that shares its history key); until: only QA dates up to this one; last: the newest N points of each.
+  // whole history comes back in one reply. tests: only these tests' series (each still built from every test that
+  // shares its history key); until: only QA dates up to this one; from: only QA dates from this one on; last: the
+  // newest N points of each. page: the same answer in parts (see trendPage); Machine Trends and the CSV export use it
+  // (app.js machineHistory). The PDF report and a saved run's quick trend do not read this endpoint's whole history.
   function trendWindow(q) {
     // ASCII digits only, as service.py trend_window does, so both servers accept and refuse the same text.
-    const w={tests:null,last:0,until:''},given=(v)=>v!==undefined&&v!==null&&v!=='',whole=(x)=>/^[0-9]+$/.test(x)?Number(x):NaN;
+    const w={tests:null,last:0,until:'',from:'',page:''},given=(v)=>v!==undefined&&v!==null&&v!=='',whole=(x)=>/^[0-9]+$/.test(x)?Number(x):NaN;
     if(given(q.tests)){const ids=String(q.tests).split(',').map(whole);if(ids.some(n=>!Number.isInteger(n)||n<1))throw Error('tests: give test ids separated by commas.');w.tests=new Set(ids);}
     if(given(q.last)){w.last=whole(String(q.last));if(!Number.isInteger(w.last)||w.last<1)throw Error('last: give a whole number of points, 1 or more.');}
     if(given(q.until)){if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(q.until)))throw Error('until: give a date as YYYY-MM-DD.');w.until=String(q.until);}
+    if(given(q.from)){if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(q.from)))throw Error('from: give a date as YYYY-MM-DD.');w.from=String(q.from);}
+    if(given(q.page)){
+      if(String(q.page)!=='start'&&!TREND_CURSOR.test(String(q.page)))throw Error('page: give start, or the next value from the previous page.');
+      if(w.last)throw Error('page: cannot be combined with last.');
+      w.page=String(q.page);
+    }
     return w;
   }
-  function machineTrends(machineId,{tests:wanted=null,last=0,until=''}={}) {
+  // A paged reply holds whole points until the next one would take its JSON (compact, UTF-8, as JSON.stringify
+  // writes it) past this many bytes; it always holds at least one, so paging always moves on. On the site this reply
+  // goes back through a Lambda (synchronous response limit recalled as 6 MB; check AWS quotas), whose wrapping adds
+  // to it, so the budget is well under half of that.
+  const TREND_PAGE_BYTES=2500000;
+  // Cursor: how many points of the answer, in the order trendPage sends them, the earlier parts held (a whole number
+  // from 1, ASCII digits). It counts places, not stored values, so any stored date or id pages the same (and a tie
+  // cannot be split wrongly); the token tells the caller when the answer, and so those places, changed.
+  const TREND_CURSOR=/^[1-9][0-9]{0,14}$/;
+  const pointBefore=(a,b)=>a.qa_date<b.qa_date?-1:a.qa_date>b.qa_date?1:a.run_id-b.run_id||a.source_order-b.source_order;
+  const utf8Length=(s)=>{if(!/[^\x00-\x7f]/.test(s))return s.length;let n=s.length;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);if(c>0x7f)n+=c<0x800?1:c>=0xd800&&c<0xdc00?0:2;}return n;};
+  // trendPage's token: a checksum of the whole answer, taken value by value rather than by writing the answer out as
+  // text: each series that has points in it (with the test ids sharing it and every field of every point) and order.
+  // A series that from leaves empty is in no part, so it does not count. Two 32-bit lanes and the point count; no
+  // crypto, it only has to change when the answer does. This server's own: service.py's differs, but has the same
+  // length (16 hex digits, -, the count), so both servers still split an answer at the same points.
+  const tokenFloat=new Float64Array(1),tokenWords=new Uint32Array(tokenFloat.buffer);
+  function trendToken(parts,order,count) {
+    let a=0x811c9dc5,b=0x2545f491;
+    const word=(w)=>{a=Math.imul(a^w,16777619);b=Math.imul(b^w,0x5bd1e995);b^=b>>>15;};
+    const text=(v)=>{word(v.length);for(let i=0;i<v.length;i++)word(v.charCodeAt(i));};
+    const value=(v)=>{
+      if(typeof v==='string'){word(1);text(v);}
+      else if(typeof v==='number'){if((v|0)===v){word(2);word(v);}else{tokenFloat[0]=v;word(3);word(tokenWords[0]);word(tokenWords[1]);}}
+      else if(v===null)word(4);else if(v===undefined)word(5);else if(typeof v==='boolean')word(v?6:7);
+      else{word(8);text(JSON.stringify(v));}
+    };
+    word(parts.length);
+    for(const [ids,pts] of parts){word(ids.length);for(const id of ids)text(id);word(pts.length);for(const p of pts){for(const k in p)value(p[k]);word(9);}}
+    const lists=Object.keys(order);word(lists.length);
+    for(const list of lists){text(list);const o=order[list],ids=Object.keys(o);word(ids.length);for(const id of ids){text(id);value(o[id]);}}
+    const hex=(h)=>(h>>>0).toString(16).padStart(8,'0');
+    return `${hex(a)}${hex(b)}-${count}`;
+  }
+  // One part of a machine's trends (page=start, then each reply's next): { series: [[points]], tests: {testId: index
+  // into series}, next: cursor or null, token, order (first part only) }. Joining every part's series per test id, in
+  // order, gives exactly the unpaged reply for the same tests/until/from; each series is sent once however many tests
+  // share it. Points run in (qa_date, run_id, source_order) order across all series. token (trendToken) changes
+  // whenever a run, result, test or alias change would change this answer; the caller starts again if it changes
+  // between parts. order: for each QA list (assignment id) with Sphinx imports, {testId: source_order} for the points
+  // of its newest Sphinx run, from the history before from is applied, as Machine Trends orders its charts. Kept in
+  // step with service.py trend_page.
+  function trendPage(machineId,{tests,until,from,page}) {
+    const whole=machineTrends(machineId,{tests,until});
+    const series=[],members=new Map();   // each distinct series once, in order of its first (lowest) test id
+    for(const id of Object.keys(whole)){const pts=whole[id];if(!members.has(pts)){members.set(pts,[]);series.push(pts);}members.get(pts).push(id);}
+    const newest=new Map(),order={};
+    // Same steps as the overview's own (Math.max from 0, then ===), so odd stored ids give the same answer too.
+    for(const pts of series)for(const p of pts)if(p.source==='sphinx'&&p.assignment_id!=null){const a=String(p.assignment_id);newest.set(a,Math.max(newest.has(a)?newest.get(a):0,p.run_id));}
+    for(const pts of series)for(const p of pts)if(p.source==='sphinx'&&p.assignment_id!=null&&newest.get(String(p.assignment_id))===p.run_id){
+      const o=order[p.assignment_id]||(order[p.assignment_id]={});for(const id of members.get(pts))o[id]=p.source_order;
+    }
+    const kept=from?series.map(pts=>pts.filter(p=>p.qa_date>=from)):series;
+    const flat=[];kept.forEach((pts,s)=>{for(const p of pts)flat.push({p,s});});
+    flat.sort((a,b)=>pointBefore(a.p,b.p));   // stable: equal keys stay in series order
+    // Each series keeps its own order whatever the comparison above makes of odd stored dates (machineTrends sorts
+    // with localeCompare): its places in flat take its points in turn. No change when the two agree, as for YYYY-MM-DD.
+    const taken=kept.map(()=>0);for(const f of flat)f.p=kept[f.s][taken[f.s]++];
+    const token=trendToken(kept.map((pts,s)=>[members.get(series[s]),pts]).filter(([,pts])=>pts.length),order,flat.length);
+    const start=page==='start'?0:Math.min(Number(page),flat.length);
+    const out={series:[],tests:{},next:null,token};
+    if(page==='start')out.order=order;
+    let bytes=utf8Length(JSON.stringify(out)),entries=0,end=start;
+    const index=new Map();
+    for(let i=start;i<flat.length;i++){
+      const {p,s}=flat[i];
+      let add=utf8Length(JSON.stringify(p)),ids=null;
+      if(index.has(s))add+=1;
+      else{const k=String(index.size);ids=members.get(series[s]);add+=(index.size?1:0)+2;for(const id of ids)add+=(entries||id!==ids[0]?1:0)+id.length+k.length+3;}
+      const nextBytes=i+1<flat.length?String(i+1).length-2:0;   // "cursor" in place of null
+      if(i>start&&bytes+add+nextBytes>TREND_PAGE_BYTES)break;
+      bytes+=add;end=i+1;
+      if(ids){index.set(s,out.series.length);for(const id of ids)out.tests[id]=out.series.length;entries+=ids.length;out.series.push([]);}
+      out.series[index.get(s)].push(p);
+    }
+    if(end<flat.length)out.next=String(end);
+    return out;
+  }
+  function machineTrends(machineId,{tests:wanted=null,last=0,until='',from=''}={}) {
     const runs=Object.fromEntries(S.runs.filter(r=>!r.trashed_at&&r.machine_id===Number(machineId)).map(r=>[r.id,r]));
     const aliases=new Map();
     for(const q of S.queues.filter(q=>isPbsTemplate(q.name))){
@@ -1172,7 +1258,7 @@
     const groups=new Map();
     for(const x of S.results){
       const run=runs[x.run_id];
-      if(!run || x.value_num==null || until&&run.qa_date>until)continue;
+      if(!run || x.value_num==null || until&&run.qa_date>until || from&&run.qa_date<from)continue;
       const test=testById.get(Number(x.test_id));if(!test)continue;
       const key=keyFor(test);if(wantedKeys&&!wantedKeys.has(key))continue;
       if(!groups.has(key))groups.set(key,[]);
@@ -1950,7 +2036,7 @@
   route("POST", "/api/runs/(\\d+)/therapist-review",(u,m,body)=>setTherapistReview(u,Number(m[1]),body));
   route("POST", "/api/runs/(\\d+)/therapist-approve", (u,m) => therapistApproveRun(u,Number(m[1])));
   route("POST", "/api/runs/(\\d+)/review", (u, m, body) => reviewRun(u, Number(m[1]), body));
-  route("GET", "/api/machines/(\\d+)/trends", (u, m, body, q) => machineTrends(Number(m[1]), trendWindow(q)));
+  route("GET", "/api/machines/(\\d+)/trends", (u, m, body, q) => { const w = trendWindow(q); return w.page ? trendPage(Number(m[1]), w) : machineTrends(Number(m[1]), w); });
   route("GET", "/api/trend", (u, m, body, q) => {
     if (!q.machine_id || !q.test_id) throw new Error("Choose a machine and a test.");
     return trend(q.machine_id, q.test_id);

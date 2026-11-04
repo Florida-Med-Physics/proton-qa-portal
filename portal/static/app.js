@@ -3440,12 +3440,43 @@ function passRing(counts, title, sub) {
     title ? el("div", { class: "ring-title" }, title) : null, sub ? el("div", { class: "ring-sub" }, sub) : null);
 }
 
-function filterRange(points, range) {
-  if (range === "all" || !points.length) return points;
+// First QA date a period shows (local calendar, YYYY-MM-DD); "all" has none.
+function rangeStart(range) {
+  if (range === "all") return "";
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - Number(range));
-  const from = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+  return `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+}
+
+function filterRange(points, range) {
+  if (range === "all" || !points.length) return points;
+  const from = rangeStart(range);
   return points.filter((p) => p.qa_date >= from);
+}
+
+// A machine's trends from one QA date on (all of them without from): the same { testId: [points] } as the unpaged
+// /api/machines/:id/trends reply, with fresh point objects per test, fetched in parts so a long history fits each
+// reply. order: { assignmentId: { testId: source_order } } for each list's newest Sphinx import, from the whole
+// history (Machine Trends orders its charts by it). Starts again if the results change while the parts arrive.
+async function machineHistory(machineId, { from = "" } = {}) {
+  const query = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(from) ? { from } : {};   // a date the server accepts, else whole history
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const histories = {};
+    let order = null, token = null, page = "start";
+    while (page) {
+      const part = await api("GET", `/api/machines/${machineId}/trends?${new URLSearchParams({ ...query, page })}`);
+      if (token === null) ({ token, order } = part);
+      else if (part.token !== token) break;
+      for (const [testId, index] of Object.entries(part.tests)) {
+        const points = histories[testId] || (histories[testId] = []);
+        for (const p of part.series[index]) points.push({ ...p });
+      }
+      if (part.next && part.next === page) throw new Error("The trends reply did not move on to the next part. Try again.");
+      page = part.next;
+    }
+    if (!page) return { histories, order: order || {} };
+  }
+  throw new Error("The results changed while they were loading (3 tries). Try again in a moment.");
 }
 
 function stats(points) {
@@ -3887,15 +3918,14 @@ function trendGroups(items) {
 
 async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = []) {
   const assignments = (await api('GET', `/api/machines/${machineId}/assignments`)).filter(a => a.active && !a.archived && (activeRole()!=='therapist'||a.frequency!=='monthly') && (!listId || String(a.id) === String(listId)));
-  const [templates, histories] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machineId}/trends`)]);
+  const [templates, { histories, order: sphinxOrder }] = await Promise.all([Promise.all(assignments.map(a => api('GET', `/api/assignments/${a.id}/template`))), machineHistory(machineId, { from: rangeStart(range) })]);
   const numberPoint=trendSourceNumberer(sourceTemplates.length?sourceTemplates:templates);
   const sections = [], insights = [];
   for (const template of templates) {
     const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range)).map(numberPoint) })).filter(i => i.points.length);
-    // Result insertion order preserves the CSV analysis order, including for existing templates.
-    const imported = Object.entries(histories).flatMap(([testId, points]) => points.filter(p => p.source === 'sphinx' && String(p.assignment_id) === String(template.assignment.id)).map(p => ({ ...p, testId })));
-    const newest = imported.reduce((id, p) => Math.max(id, p.run_id), 0);
-    const order = new Map(imported.filter(p => p.run_id === newest).map(p => [String(p.testId), p.source_order]));
+    // Result insertion order preserves the CSV analysis order, including for existing templates: the newest Sphinx
+    // import's order (from the whole history, so it holds even when that import is older than the period shown).
+    const order = new Map(Object.entries(sphinxOrder[String(template.assignment.id)] || {}));
     if (order.size) items.sort((a,b) => (order.get(String(a.test_id)) ?? Infinity) - (order.get(String(b.test_id)) ?? Infinity));
     const groups = trendGroups(items);
     const categories = new Map();
@@ -4150,7 +4180,7 @@ function trendFileTools(machine, lists, listId, range, testIds) {
       // Read permissions while the export button still has browser user activation.
       if (exportHandle && await exportHandle.queryPermission({ mode: 'readwrite' }) !== 'granted' && await exportHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') throw new Error('Allow the export folder or select Use Downloads in Folder settings.');
       const targets = lists.filter((a) => !listId || String(a.id) === String(listId));
-      const [templates, histories] = await Promise.all([Promise.all(targets.map((a) => api('GET', `/api/assignments/${a.id}/template`))), api('GET', `/api/machines/${machine.id}/trends`)]);
+      const [templates, { histories }] = await Promise.all([Promise.all(targets.map((a) => api('GET', `/api/assignments/${a.id}/template`))), machineHistory(machine.id, { from: rangeStart(range) })]);
       const rows = trendCsvRows(machine, templates, histories, range, testIds);
       if (rows.length < 2) return toast('No numeric results in the selected list and period.');
       const csv = rows.map((row) => row.map(trendCsvCell).join(',')).join('\r\n');

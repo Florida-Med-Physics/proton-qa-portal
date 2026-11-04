@@ -330,7 +330,10 @@ def dbinfo(db, user, m, body, q):
 
 @route("GET", r"/api/machines/(\d+)/trends")
 def machine_trends(db, user, m, body, q):
-    return service.machine_trends(db, user, int(m[1]), **service.trend_window(q))
+    window = service.trend_window(q)
+    if "page" in window:
+        return service.trend_page(db, user, int(m[1]), **window)
+    return service.machine_trends(db, user, int(m[1]), **window)
 
 
 @route("GET", r"/api/trend")
