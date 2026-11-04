@@ -123,6 +123,16 @@ function fmt(value, digits) {
   return digits === undefined ? String(Math.round(n * 10000) / 10000) : n.toFixed(digits);
 }
 
+// Machine Trends shows numbers to two decimal places (77.68, 0.14); `signed` puts + or − on Δ values. Display only:
+// stored values, the CSV export, the QA forms and Review keep their own precision. A missing value shows "—".
+function fmt2(value, signed = false) {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  const text = Math.abs(n).toFixed(2);
+  return (text === "0.00" ? "" : n < 0 ? "−" : signed ? "+" : "") + text;
+}
+
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -635,7 +645,6 @@ async function renderDashboard() {
   const data = applyDashboardRoleView(await api("GET", "/api/dashboard"));
   const queues = data.machines.flatMap((m) => m.queues);
   const todo = queues.filter((q) => q.state === "due" || q.state === "overdue").length;
-  const toReview = data.machines.reduce((n, m) => n + m.pending_review, 0);
   page("Perform QA", new Date(data.today + "T00:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }));
   if (!data.machines.length) {
     app.append(el("div", { class: "card empty" }, "No machines yet. ",
@@ -644,18 +653,10 @@ async function renderDashboard() {
   }
   const banner = await databaseBanner();
   if (banner) app.append(banner);
+  // Perform QA is for doing QA: runs awaiting review are listed on Review QA, not here.
   app.append(el("p", { class: "lead" },
     todo ? `${todo} QA ${todo === 1 ? "list" : "lists"} to do.` : "All QA is done for today.",
-    can("review") && toReview ? ` ${toReview} ${toReview === 1 ? "run is" : "runs are"} waiting for review.` : "",
     " ", el("a", { class: "small", href: "#/runs" }, "All past results")));
-  if (can("review") && toReview) {
-    const pending = await api("GET", "/api/runs?review_status=pending&limit=50");
-    app.append(el("h2", { class: "section-head" }, "Waiting for review"), table(["Date", "Machine", "QA list", "Result", "Performed by", ""], pending.map((r) =>
-      el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
-        el("td", {}, shortDate(r.qa_date)), el("td", {}, machineLabel(r.machine_name)), el("td", {}, r.queue_name),
-        el("td", {}, chip(r.overall)), el("td", { class: "muted" }, personName(r.performer_name, r.performer)),
-        el("td", { class: "right" }, el("a", { class: "button small", href: `#/runs/${r.id}` }, "Review"))))));
-  }
   // Two tables, Proton then Photon, at the same width; each row is a QA list on a machine.
   for (const modality of MODALITIES) {
     const machines = data.machines.filter((m) => modalityOf(m.kind) === modality).sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name));
@@ -3614,15 +3615,57 @@ function trendStatistics(series, unit, delta = false, colorIndex = null) {
   }));
 }
 
-function seriesChart(series, unit, { small = false, delta = null, yLabel = null, axisPanels = false } = {}) {
+// Machine Trends summary under a chart: one row per series, to two decimals. Every result in the period counts (also any
+// left off the plot). Baseline = the latest result's saved baseline. "Farthest from mean" = seriesStats' outlier: the one
+// result farthest from that series' own mean, with its date. On a Δ chart, Mean and Farthest are Δ from each result's
+// saved baseline. The colour matches the series' line on the chart.
+function trendSummary(series, delta = false) {
+  const years = new Set(series.flatMap((s) => s.points.map((p) => String(p.qa_date).slice(0, 4))));
+  const day = (iso) => new Date(iso + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", ...(years.size > 1 ? { year: "numeric" } : {}) });
+  return series.map((item, index) => {
+    const color = item.colorIndex !== undefined ? `axis-${item.colorIndex}` : series.length > 1 ? `axis-${index}` : "single";
+    const points = item.points.filter((p) => Number.isFinite(delta ? asDeviation(p).dev : p.value));
+    const values = points.map((p) => (delta ? asDeviation(p).dev : p.value));
+    const row = { label: item.label, color, n: values.length, baseline: fmt2(item.points.at(-1)?.expected), mean: "—", sd: "—", farthest: "—", date: "—", qa_date: null };
+    if (!values.length) return row;
+    const st = seriesStats(values), far = points[st.outlier];
+    return { ...row, mean: fmt2(st.mean, delta), sd: st.n > 1 ? fmt2(st.sd) : "—", farthest: fmt2(values[st.outlier], delta), date: day(far.qa_date), qa_date: far.qa_date };
+  });
+}
+
+function trendSummaryTable(series, unit, delta = false) {
+  const heads = [["Baseline", "Saved baseline of the latest result"], [delta ? "Mean Δ" : "Mean", delta ? "Mean Δ from each result's saved baseline" : "Mean of all results in the period"],
+    ["SD", "Standard deviation of all results in the period"], ["Farthest from mean", "The result farthest from the mean"], ["Date", "Date of that result"]];
+  return el("div", { class: "trend-summary-wrap" }, el("table", { class: "trend-summary" },
+    el("thead", {}, el("tr", {}, el("th", { scope: "col", class: "trend-summary-unit" }, unit && unit !== "unitless" ? unit : ""),
+      heads.map(([h, title], i) => el("th", { scope: "col", class: i < 4 ? "num" : "", title }, h)))),
+    el("tbody", {}, trendSummary(series, delta).map((r) => el("tr", {},
+      el("th", { scope: "row" }, el("span", { class: `key-swatch line ${r.color}`, "aria-hidden": "true" }), r.label),
+      el("td", { class: "num" }, r.baseline), el("td", { class: "num" }, r.mean), el("td", { class: "num" }, r.sd),
+      el("td", { class: "num" }, r.farthest), el("td", { title: r.qa_date ? shortDate(r.qa_date) : null }, r.date))))));
+}
+
+// Limit bands on a chart of several series only when every result in it carries the same Warning ± and Action ± (in the
+// chart's unit, from the limits saved with each result); otherwise the chart shows none and says so.
+function trendSharedLimits(series) {
+  const key = (v) => (v === null || v === undefined ? "" : String(Number(Number(v).toPrecision(12))));
+  return new Set(series.flatMap((s) => s.points.map((p) => { const d = asDeviation(p); return `${key(d.warnAbs)}|${key(d.failAbs)}`; }))).size <= 1;
+}
+
+// Machine Trends passes `trends`: two decimals and a summary table under each chart (the small charts on Perform QA and a
+// saved run keep their statistics line). `deltaOnly` (spot position) shows only Δ from each result's saved baseline.
+function seriesChart(series, unit, { small = false, delta = null, yLabel = null, axisPanels = false, trends = false, deltaOnly = false } = {}) {
   yLabel = yLabel || yAxisLabel(series.map((x) => x.label));
   // Open every trend in Absolute mode; prediction is opt-in.
-  let mode = "absolute";
+  let mode = deltaOnly ? "delta" : "absolute";
   const hasRef = series.some((x) => x.points.some((pt) => pt.expected !== null && pt.expected !== undefined));
   let prediction = false;
-  const box = el("div", { class: `chart-box${small ? " small" : ""}${series.length > 1 ? " multi" : ""}` });
+  const box = el("div", { class: `chart-box${small ? " small" : ""}${series.length > 1 ? " multi" : ""}${trends ? " trend-box" : ""}` });
+  const show = (...kids) => box.replaceChildren(...kids.filter(Boolean));     // replaceChildren would print a null as "null"
+  const keyItem = (cls, text) => el("span", { class: "key-item" }, el("span", { class: `key-swatch ${cls}` }), text);
+  const bandNote = () => el("p", { class: "muted small trend-band-note" }, "No limit bands: these series do not all share the same Warning ± and Action ±.");
   const draw = () => {
-    const buttons = hasRef ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
+    const buttons = hasRef && !deltaOnly ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
         onclick: (e) => { e.stopPropagation(); mode = m; draw(); } }, m === "absolute" ? `Absolute${unit ? ` ${unit}` : ""}` : "Δ from Reference"))) : null;
     const predictionControl = el('label', { class: 'check prediction-toggle' }, el('input', { type: 'checkbox', checked: prediction, 'aria-label': 'Show 4-week prediction', onchange: e => { prediction = e.target.checked; draw(); } }), '4-week prediction');
@@ -3630,49 +3673,59 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
     const delta = mode === "delta";
     const multi = series.length > 1;
     const pts = series.flatMap((x) => x.points);
+    const hasLimit = (items, field) => items.some((x) => x.points.some((pt) => pt[field] !== null && pt[field] !== undefined));
     if (axisPanels) {
       const energies = new Map();
       for (const item of series) {
         const energy = item.label.replace(/\s*·\s*[XYZ]$/, '');
         if (!energies.has(energy)) energies.set(energy, energies.size);
       }
+      const banded = [];
       const panels = ['X', 'Y'].map(axis => {
         const members = series.filter(item => item.label.endsWith(`· ${axis}`)).map(item => {
           const label = item.label.replace(/\s*·\s*[XYZ]$/, '');
           return { ...item, label, colorIndex: energies.get(label) };
-        });
+        }).sort((a, b) => a.colorIndex - b.colorIndex);              // the same energy order (and colours) in X and in Y
         if (!members.length) return null;
+        const bands = !delta || trendSharedLimits(members);
+        if (delta && bands) banded.push(...members);
         return el('section', { class: 'subplot skewness-axis-panel' }, el('div', { class: 'subplot-title' }, `${yLabel} ${axis}`, trendPassRing(members.flatMap(item => item.points), `${yLabel} ${axis}`)),
-          drawSeries(members, unit, { compact: true, delta, yLabel: `${yLabel} ${axis}`, prediction }),
-          ...(trendExclusionNote(members, delta) ? [trendExclusionNote(members, delta)] : []),
-          trendStatistics(members, unit, delta),
+          drawSeries(members, unit, { compact: true, delta, yLabel: `${yLabel} ${axis}`, prediction, bands, fixed2: trends }),
+          bands ? null : bandNote(),
+          trendExclusionNote(members, delta),
+          trends ? trendSummaryTable(members, unit, delta) : trendStatistics(members, unit, delta),
           el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), trendPassBreakdown(members)));
       }).filter(Boolean);
-      box.replaceChildren(controls, el('div', { class: 'energy-plot-grid plots-2 skewness-axis-grid' }, ...panels),
-        el('div', { class: 'chart-key' }, ...trendKey(true, true, prediction)));
+      show(controls, el('div', { class: 'energy-plot-grid plots-2 skewness-axis-grid' }, ...panels),
+        el('div', { class: 'chart-key' }, delta && hasRef ? keyItem('ref', 'Reference (0)') : null,
+          hasLimit(banded, 'warn') ? keyItem('band-warn', 'Within Warning') : null, hasLimit(banded, 'fail') ? keyItem('band-fail', 'Warning to Action') : null,
+          ...trendKey(true, true, prediction)));
       return;
     }
     // Absolute view of several series (X and Y sit around different references): one subplot per series, stacked,
-    // each on its own scale with its own reference line and bands.
+    // each on its own scale with its own reference line and bands. Machine Trends: one summary table under them all.
     if (multi && !delta) {
-      box.replaceChildren(controls, el('div', { class: `energy-plot-grid plots-${series.length}` }, ...series.map((x, k) => el('div', { class: 'subplot' },
+      show(controls, el('div', { class: `energy-plot-grid plots-${series.length}` }, ...series.map((x, k) => el('div', { class: 'subplot' },
         el('div', { class: 'subplot-title' }, el('span', {}, x.label), trendPassRing(x.points, x.label)),
-        drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k }),
-        ...(trendExclusionNote([x], false) ? [trendExclusionNote([x], false)] : []),
-        trendStatistics([x], unit, false, k)
+        drawSeries([x], unit, { compact: true, delta: false, yLabel, prediction, colorIndex: k, fixed2: trends }),
+        trendExclusionNote([x], false),
+        trends ? null : trendStatistics([x], unit, false, k)
       ))), el('div', { class: 'chart-key energy-shared-key' },
-        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch ref' }), 'Reference'),
-        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-warn' }), 'Within Warning'),
-        el('span', { class: 'key-item' }, el('span', { class: 'key-swatch band-fail' }), 'Warning to Action'), ...trendKey(true, false, prediction)));
+        keyItem('ref', 'Reference'), keyItem('band-warn', 'Within Warning'), keyItem('band-fail', 'Warning to Action'), ...trendKey(true, false, prediction)),
+        trends ? trendSummaryTable(series, unit, false) : null);
       return;
     }
+    // A Δ chart of several series draws limit bands only when they all share the same limits.
+    const bands = !(multi && delta) || trendSharedLimits(series);
     const drawRef = hasRef && !(multi && !delta);
     const key = el("div", { class: "chart-key" },
-      drawRef ? el("span", { class: "key-item" }, el("span", { class: "key-swatch ref" }), delta ? "Reference (0)" : "Reference") : null,
-      drawRef && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-warn" }), "Within Warning") : null,
-      drawRef && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? el("span", { class: "key-item" }, el("span", { class: "key-swatch band-fail" }), "Warning to Action") : null,
+      drawRef ? keyItem('ref', delta ? "Reference (0)" : "Reference") : null,
+      drawRef && bands && pts.some((pt) => pt.warn !== null && pt.warn !== undefined) ? keyItem('band-warn', "Within Warning") : null,
+      drawRef && bands && pts.some((pt) => pt.fail !== null && pt.fail !== undefined) ? keyItem('band-fail', "Warning to Action") : null,
       ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
-    box.replaceChildren(controls, ...(multi ? [trendPassBreakdown(series)] : []), drawSeries(series, unit, { small, delta, yLabel, prediction }), ...(trendExclusionNote(series, delta) ? [trendExclusionNote(series, delta)] : []), trendStatistics(series, unit, delta), key);
+    show(controls, ...(multi ? [trendPassBreakdown(series)] : []), drawSeries(series, unit, { small, delta, yLabel, prediction, bands, fixed2: trends }),
+      bands ? null : bandNote(), trendExclusionNote(series, delta),
+      ...(trends ? [key, trendSummaryTable(series, unit, delta)] : [trendStatistics(series, unit, delta), key]));
   };
   draw();
   return box;
@@ -3684,12 +3737,12 @@ let activePointTooltip=null;
 function trendRunHref(point) {
   return `#/runs/${point.run_id}${point.source_test_id?'?test_id='+point.source_test_id:''}`;
 }
-function pointTooltip(dot,point,label,unit,event) {
+function pointTooltip(dot,point,label,unit,event,fixed2=false) {
   let tip=document.getElementById('qa-point-tooltip');
   if(!tip){tip=el('div',{id:'qa-point-tooltip',class:'point-tooltip',role:'tooltip',hidden:true});document.body.append(tip);window.addEventListener('hashchange',hidePointTooltip);document.addEventListener('scroll',hidePointTooltip,true);document.addEventListener('pointerdown',e=>{if(!e.target.closest?.('.dot'))hidePointTooltip();});}
-  const ref=point.expected,change=ref==null?null:point.value-ref;
-  const deltaText=change==null?'Δ: — (no reference)':`Δ: ${sigSigned(change)}${unit?' '+unit:''}`;
-  tip.replaceChildren(el('strong',{},`${point.source_test_number?'Test '+point.source_test_number+' · ':''}${label}`),el('span',{},`Date: ${shortDate(point.qa_date)}`),el('span',{},`Measured: ${fmt(point.value)}${unit?' '+unit:''}`),el('span',{},deltaText),el('span',{},`Baseline: ${ref==null?'—':fmt(ref)+(unit?' '+unit:'')}`),point.current_expected!=null&&point.current_expected!==ref?el('span',{},`Current template baseline: ${fmt(point.current_expected)}${unit?' '+unit:''}`):null);
+  const num=fixed2?fmt2:fmt,ref=point.expected,change=ref==null?null:point.value-ref;
+  const deltaText=change==null?'Δ: — (no reference)':`Δ: ${fixed2?fmt2(change,true):sigSigned(change)}${unit?' '+unit:''}`;
+  tip.replaceChildren(el('strong',{},`${point.source_test_number?'Test '+point.source_test_number+' · ':''}${label}`),el('span',{},`Date: ${shortDate(point.qa_date)}`),el('span',{},`Measured: ${num(point.value)}${unit?' '+unit:''}`),el('span',{},deltaText),el('span',{},`Baseline: ${ref==null?'—':num(ref)+(unit?' '+unit:'')}`),point.current_expected!=null&&point.current_expected!==ref?el('span',{},`Current template baseline: ${num(point.current_expected)}${unit?' '+unit:''}`):null);
   tip.hidden=false;activePointTooltip=dot;dot.setAttribute('aria-describedby',tip.id);
   const rect=dot.getBoundingClientRect(),cx=event?.clientX||rect.left+rect.width/2,cy=event?.clientY||rect.top;
   tip.style.left=Math.max(8,Math.min(innerWidth-tip.offsetWidth-8,cx+14))+'px';
@@ -3697,7 +3750,9 @@ function pointTooltip(dot,point,label,unit,event) {
 }
 function hidePointTooltip(){const tip=document.getElementById('qa-point-tooltip');if(tip)tip.hidden=true;if(activePointTooltip)activePointTooltip.removeAttribute('aria-describedby');activePointTooltip=null;}
 
-function drawSeries(series, unit, { small = false, compact = false, delta = false, prediction = true, colorIndex = null, yLabel = "Value" } = {}) {
+// `bands: false` keeps the reference line but draws no limit bands; `fixed2` (Machine Trends) prints numbers to two decimals.
+function drawSeries(series, unit, { small = false, compact = false, delta = false, prediction = true, colorIndex = null, yLabel = "Value", bands = true, fixed2 = false } = {}) {
+  const num = fixed2 ? fmt2 : fmt, numSigned = fixed2 ? (v) => fmt2(v, true) : sigSigned;
   const multi = series.length > 1;
   const W = compact ? 480 : 900, H = compact ? 185 : small ? 200 : 360;
   const L = small ? 78 : 70, R = 40, T = small ? 10 : 20, B = small ? 40 : 52;
@@ -3729,7 +3784,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   const ref = (multi && !delta ? [] : series[0].points).map((p) => {
     if (delta) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
     return { d: p.qa_date, w: p.warn === null ? null : bandValue(p, "warn", 1) - p.expected, f: p.fail === null ? null : bandValue(p, "fail", 1) - p.expected, c: p.expected };
-  }).filter((b) => b.c !== null && b.c !== undefined);
+  }).filter((b) => b.c !== null && b.c !== undefined).map((b) => (bands ? b : { ...b, w: null, f: null }));
 
   // Auto-scale to the data only, with a little headroom.
   const values = series.flatMap((s) => s.points.map(val));
@@ -3743,6 +3798,8 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     const pad = (hi - lo) * 0.1;
     lo -= pad; hi += pad;
   }
+  // Two-decimal tick labels need a span of at least 0.04 so no two ticks print the same.
+  if (fixed2 && hi - lo < 0.04) { const mid = (hi + lo) / 2; lo = mid - 0.02; hi = mid + 0.02; }
   const y = (v) => T + ((hi - v) * (plotBottom - T)) / (hi - lo);
   const clipId = `clip-${Math.random().toString(36).slice(2)}`;
   const kids = [svg("defs", {}, svg("clipPath", { id: clipId }, svg("rect", { x: L-6, y: T-6, width: W-L-R+12, height: plotBottom-T+12 })))];
@@ -3770,11 +3827,11 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
   const seenTickLabels = new Set();
   for (const v of ticks) {
-    const tickLabel = (delta && v > 0 ? "+" : "") + fmt(v,decimals);
+    const tickLabel = fixed2 ? fmt2(v, delta) : (delta && v > 0 ? "+" : "") + fmt(v,decimals);
     if (seenTickLabels.has(tickLabel)) continue;
     seenTickLabels.add(tickLabel);
     kids.push(svg("line", { class: "axis", x1: L, x2: W - R, y1: y(v), y2: y(v) }),
-      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, (delta && v > 0 ? "+" : "") + fmt(v,decimals)));
+      svg("text", { x: L - 5, y: y(v) + 4, "text-anchor": "end" }, tickLabel));
   }
   const shortLabel = small && yLabel.length > 30 ? `${yLabel.slice(0, 29)}…` : yLabel;
   const yTitle = `${delta ? "Δ " : ""}${shortLabel}${unit ? ` (${unit})` : ""}`;   // "Y Offset (mm)" / "Δ Y Offset (mm)": the unit never changes between the two views
@@ -3796,20 +3853,21 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   if (prediction) plot.push(svg("line", { class: "forecast-line", x1: xt(t1), x2: xt(t1), y1: T, y2: plotBottom }));
   series.forEach((s, k) => {
     const cls = s.colorIndex !== undefined ? `axis-${s.colorIndex}` : colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "";
-    const r = small ? (dates.length > 120 ? 2.2 : 3) : (dates.length > 150 ? 2.6 : 3.6);
+    // Smaller dots when many series share one plot (spot position: six energies), so the lines stay readable.
+    const r = (small ? (dates.length > 120 ? 2.2 : 3) : (dates.length > 150 ? 2.6 : 3.6)) * (series.length > 3 ? 0.7 : 1);
     // A line from each result to the next, then the dots on top.
     if (s.points.length > 1) plot.push(svg("polyline", { class: `series ${cls || "single"}`, points: s.points.map((p) => `${x(p.qa_date)},${y(val(p))}`).join(" ") }));
     for (const p of s.points) {
       const change=p.expected==null?null:p.value-p.expected;
-      const description=`${p.source_test_number?"Test "+p.source_test_number+" · ":""}${s.label} · Date: ${shortDate(p.qa_date)} · Measured: ${fmt(p.value)}${unit?' '+unit:''} · Δ: ${change==null?'— (no reference)':sigSigned(change)+(unit?' '+unit:'')}`;
+      const description=`${p.source_test_number?"Test "+p.source_test_number+" · ":""}${s.label} · Date: ${shortDate(p.qa_date)} · Measured: ${num(p.value)}${unit?' '+unit:''} · Δ: ${change==null?'— (no reference)':numSigned(change)+(unit?' '+unit:'')}`;
       const dot=svg('circle',{class:`dot ${cls||'single'} st-${p.status}`,cx:x(p.qa_date),cy:y(val(p)),r,tabindex:0,'aria-label':description},svg('title',{},description));
-      dot.addEventListener('pointerenter',e=>pointTooltip(dot,p,s.label,unit,e));
-      dot.addEventListener('pointermove',e=>pointTooltip(dot,p,s.label,unit,e));
+      dot.addEventListener('pointerenter',e=>pointTooltip(dot,p,s.label,unit,e,fixed2));
+      dot.addEventListener('pointermove',e=>pointTooltip(dot,p,s.label,unit,e,fixed2));
       dot.addEventListener('pointerleave',hidePointTooltip);
-      dot.addEventListener('focus',()=>pointTooltip(dot,p,s.label,unit));
+      dot.addEventListener('focus',()=>pointTooltip(dot,p,s.label,unit,undefined,fixed2));
       dot.addEventListener('blur',hidePointTooltip);
       dot.addEventListener('keydown',e=>{if(e.key==='Escape')hidePointTooltip();if((e.key==='Enter'||e.key===' ')&&p.run_id){e.preventDefault();location.hash=trendRunHref(p);}});
-      dot.addEventListener('click',e=>{e.stopPropagation();if(p.run_id){hidePointTooltip();location.hash=trendRunHref(p);}else pointTooltip(dot,p,s.label,unit,e);});
+      dot.addEventListener('click',e=>{e.stopPropagation();if(p.run_id){hidePointTooltip();location.hash=trendRunHref(p);}else pointTooltip(dot,p,s.label,unit,e,fixed2);});
       plot.push(dot);
     }
   });
@@ -3819,7 +3877,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     const cls = s.colorIndex !== undefined ? `axis-${s.colorIndex}` : colorIndex !== null ? `axis-${colorIndex}` : multi ? `axis-${k}` : "single";
     plot.push(svg("line", { class: `fit ${cls}`, x1: xt(t0), y1: y(f.at(t0)), x2: xt(t1), y2: y(f.at(t1)) }));
     if (prediction) plot.push(svg("line", { class: `fit forecast ${cls}`, x1: xt(t1), y1: y(f.at(t1)), x2: xt(tEnd), y2: y(f.end) },
-      svg("title", {}, `Projected ${sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (least-squares fit)`)));
+      svg("title", {}, `Projected ${fixed2 ? fmt2(f.end, delta) : sig(f.end)}${unit ? ` ${unit}` : ""} in ${FORECAST_DAYS / 7} weeks (least-squares fit)`)));
 
   });
   const plotGroup = svg("g", { "clip-path": `url(#${clipId})` }, plot);
@@ -3872,17 +3930,38 @@ function trendGroups(items) {
     const energy = /(\d+(?:\.\d+)?)\s*MeV/i.exec(item.name);
     if (!energy) { plain.push(item); continue; }
     let metric = item.name.replace(/\[\s*\d+(?:\.\d+)?\s*MeV\s*\]|\d+(?:\.\d+)?\s*MeV/ig, '').replace(/^.*?:\s*/, '').replace(/^\s*(?:Energy|Spot)\s*[-–—:]?\s*/i, '').replace(/^\s*[-–—:]\s*/, '').trim();
+    // X and Y of one measurement share a family ("100 MeV · X", "100 MeV · Y"); spot position X/Y is shown as two panels.
     const axis = axisParts(metric);
-    const splitPosition = axis && /position/i.test(axis.base);
-    if (axis) metric = `${axis.base}${splitPosition ? ` ${axis.axis}` : ''}`;
-    const labels = { 'dfo': 'Distal Fall Off', 'distal falloff': 'Distal Fall Off', 'distal fall off': 'Distal Fall Off', 'distal depth': 'Distal Depths' };
+    if (axis) metric = axis.base;
+    const labels = { 'dfo': 'Distal Fall Off', 'distal falloff': 'Distal Fall Off', 'distal fall off': 'Distal Fall Off', 'distal depth': 'Distal Depths', 'position': 'Spot Position' };
     metric = labels[metric.toLowerCase()] || metric;
     const key = `${item.category || ''}|${metric.toLowerCase()}|${item.unit || ''}`;
     if (!families.has(key)) families.set(key, { base: metric, category: item.category, members: [] });
-    families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis && !splitPosition ? ` · ${axis.axis}` : ''}` });
+    families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis ? ` · ${axis.axis}` : ''}` });
   }
   const order = new Map(items.map((item, index) => [item.test_id, index]));
   return [...axisGroups(plain), ...families.values()].sort((a,b) => Math.min(...a.members.map(m => order.get(m.test_id))) - Math.min(...b.members.map(m => order.get(m.test_id))));
+}
+
+// Key checks lead each QA list on Machine Trends, open: distal depth, then spot position (X/Y). They are recognised from
+// the test names by the Sphinx matching rules (MEASURE_RULES), so "Energy [100 MeV] – Distal Depth" and
+// "Energy [100.00 MeV]: Distal Depth [mm]" both count, and Distal Fall Off does not.
+function trendKeyCheck(group) {
+  const kind = { distal: 'depth', pos_x: 'position', pos_y: 'position' };
+  const kinds = new Set(group.members.map((m) => kind[measureParts(m.name)?.metric] || null));
+  return kinds.size === 1 ? [...kinds][0] : null;
+}
+// Members named for one axis of a pair ("100 MeV · X", "100 MeV · Y") are drawn as an X panel and a Y panel.
+function trendAxisSplit(group) {
+  return group.members.length > 1 && group.members.every((m) => /· [XY]$/.test(m.axis || ''));
+}
+
+// The chart for one group, on the overview and on its own page. Spot position: X and Y panels side by side, every energy
+// on one scale as Δ from each result's saved baseline. Skewness X/Y: the same two panels, Absolute or Δ.
+function trendGroupChart(group) {
+  const split = trendAxisSplit(group), spot = split && trendKeyCheck(group) === 'position';
+  return seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, {
+    yLabel: yAxisLabel(group.members.map((m) => m.name)), trends: true, deltaOnly: spot, axisPanels: spot || (split && /skewness/i.test(group.base)) });
 }
 
 async function renderTrendOverview(machines, machineId, range, listId = "", sourceTemplates = []) {
@@ -3898,25 +3977,30 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
     const order = new Map(imported.filter(p => p.run_id === newest).map(p => [String(p.testId), p.source_order]));
     if (order.size) items.sort((a,b) => (order.get(String(a.test_id)) ?? Infinity) - (order.get(String(b.test_id)) ?? Infinity));
     const groups = trendGroups(items);
-    const categories = new Map();
+    const categories = new Map(), keyChecks = [];
     for (const group of groups) {
       const category = categoryLabel(group.category) || 'Other measurements';
-      if (!categories.has(category)) categories.set(category, []);
+      const keyCheck = trendKeyCheck(group);
       const href = `#/trends?machine_id=${machineId}&list=${template.assignment.id}&test_id=${group.members.map(m => m.test_id).join(',')}&range=${range}`;
       insights.push(...group.members.map(m => ({ ...m, href })));
       const body = el('div', { class: 'trend-chart-body' });
       const chart = el('details', { class: 'trend-chart-row' }, el('summary', {}, el('strong', {}, group.base), trendPassRing(group.members.flatMap(m => m.points), group.base)), body);
-      chart.dataset.search = `${group.base} ${category} ${template.queue.name}`.toLowerCase();
+      chart.dataset.search = `${group.base} ${category} ${template.queue.name}${keyCheck ? ' key checks' : ''}`.toLowerCase();
       let drawn = false;
-      chart.addEventListener('toggle', () => {
-        if (!chart.open || drawn) return;
+      const draw = () => {
+        if (drawn) return;
         drawn = true;
-        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), seriesChart(group.members.map(m => ({ label: m.axis || m.name, points: m.points })), group.members[0].unit, { yLabel: yAxisLabel(group.members.map(m => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }), el('a', { href, class: 'button small' }, 'View values and details'));
-      });
+        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
+      };
+      chart.addEventListener('toggle', () => { if (chart.open) draw(); });
+      // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category, closed.
+      if (keyCheck) { chart.open = true; draw(); keyChecks.push({ keyCheck, chart }); continue; }
+      if (!categories.has(category)) categories.set(category, []);
       categories.get(category).push(chart);
     }
     if (groups.length) {
       const section = el('section', { class: 'trend-organized-list' }, el('h2', { class: 'section-head' }, template.queue.name));
+      if (keyChecks.length) section.append(el('h3', { class: 'trend-key-checks' }, 'Key checks'), ...keyChecks.sort((a, b) => (a.keyCheck === 'depth' ? 0 : 1) - (b.keyCheck === 'depth' ? 0 : 1)).map(k => k.chart));
       for (const [category, charts] of categories) section.append(el('h3', {}, category), ...charts);
       sections.push(section);
     }
@@ -3936,31 +4020,36 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
 
 function renderTrendDetail(group, range, assignments=[]) {
   const unit = group.members[0].unit;
-  const multi = group.members.length > 1;
-  app.append(seriesChart(group.members.map((m) => ({ label: m.axis || m.name, points: m.points })), unit, { yLabel: yAxisLabel(group.members.map((m) => m.name)), axisPanels: /skewness/i.test(group.base) && group.members.some(m => /· [XY]$/.test(m.axis)) }));
-  // Keep separate runs on the same date so a later pass never hides an earlier failure.
-  const byRun=new Map();
-  group.members.forEach((m,k)=>m.points.forEach(p=>{
-    const key=`${p.qa_date}|${p.run_id}`;
-    if(!byRun.has(key))byRun.set(key,{qa_date:p.qa_date,run_id:p.run_id,cells:[]});
-    byRun.get(key).cells[k]=p;
-  }));
-  const rows=[...byRun.values()].sort((a,b)=>b.qa_date.localeCompare(a.qa_date)||b.run_id-a.run_id).slice(0,100);
-  const valueRows=rows.map(row=>{
-    const cells=group.members.map((m,k)=>{
-      const p=row.cells[k];
-      const title=p?`Baseline at submission: ${fmt(p.expected)} ${unit}. Current template baseline: ${fmt(p.current_expected)} ${unit}.`:null;
-      return el('td',{class:'num',title},p?el('a',{href:trendRunHref(p),class:'trend-result-link'},
-        p.source_test_number?el('span',{class:'small'},`Test ${p.source_test_number}`):null,
-        el('span',{},`${fmt(p.value)} ${unit}`.trim()),chip(p.status)):'');
+  app.append(trendGroupChart(group));
+  // X / Y pairs (spot position, skewness): one values table per axis, so a table never runs off the page.
+  const split = trendAxisSplit(group), energyOf = (m) => (m.axis || '').replace(/\s*·\s*[XY]$/, '');
+  const order = [...new Set(group.members.map(energyOf))];            // the same energy order in X and Y, as on the chart
+  const sets = split ? ['X','Y'].map(axis=>({axis,members:group.members.filter(m=>m.axis.endsWith(`· ${axis}`)).sort((a,b)=>order.indexOf(energyOf(a))-order.indexOf(energyOf(b)))})).filter(s=>s.members.length) : [{axis:'',members:group.members}];
+  for (const {axis,members} of sets) {
+    // Keep separate runs on the same date so a later pass never hides an earlier failure.
+    const byRun=new Map();
+    members.forEach((m,k)=>m.points.forEach(p=>{
+      const key=`${p.qa_date}|${p.run_id}`;
+      if(!byRun.has(key))byRun.set(key,{qa_date:p.qa_date,run_id:p.run_id,cells:[]});
+      byRun.get(key).cells[k]=p;
+    }));
+    const rows=[...byRun.values()].sort((a,b)=>b.qa_date.localeCompare(a.qa_date)||b.run_id-a.run_id).slice(0,100);
+    const valueRows=rows.map(row=>{
+      const cells=members.map((m,k)=>{
+        const p=row.cells[k];
+        const title=p?`Baseline at submission: ${fmt2(p.expected)} ${unit}. Current template baseline: ${fmt2(p.current_expected)} ${unit}.`:null;
+        return el('td',{class:'num',title},p?el('a',{href:trendRunHref(p),class:'trend-result-link'},
+          p.source_test_number?el('span',{class:'small'},`Test ${p.source_test_number}`):null,
+          el('span',{},`${fmt2(p.value)} ${unit}`.trim()),chip(p.status)):'');
+      });
+      return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}`},row.qa_date)),
+        el('td',{},assignments.find(a=>String(a.id)===String(row.cells.find(Boolean)?.assignment_id))?.queue_name||'Recorded QA'),cells);
     });
-    return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}`},row.qa_date)),
-      el('td',{},assignments.find(a=>String(a.id)===String(row.cells.find(Boolean)?.assignment_id))?.queue_name||'Recorded QA'),cells);
-  });
-  app.append(el('details',{class:'card',open:rows.length<=20},
-    el('summary',{},byRun.size>100?'Latest 100 runs':'Values'),
-    table(['QA date','Source QA list',...group.members.map(m=>m.axis||'Value')],valueRows)));
-
+    const title=`${byRun.size>100?'Latest 100 runs':'Values'}${axis?` · ${yAxisLabel(members.map(m=>m.name)).replace(/\s+[XY]$/,'')} ${axis}`:''}`;
+    app.append(el('details',{class:'card',open:rows.length<=20},
+      el('summary',{},title),
+      table(['QA date','Source QA list',...members.map(m=>(axis?energyOf(m):m.axis)||'Value')],valueRows)));
+  }
 }
 
 function stat(label, value, note) {
@@ -4202,7 +4291,7 @@ function trendInsightsCard(series) {
     if (last.status === 'fail' || last.status === 'warn') messages.push({ priority: last.status === 'fail' ? 3 : 2,
       href: last.run_id?trendRunHref(last):item.href, text: `${who}${last.source_test_number?'Test '+last.source_test_number+' · ':''}${item.name}: latest result is at ${last.status === 'fail' ? 'action' : 'warning'} level (${shortDate(last.qa_date)}).` });
     const pattern = trendPattern(item.points);
-    if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${sig(pattern.change)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${sig(pattern.r2)}).` });
+    if (pattern) messages.push({ priority: 1, href: item.href, text: `${who}${item.name}: ${pattern.direction.toLowerCase()} pattern, ${fmt2(pattern.change, true)} ${item.unit || ''} fitted change across ${pattern.n} results (R² ${fmt2(pattern.r2)}).` });
   }
   messages.sort((a,b) => b.priority-a.priority);
   const populated=series.filter(s=>s.points.length);
@@ -4253,7 +4342,7 @@ async function renderTrends() {
   }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = trendGroups(items)[0];
-  app.append(el("h2", {}, group ? group.base : trendDisplayName(head.name), group ? axisLegend(group) : null),
+  app.append(el("h2", {}, group ? group.base : trendDisplayName(head.name), group && !trendAxisSplit(group) ? axisLegend(group) : null),
     el("p", { class: "muted small" }, [sectionOf(head), categoryLabel(head.category)].join(" · ")));
   if (!group) return app.append(el("div", { class: "card empty" }, "No results for this test in this period."));
   renderTrendDetail(group, range, lists);

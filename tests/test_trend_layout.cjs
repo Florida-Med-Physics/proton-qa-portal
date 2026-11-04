@@ -33,12 +33,11 @@ for (const metric of ['Distal Fall Off', 'Proximal Depth', 'Width', 'DFO']) {
  assert.equal(grouped.length, 1);
  assert.equal(grouped[0].members.length, 3);
 }
+// Spot position X and Y of every energy form one group, drawn as an X panel and a Y panel (Δ from each saved baseline).
 const positions = context.trendGroups([100,200].flatMap((energy,index) => ['X','Y'].map((axis,n) => ({test_id: index*2+n+30, name: `[${energy} MeV] – Position ${axis}`, unit: 'mm', category: 'Spot'}))));
-assert.equal(positions.length, 2);
-assert.equal(positions[0].members.length, 2);
-assert.equal(positions[0].base, 'Position X');
-assert.equal(positions[1].base, 'Position Y');
-assert.equal(positions[0].members[0].axis, '100 MeV');
+assert.equal(positions.length, 1);
+assert.equal(positions[0].base, 'Spot Position');
+assert.equal(positions[0].members.map(m => m.axis).join(' | '), '100 MeV · X | 100 MeV · Y | 200 MeV · X | 200 MeV · Y');
 
 const csvOrder = context.trendGroups([
  {test_id: 80, name: 'Energy [225 MeV] – Width', category: 'Energy', unit: 'mm'},
