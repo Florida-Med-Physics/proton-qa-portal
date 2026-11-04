@@ -55,12 +55,17 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   the test (full text on hover). Large fonts (base 16 px). Nothing scrolls sideways. Never show "null",
   "undefined", "[object …]" or "unitless". Keep words to a minimum (the boss called an earlier layout "too busy").
 - **Tables** (Perform QA and Machine Trends share the layout): `# · Test/Energy/Axis · Unit · Baseline ·
-  Measured/Latest · Deviation · Result · Comment · History · (30 days) · Trends`. Per-energy/spot measurements are
+  Measured/Latest · Result · Comment · History · (30 days) · Trends`. Per-energy/spot measurements are
   one titled table with one row per energy ("Spot 1 · 226.4 MeV" on one line); X/Y/Z (+3D) likewise, no lines
   between its rows. One sequential number per block, centred in the # column, identical on both pages
   (`blockNumbers()`). One decimal count per table. History = dates in a header row, values in equal slots under
-  them, only as many as fit one line. Every numeric result gets a green/yellow/red Δ badge. Comments behind a
+  them, only as many as fit one line. A numeric result's deviation follows its verdict chip in plain brackets,
+  "PASS (Δ +0.30 mm)" (Brook, 2026-11-04: no Deviation column); hidden on phones. Comments behind a
   pencil icon. Yes before No.
+- **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
+  link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
+  position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
+  parts (machineHistory); never ask for a machine's whole history in one reply.
 - **Charts:** views "Absolute <unit>" and "Δ from Reference", unit unchanged between them; several series in
   Absolute = stacked subplots. Lines join dots; green band inside warning, orange strips warning→action; axis spans
   the warning band; calendar x-axis with a line per month; HTML key under the chart; biggest outlier ringed; click a
@@ -74,7 +79,8 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
 - **Lists and actions:** Setup QA has a QA Lists table (✎ left of the name; ＋ schedule on machines, 🗑 delete,
   ⋯ Duplicate / Re-evaluate / Archive; Scheduled On chips) and a Machine Schedules table grouped by machine
   (Machine Values count; ⋯ Set Active/Inactive, Values for this machine, Schedule and import folder).
-  Perform QA: green ▶ before every list (no Start column), due lists first, Save (draft) button, frozen title row.
+  Perform QA: green ▶ before every list (no Start column), due lists first, Mark in Progress button (saves the draft; Brook renamed it 2026-11-04), frozen title row;
+  no runs-waiting-for-review list there (Brook: "I just want to perform QA"; they live on Review QA).
   Tabs: ⌂ (Dashboard, icon only) · Perform QA · Review QA · Setup QA · Machine Trends · Data Administration — no
   Machines tab (machine pages open from Setup QA names).
 - **Data rules:** "QA Performed By" starts as the signed-in user; other text fields carry forward the last recorded
