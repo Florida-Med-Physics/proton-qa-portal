@@ -73,12 +73,15 @@ const OFF = { browserFolders: false };
   // Switch off, in the worst case for it: the page has localApi and a browser that could open folders.
   for (const role of ['physicist', 'therapist']) {
     const { context, calls, bodies, app, buttons } = load({ host: OFF, role });
-    // Schedule editor (existing and new list): a typed path, saved with the schedule, and a one-line hint.
-    for (const a of [LIST, {}]) {
-      const node = context.importFolderField(a), input = node.find((n) => n.tagName === 'input');
-      assert.equal(input.length, 1); assert.equal(input[0].attributes.name, 'import_folder'); assert.equal(input[0].value, a.import_folder || '');
-      assert.match(node.textContent, /The scheduled import on a UFHPTI computer reads this folder\./); assert.deepEqual(buttons(node), []);
-    }
+    // Schedule editor: a typed path, saved with the schedule, and a one-line hint.
+    { const node = context.importFolderField(LIST), input = node.find((n) => n.tagName === 'input');
+      assert.equal(input.length, 1); assert.equal(input[0].attributes.name, 'import_folder'); assert.equal(input[0].value, LIST.import_folder);
+      assert.match(node.textContent, /The scheduled import on a UFHPTI computer reads this folder\./); assert.deepEqual(buttons(node), []); }
+    // A new list (Add a QA list, or "Schedule on machines", which may create several at once) gets no folder field, so
+    // one typed folder is never saved on several lists.
+    const fresh = context.importFolderField({});
+    assert.deepEqual(fresh.find((n) => n.tagName === 'input'), []); assert.deepEqual(buttons(fresh), []);
+    assert.match(fresh.textContent, /Save this list first, then type its folder under Change schedule or in Data Administration\./);
     // Perform QA: no folder line, so autoReadLine never runs (its only call is behind autoLine).
     assert.equal(context.autoLine({ assignment: LIST }), null);
     // Machine Trends: Export CSV only, saved by the browser's download; no remembered export folder is looked up.

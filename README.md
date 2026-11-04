@@ -150,7 +150,7 @@ A page that hosts these pages (floridaphysics.com does) may set this before `app
 window.QA_HOST = { browserFolders: false };
 ```
 
-Then no page opens a folder: no folder picker, no `window.localFolders`, no `GET /api/assignments/:id/files` or `/file`, no folder `<input webkitdirectory>` and no export folder. Each list's **Default import folder** is a typed path (in the schedule editor, and in Data Administration for a Physicist or Admin), saved with its schedule by `PUT /api/assignments/:id`; the scheduled import on a UFHPTI computer reads those folders. Perform QA keeps its single-file import, Machine Trends has **Export CSV** only (a browser download), and Data Administration does not scan. Without `QA_HOST`, or with any other value, both builds work as before; `tests/test_host_folders.cjs` checks both.
+Then no page opens a folder: no folder picker, no `window.localFolders`, no `GET /api/assignments/:id/files` or `/file`, no folder `<input webkitdirectory>` and no export folder. Each list's **Default import folder** is a typed path (in the schedule editor, and in Data Administration for a Physicist or Admin), saved with its schedule by `PUT /api/assignments/:id`. It is typed once the list is saved: adding a list, or scheduling one on several machines at once, offers no folder, so one folder is never set on several lists. The scheduled import on a UFHPTI computer reads those folders. Perform QA keeps its single-file import, Machine Trends has **Export CSV** only (a browser download), and Data Administration does not scan. Without `QA_HOST`, or with any other value, both builds work as before; `tests/test_host_folders.cjs` checks both.
 
 ## Shared UFHPTI deployment
 

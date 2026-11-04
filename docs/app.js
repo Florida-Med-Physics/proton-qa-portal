@@ -1114,8 +1114,10 @@ function scheduleForm(assignment, queues) {
 }
 
 // Where this list's export files (Sphinx, DQA3, ...) appear, so the Perform page can offer them without a file dialog.
-// Without browser folders (browserFolders()) it is a typed path that the scheduled import reads instead.
+// Without browser folders (browserFolders()) it is a typed path that the scheduled import reads instead, typed on a
+// saved list only: "Schedule on machines" creates several lists at once, and each needs a folder of its own.
 function importFolderField(a) {
+  if (!a.id && !browserFolders()) return field("Default import folder", el("span", { class: "muted small" }, "Save this list first, then type its folder under Change schedule or in Data Administration."), "wide");
   if (!window.localApi || !browserFolders()) {
     const input = el("input", { name: "import_folder", value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\ProtonDaily\\G1 Sphinx" });
     return field("Default import folder", browserFolders() ? input : [input, el("div", { class: "muted small" }, "The scheduled import on a UFHPTI computer reads this folder.")], "wide");
