@@ -1119,9 +1119,10 @@ def sphinx_add_tests(db, user, assignment_id, upload):
     return {"added": added}
 
 
-def import_sphinx(db, user, assignment_id, files, historical=True):
+def import_sphinx(db, user, assignment_id, files, historical=True, history_before=None):
     """Record Sphinx files as runs. New runs (historical=False, awaiting review) are judged by the list's limits;
-    history (historical=True) keeps the limits and verdict from its own file.
+    history (historical=True) keeps the limits and verdict from its own file. With history_before ('YYYY-MM-DD'),
+    each file dated before it is history and each file on or after it awaits review; historical is then ignored.
 
     files: iterable of (filename, bytes). Duplicate files (same content) are skipped.
     """
@@ -1144,6 +1145,7 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
         if added:
             template = run_template(db, user, assignment_id)
         list_items = {i["test_id"]: i for i in template["items"]}
+        as_history = parsed["qa_date"] < history_before if history_before else historical
         rows = []
         for m in parsed["measurements"]:
             if (m["category"], m["name"]) not in ids:
@@ -1151,13 +1153,13 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
             test_id = ids[(m["category"], m["name"])]
             # New results are judged by the list's limits, as when the QA is done on the form; the file's own verdict
             # is noted when it differs. Old files brought in as history keep the limits and verdict written in them.
-            limits = _file_limits(m) if historical or test_id not in list_items else list_items[test_id]["limits"]
+            limits = _file_limits(m) if as_history or test_id not in list_items else list_items[test_id]["limits"]
             try:
                 ours = qa.evaluate("numeric", m["result"], limits)
             except ValueError:
                 ours = "recorded"
             sphinx_verdict = SPHINX_STATUS.get(m["sphinx_status"])
-            if historical:
+            if as_history:
                 status = sphinx_verdict or ours
                 note = f"Sphinx: {m['sphinx_status']}; portal rule on the rounded values gives {ours}." if status != ours else ""
             else:
@@ -1171,7 +1173,7 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
         comment = f"Imported from {name}. Sphinx finished {parsed['finished'].replace('T', ' ')}" + \
                   (f" by {parsed['sphinx_user']}." if parsed["sphinx_user"] else ".")
         run = _insert_run(db, user, template, parsed["qa_date"], rows, comment, "sphinx", parsed["sha256"],
-                          "imported" if historical else "pending")
+                          "imported" if as_history else "pending")
         imported.append({"file": name, "run_id": run["id"], "qa_date": parsed["qa_date"], "overall": run["overall"]})
     return {"imported": imported, "skipped": skipped}
 
@@ -1197,11 +1199,81 @@ def import_checklist(db, user, queue_id, parsed):
     return {"added": added}
 
 
+def _iso_day(value, key):
+    """A day written YYYY-MM-DD in ASCII digits that is on the calendar; the same rule and words as local-backend.js isoDay."""
+    if isinstance(value, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
+        try:
+            return date.fromisoformat(value).isoformat()
+        except ValueError:
+            pass
+    raise PortalError(f"{key}: give a date as YYYY-MM-DD.")
+
+
+def _optional_row(db, data, key, table, missing):
+    """An optional id in a request body: absent or null means none; anything else must be a whole number naming a row
+    (JSON 3.0 counts as 3, as it does in JavaScript)."""
+    value = data.get(key)
+    if value is None:
+        return None
+    whole = (isinstance(value, int) and not isinstance(value, bool)) or (isinstance(value, float) and value.is_integer())
+    row = db.one(f"SELECT * FROM {table} WHERE id = ?", (int(value),)) if whole and 0 < value <= 2 ** 53 - 1 else None
+    if not row:
+        raise PortalError(missing, 404)
+    return row
+
+
 def import_sphinx_uploads(db, user, assignment_id, data):
+    require(user, "configure")
+    history_before = None if data.get("history_before") is None else _iso_day(data.get("history_before"), "history_before")
     files = [_decode_upload(u) for u in data.get("files") or []]
     if not files:
         raise PortalError("Choose one or more Sphinx .xls files.")
-    return import_sphinx(db, user, assignment_id, files, historical=bool(data.get("historical", True)))
+    return import_sphinx(db, user, assignment_id, files, historical=bool(data.get("historical", True)), history_before=history_before)
+
+
+# The note a Sphinx file import writes: "Imported from <file>. Sphinx finished <date> <time>…" (import_sphinx), or
+# "Imported from <file>.xls/.csv/.pdf" and nothing more (the browser folder import, which sends each file through the
+# form). The same pattern as local-backend.js IMPORT_NOTE.
+_IMPORT_NOTE = re.compile(r"Imported from [^\n]+(\. Sphinx finished [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
+                          r"|\.([Xx][Ll][Ss]|[Cc][Ss][Vv]|[Pp][Dd][Ff])\Z)")
+
+
+def _imported_from_file(run):
+    """A run made by a Sphinx file import, known by the note the import writes. A run performed on the Perform form keeps
+    the note the person typed, so it is not chosen, even when a file filled it in."""
+    return run["source"] == "sphinx" and bool(_IMPORT_NOTE.match(run["comment"] or ""))
+
+
+def record_history(db, user, data):
+    """Past Sphinx imports still waiting for review become history, as if imported as history in the first place:
+    results, limits, verdicts, comments and any therapist sign-off stay as they are. Mirrors local-backend.js recordHistory.
+
+    data: until 'YYYY-MM-DD' (required, QA dates up to and including it), machine_id, assignment_id, dry_run.
+    A dry run returns {count, runs} and changes nothing; otherwise {count}, with one audit entry per run."""
+    require(user, "review")
+    until = _iso_day(data.get("until"), "until")
+    machine = _optional_row(db, data, "machine_id", "machines", "Machine not found.")
+    assignment = _optional_row(db, data, "assignment_id", "assignments", "Schedule not found.")
+    dry_run = data.get("dry_run")
+    if dry_run is not None and not isinstance(dry_run, bool):
+        raise PortalError("dry_run: give true or false.")
+    if machine and assignment and assignment["machine_id"] != machine["id"]:
+        raise PortalError("That schedule is not on that machine.")
+    clauses, params = ["trashed_at IS NULL", "review_status = 'pending'", "source = 'sphinx'", "qa_date <= ?"], [until]
+    for key, row in (("machine_id", machine), ("assignment_id", assignment)):
+        if row:
+            clauses.append(f"{key} = ?")
+            params.append(row["id"])
+    with db.transaction():
+        runs = [r for r in db.all("SELECT * FROM runs WHERE " + " AND ".join(clauses) + " ORDER BY id", params) if _imported_from_file(r)]
+        if dry_run:
+            return {"count": len(runs), "runs": [r["id"] for r in runs]}
+        for r in runs:
+            previous = {"review_status": r["review_status"], "therapist_approval_required": bool(r["therapist_approval_required"]),
+                        "therapist_approved_by": r["therapist_approved_by"], "therapist_approved_at": r["therapist_approved_at"]}
+            db.run("UPDATE runs SET review_status = 'imported', therapist_approval_required = 0 WHERE id = ?", (r["id"],))
+            db.audit(user["id"], "record_history", "run", r["id"], previous=previous, until=until)
+    return {"count": len(runs)}
 
 
 _RUN_SELECT = ("SELECT r.*, m.name AS machine_name, q.name AS queue_name, pu.full_name AS performer_name, pu.username AS performer, "
@@ -1311,6 +1383,9 @@ def unapprove_therapist_review(db,user,run_id):
         run=_get(db,'runs',run_id)
         if run.get('trashed_at') or not run['therapist_approved_by']:
             raise PortalError('This QA has no therapist approval to undo.')
+        # A run recorded as history keeps its sign-off but no longer asks for one; as in set_therapist_review, it stays as it is.
+        if not run['therapist_approval_required']:
+            raise PortalError('Therapist review can be changed only before physicist review.')
         previous={k:run.get(k) for k in ('therapist_approved_by','therapist_approved_at','review_status','reviewed_by','reviewed_at','review_comment')}
         checks=_pbs_therapist_results(db,run)
         if checks is None:checks=db.all("SELECT res.* FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=? AND lower(trim(t.name))='qa reviewed by therapist?'",(run_id,))
