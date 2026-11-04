@@ -34,7 +34,7 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
     localFolders: new Proxy({}, { get: (_, name) => async () => { calls.push(`localFolders.${name}`); return 'G1 Sphinx'; } }) };
   if (localApi) window.localApi = () => {};
   if (picker) window.showDirectoryPicker = async () => { calls.push('showDirectoryPicker'); return { name: 'G1 Sphinx' }; };
-  const context = { window, document, Node, app, state: { user: { id: 1, role }, actingRole: null },
+  const context = { window, document, Node, app, URLSearchParams, state: { user: { id: 1, role }, actingRole: null },
     api: async (method, path, body) => {
       calls.push(`${method} ${path}`); bodies.push(body);
       if (path === '/api/machines') return [{ id: 1, name: 'G1', active: 1 }];
@@ -43,7 +43,11 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
       if (path.includes('/file?')) return { name: 'G1_11022026.xls', data: '' };
       if (path.endsWith('/sphinx/import')) return { imported: [], skipped: [] };
       if (path.endsWith('/template')) return { assignment: { id: 7 }, queue: { name: LIST.queue_name }, items: [{ test_id: 1, type: 'numeric', name: 'Output', unit: '%', limits: { expected: 0, warn: 1, fail: 2, tol_mode: 'absolute' } }] };
-      if (path.endsWith('/trends')) return { 1: [{ assignment_id: 7, run_id: 3, qa_date: '2026-11-02', value: 0.4, expected: 0, warn: 1, fail: 2, tol_mode: 'absolute', status: 'pass' }] };
+      if (/\/machines\/1\/trends(\?|$)/.test(path)) {
+        const point = { assignment_id: 7, run_id: 3, qa_date: '2026-11-02', value: 0.4, expected: 0, warn: 1, fail: 2, tol_mode: 'absolute', status: 'pass' };
+        // Machine Trends and Export CSV ask for the history in parts (machineHistory); one part holds it all here.
+        return /[?&]page=/.test(path) ? { series: [[point]], tests: { 1: 0 }, next: null, token: 't-1', order: {} } : { 1: [point] };
+      }
       return method === 'PUT' ? { id: 7 } : null;
     },
     indexedDB: { open(name) { calls.push(`indexedDB ${name}`); const request = {}; setTimeout(() => { request.error = new Error('synthetic'); request.onerror(); }); return request; } },
@@ -58,6 +62,7 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
   for (const code of [part('const ROLE_LABEL', 'const STATE_LABEL'), part('function el(', 'function svg('), part('function activeRole(', 'let toastTimer;'),
     part('function browserFolders(', 'function formData('), part('function field(', 'function modal('), part('function importFolderField(', 'function scheduleData('),
     part('const trendExportFolders', 'function trendPattern('), part('function trendPattern(', 'async function renderTrends('),
+    part('function rangeStart(', 'function stats('),
     part('const RIGHTS = [', 'function importUserSpreadsheet('), part('async function renderAdmin(', 'async function renderUsers('),
     `function chip(status, label) { return el("span", { class: "chip " + status }, label); }
      function page(title, subtitle, actions) { app.replaceChildren(el("div", { class: "page-head" }, el("h1", {}, title), el("div", {}, actions || []))); }
