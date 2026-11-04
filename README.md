@@ -128,13 +128,13 @@ HDR Flexitron starts with **Daily QA** and **Source Exchange QA**, both **as nee
 
 Machine Trends shows one machine at a time, defaulting to GTR1 when available. Choose a machine, QA list, and period, then expand measurements organized by list and category. Spot numbers are omitted from display labels; same-energy X/Y measurements share a graph. Saved test identities are unchanged. Each insight opens its grouped graph and values. Insights are calculated locally (documented straight-line fit, minimum five distinct dates), not an external AI or clinical assessment.
 
-Use **Import**, **Export CSV**, and the folder-settings gear. Import reuses that machine's QA-list folder and supports Sphinx `.xls`/`.csv` history. Export uses the current list/period/test selection and includes both recorded and current limits/verdicts. Export directories are remembered per machine/user in this browser; Downloads is the fallback. Directory permissions may need reconnecting after a browser restart.
+Use **Import Folder** and **Export CSV**. Import Folder reads a folder of Sphinx `.xls`/`.csv` history (subfolders included) into the selected list. Export uses the current list/period/test selection and includes both recorded and current limits/verdicts; it goes to Downloads (or to an export folder chosen in an earlier version, in that browser).
 
 ### New QA Template List
 
 Choose an existing departmental starter (including TG-142/TG-224 and CT simulation references), a blank template, or an Excel/MyQA checklist export. Spreadsheet import supports `.xlsx`, `.xls`, and `.csv`, with worksheet choice, adjustable column mapping and a test preview before creation. Numeric limits are read only from explicit mapped cells; unsupported text criteria remain instructions. Review every imported test and limit before use. Native MyQA `.pld` parsing is not implemented; export the checklist to Excel first. Creation is unscheduled and atomic, so an invalid import does not leave a partial template.
 
-Client regression checks: `node tests/test_trend_tools.cjs`, `node tests/test_autosave.cjs`, and `node tests/test_report.cjs`.
+Client regression checks: `node tests/test_trend_tools.cjs`, `node tests/test_autosave.cjs`, `node tests/test_report.cjs`, and `node tests/test_host_folders.cjs`.
 
 ### Responsive home and machine management
 
@@ -142,6 +142,15 @@ The home dashboard uses four modality cards (Proton, Photon, Brachy and Simulati
 
 Manage machines from Setup QA. Unused machines can be deleted along with their schedules, preserving shared templates. Machines with recorded QA cannot be deleted; retire them to remove them from active views while preserving results. Linac 1 is retired from existing browser setups and removed from new starting data at the user's request. Deleted seeded machines are not automatically recreated.
 
+## Pages hosted by another site (`window.QA_HOST`)
+
+A page that hosts these pages (floridaphysics.com does) may set this before `app.js` loads:
+
+```
+window.QA_HOST = { browserFolders: false };
+```
+
+Then no page opens a folder: no folder picker, no `window.localFolders`, no `GET /api/assignments/:id/files` or `/file`, no folder `<input webkitdirectory>` and no export folder. Each list's **Default import folder** is a typed path (in the schedule editor, and in Data Administration for a Physicist or Admin), saved with its schedule by `PUT /api/assignments/:id`; the scheduled import on a UFHPTI computer reads those folders. Perform QA keeps its single-file import, Machine Trends has **Export CSV** only (a browser download), and Data Administration does not scan. Without `QA_HOST`, or with any other value, both builds work as before; `tests/test_host_folders.cjs` checks both.
 
 ## Shared UFHPTI deployment
 
