@@ -160,7 +160,18 @@ function toast(message, bad) {
   toastTimer = setTimeout(() => (node.className = "toast"), bad ? 6000 : 2500);
 }
 
-async function api(method, path, body) {
+// route() numbers each page it draws. A read (GET) that answers after the person has left that page (or it was drawn
+// again) never settles, so the old page stops drawing instead of adding its late sections to the page now on screen.
+// Writes (POST, PUT, ...) always finish, with their own toast or note.
+let routeGen = 0;
+function api(method, path, body) {
+  const gen = routeGen, reply = request(method, path, body);
+  if (method !== "GET") return reply;
+  const left = () => gen !== routeGen;
+  return reply.then((data) => (left() ? new Promise(() => {}) : data), (err) => (left() ? new Promise(() => {}) : Promise.reject(err)));
+}
+
+async function request(method, path, body) {
   // The browser-only build (GitHub Pages) answers every request from local storage instead of a server.
   if (window.localApi) return window.localApi(method,path,body,{actingRole:state.user?.role==='admin'?state.actingRole:null});
   const response = await fetch(path, {
@@ -570,6 +581,7 @@ async function logout() {
   state.actingRole=null;sessionStorage.removeItem('qa_admin_acting_role');
   await api("POST", "/api/logout").catch(() => {});
   state.user = null;
+  routeGen++;   // a page still loading does not draw on the sign-in form
   location.hash = "#/";
   renderLogin();
 }
@@ -598,6 +610,7 @@ const ROUTES = [
 
 async function route() {
   if (!state.user) return renderLogin();
+  const gen = ++routeGen;   // reads still on their way for an earlier page are dropped (api)
   renderShell();
   const hash = location.hash.split("?")[0] || "#/";
   for (const [pattern, handler] of ROUTES) {
@@ -606,7 +619,7 @@ async function route() {
       try {
         await handler(...match.slice(1));
       } catch (err) {
-        if (state.user) app.replaceChildren(el("div", { class: "card error" }, err.message));
+        if (state.user && gen === routeGen) app.replaceChildren(el("div", { class: "card error" }, err.message));
       }
       return;
     }
@@ -1626,6 +1639,9 @@ function wireCalculations(entries) {
 }
 
 async function renderPerform(assignmentId) {
+  // "Add them" asks this redraw to apply the file again; taken now, so a redraw the person leaves cannot pass it to another list.
+  const applySphinxOnLoad = state.applySphinxOnLoad;
+  state.applySphinxOnLoad = false;
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
   if (t.queue.active === 0) {
     page(t.queue.name, "This template is archived.", [el("a", { class: "button", href: "#/setup" }, "Back to Setup QA")]);
@@ -2103,10 +2119,7 @@ async function renderPerform(assignmentId) {
   }
   if (autoLine) autoLine.append(autoReadLine(assignmentId,useUpload,qaDate,QAHdrDaily.supported(t)?hdrPreview:null));
   // Programmatic imports also persist their filled measurements.
-  if (state.applySphinxOnLoad && state.sphinxFile) {
-    state.applySphinxOnLoad = false;
-    await applySphinx();
-  }
+  if (applySphinxOnLoad && state.sphinxFile) await applySphinx();
 }
 
 function importSphinxDialog(a) {
