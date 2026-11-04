@@ -195,6 +195,23 @@ class ImportTests(unittest.TestCase):
         with self.assertRaises(PortalError):
             service.import_sphinx(self.db, self.users["therapist"], self.assignment, files)
 
+    def test_new_imports_are_judged_by_the_lists_limits(self, _):
+        physicist = self.users["physicist"]
+        first = service.import_sphinx(self.db, physicist, self.assignment, [("a.xls", fake_file("list-a"))], historical=False)
+        run = service.get_run(self.db, self.users["admin"], first["imported"][0]["run_id"])
+        dose = next(r for r in run["results"] if r["name"] == "Output – Absolute Dose")
+        # Sphinx said Passed; 101.5 vs 100 is outside the list's ±1 % warning, so the list's verdict stands.
+        self.assertEqual((dose["status"], dose["warn"]), ("warn", 1.0))
+        self.assertIn("judged by this list's limits", dose["comment"])
+        # The list's limits, not the file's, decide the next import.
+        test_id = self.db.one("SELECT id FROM tests WHERE name = 'Output – Absolute Dose'")["id"]
+        self.db.run("UPDATE tests SET warn = 2.0, fail = 3.0 WHERE id = ?", (test_id,))
+        second = service.import_sphinx(self.db, physicist, self.assignment,
+                                       [("b.xls", fake_file("list-b", finished="10/22/2026 6:00:00 AM"))], historical=False)
+        dose = next(r for r in service.get_run(self.db, self.users["admin"], second["imported"][0]["run_id"])["results"]
+                    if r["name"] == "Output – Absolute Dose")
+        self.assertEqual((dose["status"], dose["warn"], dose["fail"], dose["comment"]), ("pass", 2.0, 3.0, ""))
+
     def test_shared_test_keeps_each_machines_limits(self, _):
         admin = self.users["admin"]
         machine = service.save_machine(self.db, admin, {"name": "Synthetic Gantry B"})["id"]

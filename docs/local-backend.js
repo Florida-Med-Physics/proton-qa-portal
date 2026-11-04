@@ -1184,13 +1184,20 @@
         continue;
       }
       if (added.length) t = runTemplate(assignmentId);
+      const listItems = Object.fromEntries(t.items.map((i) => [i.test_id, i]));
       const rows = parsed.measurements.filter((m) => ids[`${m.category}|${m.name}`]).map((m) => {
-        const limits = fileLimits(m);
+        const testId = ids[`${m.category}|${m.name}`];
+        // New results are judged by the list's limits, as when the QA is done on the form; the file's own verdict
+        // is noted when it differs. Old files brought in as history keep the limits and verdict written in them.
+        const limits = historical || !listItems[testId] ? fileLimits(m) : listItems[testId].limits;
         let ours;
         try { ours = evaluate("numeric", m.result, limits); } catch { ours = "recorded"; }
-        const status = SPHINX_STATUS[m.sphinx_status] || ours;
-        return { test_id: ids[`${m.category}|${m.name}`], value_num: m.result, value_text: null, limits, status,
-          comment: status !== ours ? `Sphinx: ${m.sphinx_status}; portal rule on the rounded values gives ${ours}.` : "" };
+        const sphinx = SPHINX_STATUS[m.sphinx_status];
+        const status = historical ? sphinx || ours : ours;
+        const comment = historical
+          ? (status !== ours ? `Sphinx: ${m.sphinx_status}; portal rule on the rounded values gives ${ours}.` : "")
+          : (sphinx && sphinx !== ours ? `Sphinx: ${m.sphinx_status}; judged by this list's limits.` : "");
+        return { test_id: testId, value_num: m.result, value_text: null, limits, status, comment };
       });
       if (!rows.length) { skipped.push({ file: u.name, reason: "No included tests match this machine's list." }); continue; }
       const comment = `Imported from ${parsed.filename}. Sphinx finished ${parsed.finished.replace("T", " ")}${parsed.sphinx_user ? " by " + parsed.sphinx_user : ""}.`;

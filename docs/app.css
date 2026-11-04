@@ -1300,7 +1300,9 @@ td, .measure-table td { font-size: 21px; }
 @media(max-width:1200px) {
   .table-wrap { display:block; width:100%; overflow-x:auto; }
   .measure-wrap { overflow:visible; }
-  .measure-table td.qa-unit:empty { display:none; }
+  /* #app[data-page] outranks the card layout's display:block on every cell. */
+  #app[data-page] .measure-table td.qa-unit:empty, #app[data-page] .measure-table td.qa-baseline:empty,
+  #app[data-page] .measure-table td.qa-result:has(> .status-cell:empty) { display:none; }
   .measure-table .result-input, .measure-table select { max-width:100%; }
   .monthly-workbook-tools { flex-wrap:wrap; min-width:0; }
 }

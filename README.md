@@ -57,9 +57,11 @@ Energies are filed to the nearest 5 MeV (`ENERGY_STEP` in `portal/sphinx.py`), s
 .venv\Scripts\python run_portal.py import-sphinx --machine G1 --queue "Daily QA – G1" --user <physicist> --create "G:\My Drive\...\ProtonDaily\G1 Sphinx"
 ```
 
-Folders are searched recursively; duplicate files, empty files, and sessions Sphinx marked Skipped are reported and skipped. Imported runs are marked **Historical import** (no review needed) unless `--pending` is given. Each imported result keeps the expected value, tolerances, and pass/warn/fail verdict from its own file.
+Folders are searched recursively; duplicate files, empty files, and sessions Sphinx marked Skipped are reported and skipped. Imported runs are marked **Historical import** (no review needed) unless `--pending` is given. A historical import keeps the expected value, tolerances, and pass/warn/fail verdict from its own file.
 
-Checked against the full archive on 2026-10-21 (942 G1 and 201 G5 sessions, 74,998 values): the portal's rule matched Sphinx's verdict on all but 7 values, each sitting exactly on a tolerance in the one-decimal file values. Sphinx judges unrounded values, so imports keep Sphinx's verdict and add a comment where the two differ.
+A new import that awaits review (`--pending`, or the automatic folder scan in Data Administration) is judged by the list's own baseline and tolerances, as if the values had been entered on the Perform page. Where Sphinx's verdict differs, the result's comment says so.
+
+Checked against the full archive on 2026-10-21 (942 G1 and 201 G5 sessions, 74,998 values): the portal's rule matched Sphinx's verdict on all but 7 values, each sitting exactly on a tolerance in the one-decimal file values. Sphinx judges unrounded values, so historical imports keep Sphinx's verdict and add a comment where the two differ. A new import judged by the list's limits can disagree with Sphinx at those same edges; the comment flags it for the reviewer.
 
 ## Templates and machine lists
 

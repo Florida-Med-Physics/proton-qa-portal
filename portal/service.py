@@ -1112,7 +1112,8 @@ def sphinx_add_tests(db, user, assignment_id, upload):
 
 
 def import_sphinx(db, user, assignment_id, files, historical=True):
-    """Record Sphinx files as runs. Each result keeps the limits and verdict from its own file.
+    """Record Sphinx files as runs. New runs (historical=False, awaiting review) are judged by the list's limits;
+    history (historical=True) keeps the limits and verdict from its own file.
 
     files: iterable of (filename, bytes). Duplicate files (same content) are skipped.
     """
@@ -1134,18 +1135,27 @@ def import_sphinx(db, user, assignment_id, files, historical=True):
             continue
         if added:
             template = run_template(db, user, assignment_id)
+        list_items = {i["test_id"]: i for i in template["items"]}
         rows = []
         for m in parsed["measurements"]:
             if (m["category"], m["name"]) not in ids:
                 continue
-            limits = _file_limits(m)
+            test_id = ids[(m["category"], m["name"])]
+            # New results are judged by the list's limits, as when the QA is done on the form; the file's own verdict
+            # is noted when it differs. Old files brought in as history keep the limits and verdict written in them.
+            limits = _file_limits(m) if historical or test_id not in list_items else list_items[test_id]["limits"]
             try:
                 ours = qa.evaluate("numeric", m["result"], limits)
             except ValueError:
                 ours = "recorded"
-            status = SPHINX_STATUS.get(m["sphinx_status"], ours)
-            note = f"Sphinx: {m['sphinx_status']}; portal rule on the rounded values gives {ours}." if status != ours else ""
-            rows.append({"test_id": ids[(m["category"], m["name"])], "value_num": m["result"], "value_text": None,
+            sphinx_verdict = SPHINX_STATUS.get(m["sphinx_status"])
+            if historical:
+                status = sphinx_verdict or ours
+                note = f"Sphinx: {m['sphinx_status']}; portal rule on the rounded values gives {ours}." if status != ours else ""
+            else:
+                status = ours
+                note = f"Sphinx: {m['sphinx_status']}; judged by this list's limits." if sphinx_verdict and sphinx_verdict != ours else ""
+            rows.append({"test_id": test_id, "value_num": m["result"], "value_text": None,
                          "limits": limits, "status": status, "comment": note})
         if not rows:
             skipped.append({"file": name, "reason": "No included tests match this machine's list."})

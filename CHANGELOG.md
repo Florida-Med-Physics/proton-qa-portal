@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- **[Physics review]** Judge new Sphinx imports that await review (the automatic folder scan in Data Administration, `import-sphinx --pending`) by the list's own baseline and tolerances, not the file's; the result's comment notes when Sphinx's verdict differs. Historical imports still keep their file's limits and verdict.
+
+- Show a Pass / Fail answer once: no PASS chip under the selected button, and no "Pass / Fail" unit or "Pass" baseline on those tests (or their empty labels on tablet-width cards), on the QA form and on a saved run.
+
 - Let Perform QA columns size to their contents so enlarged numbers, headers and controls cannot overlap; keep horizontal overflow inside each table on narrow screens.
 
 - Use plus icons for comments, reserve space for test numbers and headers, show Pass as the boolean baseline, and fill missing matched Ortho axis defaults from the supplied workbook (cm conversion); preserve existing values and machine overrides.

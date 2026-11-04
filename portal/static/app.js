@@ -293,7 +293,6 @@ function limitsText(limits, unit) {
 }
 
 const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived" };
-const STATUS_WORDS = { pass: "PASS", warn: "WARNING", fail: "ACTION" };
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
 // "Δ +0.30 mm" badge beside a numeric result, green / yellow / red by its status against the limits.
@@ -1752,10 +1751,12 @@ async function renderPerform(assignmentId) {
           return evaluate(item.type, raw, item.limits);
         },
       };
+      // Pass / Fail buttons already show the answer in its colour; a chip under them would repeat it.
+      const answeredByButton = item.type === "boolean" || item.type === "status";
       const update = () => {
         if(input.readOnly&&input.dataset.derivedValue!==undefined) QADerived.setInput(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
         const s = entry.status();
-        statusCell.replaceChildren(s ? chip(s) : "");
+        statusCell.replaceChildren(s && !answeredByButton ? chip(s) : "");
         refresh();
       };
       input.addEventListener("input", update);
@@ -1824,8 +1825,10 @@ async function renderPerform(assignmentId) {
         const row = el("tr", {'data-qa-entry':it.test_id},
           numberCell(it),
           el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
-          el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit : it.type === "boolean" ? (it.unit === "Yes/No" ? "Yes / No" : "Pass / Fail") : ""),
-          el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" ? "Pass" : el("span", { class: "muted" }, "—")),
+          // A Pass / Fail test needs no unit or baseline: its buttons say both.
+          // null, not "": an empty cell must stay :empty so the card layout drops its label too.
+          el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
+          el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
           el("td", { class: "qa-measured" }, control),
           el("td", { class: "qa-dev" }, dlt),
           el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
@@ -3289,7 +3292,8 @@ async function renderReviewMeasurements(run) {
       const recent=[...prior].reverse().slice(0,3);
       const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+' '+unit}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+(unit?' '+unit:''))))):el('span',{class:'muted small'},'—');
       const missing=r.value_num==null&&r.value_text==null;
-      const value=missing?'Unanswered':r.type==='boolean'?(r.value_num?'Pass':'Fail'):r.type==='status'?STATUS_WORDS[r.value_text]||r.value_text:['text','choice'].includes(r.type)?r.value_text:`${QADerived.read(r.description)||/\[calc:/.test(r.description||'')?Number(r.value_num).toPrecision(3):fmt(r.value_num)} ${unit}`.trim();
+      // A Pass / Fail answer is the Result chip itself; writing it under Measured too would repeat it.
+      const value=missing?'Unanswered':r.type==='boolean'||r.type==='status'?'':['text','choice'].includes(r.type)?r.value_text:`${QADerived.read(r.description)||/\[calc:/.test(r.description||'')?Number(r.value_num).toPrecision(3):fmt(r.value_num)} ${unit}`.trim();
       const measured=el('div',{class:'review-measured'},value);
       if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
         const {value:input,control}=passFailInput(r.name,false,false);
@@ -3316,8 +3320,8 @@ async function renderReviewMeasurements(run) {
       const row=el('tr',{'data-test-id':r.test_id},
         el('td',{class:'qa-n'},numberFor(r)),
         el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
-        el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?'Pass / Fail':unit),
-        el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'?'Pass':r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
+        el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
+        el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         el('td',{class:'qa-measured','data-label':'Measured'},measured),
         el('td',{class:'qa-dev','data-label':'Deviation'},r.type==='numeric'&&!missing?deltaBadge(r.value_num,limits,unit,r.status):'—'),
         el('td',{class:'qa-result','data-label':'Result'},el('div',{class:'status-cell'},chip(r.status))),
