@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Trends and Export CSV on the server build load long periods much faster: the server now works out the chosen period once and keeps it while the parts arrive (and for the next person who asks), instead of working the whole history out again for every part. Any change to the database, by the portal or by another program using the same file, makes it start afresh. Nothing shown, exported or sent changes. On three years of synthetic records for one gantry, all history went from about 6.3 s to about 0.9 s.
+
 - Machine Trends and Export CSV now download only the chosen period, in parts, so machines with long histories load instead of failing on the shared site; nothing shown or exported changes (chart order still follows the newest Sphinx import, even when it is older than the period). The trends endpoint takes `from=` and `page=` in both builds; see the README's Trends API paragraph.
 
 - Add `window.QA_HOST = { browserFolders: false }` for a site that hosts these pages (floridaphysics.com): no page then opens, lists or reads a folder. Each list's import folder is typed once the list is saved (schedule editor; Data Administration for a Physicist or Admin; not when adding a list or scheduling it on several machines at once) and read by the scheduled import on a UFHPTI computer; Machine Trends exports by browser download only; Data Administration does not scan. Without it both builds are unchanged. Removed the unused Perform folder card and the Machine Trends folder-settings dialog (unreachable since the toolbar became Import Folder and Export CSV).

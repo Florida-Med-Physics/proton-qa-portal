@@ -331,8 +331,8 @@ def dbinfo(db, user, m, body, q):
 @route("GET", r"/api/machines/(\d+)/trends")
 def machine_trends(db, user, m, body, q):
     window = service.trend_window(q)
-    if "page" in window:
-        return service.trend_page(db, user, int(m[1]), **window)
+    if "page" in window:  # the reply's JSON, already written (see service.trend_page_json)
+        return service.trend_page_json(db, user, int(m[1]), **window)
     return service.machine_trends(db, user, int(m[1]), **window)
 
 
@@ -380,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
         return cookie[COOKIE].value if COOKIE in cookie else None
 
     def _send(self, status, payload, headers=()):
-        data = json.dumps(payload, default=str).encode()
+        data = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()  # bytes: JSON already written, as wsgi.py
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))

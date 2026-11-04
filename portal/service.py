@@ -5,7 +5,12 @@ import binascii
 import hashlib
 import json
 import re
+import threading
+import weakref
 import zlib
+from array import array
+from collections import OrderedDict
+from operator import itemgetter
 from urllib.parse import unquote, quote
 from datetime import date, datetime
 from pathlib import Path
@@ -1442,15 +1447,88 @@ def _point_bytes(p):
     return len(text) if text.isascii() else len(text.encode('utf-8'))
 
 
-def _point_key(p):
-    return (p['qa_date'],p['run_id'],p['source_order'])
+_point_key=itemgetter('qa_date','run_id','source_order')   # (p['qa_date'], p['run_id'], p['source_order'])
 
 
-def trend_page(db, user, machine_id, tests=None, until=None, since=None, page='start'):
-    """One part of a machine's trends, as local-backend.js trendPage (see there for the reply and its rules). Joining
-    every part's series per test id, in order, gives exactly machine_trends for the same tests/until/since. The token is
-    a checksum of the whole answer (each series with points in it, the tests sharing it, and order), this server's own
-    (the browser build's differs); it is compared only between parts."""
+# A point's JSON exactly as the reply writes it (json.dumps(reply, default=str): spaces after ',' and ':', \uXXXX escapes).
+_REPLY_JSON=json.JSONEncoder(default=str).encode
+
+
+def _point_size(p, text):
+    """_point_bytes(p), worked out quickly from text, p as _REPLY_JSON writes it. JavaScript's compact JSON has no space
+    after ',' and ':' and writes a float without a final '.0' (and a few floats its own way); a point with anything
+    Python writes as a \\u escape (non-ASCII, control characters, DEL) is measured the slow way."""
+    if '\\u' in text or len(p)!=len(_POINT_KEYS): return _point_bytes(p)
+    n=len(text)-2*len(p)+1
+    for v in p.values():
+        if type(v) is float:
+            if 1e-4<=abs(v)<1e16:   # Python writes no exponent here, and the same digits as JavaScript
+                if v.is_integer(): n-=2
+            elif v==0: n-=len(repr(v))-1   # '0.0' or '-0.0': JavaScript writes 0
+            else: n+=len(_js_number(v))-len(json.dumps(v))
+    return n
+
+
+# Paged trends work out a machine's whole windowed answer once and keep it for the following parts (and the next
+# visitor), where each part used to recompute it: about 0.75 s a part for three years of a gantry's synthetic records.
+# Kept per open Database, whose version() moves with any change to the file, to any table, by this server or another
+# process: an answer is used only while that version is unchanged, and a new version drops every kept answer. At most
+# TREND_CACHE_ENTRIES answers (machine and window), least recently used dropped first; each holds only its token, order
+# and the tests sharing each series, plus per point its series, size and JSON text, compressed in blocks.
+TREND_CACHE_ENTRIES=4
+_TREND_BLOCK=256   # points per compressed block of JSON text
+_TREND_CACHES=weakref.WeakKeyDictionary()   # Database -> _TrendCache (versions of different connections do not compare)
+_TREND_CACHES_LOCK=threading.Lock()
+
+
+class _TrendCache:
+    """Used only under db.lock, which also guards every read of db.version(): the cache moves to each version as it is
+    read, in the order read, so a request that read its version earlier can never set it back to an older one."""
+    def __init__(self):
+        self.version=None;self.answers=OrderedDict()
+
+    def get(self, db, key):
+        """(db's version now, the answer kept for key or None); version None (inside an open transaction): keep nothing."""
+        with db.lock:
+            version=db.version()
+            if version is None: return None,None
+            if version!=self.version: self.answers.clear();self.version=version
+            answer=self.answers.get(key)
+            if answer is not None: self.answers.move_to_end(key)
+            return version,answer
+
+    def put(self, db, key, version, answer):
+        """Keep answer, worked out after get read version, only if db's version is still that one."""
+        with db.lock:
+            if version!=self.version or db.version()!=version: return   # the file changed while this answer was worked out: never keep it
+            self.answers[key]=answer;self.answers.move_to_end(key)
+            while len(self.answers)>TREND_CACHE_ENTRIES: self.answers.popitem(last=False)
+
+
+def _trend_cache(db):
+    with _TREND_CACHES_LOCK:
+        cache=_TREND_CACHES.get(db)
+        if cache is None: cache=_TREND_CACHES[db]=_TrendCache()
+        return cache
+
+
+class _TrendAnswer:
+    """A window's whole answer as trend_page sends it in parts. token and order as sent; members: the test ids sharing
+    each series, by series index; then per point, in the order the parts send them: series (its series index), sizes
+    (_point_bytes) and its _REPLY_JSON text, in zlib blocks of _TREND_BLOCK points joined by newlines (JSON text written
+    with \\u escapes holds none). Never changed once made, so threads share it without a lock."""
+    __slots__=('token','order','members','series','sizes','blocks')
+
+    def texts(self, start, end):
+        """The JSON text of points start to end-1."""
+        out=[]
+        for b in range(start//_TREND_BLOCK,(end-1)//_TREND_BLOCK+1) if end>start else ():
+            out.extend(zlib.decompress(self.blocks[b]).decode('utf-8').split('\n')[max(start-b*_TREND_BLOCK,0):end-b*_TREND_BLOCK])
+        return out
+
+
+def _trend_answer(db, user, machine_id, tests, until, since):
+    """Work out the whole answer that trend_page sends in parts (see there)."""
     whole=machine_trends(db,user,machine_id,tests=tests,until=until)
     series,members=[],{}   # each distinct series once, in order of its first (lowest) test id
     for test_id in sorted(whole,key=int):
@@ -1458,43 +1536,99 @@ def trend_page(db, user, machine_id, tests=None, until=None, since=None, page='s
         if id(points) not in members: members[id(points)]=[];series.append(points)
         members[id(points)].append(test_id)
     newest,order={},{}
-    for points in series:
-        for p in points:
-            # Math.max from 0, as local-backend.js and the overview did: a run with id 0 still counts.
-            if p['source']=='sphinx' and p['assignment_id'] is not None: newest[p['assignment_id']]=max(newest.get(p['assignment_id'],0),p['run_id'])
-    for points in series:
-        for p in points:
-            if p['source']=='sphinx' and p['assignment_id'] is not None and newest.get(p['assignment_id'])==p['run_id']:
-                o=order.setdefault(str(p['assignment_id']),{})
-                for test_id in members[id(points)]: o[test_id]=p['source_order']
+    imported=[(p,points) for points in series for p in points if p['source']=='sphinx' and p['assignment_id'] is not None]
+    for p,_ in imported:
+        # Math.max from 0, as local-backend.js and the overview did: a run with id 0 still counts.
+        newest[p['assignment_id']]=max(newest.get(p['assignment_id'],0),p['run_id'])
+    for p,points in imported:
+        if newest.get(p['assignment_id'])==p['run_id']:
+            o=order.setdefault(str(p['assignment_id']),{})
+            for test_id in members[id(points)]: o[test_id]=p['source_order']
     kept=[[p for p in points if p['qa_date']>=since] for points in series] if since else series
-    flat=sorted(((p,s) for s,points in enumerate(kept) for p in points),key=lambda x:_point_key(x[0]))   # stable
-    taken=[iter(points) for points in kept]   # each series keeps its own order (see local-backend.js trendPage)
-    flat=[(next(taken[s]),s) for _,s in flat]
-    text=json.dumps([[[members[id(series[s])],points] for s,points in enumerate(kept) if points],order],default=str).encode('utf-8')
-    token=f'{zlib.crc32(text):08x}{zlib.adler32(text):08x}-{len(flat)}'   # as long as local-backend.js's, so parts split alike
-    start=0 if page=='start' else min(int(page),len(flat))
-    out={'series':[],'tests':{},'next':None,'token':token}
-    if page=='start': out['order']=order
+    # Every point by _point_key (a stable sort); only the series of each place is taken from this order: each series keeps
+    # its own order (see local-backend.js trendPage).
+    pool=[p for points in kept for p in points];owner=[s for s,points in enumerate(kept) for _ in points]
+    keys=list(map(_point_key,pool))
+    places=[owner[i] for i in sorted(range(len(pool)),key=keys.__getitem__)]
+    del pool,keys,owner
+    texts=[[_REPLY_JSON(p) for p in points] for points in kept]
+    sizes=[[_point_size(p,t) for p,t in zip(points,texts[s])] for s,points in enumerate(kept)]
+    answer=_TrendAnswer()
+    answer.members=tuple(tuple(members[id(points)]) for points in series)
+    # The token: a checksum of json.dumps([[[tests, points] for each series with points in it], order], default=str),
+    # read in pieces; as long as local-backend.js's, so parts split alike.
+    crc,adler=0,1
+    for piece in _token_pieces(kept,texts,answer.members,order):
+        piece=piece.encode('utf-8');crc=zlib.crc32(piece,crc);adler=zlib.adler32(piece,adler)
+    answer.token=f'{crc:08x}{adler:08x}-{len(places)}'
+    answer.order=order
+    answer.series=array('I',places)
+    taken=[iter(x) for x in sizes];answer.sizes=array('I',[next(taken[s]) for s in places])
+    taken=[iter(x) for x in texts];texts=[next(taken[s]) for s in places]
+    answer.blocks=tuple(zlib.compress('\n'.join(texts[i:i+_TREND_BLOCK]).encode('utf-8'),1) for i in range(0,len(texts),_TREND_BLOCK))
+    return answer
+
+
+def _token_pieces(kept, texts, members, order):
+    """json.dumps([[[members[s], kept[s]] for each s with points], order], default=str) in pieces, from the points' texts."""
+    yield '[['
+    comma=''
+    for s,points in enumerate(kept):
+        if points:
+            yield comma+'['+json.dumps(list(members[s]))+', ['+', '.join(texts[s])+']]';comma=', '
+    yield '], '+json.dumps(order,default=str)+']'
+
+
+def _trend_part(answer, page):
+    """One part of answer, from page ('start', or the point to start at), as the reply's bytes."""
+    count=len(answer.series)
+    start=0 if page=='start' else min(int(page),count)
+    out={'series':[],'tests':{},'next':None,'token':answer.token}
+    if page=='start': out['order']=answer.order
     size=len(json.dumps(out,ensure_ascii=False,separators=(',',':')).encode('utf-8'))
-    entries,end,index=0,start,{}
-    for i in range(start,len(flat)):
-        p,s=flat[i]
-        add,ids=_point_bytes(p),None
+    entries,end,index,parts=0,start,{},[]
+    for i in range(start,count):
+        s=answer.series[i]
+        add,ids=answer.sizes[i],None
         if s in index: add+=1
         else:
-            k=str(len(index));ids=members[id(series[s])];add+=(1 if index else 0)+2
+            k=str(len(index));ids=answer.members[s];add+=(1 if index else 0)+2
             for test_id in ids: add+=(1 if entries or test_id!=ids[0] else 0)+len(test_id)+len(k)+3
-        next_bytes=len(str(i+1))-2 if i+1<len(flat) else 0   # "cursor" in place of null
+        next_bytes=len(str(i+1))-2 if i+1<count else 0   # "cursor" in place of null
         if i>start and size+add+next_bytes>TREND_PAGE_BYTES: break
         size+=add;end=i+1
         if ids:
-            index[s]=len(out['series'])
-            for test_id in ids: out['tests'][test_id]=len(out['series'])
-            entries+=len(ids);out['series'].append([])
-        out['series'][index[s]].append(p)
-    if end<len(flat): out['next']=str(end)
-    return out
+            index[s]=len(parts)
+            for test_id in ids: out['tests'][test_id]=len(parts)
+            entries+=len(ids);parts.append([])
+        parts[index[s]].append(i)
+    if end<count: out['next']=str(end)
+    # json.dumps(out, default=str) with out['series'] the points' kept texts, as the server used to write the whole reply.
+    texts=answer.texts(start,end)
+    out['series']=None;rest=json.dumps(out,default=str)
+    series='['+', '.join('['+', '.join(texts[i-start] for i in part)+']' for part in parts)+']'
+    return ('{"series": '+series+rest[len('{"series": null'):]).encode('utf-8')
+
+
+def trend_page_json(db, user, machine_id, tests=None, until=None, since=None, page='start'):
+    """trend_page's reply as the server sends it (the bytes json.dumps(trend_page(...), default=str) writes), from the
+    kept answer when the database has not changed since it was worked out (see TREND_CACHE_ENTRIES)."""
+    key=(machine_id,None if tests is None else frozenset(tests),until,since)
+    cache=_trend_cache(db)
+    version,answer=cache.get(db,key)   # read first: a change made while the answer is worked out then never passes as current
+    if answer is None:
+        answer=_trend_answer(db,user,machine_id,tests,until,since)
+        if version is not None: cache.put(db,key,version,answer)
+    return _trend_part(answer,page)
+
+
+def trend_page(db, user, machine_id, tests=None, until=None, since=None, page='start'):
+    """One part of a machine's trends, as local-backend.js trendPage (see there for the reply and its rules). Joining
+    every part's series per test id, in order, gives exactly machine_trends for the same tests/until/since. The token is
+    a checksum of the whole answer (each series with points in it, the tests sharing it, and order), this server's own
+    (the browser build's differs); it is compared only between parts. The server sends trend_page_json's bytes; this
+    returns them parsed, so a value JSON cannot hold arrives as the reply carries it (str(), e.g. a BLOB as "b'...'")."""
+    return json.loads(trend_page_json(db,user,machine_id,tests=tests,until=until,since=since,page=page))
 
 
 def machine_trends(db, user, machine_id, tests=None, last=None, until=None, since=None):
