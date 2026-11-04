@@ -1482,19 +1482,25 @@ _TREND_CACHES_LOCK=threading.Lock()
 
 
 class _TrendCache:
+    """Used only under db.lock, which also guards every read of db.version(): the cache moves to each version as it is
+    read, in the order read, so a request that read its version earlier can never set it back to an older one."""
     def __init__(self):
-        self.lock=threading.Lock();self.version=None;self.answers=OrderedDict()
+        self.version=None;self.answers=OrderedDict()
 
-    def get(self, key, version):
-        with self.lock:
+    def get(self, db, key):
+        """(db's version now, the answer kept for key or None); version None (inside an open transaction): keep nothing."""
+        with db.lock:
+            version=db.version()
+            if version is None: return None,None
             if version!=self.version: self.answers.clear();self.version=version
             answer=self.answers.get(key)
             if answer is not None: self.answers.move_to_end(key)
-            return answer
+            return version,answer
 
-    def put(self, key, version, answer):
-        with self.lock:
-            if version!=self.version: return   # the file changed while this answer was worked out: never keep it
+    def put(self, db, key, version, answer):
+        """Keep answer, worked out after get read version, only if db's version is still that one."""
+        with db.lock:
+            if version!=self.version or db.version()!=version: return   # the file changed while this answer was worked out: never keep it
             self.answers[key]=answer;self.answers.move_to_end(key)
             while len(self.answers)>TREND_CACHE_ENTRIES: self.answers.popitem(last=False)
 
@@ -1608,12 +1614,11 @@ def trend_page_json(db, user, machine_id, tests=None, until=None, since=None, pa
     """trend_page's reply as the server sends it (the bytes json.dumps(trend_page(...), default=str) writes), from the
     kept answer when the database has not changed since it was worked out (see TREND_CACHE_ENTRIES)."""
     key=(machine_id,None if tests is None else frozenset(tests),until,since)
-    version=db.version()   # read first: a change made while the answer is worked out then never passes as current
-    cache=None if version is None else _trend_cache(db)
-    answer=None if cache is None else cache.get(key,version)
+    cache=_trend_cache(db)
+    version,answer=cache.get(db,key)   # read first: a change made while the answer is worked out then never passes as current
     if answer is None:
         answer=_trend_answer(db,user,machine_id,tests,until,since)
-        if cache is not None: cache.put(key,version,answer)
+        if version is not None: cache.put(db,key,version,answer)
     return _trend_part(answer,page)
 
 
@@ -1621,7 +1626,8 @@ def trend_page(db, user, machine_id, tests=None, until=None, since=None, page='s
     """One part of a machine's trends, as local-backend.js trendPage (see there for the reply and its rules). Joining
     every part's series per test id, in order, gives exactly machine_trends for the same tests/until/since. The token is
     a checksum of the whole answer (each series with points in it, the tests sharing it, and order), this server's own
-    (the browser build's differs); it is compared only between parts. The server sends trend_page_json's bytes."""
+    (the browser build's differs); it is compared only between parts. The server sends trend_page_json's bytes; this
+    returns them parsed, so a value JSON cannot hold arrives as the reply carries it (str(), e.g. a BLOB as "b'...'")."""
     return json.loads(trend_page_json(db,user,machine_id,tests=tests,until=until,since=since,page=page))
 
 

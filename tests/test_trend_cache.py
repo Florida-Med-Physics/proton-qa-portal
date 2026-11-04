@@ -8,6 +8,7 @@ import json
 import os
 import random
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -229,6 +230,69 @@ class TrendCacheTests(unittest.TestCase):
             self.assertNotIn(json.loads(third)['token'], (first['token'], json.loads(second)['token']))
             self.assertEqual(made.call_count, 3)
             self.every_part({}, db)
+
+    def test_a_restore_or_a_schema_change_on_the_servers_own_connection_drops_the_kept_answer(self):
+        # Neither changes a row that this connection's total_changes counts, nor is it another connection's commit.
+        result = self.db.one('SELECT id FROM results WHERE run_id=? ORDER BY id', (self.f['runs'][0],))['id']
+        snapshot = sqlite3.connect(':memory:')
+        self.addCleanup(snapshot.close)
+        with self.db.lock: self.db.conn.backup(snapshot)
+        snapshot.execute('UPDATE results SET value_num=value_num+5 WHERE id=?', (result,)); snapshot.commit()
+        first = self.part({}, 'start')
+        with self.db.lock: snapshot.backup(self.db.conn)   # a restore done in-process, onto the live connection
+        restored = self.part({}, 'start')
+        self.assertEqual(restored, self.reference({}, 'start'))
+        self.assertNotEqual(json.loads(restored)['token'], json.loads(first)['token'])
+        with self.db.lock:   # a schema change alone, as a migration on the live connection would be: no value is left
+            self.db.conn.execute('ALTER TABLE results RENAME COLUMN value_num TO value_num_before')
+            self.db.conn.execute('ALTER TABLE results ADD COLUMN value_num REAL')
+        changed = self.part({}, 'start')
+        self.assertEqual(changed, self.reference({}, 'start'))
+        self.assertTrue(json.loads(changed)['token'].endswith('-0'), json.loads(changed)['token'])
+
+    def test_a_request_that_read_an_older_version_never_sets_the_cache_back(self):
+        """Request S reads the version, then waits while a write and request P go by. S used to compare its older version
+        with the cache's, drop P's newer answer and keep its own under the older version, so the next request worked
+        the answer out a third time. S's version read and the cache's update are now one step under db.lock."""
+        version = Database.version
+        slow, held, release = {}, threading.Event(), threading.Event()
+
+        def held_version(db):
+            v = version(db)
+            if threading.current_thread() is slow.get('thread') and not held.is_set():
+                held.set(); release.wait(10)   # S: its version read, not yet compared with the cache's
+            return v
+
+        def write_then_ask():
+            self.db.audit(self.admin['id'], 'synthetic', 'portal')   # a write that leaves the answer alone
+            self.part({}, 'start')                                     # P
+
+        with mock.patch.object(Database, 'version', held_version), mock.patch.object(service, '_trend_answer', wraps=service._trend_answer) as made:
+            self.part({}, 'start')   # kept
+            slow['thread'] = threading.Thread(target=self.part, args=({}, 'start')); slow['thread'].start()
+            self.assertTrue(held.wait(10))
+            other = threading.Thread(target=write_then_ask); other.start()
+            other.join(0.5)   # P waits for S to finish its lookup; it used to go by
+            release.set(); slow['thread'].join(10); other.join(10)
+            self.assertEqual(made.call_count, 2)   # the first request and P; S used the kept answer
+            self.part({}, 'start')
+            self.assertEqual(made.call_count, 2)   # P's answer is still kept, under the current version
+            self.assertEqual(service._TREND_CACHES[self.db].version, version(self.db))
+
+    def test_an_answer_that_a_write_overtook_while_it_was_worked_out_is_not_kept(self):
+        result = self.db.one('SELECT id FROM results WHERE run_id=? ORDER BY id', (self.f['runs'][0],))['id']
+        trends, wrote = service.machine_trends, []
+
+        def then_write(*args, **options):
+            out = trends(*args, **options)
+            if not wrote: wrote.append(self.db.run('UPDATE results SET value_num=value_num+1 WHERE id=?', (result,)))
+            return out
+        with mock.patch.object(service, 'machine_trends', then_write):
+            first = self.part({}, 'start')   # its points were read before the write
+        self.assertEqual((len(wrote), list(service._TREND_CACHES[self.db].answers)), (1, []))
+        second = self.part({}, 'start')
+        self.assertEqual(second, self.reference({}, 'start'))
+        self.assertNotEqual(json.loads(second)['token'], json.loads(first)['token'])
 
     def test_at_most_a_few_answers_are_kept_least_recently_used_dropped_first(self):
         windows = [{'from': f'2026-09-0{d}'} for d in range(1, 8)]
