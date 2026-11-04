@@ -160,7 +160,19 @@ function toast(message, bad) {
   toastTimer = setTimeout(() => (node.className = "toast"), bad ? 6000 : 2500);
 }
 
-async function api(method, path, body) {
+// route() numbers each page it draws. A read (GET) that answers after the person has left that page (or it was drawn
+// again) never settles, so the old page stops drawing instead of adding its late sections to the page now on screen.
+// Writes (POST, PUT, ...) always finish, with their own toast or note. A read that is one step of a save calls
+// request() instead, so the save does not stop half-way when a page is drawn meanwhile.
+let routeGen = 0;
+function api(method, path, body) {
+  const gen = routeGen, reply = request(method, path, body);
+  if (method !== "GET") return reply;
+  const left = () => gen !== routeGen;
+  return reply.then((data) => (left() ? new Promise(() => {}) : data), (err) => (left() ? new Promise(() => {}) : Promise.reject(err)));
+}
+
+async function request(method, path, body) {
   // The browser-only build (GitHub Pages) answers every request from local storage instead of a server.
   if (window.localApi) return window.localApi(method,path,body,{actingRole:state.user?.role==='admin'?state.actingRole:null});
   const response = await fetch(path, {
@@ -172,6 +184,7 @@ async function api(method, path, body) {
   const data = await response.json().catch(() => ({}));
   if (response.status === 401 && path !== "/api/login") {
     state.user = null;
+    routeGen++;   // the page that was loading stops, as if left, instead of drawing under the sign-in form
     renderLogin();
     throw new Error(data.error || "Please sign in.");
   }
@@ -570,6 +583,7 @@ async function logout() {
   state.actingRole=null;sessionStorage.removeItem('qa_admin_acting_role');
   await api("POST", "/api/logout").catch(() => {});
   state.user = null;
+  routeGen++;   // a page still loading does not draw on the sign-in form
   location.hash = "#/";
   renderLogin();
 }
@@ -598,6 +612,7 @@ const ROUTES = [
 
 async function route() {
   if (!state.user) return renderLogin();
+  const gen = ++routeGen;   // reads still on their way for an earlier page are dropped (api)
   renderShell();
   const hash = location.hash.split("?")[0] || "#/";
   for (const [pattern, handler] of ROUTES) {
@@ -606,7 +621,7 @@ async function route() {
       try {
         await handler(...match.slice(1));
       } catch (err) {
-        if (state.user) app.replaceChildren(el("div", { class: "card error" }, err.message));
+        if (state.user && gen === routeGen) app.replaceChildren(el("div", { class: "card error" }, err.message));
       }
       return;
     }
@@ -1626,6 +1641,10 @@ function wireCalculations(entries) {
 }
 
 async function renderPerform(assignmentId) {
+  // "Add them" asks its own list's redraw to apply the file again (by list, so another list's form never does); taken
+  // now, so a redraw the person leaves cannot pass it on.
+  const applySphinxOnLoad = state.applySphinxOnLoad === assignmentId;
+  state.applySphinxOnLoad = false;
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
   if (t.queue.active === 0) {
     page(t.queue.name, "This template is archived.", [el("a", { class: "button", href: "#/setup" }, "Back to Setup QA")]);
@@ -1954,7 +1973,7 @@ async function renderPerform(assignmentId) {
           try {
             const r = await api("POST", `/api/assignments/${assignmentId}/sphinx/tests`, { file: state.sphinxFile });
             toast(`Added ${r.added.length} tests to the list`);
-            state.applySphinxOnLoad = true;
+            state.applySphinxOnLoad = assignmentId;
             route();
           } catch (err) {
             toast(err.message, true);
@@ -2103,10 +2122,7 @@ async function renderPerform(assignmentId) {
   }
   if (autoLine) autoLine.append(autoReadLine(assignmentId,useUpload,qaDate,QAHdrDaily.supported(t)?hdrPreview:null));
   // Programmatic imports also persist their filled measurements.
-  if (state.applySphinxOnLoad && state.sphinxFile) {
-    state.applySphinxOnLoad = false;
-    await applySphinx();
-  }
+  if (applySphinxOnLoad && state.sphinxFile) await applySphinx();
 }
 
 function importSphinxDialog(a) {
@@ -2537,8 +2553,8 @@ async function renderQueueEditor(id) {
   const body = el("tbody");
   const holder = el("div");
   const customizationNote = el("p", { class: "muted small", role: "status" });
-  const reloadMachine = async () => {
-    const template = await api("GET", `/api/assignments/${valuesFor}/template`);
+  const reloadMachine = async () => {   // the last step of a machine-test save (request(), see api)
+    const template = await request("GET", `/api/assignments/${valuesFor}/template`);
     machineSelections[valuesFor] = template.test_selection || {};
     machineValues[valuesFor] = Object.fromEntries((template.all_items || template.items).map((i) => [i.test_id, { ...(i.override || {}) }]));
     draw();
@@ -2842,7 +2858,7 @@ async function renderQueueEditor(id) {
     const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => { if (valuesFor && dirty) { toast("Save your limits before adding a test.", true); return; } modal("New test for this list", testForm(null,items.map(x=>byId[x.test_id])), async (data) => {
       const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
       if (valuesFor) {
-        const refreshed = await api("GET", "/api/tests");
+        const refreshed = await request("GET", "/api/tests");   // a step of this save (see api)
         const created = refreshed.find((t) => t.id === r.id); tests.push(created); byId[r.id] = created;
         const selection = machineSelections[valuesFor] || {};
         await api("PUT", `/api/assignments/${valuesFor}/tests`, { excluded: selection.excluded || [], added: [...(selection.added || []), r.id] });
@@ -4250,7 +4266,7 @@ function trendFileTools(machine, lists, listId, range, testIds, importListId = l
     try {
       let pending = initialFiles;
       if (!pending.length) {
-        const found = await api('GET', `/api/assignments/${a.id}/files`);
+        const found = await request('GET', `/api/assignments/${a.id}/files`);   // steps of this import (see api)
         if (found.permission && found.permission !== 'granted') throw new Error('Allow access to the selected folder.');
         duplicates = found.files.filter(f=>f.run_id).length;
         pending = found.files.filter(f=>!f.run_id);
@@ -4259,7 +4275,7 @@ function trendFileTools(machine, lists, listId, range, testIds, importListId = l
         status.textContent = `Importing ${i+1}–${Math.min(i+25,pending.length)} of ${pending.length}…`;
         const files=[];
         for (const file of pending.slice(i,i+25)) {
-          try { files.push(initialFiles.length ? await readFileBase64(file) : await api('GET', `/api/assignments/${a.id}/file?path=${encodeURIComponent(file.path)}`)); }
+          try { files.push(initialFiles.length ? await readFileBase64(file) : await request('GET', `/api/assignments/${a.id}/file?path=${encodeURIComponent(file.path)}`)); }
           catch (err) { summary.skipped.push({file:file.path || file.name,reason:err.message}); }
         }
         if (!files.length) continue;
@@ -4269,7 +4285,7 @@ function trendFileTools(machine, lists, listId, range, testIds, importListId = l
           try {const preview=await api('POST',`/api/assignments/${a.id}/sphinx/preview`,{file});if(preview.duplicate_run){duplicates++;continue;}if(!preview.matched.length)throw Error('No measurements match this QA list.');const run=await api('POST',`/api/assignments/${a.id}/runs`,{qa_date:preview.qa_date,source_ref:preview.source_ref,comment:`Imported from ${file.name}`,results:preview.matched.map(m=>({test_id:m.test_id,value:m.value}))});summary.imported.push({run_id:run.id});}catch(err){summary.skipped.push({file:file.name,reason:err.message});}
         }
       }
-      if (summary.imported.length) await route();
+      if (summary.imported.length && location.hash.startsWith('#/trends')) await route();   // not a page opened meanwhile
       modal('Folder import complete', el('div', {},
         el('p', {}, `${summary.imported.length} imported · ${duplicates} already recorded · ${summary.skipped.length} skipped`),
         el('p', {class:'muted small'}, `${machine.name} · ${a.queue_name}. Subfolders were included.`),
