@@ -1178,6 +1178,23 @@ td, .measure-table td { font-size: 21px; }
 .trend-statistics { margin: 6px 0 10px; }
 .trend-statistics-line { font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
 
+/* Machine Trends summary under each chart: one aligned row per series, the unit once in the corner cell. */
+.trend-summary-wrap { overflow-x: auto; margin: 8px 0 10px; }
+.trend-summary-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.trend-summary { width: auto; background: transparent; }
+.trend-summary th, .trend-summary td { padding: 4px 16px; max-width: none; white-space: nowrap; overflow-wrap: normal; border-left: 0; }
+.trend-summary th:first-child { padding-left: 0; }
+.trend-summary thead th { background: transparent; text-transform: none; letter-spacing: 0; font-size: 16px; color: var(--muted); font-weight: 600; }
+.trend-summary tbody th, .trend-summary td { background: transparent; text-transform: none; letter-spacing: 0; font-size: 19px; color: var(--text); }
+.trend-summary tbody th { font-weight: 600; }
+.trend-summary .num { text-align: right; }
+.trend-summary tbody th .key-swatch { margin-right: 8px; vertical-align: middle; }
+.trend-summary tbody tr:last-child > * { border-bottom: 0; }
+.trend-band-note { margin: 2px 0 4px; }
+.trend-box .energy-plot-grid { align-items: start; }
+@media(max-width:600px){ .trend-summary th, .trend-summary td { padding: 4px 8px; } .trend-summary tbody th, .trend-summary td { font-size: 17px; } }
+
 .energy-plot-grid.plots-2 { grid-template-columns: repeat(2,minmax(0,1fr)); }
 @media(max-width:600px){ .energy-plot-grid.plots-2 { grid-template-columns: minmax(0,1fr); } }
 

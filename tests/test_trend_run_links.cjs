@@ -29,7 +29,7 @@ const {chromium}=require('playwright');
     assert((await failure.textContent()).includes(String(sample.baseline+5)));
     assert.equal(await failure.locator('.chip.fail').count(),1);
     assert.equal(await success.locator('.chip.pass').count(),1);
-    assert((await page.locator('.trend-statistics').textContent()).includes(`Baseline: ${sample.baseline}`));
+    assert((await page.locator('.trend-summary tbody td').first().textContent())===await page.evaluate(b=>fmt2(b),sample.baseline));
     await failure.click();await page.waitForSelector('.selected-qa-result');
     assert(page.url().includes(`/runs/${sample.failed}?test_id=${sample.test}`));
     assert.equal(await page.locator('.selected-qa-result').getAttribute('data-test-id'),String(sample.test));
