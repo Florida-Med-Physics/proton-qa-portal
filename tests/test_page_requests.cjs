@@ -2,8 +2,10 @@
 // DOM against the real browser backend (docs/local-backend.js, its own node:vm), and every request is recorded with the
 // round trip ("step") it went out in: requests sent before any of them is answered share a step. On the shared site every
 // request is a server call with its own fixed cost, and requests in a row add up, so these numbers are what to keep low:
-//   Dashboard and Review QA one request; Machine Trends 2 steps (3 requests on one list), nothing asked twice; Data
-//   Administration, Setup QA and Machines one request; Submit one save. (A batch, GET /api/batch, is shown as its paths.)
+//   Dashboard and Review QA one request; Machine Trends 3 steps of one request each (on one list), nothing asked twice;
+//   a run's review one request after the run; Data Administration, Setup QA and Machines one request; Submit one save.
+//   No page sends two requests side by side: on such a site the second would need a second server, which may first have
+//   to start or catch up with the latest records. (A batch, GET /api/batch, is shown as its paths.)
 // The backend answers are checked too: GET /api/assignments is every machine's GET /api/machines/:id/assignments in
 // GET /api/machines order; GET /api/batch answers each path as it would be answered on its own; POST .../runs with
 // clear_draft: true clears that person's draft of that list in the same save (tests/test_page_requests.py checks the
@@ -263,19 +265,33 @@ function pages(B, { reply = (path, x) => x } = {}) {
     assert.deepEqual(await P.open('#/review'), [[batch('/api/runs?limit=400', '/api/runs?trashed=1&limit=200')]]);
     assert.match(P.app.textContent, /Trash \(\d+\)/);
 
-    // Machine Trends: the machines and every machine's lists in one step, then the period's history beside each list's
-    // template; nothing asked twice.
+    // Machine Trends: the machines and every machine's lists in one step, then each list's template, then the period's
+    // history; one request at a time, nothing asked twice.
     const visible = (await B.api('GET', `/api/machines/${gtr1.id}/assignments`)).filter((a) => a.active && (role !== 'therapist' || a.frequency !== 'monthly'));
     const from = new FixedDate(); from.setDate(from.getDate() - 90);   // the default period, as rangeStart('90') gives it
     const day = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
     const trends = await P.open('#/trends');
     const templates = batch(...visible.map((a) => `/api/assignments/${a.id}/template`));
-    assert.deepEqual(trends, [[batch('/api/machines', '/api/assignments')], [`GET /api/machines/${gtr1.id}/trends?from=${day}&page=start`, templates]]);
+    assert.deepEqual(trends, [[batch('/api/machines', '/api/assignments')], [templates], [`GET /api/machines/${gtr1.id}/trends?from=${day}&page=start`]]);
     const shown = visible.find((a) => String(a.id) === P.app.querySelector('select[name=list]').value);   // the one list shown
     assert.deepEqual([...P.app.querySelectorAll('.trend-organized-list > h2')].map((h) => h.textContent), [shown.queue_name]);
     const testId = (await B.api('GET', `/api/assignments/${pbs.id}/template`)).items.find((i) => i.type === 'numeric').test_id;
     assert.deepEqual(await P.open(`#/trends?machine_id=${gtr1.id}&list=${pbs.id}&test_id=${testId}&range=365`),
       [[batch('/api/machines', '/api/assignments')], [templates], [`GET /api/trend?machine_id=${gtr1.id}&test_id=${testId}`]]);
+    // Several tests (a group): their trends in one request, answered as each on its own.
+    const groupIds = (await B.api('GET', `/api/assignments/${pbs.id}/template`)).items.filter((i) => i.type === 'numeric').slice(0, 3).map((i) => i.test_id);
+    assert.deepEqual(await P.open(`#/trends?machine_id=${gtr1.id}&list=${pbs.id}&test_id=${groupIds.join(',')}&range=365`),
+      [[batch('/api/machines', '/api/assignments')], [templates], [batch(...groupIds.map((id) => `/api/trend?machine_id=${gtr1.id}&test_id=${id}`))]]);
+
+    // A run's review: the run, then its list's template and its tests' history in one request (shown as on the page,
+    // each with its numbers and history).
+    const run = (await B.api('GET', '/api/runs?limit=400')).find((r) => !r.trashed_at && r.assignment_id === pbs.id);
+    const full = await B.api('GET', `/api/runs/${run.id}`);
+    const tests = [...new Set(full.results.map((r) => r.test_id))].join(',');
+    assert.ok(tests, 'the run has results');
+    assert.deepEqual(await P.open(`#/runs/${run.id}`), [[`GET /api/runs/${run.id}`],
+      [batch(`/api/assignments/${pbs.id}/template`, `/api/machines/${full.machine_id}/trends?tests=${tests}&until=${full.qa_date}&last=61`)]]);
+    assert.ok(P.app.querySelectorAll('tbody tr').length >= full.results.length, 'every result is shown');
 
     // Data Administration: one step; the folder table lists each active machine's lists, as each machine's own reply has them.
     // (Then GET /api/dbfile for the browser build's database card, shown to a Physicist or Admin: answered in the page,
@@ -319,5 +335,5 @@ function pages(B, { reply = (path, x) => x } = {}) {
       assert.equal(await hasDraft(pbs.id), false);
     }
   }
-  console.log("Dashboard, Review QA, Data Administration, Setup QA and Machines one request; Machine Trends 2 steps, nothing asked twice; Submit one save that clears the draft (older servers: as before); GET /api/assignments is every machine's list; a batch answers each path as on its own.");
+  console.log("Dashboard, Review QA, Data Administration, Setup QA and Machines one request; Machine Trends 3 steps of one request, nothing asked twice; a run's review one request after the run; Submit one save that clears the draft (older servers: as before); GET /api/assignments is every machine's list; a batch answers each path as on its own.");
 })().catch((e) => { console.error(e); process.exit(1); });

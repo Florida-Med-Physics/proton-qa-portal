@@ -170,10 +170,14 @@ What the pages now ask for (synthetic records; `tests/test_page_requests.cjs` ru
 | --- | --- | --- |
 | Dashboard | 2 requests, one after the other | 1 |
 | Review QA | 2, one after the other | 1 |
-| Machine Trends (overview) | machines, then the machine's lists, then the period's history beside each list's template, then the lists and the chosen list's template again: 5 steps | 2 steps: machines and lists; then the history beside one request for the templates |
+| Machine Trends (overview) | machines, then the machine's lists, then the period's history beside each list's template, then the lists and the chosen list's template again: 5 steps | 3 steps of one request each: machines and lists; the templates; the history (in parts, one after another) |
+| Machine Trends (a group of tests) | one request per test, side by side | 1 |
+| Open a run, and the review after Submit | the run, then its history beside its list's template | the run, then 1 |
 | Data Administration | users and machines, then each active machine's lists, one machine after another (11 requests, 10 in a row) | 1 |
 | Setup QA, Machines | 11 requests in 2 or 3 steps, one for each machine's lists | 1 |
 | Submit for review | two saves: the run, then clearing the draft | one save |
+
+No page sends two requests side by side: on a site that runs the backend once per request, the second would go to a second server, which may first have to start or catch up with the latest records, and that costs more than the round trip it saves. (More than 20 paths still go as several batches at once.)
 
 The QA form still asks for its template, then the history of its tests, then the draft, one after another: the history needs the template's tests, and a hosting page that screens the draft reply when it arrives (floridaphysics.com holds back a draft from an earlier day and says so on the form) needs the form drawn first. A site that hosts these pages should update its backend copy before, or with, these pages: the pages need the new requests.
 

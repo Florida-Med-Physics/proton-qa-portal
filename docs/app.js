@@ -3268,10 +3268,12 @@ async function renderReviewMeasurements(run) {
   // History column: this run's own tests up to its own date; the 3 results before it are among the newest 61 points
   // (a margin for several runs on one date). The quick trend fetches its own points when clicked.
   const runTests=[...new Set(run.results.map(r=>r.test_id))].join(',');
-  const [history,template]=await Promise.all([
-    runTests?api('GET',`/api/machines/${run.machine_id}/trends?tests=${runTests}&until=${run.qa_date}&last=61`).catch(()=>({})):{},
-    api('GET',`/api/assignments/${run.assignment_id}/template`).catch(()=>null)
-  ]);
+  // The list's template and the history in one request (GET /api/batch), not two side by side: on a site that runs the
+  // backend once per request, a second request at the same time goes to a second server, which may first have to start
+  // or catch up with the latest records. Each answer that failed is left out, as before.
+  const paths=[`/api/assignments/${run.assignment_id}/template`,...(runTests?[`/api/machines/${run.machine_id}/trends?tests=${runTests}&until=${run.qa_date}&last=61`]:[])];
+  const answers=await api('GET',`/api/batch?paths=${encodeURIComponent(JSON.stringify(paths))}`).catch(()=>[]);
+  const template=answers[0]?.ok?answers[0].value:null, history=answers[1]?.ok?answers[1].value:{};
   const numbers=blockNumbers(template?.items||run.results), fallback=blockNumbers(run.results);
   const numberFor=r=>numbers.get(r.test_id)||checkNumber(r.description)||fallback.get(r.test_id)||'';
   const groups=new Map();
@@ -4340,9 +4342,11 @@ async function renderTrends() {
   let testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
   const lists = machineId ? machineSchedules(schedules, machineId).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
-  // The overview reads the chosen period's history (in parts); asking for it beside the templates saves a round trip.
-  let historyRequest = machineId && !testIds.length ? machineHistory(machineId, { from: rangeStart(range) }) : null;
   const templates=lists.length?await apiBatch(lists.map(a=>`/api/assignments/${a.id}/template`)):[];   // every list's template, in one request
+  // The overview then reads the chosen period's history (in parts): after the templates, not beside them. On a site that
+  // runs the backend once per request, two requests at once need two servers, and the second may first have to start or
+  // catch up with the latest records, which costs more than the round trip saved.
+  let historyRequest = machineId && !testIds.length ? machineHistory(machineId, { from: rangeStart(range) }) : null;
   if(activeRole()==='therapist'){const visible=new Set(templates.flatMap(t=>t.items.map(i=>String(i.test_id))));testIds=testIds.filter(id=>visible.has(id));}
   const numberPoint=trendSourceNumberer(templates);
   let listId = lists.some((a) => String(a.id) === params.get("list")) ? params.get("list") : "";
@@ -4368,7 +4372,9 @@ async function renderTrends() {
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));
   app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
   if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest, lists);
-  const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));
+  // Several tests' trends in one request (GET /api/batch), for the same reason; one test, one request as before.
+  const trendPaths = testIds.map((id) => `/api/trend?machine_id=${machineId}&test_id=${id}`);
+  const data = trendPaths.length > 1 ? await apiBatch(trendPaths) : await Promise.all(trendPaths.map((p) => api("GET", p)));
   const listItems = new Map(templates.filter(t=>!listId||String(t.assignment.id)===listId).flatMap(t=>t.items).map(i=>[String(i.test_id),i]));
   const items = data.map((d) => {
     const li = listItems.get(String(d.test.id));
