@@ -296,11 +296,15 @@ const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass 
 
 // "(Δ +0.30 mm)" in plain text after the Result chip (the chip carries the colour): the difference from the reference,
 // sign always shown, unit after the number. Nothing when there is no reference or no value.
+// A percent limit adds the percent after a comma; the text may break there, never inside a number and its unit.
 function deviationText(value, limits, unit) {
   if (!Number.isFinite(value) || !limits || limits.expected === null || limits.expected === undefined) return null;
   const d = value - limits.expected;
-  const pct = limits.tol_mode === "percent" && limits.expected ? `, ${signed((100 * d) / limits.expected, 2)} %` : "";
-  return el("span", { class: "result-dev", title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, `(Δ ${signed(d)}${unit ? ` ${unit}` : ""}${pct})`);
+  const first = `(Δ ${signed(d)}${unit ? ` ${unit}` : ""}`;
+  const parts = limits.tol_mode === "percent" && limits.expected
+    ? [el("span", {}, `${first},`), " ", el("span", {}, `${signed((100 * d) / limits.expected, 2)} %)`)]
+    : [el("span", {}, `${first})`)];
+  return el("span", { class: "result-dev", title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, parts);
 }
 
 // Mirrors portal/qa.py evaluate(); the server re-checks on submit.
@@ -1395,13 +1399,14 @@ function fitQaTable(table) {
     const adapt=()=>{
       const compact=matchMedia('(max-width: 1200px)').matches;
       const maxHistory=Math.max(0,...[...table.querySelectorAll('.hist-row')].map(row=>row.children.length));
-      // 828 px: the fixed columns below (#, Measured, Unit, Result, Baseline, Note, Trend); the test name keeps 320 px or more.
-      // Result is wide enough for "WARNING (Δ −12.35 mm)" on one line; the old Deviation + Result pair took 268 px.
-      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-828-320)/144))));
+      // 888 px: the fixed columns below (#, Measured, Unit, Result, Baseline, Note, Trend); the test name keeps 320 px or more.
+      // Result (300 px) fits "WARNING (Δ −12.35 mm)" on one line at the form's 22 px reading size. The old Deviation and
+      // Result columns took 268 px, but their text already ran past them at that size.
+      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-888-320)/144))));
       table.querySelectorAll('.hist-row').forEach(row=>[...row.children].forEach((cell,i)=>cell.hidden=i>=count));
       let cols=table.querySelector('colgroup');
       if(!cols){cols=el('colgroup',{},Array.from({length:9},()=>el('col')));table.prepend(cols);}
-      const widths=['72px','auto','156px','76px','240px','132px',`${count?count*136+(count-1)*8+16:112}px`,'72px','80px'];
+      const widths=['72px','auto','156px','76px','300px','132px',`${count?count*136+(count-1)*8+16:112}px`,'72px','80px'];
       [...cols.children].forEach((col,i)=>col.style.width=widths[i]);
     };
     const observer=new ResizeObserver(adapt);qaTableObservers.add(observer);observer.observe(wrap);adapt();
@@ -1853,7 +1858,7 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "190px", "100px", "240px", "150px", "424px", "130px", "100px"];
+      const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
           el("thead", {}, el("tr", {}, qaHeaders(firstHeader)),
@@ -4062,10 +4067,12 @@ async function saveTrendCsv(machineId, filename, text, handle) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
   return 'Downloads';
 }
-function trendFileTools(machine, lists, listId, range, testIds) {
+// Export CSV exports the list on screen (listId). Import uses a list named in the link (importListId); when the page
+// opened its own default list, it uses the "Default import QA list" remembered in Folder settings.
+function trendFileTools(machine, lists, listId, range, testIds, importListId = listId) {
   const storageKey = `qa-trends-import:${state.user.id}:${machine.id}`;
   const preferred = localStorage.getItem(storageKey);
-  let selectedId = String(listId || (lists.find((a) => String(a.id) === preferred) || lists.find((a) => a.import_folder) || lists[0] || {}).id || '');
+  let selectedId = String(importListId || (lists.find((a) => String(a.id) === preferred) || lists.find((a) => a.import_folder) || lists[0] || {}).id || '');
   let exportHandle = null;
   const status = el('span', { class: 'muted small', role: 'status' });
   const selected = () => lists.find((a) => String(a.id) === selectedId);
@@ -4248,6 +4255,7 @@ async function renderTrends() {
     if(selected)listId=String(selected.assignment.id);
   }
   // One QA list at a time. With none named (or one not on this machine), open the list with the most recorded runs here.
+  const namedListId = listId;   // Import keeps the remembered import list unless the link names a list, as before
   if (!listId && lists.length) {
     historyRequest = historyRequest || api("GET", `/api/machines/${machineId}/trends`);
     listId = String(busiestList(lists, await historyRequest).id);
@@ -4256,11 +4264,11 @@ async function renderTrends() {
   page("Machine Trends", null, [
     select('machine_id', machines.map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
     lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }) : null,
-    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
-    testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
+    select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: namedListId, test_id: testIds.join(","), range: e.target.value }) }),
+    testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: namedListId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
-  app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds));
+  app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));
   app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
   if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest);
   const data = await Promise.all(testIds.map((id) => api("GET", `/api/trend?machine_id=${machineId}&test_id=${id}`)));

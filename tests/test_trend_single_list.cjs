@@ -31,6 +31,40 @@ assert.match(trends, /if \(!listId && lists\.length\) \{[\s\S]{0,200}?listId = S
 assert.match(trends, /renderTrendOverview\(machines, machineId, range, listId, templates, historyRequest\)/);
 assert.match(between('async function renderTrendOverview(', 'function renderTrendDetail('), /historyRequest \|\| api\('GET', `\/api\/machines\/\$\{machineId\}\/trends`\)/);
 assert.match(between('function trendFileTools(', 'function trendPattern('), /const targets = lists\.filter\(\(a\) => String\(a\.id\) === String\(listId\)\);/);
+// Import keeps the remembered "Default import QA list" unless the link names a list; changing the period keeps it so.
+assert.match(trends, /const namedListId = listId;[^\n]*\n  if \(!listId && lists\.length\) \{/);
+assert.match(trends, /trendFileTools\(machines\.find\(\(m\) => String\(m\.id\) === String\(machineId\)\), lists, listId, range, testIds, namedListId\)/);
+assert.match(trends, /select\("range", [^\n]*go\(\{ machine_id: machineId, list: namedListId, test_id:/);
+assert.match(trends, /machine_id: machineId, list: namedListId, range \}\)\.filter\(\(\[, v\]\) => v\)\)\}` \}, "← All tests"\)/);
+
+// Import Folder and Export CSV on the toolbar, run for real with stand-ins for the page (synthetic lists only).
+async function toolbarTargets(listId, importListId, remembered) {
+  const node = (tag, props, ...kids) => ({ tag, props: props || {}, kids: kids.flat(Infinity).filter(Boolean), textContent: '' });
+  const asked = { importInto: null, exported: [] };
+  const tools = { el: node, select: (...a) => node('select', ...a), state: { user: { id: 7 } }, can: () => true, toast() {}, modal() {},
+    localStorage: { getItem: (k) => (k === 'qa-trends-import:7:1' ? remembered : null), setItem() {} },
+    trendExportFolders: { get: () => Promise.resolve(null) }, trendCsvRows: () => [],
+    api: async (method, path) => { const m = /^\/api\/assignments\/(\d+)\/template$/.exec(path); if (m) asked.exported.push(m[1]); return {}; } };
+  tools.window = { localApi: {}, showDirectoryPicker() {}, localFolders: { choose: async (id) => { asked.importInto = String(id); throw Object.assign(new Error('stop'), { name: 'AbortError' }); } } };
+  vm.createContext(tools);
+  vm.runInContext(between('function trendFileTools(', 'function trendPattern('), tools);
+  const lists = [{ id: 11, queue_name: 'Synthetic daily (most runs)', import_folder: '' }, { id: 12, queue_name: 'Synthetic monthly', import_folder: 'synthetic-monthly-folder' }];
+  const bar = tools.trendFileTools({ id: 1, name: 'Synthetic gantry' }, lists, listId, '90', [], importListId);
+  const [importButton, exportButton] = bar.kids;
+  await importButton.props.onclick();
+  await exportButton.props.onclick();
+  return asked;
+}
+
+(async () => {
+  // The page opened its own default (busiest) list: Import uses the remembered list, Export the list on screen.
+  assert.deepEqual(await toolbarTargets('11', '', '12'), { importInto: '12', exported: ['11'] });
+  // Nothing remembered: the first list with an import folder, as before.
+  assert.deepEqual(await toolbarTargets('11', '', null), { importInto: '12', exported: ['11'] });
+  // A list named in the link (menu, Full trend, history ring): Import and Export both follow it.
+  assert.deepEqual(await toolbarTargets('11', '11', '12'), { importInto: '11', exported: ['11'] });
+  assert.deepEqual(await toolbarTargets('12', '12', null), { importInto: '12', exported: ['12'] });
+})().catch((e) => { console.error(e); process.exit(1); });
 
 // End to end with the browser backend's seeded lists and synthetic runs on GTR1.
 function fakeIndexedDb() {
@@ -73,5 +107,5 @@ const api = (method, path, body) => ctx.localApi(method, path, body || {}, {}).t
   await record(daily, dailyTests.slice(0, 1), '2026-10-06');
   const tied = app.busiestList(menuFor('admin'), await api('GET', `/api/machines/${gtr1.id}/trends`));
   assert.equal(tied.id, menuFor('admin').find((a) => a.id === daily.id || a.id === monthly.id).id);
-  console.log('Machine Trends: one list at a time, busiest list by runs (ties keep menu order), therapist menu unchanged, CSV follows the list.');
+  console.log('Machine Trends: one list at a time, busiest list by runs (ties keep menu order), therapist menu unchanged, CSV follows the list, Import keeps the remembered list.');
 })().catch((e) => { console.error(e); process.exit(1); });

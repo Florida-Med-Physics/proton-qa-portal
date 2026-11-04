@@ -635,8 +635,10 @@ th { overflow-wrap: normal; word-break: normal; }
 .measure-table .directions.in-cell .directions-label { font-size: 11px; }
 .measure-table td:first-child .category-tag { margin: 2px 0 0; }
 
-/* "(Δ +0.30 mm)" after the Result chip: plain, quiet text; the chip carries the colour. */
-.result-dev { margin-left: 6px; color: var(--muted); font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* "(Δ +0.30 mm)" after the Result chip: plain, quiet text in the form's one reading size; the chip carries the colour.
+   It breaks only between its parts (after the comma of a percent limit), never inside a number and its unit. */
+.result-dev { margin-left: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.result-dev > span { white-space: nowrap; }
 
 /* X, Y and Z of one offset on one row. */
 .axis-inputs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -1728,7 +1730,7 @@ td, .measure-table td { font-size: 21px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table select { min-height:44px; padding:5px 7px; font-size:16px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .segmented button { min-height:44px; padding:6px 9px; font-size:16px; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .chip { font-size:13px; padding:2px 6px; }
-  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .result-dev { font-size:13px; margin-left:4px; }
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .result-dev { display:none; }   /* as the Deviation column was */
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block { padding:0; }
   #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-block > h3 { padding:6px 7px; margin:0; font-size:15px; }
 }

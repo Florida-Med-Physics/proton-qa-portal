@@ -36,6 +36,10 @@ for (const v of [100.004, 100.005, 99.995, 112.345, 87.6549, 0, -3.21]) for (con
   assert.equal(text(context.deviationText(v, ref, unit)), `(${oldBadge(v, ref, unit)})`);
 assert.equal(text(context.deviationText(101.2, { ...ref, tol_mode: 'percent' }, 'MU')), '(Δ +1.20 MU, +1.20 %)');
 assert.equal(context.deviationText(100.3, ref, 'mm').props.class, 'result-dev');   // plain; the chip carries the colour
+// Pieces that never break inside: one for a plain limit, two for a percent limit (the line may break after the comma).
+const pieces = (node) => node.kids.map((k) => (typeof k === 'object' ? [k.tag, k.text] : k));
+assert.deepEqual(pieces(context.deviationText(99.7, ref, 'mm')), [['span', '(Δ −0.30 mm)']]);
+assert.deepEqual(pieces(context.deviationText(97.4, { ...ref, tol_mode: 'percent' }, 'cGy')), [['span', '(Δ −2.60 cGy,'], ' ', ['span', '−2.60 %)']]);
 // Nothing without a reference or a value.
 for (const [v, limits] of [[100.3, { ...ref, expected: null }], [100.3, { ...ref, expected: undefined }], [100.3, null], [null, ref], [NaN, ref], [undefined, ref]])
   assert.equal(context.deviationText(v, limits, 'mm'), null);
@@ -75,10 +79,24 @@ assert.equal(widths.length, 9);
 assert.match(fit, /Array\.from\(\{length:9\}/);
 const fixed = widths.filter((w) => /^'\d+px'$/.test(w)).reduce((sum, w) => sum + parseInt(w.slice(1), 10), 0);
 assert.equal(fixed, Number(/wrap\.clientWidth-(\d+)-320/.exec(fit)[1]), 'the history count must use the fixed column total');
-assert.ok(fixed < 72 + 156 + 140 + 76 + 128 + 132 + 72 + 80, 'the table must not get wider than with the Deviation column');
-assert.equal(widths[4], "'240px'");   // Result: "WARNING (Δ −12.35 mm)" on one line
+// Result is sized for the QA form's one reading size (22 px on desktop, forced on every element of the form): measured in
+// Chrome, the WARNING chip is 128 px and "(Δ −12.35 mm)" 146 px, with a 6 px gap and 8 px cell padding each side.
+assert.match(css, /#app\[data-page\^="perform\/"\], #app\[data-page\^="runs\/"\] \{ --qa-form-font-size:22px; \}/);
+const result = parseInt(widths[4].slice(1), 10);
+assert.equal(widths[4], "'300px'");
+assert.ok(result >= 128 + 6 + 146 + 2 * 8, '"WARNING (Δ −12.35 mm)" must fit on one line');
+// Every other column keeps its width; Result takes 32 px more than the old Deviation (140) + Result (128) pair.
+assert.equal(fixed, 72 + 156 + 76 + 132 + 72 + 80 + result);
+assert.equal(result - (140 + 128), 32);
+assert.match(perform, /const widths = \["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"\];/);
 assert.doesNotMatch(css, /qa-dev|\.delta\b/);
 assert.match(css, /\.result-dev \{[^}]*color: var\(--muted\)/);
+// No size of its own (the form's reading size wins anyway); the pieces never break inside; phones leave it out, as they
+// left out the Deviation column (only the test, answer and verdict).
+assert.doesNotMatch(css, /\.result-dev[^{]*\{[^}]*font-size/);
+assert.match(css, /\.result-dev > span \{ white-space: nowrap; \}/);
+const phone = css.slice(css.indexOf('/* Compact phone entry: only the test, measured value and verdict. */'));
+assert.match(phone.slice(0, phone.indexOf('\n}\n')), /\.measure-table \.result-dev \{ display:none; \}/);
 assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
 
 // The PDF report keeps its own "Deviation:" line.
