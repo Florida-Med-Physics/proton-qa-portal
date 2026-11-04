@@ -102,7 +102,8 @@ assert.match(phone.slice(0, phone.indexOf('\n}\n')), /\.measure-table \.result-d
 assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
 
 // The PDF report keeps its own "Deviation:" line.
-const report = { Blob };
+// One test per row here; the PDF's numbering of shared rows is checked in tests/test_shared_rows.cjs.
+const report = { Blob, blockNumbers: () => new Map(), sharedRows: (list) => list.map((r) => [r]) };
 vm.createContext(report);
 for (const part of [between('const REVIEW_LABEL', 'function reviewChip('), between('function capitalize(', 'function decimalsOf('), between('function qaReportPdf(', 'async function downloadQaReport')])
   vm.runInContext(part, report);

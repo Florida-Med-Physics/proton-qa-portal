@@ -1348,6 +1348,9 @@ const TEMPLATE_NUMBER = /^Template (\d+)\.(\d+[a-z]?)\.\s*/;
 const SECTION_NAME = /\[Section: ([^\]]+)\]\s*/;
 const MARKER = /\[(auto|calc): ((?:[^\[\]]|\[[^\]]*\])+)\]\s*/;
 const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist]": the value a text field starts with   // the rule may itself contain "[mm]"         // "[auto: user]" / "[calc: 3d-offset]": the Perform page does it
+// "[row: with above]" (Setup QA: "Same row as the test above"): the test is drawn on the row of the test above it, on the
+// QA form and a saved run, and has no number of its own (blockNumbers). The first test of a list or section ignores it.
+const ROW_MARK = /\[row: with above\]/;
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function infoDisclosure(content,label='Test information',open=false) {
   return el('details',{class:'qa-info',open},el('summary',{title:label,'aria-label':label},el('span',{'aria-hidden':'true'},'i')),el('div',{class:'qa-info-content'},content));
@@ -1420,7 +1423,7 @@ function performDirections(item){return QADerived.read(item.description)||/\[cal
 function helpText(description, { inline = false } = {}) {
   description=(description||'').replace(/(?:^|\n)\s*Source:[^\n]*/g,'');
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device): [^\]]+\]\s*/g, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
   if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
     const one = text.replace(/\s+/g, " ");
@@ -1430,7 +1433,7 @@ function helpText(description, { inline = false } = {}) {
 }
 
 // Directions as people read and edit them, apart from the markers GatorQA keeps in the same field: the template
-// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device: …] and Source lines.
+// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device|row: …] and Source lines.
 // Editing the text in the list editor keeps every marker exactly as it was.
 function directionsParts(description) {
   let d = description || "";
@@ -1438,7 +1441,7 @@ function directionsParts(description) {
   const prefix = num ? num[0].trim() : "";
   if (num) d = d.slice(num[0].length);
   const tags = [], sources = [];
-  for (const re of [new RegExp(SECTION_NAME.source, "g"), new RegExp(MARKER.source, "g"), new RegExp(DEFAULT_MARK.source, "g"), /\[(?:choices|excel|rule|derived|device): [^\]]+\]/g])
+  for (const re of [new RegExp(SECTION_NAME.source, "g"), new RegExp(MARKER.source, "g"), new RegExp(DEFAULT_MARK.source, "g"), /\[(?:choices|excel|rule|derived|device|row): [^\]]+\]/g])
     d = d.replace(re, (m) => { tags.push(m.trim()); return " "; });
   d = d.replace(/(?:^|\n)\s*Source:[^\n]*/g, (m) => { sources.push(m.trim()); return ""; });
   return { prefix, tags, sources, text: d.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim() };
@@ -1446,6 +1449,11 @@ function directionsParts(description) {
 function joinDirections(parts, text) {
   const section = parts.tags.filter((t) => t.startsWith("[Section:")), other = parts.tags.filter((t) => !t.startsWith("[Section:"));
   return [parts.prefix, ...section, (text || "").trim(), ...other].filter(Boolean).join(" ") + (parts.sources.length ? "\n" + parts.sources.join("\n") : "");
+}
+// The list editor's "Same row as the test above" box adds or removes the tag; the rest of the field stays as it was.
+function withRowMark(description, on) {
+  const d = (description || "").replace(/ ?\[row: with above\]/g, ""), at = d.search(/\n\s*Source:/);
+  return !on ? d : !d ? "[row: with above]" : at < 0 ? `${d} [row: with above]` : `${d.slice(0, at)} [row: with above]${d.slice(at)}`;
 }
 function fitTextarea(box) { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; }
 
@@ -1501,8 +1509,11 @@ function measureParts(name) {
 
 function blockNumbers(items) {
   const out = new Map();
+  out.joined = new Set();                                                 // tests on the row of the test above (sharedRows)
+  out.joinable = new Set();                                               // tests the tag would join (Setup QA's box)
   const counter = {};
   const next = (item) => { const n = sectionNumber(item); counter[n] = (counter[n] || 0) + 1; return `${n}.${String(counter[n]).padStart(2, "0")}`; };
+  const box = (item) => sectionNameOf(item) || item.category || "";      // the section card a test is drawn in
   const bySection = new Map();
   for (const it of items) { const n = sectionNumber(it); if (!bySection.has(n)) bySection.set(n, []); bySection.get(n).push(it); }
   for (const list of bySection.values()) {
@@ -1516,8 +1527,9 @@ function blockNumbers(items) {
     }
     const familyOf = new Map();
     for (const f of families.values()) if (f.length > 1) for (const it of f) familyOf.set(it.test_id, f);
-    for (let i = 0; i < list.length; i++) {
-      const it = list[i];
+    for (let i = 0, above = null; i < list.length; i++) {
+      const it = list[i], prev = above;
+      above = null;
       if (out.has(it.test_id)) continue;
       const fam = familyOf.get(it.test_id);
       if (fam) { const n = next(it); for (const m of fam) out.set(m.test_id, n); continue; }
@@ -1531,10 +1543,34 @@ function blockNumbers(items) {
         i += group.length - 1;
         continue;
       }
-      out.set(it.test_id, next(it));
+      // [row: with above]: the number of the single test just above it, when that one is in the same section.
+      if (prev && box(prev) === box(it)) out.joinable.add(it.test_id);
+      if (out.joinable.has(it.test_id) && ROW_MARK.test(it.description || "")) { out.set(it.test_id, out.get(prev.test_id)); out.joined.add(it.test_id); }
+      else out.set(it.test_id, next(it));
+      above = it;
     }
   }
   return out;
+}
+
+// Tests that share a row: [[test, …], …] in list order. A test joins the row of the test before it in `list` when
+// blockNumbers (`numbers`) joined it to that test, so the QA form, a saved run, the PDF and Setup QA always agree.
+function sharedRows(list, numbers) {
+  const rows = [];
+  list.forEach((it, i) => (i && numbers.joined?.has(it.test_id) && numbers.get(it.test_id) === numbers.get(list[i - 1].test_id) ? rows.at(-1).push(it) : rows.push([it])));
+  return rows;
+}
+// A shared row is one cell over the Test, Measured, Unit, Result and Baseline columns, its tests side by side as in a
+// row of their own: each one's name and unit ("TCS Sk (mGy·m²·h⁻¹)") with its details button (named for it), its input
+// or value, its result, baseline and limits, and its notes. `fields` are [test, name, unit, details, answer, result, limits, ...notes].
+function sharedCell(fields) {
+  return el("td", { class: "qa-measured qa-shared-cell", colspan: 5 }, el("div", { class: "qa-shared" },
+    fields.map(([test, name, unit, details, answer, result, limits, ...notes]) => {
+      if (details) for (const key of ["title", "aria-label"]) details.setAttribute(key, `${details.getAttribute(key)}: ${name}`);
+      return el("div", { class: "qa-shared-field", "data-test-id": test.test_id },
+        el("div", { class: "qa-shared-name" }, el("span", {}, name, unit ? [" ", el("span", { class: "qa-shared-unit" }, `(${unit})`)] : null), details), answer,
+        el("div", { class: "qa-shared-more" }, result, limits ? el("div", { class: "qa-shared-info" }, limits) : null, notes));
+    })));
 }
 
 function checkNumber(description) {
@@ -1547,9 +1583,10 @@ function checkNumber(description) {
 function derivedExplanation(item,items,numbers) {
   const rule=QADerived.read(item.description);
   if(rule){
-    const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name};});
+    const refs=rule.inputs.map((source,i)=>{const input=items.find(t=>t.name===source.name&&(t.category||'')===source.category);const n=input&&(numbers.get(input.test_id)||checkNumber(input.description));return {letter:String.fromCharCode(65+i),number:n||'?',name:source.name,joined:!!input&&!!numbers.joined?.has(input.test_id)};});
     if(rule.kind==='lookup')return el('div',{class:'derived-explanation'},el('strong',{},'Device calibration lookup'),el('p',{},`Uses the selected device from Test ${refs[0].number} · ${refs[0].name}. Unconfigured factors stay blank.`));
-    const equation=rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
+    // Inputs on one row ("Same row as the test above") share its number; "[1.08]-[1.08]" would not say which is which, so the letters stay.
+    const equation=refs.some(r=>r.joined)&&new Set(refs.map(r=>r.number)).size<refs.length?rule.formula:rule.formula.replace(/\b[A-Z]\b/g,letter=>`[${refs.find(r=>r.letter===letter)?.number||'?'}]`);
     return el('div',{class:'derived-explanation'},el('div',{},el('strong',{},'Calculated: '),equation),el('div',{class:'derived-input-reference'},refs.map(r=>`${r.letter} = Test ${r.number} · ${r.name}`).join('; ')));
   }
   if(/\[calc: workbook\]/.test(item.description||'')&&window.QAExcel){
@@ -1687,7 +1724,7 @@ async function renderPerform(assignmentId) {
     for(let parent=entry.row.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
     app.querySelectorAll('.qa-next-unanswered').forEach(row=>row.classList.remove('qa-next-unanswered'));
     entry.row.classList.add('qa-next-unanswered');entry.row.scrollIntoView({block:'center',behavior:'smooth'});
-    const focus=entry.row.querySelector('.qa-measured button:not(:disabled), .qa-measured select:not(:disabled), .qa-measured input:not([readonly]):not([type=hidden])');
+    const focus=(entry.field||entry.row).querySelector('.qa-measured button:not(:disabled):not(.qa-calculation-info), .qa-measured select:not(:disabled), .qa-measured input:not([readonly]):not([type=hidden]):not(.note-input)');   // a shared row's field also holds its details and note
     if(focus)focus.focus({preventScroll:true});else{entry.row.tabIndex=-1;entry.row.focus({preventScroll:true});}
   }},'Next unanswered');
   const unfinishedToggle=el('input',{type:'checkbox','aria-label':'Show unfinished only',onchange:event=>{unfinishedOnly=event.target.checked;refresh();if(unfinishedOnly)for(const section of sections)if(!section.box.hidden)section.box.open=true;}});
@@ -1704,7 +1741,7 @@ async function renderPerform(assignmentId) {
     importRemaining.textContent=left?`${left} tests still need an answer.`:'All required tests are answered.';
     nextUnanswered.disabled=left===0;
     finishedMessage.hidden=!unfinishedOnly||left!==0;
-    for(const entry of inputs){if(!entry.row)continue;entry.row.hidden=unfinishedOnly&&(!entry.required||!!entry.status());if(entry.row.hidden)entry.chart.hidden=true;}
+    for(const entry of inputs){if(!entry.row)continue;entry.row.hidden=unfinishedOnly&&(entry.rowEntries||[entry]).every(e=>!e.required||!!e.status());if(entry.row.hidden)entry.chart.hidden=true;}
     for (const s of sections){
       s.refresh();const hide=unfinishedOnly&&!s.entries.some(e=>e.required&&!e.status());s.box.hidden=hide;if(s.heading)s.heading.hidden=hide;
       for(const block of s.box.querySelectorAll('.measure-block')){
@@ -1817,34 +1854,47 @@ async function renderPerform(assignmentId) {
       const numberCell = (it) => (firstHeader !== "Test"
         ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
-      const trRows = members.map((it) => {
-        drawn.add(it.test_id);
-        const unit = it.unit && it.unit !== "unitless" ? it.unit : "";
-        const { entry, control, comment, noteToggle, note, statusCell } = buildEntry(it);
-        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
+      // Tests marked "Same row as the test above" share one row (sharedCell), each laid out as in a row of its own: its
+      // result and deviation (when it has a baseline or limits), baseline and limits under its input, then its comment
+      // (the + opens every one); History and Trend follow the first judged one, named (each keeps its own on Machine Trends).
+      const sharedCells = (parts) => {
+        const has = (p, ...keys) => p.it.type === "numeric" && keys.some((k) => (p.it.limits || {})[k] != null);
+        const main = parts.find((p) => has(p, "warn", "fail")) || parts.find((p) => p.it.type === "numeric") || parts[0];
+        const limits = (p) => { const line = limitsLine(p.it, p.unit); return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line; };   // the unit is in the name
+        parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
+        const cell = sharedCell(parts.map((p) => [p.it, shortName(p.it), p.it.type === "numeric" ? p.unit : "", testDetailsButton(p.it, t.items, numbers), p.control,
+          has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
+        parts.forEach((p, i) => { p.entry.field = cell.firstChild.children[i]; });
+        return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
+      };
+      const trRows = (firstHeader === "Test" ? sharedRows(members, numbers) : members.map((it) => [it])).map((group) => {
+        const parts = group.map((it) => { drawn.add(it.test_id); return { it, unit: it.unit && it.unit !== "unitless" ? it.unit : "", ...buildEntry(it) }; });
+        const [{ it, unit, control, comment, noteToggle, note, statusCell }] = parts;
+        const shared = parts.length > 1 ? sharedCells(parts) : null, main = shared ? shared.main : parts[0];
+        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
-          const pts = (history[it.test_id] || []).slice(-60);
+          const pts = (history[main.it.test_id] || []).slice(-60);
           if (!pts.length) return toast("No results yet for this test.", true);
           if (chart.hidden) chart.firstChild.replaceChildren(
-            el("div", { class: "row" }, el("strong", {}, label(it)), el("span", { class: "spacer" }),
-              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&list=${t.assignment.id}&test_id=${it.test_id}&range=365` }, "Full trend")),
-            seriesChart([{ label: it.name, points: pts }], unit, { small: true, yLabel: yAxisLabel([it.name]) }));
+            el("div", { class: "row" }, el("strong", {}, label(main.it)), el("span", { class: "spacer" }),
+              el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&list=${t.assignment.id}&test_id=${main.it.test_id}&range=365` }, "Full trend")),
+            seriesChart([{ label: main.it.name, points: pts }], main.unit, { small: true, yLabel: yAxisLabel([main.it.name]) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
         const row = el("tr", {'data-qa-entry':it.test_id},
           numberCell(it),
-          el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
+          shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
           // null, not "": an empty cell must stay :empty so the card layout drops its label too.
-          el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
-          el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
-          el("td", { class: "qa-measured" }, control),
-          el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
-          el("td", { class: "qa-comment" }, noteToggle, comment),
-          el("td", { class: "history-cell" }, dates.length ? histChips(it, unit) : el("span", { class: "muted small" }, "—")),
+          shared ? null : el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
+          shared ? null : el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
+          shared ? null : el("td", { class: "qa-measured" }, control),
+          shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
+          el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
+          el("td", { class: "history-cell" }, dates.length ? [shared?.history, histChips(main.it, main.unit)] : el("span", { class: "muted small" }, "—")),
           el("td", {class:"qa-trends"}, trend));
-        entry.row=row;entry.chart=chart;
+        for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
         const extras = el('td', {class:'qa-phone-extras', colspan:9});
         orderMeasurementRow(row);
         row.append(extras);
@@ -2745,7 +2795,7 @@ async function renderQueueEditor(id) {
       const lastInFamily = family && family[family.length - 1].item === item;
       const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
       const familyDirections = family
-        ? (firstInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        ? (firstInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
         : null;
       // Directions sit above their test. In the editor they are edited in place, like the name and category;
       // the markers kept in the same field are not shown and are kept as they were. Sphinx-measured tests keep
@@ -2769,12 +2819,15 @@ async function renderQueueEditor(id) {
       const addDirections = inlineDirections && !dirRow ? el("button", { type: "button", class: "link small add-directions", title: "Add directions shown with this test",
         onclick: () => { addingDirections.add(t.id); draw(); requestAnimationFrame(() => body.querySelector(`textarea[aria-label="Directions: ${t.id}"]`)?.focus()); } }, "+ Directions") : null;
       lastSection = n;
-      const number = numbers.get(item.test_id);
+      const number = numbers.joined.has(item.test_id) ? null : numbers.get(item.test_id);   // on the row above: no number of its own
+      // Offered only where it can join (a single test right below another in the same section), or to clear it.
+      const sameRow = editable && !valuesFor && !family && (numbers.joinable.has(item.test_id) || ROW_MARK.test(t.description || "")) ? el("label", { class: "check small same-row" },
+        el("input", { type: "checkbox", checked: ROW_MARK.test(t.description || ""), onchange: (e) => { editDefinition("description", withRowMark(t.description, e.target.checked)); draw(); } }), "Same row as the test above") : null;
       const derivedRow=editable&&!valuesFor&&QADerived.read(t.description)?el('tr',{class:'derived-definition-row'},el('td',{colspan:6},QADerived.read(t.description)?derivedEditor(QADerived.read(t.description),items.slice(0,index).map(x=>byId[x.test_id]),rule=>{t.description=(t.description||'').replace(/\s*\[derived: [^\]]+\]/g,'')+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}):null)):null;
       return [head, family ? dirRow : null, groupHead, family ? null : dirRow, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow && !family ? " after-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
-          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null,
+          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null, sameRow,
             el("textarea", { rows: 1, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => { editDefinition('name', e.target.value); e.target.style.height='auto';e.target.style.height=`${e.target.scrollHeight}px`; } }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item), addDirections)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
@@ -3249,10 +3302,13 @@ function qaReportPdf(run) {
   if (run.review_comment) lines.push(`Review note: ${run.review_comment}`);
   lines.push('');
   const blocks = [lines.flatMap((x) => wrap(x))];
-  for (const [index, r] of (run.results || []).entries()) {
+  // Tests on one row ("Same row as the test above") share its number, as on the QA form; otherwise 1, 2, 3, ...
+  const numbers = blockNumbers(run.results || []), counted = new Map();
+  sharedRows(run.results || [], numbers).forEach((row, i) => row.forEach((r) => counted.set(r, i + 1)));
+  for (const r of run.results || []) {
     const unit = r.unit && r.unit !== 'unitless' ? r.unit : '';
     const value = r.value_num == null && r.value_text == null ? 'Unanswered' : r.type === 'boolean' ? (r.value_num ? 'Yes' : 'No') : r.type === 'numeric' ? `${r.value_num ?? ''} ${unit}` : r.value_text || '';
-    const block = [`${index + 1}. ${r.name}`, `Result: ${value} | ${verdict(r.status)}`];
+    const block = [`${counted.get(r)}. ${r.name}`, `Result: ${value} | ${verdict(r.status)}`];
     if (r.type === 'numeric') {
       const suffix = r.tol_mode === 'percent' ? '%' : unit;
       block.push(`Baseline: ${r.expected ?? 'Not set'} ${unit} | Warning: +/- ${r.warn ?? 'Not set'} ${suffix} | Action: +/- ${r.fail ?? 'Not set'} ${suffix}`);
@@ -3339,34 +3395,53 @@ async function renderReviewMeasurements(run) {
   const numberFor=r=>numbers.get(r.test_id)||checkNumber(r.description)||fallback.get(r.test_id)||'';
   const groups=new Map();
   for(const r of run.results){const n=sectionNumber(r),named=sectionNameOf(r);const key=`${n}|${named||r.category||'General'}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
+  // Tests marked "Same row as the test above" share one row, as on the QA form (measureTable's sharedCells): their values in
+  // one cell (sharedCell; a Pass / Fail answer as its chip), each with its details, its result and deviation when it has a
+  // baseline or limits, its baseline and limits, and its comment; History and Trend of the first judged one, named.
+  const sharedCells=parts=>{
+    const has=(p,...keys)=>p.r.type==='numeric'&&keys.some(k=>p.r[k]!=null);
+    const main=parts.find(p=>has(p,'warn','fail'))||parts.find(p=>p.r.type==='numeric')||parts[0];
+    return {main,history:parts.filter(p=>p.r.type==='numeric').length>1?el('div',{class:'qa-shared-name'},qaDisplayName(main.r)):null,
+      cell:sharedCell(parts.map(p=>[p.r,qaDisplayName(p.r),p.r.type==='numeric'?p.unit:'',testDetailsButton(p.r,run.results,numbers),
+        p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('div',{class:'review-measured'},p.amount),
+        has(p,'expected','warn','fail')&&!p.missing?p.result:null,
+        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},p.r.expected!=null?'Baseline ':null,limitsText(p.limits,p.unit)):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
+      comment:parts.some(p=>p.r.comment)?null:'—'};
+  };
   let last=null;
   for(const[key,results]of [...groups].sort(([a],[b])=>Number(a.split('|')[0])-Number(b.split('|')[0]))){
     const [n,category]=key.split('|');
     if(n!==last){app.append(el('h2',{class:'section-head'},sectionTitle(Number(n),[...groups.keys()].filter(k=>k.startsWith(n+'|')).map(k=>k.split('|')[1]),sectionNameOf(results[0]))));last=n;}
     const tbody=el('tbody');
-    for(const r of results){
-      const unit=r.unit&&r.unit!=='unitless'?r.unit:'';
+    for(const group of sharedRows(results,numbers)){
+      const parts=group.map(r=>{
+        const unit=r.unit&&r.unit!=='unitless'?r.unit:'';
+        const missing=r.value_num==null&&r.value_text==null;
+        // A Pass / Fail answer is the Result chip itself; writing it under Measured too would repeat it.
+        const amount=missing||r.type==='boolean'||r.type==='status'||['text','choice'].includes(r.type)?null:QADerived.read(r.description)||/\[calc:/.test(r.description||'')?Number(r.value_num).toPrecision(3):fmt(r.value_num);
+        const value=missing?'Unanswered':r.type==='boolean'||r.type==='status'?'':['text','choice'].includes(r.type)?r.value_text:`${amount} ${unit}`.trim();
+        const measured=el('div',{class:'review-measured'},value);
+        if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
+          const {value:input,control}=passFailInput(r.name,false,false);
+          const original=r.value_num==null?'':r.value_num?'pass':'fail';input.value=original;
+          const sync=()=>control.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.value===input.value));sync();
+          input.addEventListener('input',async()=>{
+            const decision=input.value||'clear',scroll={x:scrollX,y:scrollY};control.querySelectorAll('button').forEach(b=>b.disabled=true);control.setAttribute('aria-busy','true');
+            try{
+              if(decision==='clear'&&run.therapist_approved_by)await api('POST',`/api/runs/${run.id}/therapist-unapprove`,{});
+              else await api('POST',`/api/runs/${run.id}/therapist-review`,{decision});
+              await route();requestAnimationFrame(()=>scrollTo(scroll.x,scroll.y));toast(decision==='pass'?'Saved. Awaiting Physics Review.':'Saved. Awaiting Therapy Review.');
+            }catch(err){input.value=original;sync();control.querySelectorAll('button').forEach(b=>b.disabled=false);control.removeAttribute('aria-busy');toast(err.message,true);}
+          });
+          measured.replaceChildren(control);
+        }
+        const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
+        return {r,unit,missing,amount:amount??value,measured,limits,result:el('div',{class:'status-cell'},chip(r.status),r.type==='numeric'&&!missing?deviationText(r.value_num,limits,unit):null)};
+      });
+      const shared=parts.length>1?sharedCells(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=shared?shared.main:parts[0];
       const prior=(history[r.test_id]||[]).filter(h=>h.run_id!==run.id&&h.qa_date<=run.qa_date);
       const recent=[...prior].reverse().slice(0,3);
       const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+' '+unit}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+(unit?' '+unit:''))))):el('span',{class:'muted small'},'—');
-      const missing=r.value_num==null&&r.value_text==null;
-      // A Pass / Fail answer is the Result chip itself; writing it under Measured too would repeat it.
-      const value=missing?'Unanswered':r.type==='boolean'||r.type==='status'?'':['text','choice'].includes(r.type)?r.value_text:`${QADerived.read(r.description)||/\[calc:/.test(r.description||'')?Number(r.value_num).toPrecision(3):fmt(r.value_num)} ${unit}`.trim();
-      const measured=el('div',{class:'review-measured'},value);
-      if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
-        const {value:input,control}=passFailInput(r.name,false,false);
-        const original=r.value_num==null?'':r.value_num?'pass':'fail';input.value=original;
-        const sync=()=>control.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.value===input.value));sync();
-        input.addEventListener('input',async()=>{
-          const decision=input.value||'clear',scroll={x:scrollX,y:scrollY};control.querySelectorAll('button').forEach(b=>b.disabled=true);control.setAttribute('aria-busy','true');
-          try{
-            if(decision==='clear'&&run.therapist_approved_by)await api('POST',`/api/runs/${run.id}/therapist-unapprove`,{});
-            else await api('POST',`/api/runs/${run.id}/therapist-review`,{decision});
-            await route();requestAnimationFrame(()=>scrollTo(scroll.x,scroll.y));toast(decision==='pass'?'Saved. Awaiting Physics Review.':'Saved. Awaiting Therapy Review.');
-          }catch(err){input.value=original;sync();control.querySelectorAll('button').forEach(b=>b.disabled=false);control.removeAttribute('aria-busy');toast(err.message,true);}
-        });
-        measured.replaceChildren(control);
-      }
       const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:9}));
       // The quick trend shows the newest 60 points of this test, fetched on the first click: the page's own history
       // stops at this run's date, which would leave an early or trashed run's chart empty.
@@ -3380,16 +3455,15 @@ async function renderReviewMeasurements(run) {
         chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
         chart.hidden=false;
       }},trendIcon(16));
-      const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
-      const row=el('tr',{'data-test-id':r.test_id},
-        el('td',{class:'qa-n'},numberFor(r)),
-        el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
-        el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
-        el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
-        el('td',{class:'qa-measured','data-label':'Measured'},measured),
-        el('td',{class:'qa-result','data-label':'Result'},el('div',{class:'status-cell'},chip(r.status),r.type==='numeric'&&!missing?deviationText(r.value_num,limits,unit):null)),
-        el('td',{class:'qa-comment','data-label':'Comment'},r.comment||'—'),
-        el('td',{class:'history-cell','data-label':'History'},hist),
+      const row=el('tr',{'data-test-id':lead.test_id},
+        el('td',{class:'qa-n'},numberFor(lead)),
+        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
+        shared?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
+        shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
+        shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
+        shared?null:el('td',{class:'qa-result','data-label':'Result'},result),
+        el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment||'—'),
+        el('td',{class:'history-cell','data-label':'History'},recent.length?shared?.history:null,hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
       orderMeasurementRow(row);
       tbody.append(row,chart);
@@ -3456,7 +3530,7 @@ async function renderRun(id) {
 
   const selectedTest=queryParams().get('test_id');
   if(selectedTest)requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    const row=[...app.querySelectorAll('[data-test-id]')].find(r=>r.dataset.testId===selectedTest);
+    const row=[...app.querySelectorAll('[data-test-id]')].find(r=>r.dataset.testId===selectedTest)?.closest('tr');
     if(row){row.classList.add('selected-qa-result');row.setAttribute('tabindex','-1');row.focus({preventScroll:true});row.scrollIntoView({block:'center'});}
   }));
   const therapistMode=can('therapist_approve')&&!can('review');

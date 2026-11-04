@@ -21,7 +21,8 @@ const runs = {
 };
 
 // ---- the PDF report ----
-const report = { Blob };
+// One test per row here; the PDF's numbering of shared rows is checked in tests/test_shared_rows.cjs.
+const report = { Blob, blockNumbers: () => new Map(), sharedRows: (list) => list.map((r) => [r]) };
 vm.createContext(report);
 for (const part of [between('const REVIEW_LABEL', 'function reviewChip('), between('function capitalize(', 'function decimalsOf('), between('function qaReportPdf(', 'async function downloadQaReport')])
   vm.runInContext(part, report);
