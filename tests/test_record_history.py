@@ -113,6 +113,14 @@ class RecordHistoryTests(unittest.TestCase):
         self.assertEqual(details[r["signed"]]["previous"], {"review_status": "pending", "therapist_approval_required": True,
                                                             "therapist_approved_by": signer["therapist_approved_by"],
                                                             "therapist_approved_at": signer["therapist_approved_at"]})
+        # The kept sign-off stays: a therapist cannot undo or change it on a run recorded as history (that would make it wait again).
+        kept = self.state()
+        therapist = self.users["therapist"]
+        for call in (lambda: service.unapprove_therapist_review(self.db, therapist, r["signed"]),
+                     lambda: service.set_therapist_review(self.db, therapist, r["signed"], {"decision": "clear"})):
+            with self.assertRaisesRegex(PortalError, "^Therapist review can be changed only before physicist review.$"):
+                call()
+        self.assertEqual(self.state(), kept)
         # They leave every review queue; the rest still wait.
         waiting = {x["id"] for x in service.list_runs(self.db, self.users["admin"], {}) if x["review_status"] == "pending"}
         self.assertEqual(waiting, {r["later"], r["other_machine"], r["other_list"], r["form_sphinx"], r["form_manual"]})
@@ -121,6 +129,16 @@ class RecordHistoryTests(unittest.TestCase):
         self.assertEqual(service.record_history(self.db, self.users["physicist"], {"until": "2026-10-04", "dry_run": False}), {"count": 3})
         self.assertEqual(self.run_row(r["later"])["review_status"], "imported")
         self.assertEqual(self.db.one("SELECT COUNT(*) AS n FROM audit WHERE action = 'record_history'")["n"], 6)
+
+    def test_only_the_notes_an_import_writes_count(self, _):
+        # Sphinx-filled runs (source 'sphinx') with each synthetic note: what a file import writes is chosen, a typed note never.
+        noted = lambda note, ref: service.submit_run(self.db, self.users["therapist"], self.daily_b, {"qa_date": "2026-09-01", "results": [],
+                                                                                                  "source_ref": ref, "comment": note})["id"]
+        imports = [noted(note, f"synthetic-import-note-{i}") for i, note in enumerate(CASES["import_notes"])]
+        typed = [noted(note, f"synthetic-typed-note-{i}") for i, note in enumerate(CASES["typed_notes"])]
+        self.assertEqual({self.run_row(i)["source"] for i in imports + typed}, {"sphinx"})
+        self.assertEqual(service.record_history(self.db, self.users["physicist"], {"until": "2026-09-01", "assignment_id": self.daily_b, "dry_run": True}),
+                         {"count": len(imports), "runs": imports})
 
     def test_permission_refusals(self, _):
         self.make_runs()

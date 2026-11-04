@@ -1231,10 +1231,17 @@ def import_sphinx_uploads(db, user, assignment_id, data):
     return import_sphinx(db, user, assignment_id, files, historical=bool(data.get("historical", True)), history_before=history_before)
 
 
+# The note a Sphinx file import writes: "Imported from <file>. Sphinx finished <date> <time>…" (import_sphinx), or
+# "Imported from <file>.xls/.csv/.pdf" and nothing more (the browser folder import, which sends each file through the
+# form). The same pattern as local-backend.js IMPORT_NOTE.
+_IMPORT_NOTE = re.compile(r"Imported from [^\n]+(\. Sphinx finished [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
+                          r"|\.([Xx][Ll][Ss]|[Cc][Ss][Vv]|[Pp][Dd][Ff])\Z)")
+
+
 def _imported_from_file(run):
-    """A run made by a Sphinx file import (import_sphinx, or a folder import that sends each file through the form with
-    the same opening words), never one someone performed on the Perform form, even when a file filled it in."""
-    return run["source"] == "sphinx" and (run["comment"] or "").startswith("Imported from ")
+    """A run made by a Sphinx file import, known by the note the import writes. A run performed on the Perform form keeps
+    the note the person typed, so it is not chosen, even when a file filled it in."""
+    return run["source"] == "sphinx" and bool(_IMPORT_NOTE.match(run["comment"] or ""))
 
 
 def record_history(db, user, data):
@@ -1376,6 +1383,9 @@ def unapprove_therapist_review(db,user,run_id):
         run=_get(db,'runs',run_id)
         if run.get('trashed_at') or not run['therapist_approved_by']:
             raise PortalError('This QA has no therapist approval to undo.')
+        # A run recorded as history keeps its sign-off but no longer asks for one; as in set_therapist_review, it stays as it is.
+        if not run['therapist_approval_required']:
+            raise PortalError('Therapist review can be changed only before physicist review.')
         previous={k:run.get(k) for k in ('therapist_approved_by','therapist_approved_at','review_status','reviewed_by','reviewed_at','review_comment')}
         checks=_pbs_therapist_results(db,run)
         if checks is None:checks=db.all("SELECT res.* FROM results res JOIN tests t ON t.id=res.test_id WHERE res.run_id=? AND lower(trim(t.name))='qa reviewed by therapist?'",(run_id,))

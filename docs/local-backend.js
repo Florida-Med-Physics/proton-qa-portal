@@ -1110,6 +1110,8 @@
   function unapproveTherapistReview(user,id) {
     require(user,'therapist_approve');const run=get('runs',id);
     if(run.trashed_at||!run.therapist_approved_by)throw Error('This QA has no therapist approval to undo.');
+    // A run recorded as history keeps its sign-off but no longer asks for one; as in setTherapistReview, it stays as it is.
+    if(!run.therapist_approval_required)throw Error('Therapist review can be changed only before physicist review.');
     const previous={};for(const k of ['therapist_approved_by','therapist_approved_at','review_status','reviewed_by','reviewed_at','review_comment'])previous[k]=run[k];
     const checks=pbsTherapistResults(run)??S.results.filter(r=>r.run_id===id&&byId('tests',r.test_id)?.name.trim().toLowerCase()==='qa reviewed by therapist?');
     previous.results=checks.map(r=>({test_id:r.test_id,value:r.value_num,status:r.status}));
@@ -1389,9 +1391,12 @@
     }
     return { imported, skipped };
   }
-  // A run made by a Sphinx file import (importSphinx above, or a folder import that sends each file through the form
-  // with the same opening words), never one someone performed on the Perform form, even when a file filled it in.
-  const importedFromFile = (run) => run.source === "sphinx" && String(run.comment || "").startsWith("Imported from ");
+  // A run made by a Sphinx file import, known by the note the import writes: "Imported from <file>. Sphinx finished
+  // <date> <time>…" (importSphinx above), or "Imported from <file>.xls/.csv/.pdf" and nothing more (the browser folder
+  // import, which sends each file through the form). A run performed on the Perform form keeps the note the person
+  // typed, so it is not chosen, even when a file filled it in. The same pattern as service.py _IMPORT_NOTE.
+  const IMPORT_NOTE = /^Imported from [^\n]+(\. Sphinx finished [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}|\.([Xx][Ll][Ss]|[Cc][Ss][Vv]|[Pp][Dd][Ff])$)/;
+  const importedFromFile = (run) => run.source === "sphinx" && IMPORT_NOTE.test(String(run.comment || ""));
   // Past Sphinx imports still waiting for review become history, as if imported as history in the first place: results,
   // limits, verdicts, comments and any therapist sign-off stay as they are. Mirrors service.py record_history.
   function recordHistory(user, data) {

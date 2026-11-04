@@ -3131,6 +3131,8 @@ async function recordHistoryDialog() {
     } catch (err) { if (ask === asked) count.textContent = err.message; }
   };
   machine.addEventListener('change', async () => {
+    // Until the new machine's lists are in and counted, the count on screen is for the old choice: Confirm waits.
+    asked++; confirmButton.disabled = true; count.textContent = 'Counting…';
     const chosen = machine.value;
     const schedules = chosen ? await api('GET', `/api/machines/${chosen}/assignments`).catch(() => []) : [];
     if (chosen !== machine.value) return;
@@ -3209,7 +3211,7 @@ function qaReportPdf(run) {
   const lines = [run.queue_name, `Machine: ${run.machine_name} | QA date: ${run.qa_date} | Run: ${run.id}`,
     `Performed by: ${run.performer_name || run.performer || ''} | Recorded: ${run.performed_at || ''}`,
     `Overall: ${verdict(run.overall)} | Review: ${reviewStatusText(run)}`];
-  if (run.therapist_approval_required) lines.push(`Therapist approval: ${run.therapist_approved_by ? `${run.therapist_approver_name || run.therapist_approved_by} | ${run.therapist_approved_at}` : 'Awaiting therapist sign-off'}`);
+  if (run.therapist_approval_required || run.therapist_approved_by) lines.push(`Therapist approval: ${run.therapist_approved_by ? `${run.therapist_approver_name || run.therapist_approved_by} | ${run.therapist_approved_at}` : 'Awaiting therapist sign-off'}`);
   if (run.reviewed_at) lines.push(`Reviewed by: ${run.reviewer_name || run.reviewer || ''} | ${run.reviewed_at}`);
   if (run.comment) lines.push(`Notes: ${run.comment}`);
   if (run.review_comment) lines.push(`Review note: ${run.review_comment}`);
@@ -3373,6 +3375,9 @@ async function renderRun(id) {
     el("dt", {}, "Performed by"), el("dd", {}, who, run.source === "sphinx" ? el("span", { class: "muted small" }, " · imported measurement file") : ""),
     el("dt", {}, "Review"), el("dd", {}, reviewChip(run),
       run.reviewed_by ? ` ${personName(run.reviewer_name, run.reviewer)}, ${run.reviewed_at.slice(0, 16).replace("T", " ")}` : ""),
+    // A run recorded as history keeps a therapist sign-off given before; the review card below is only for runs that ask for one.
+    run.therapist_approved_by && !run.therapist_approval_required ? [el("dt", {}, "Therapist review"),
+      el("dd", {}, `Signed by ${run.therapist_approver_name || 'therapist'} · ${run.therapist_approved_at.replace('T', ' ')}`)] : null,
     run.comment ? [el("dt", {}, "Notes"), el("dd", { class: "pre" }, run.comment)] : null,
     run.review_comment ? [el("dt", {}, "Review note"), el("dd", {}, run.review_comment)] : null);
   app.append(facts);

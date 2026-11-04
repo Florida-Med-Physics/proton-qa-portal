@@ -1,7 +1,7 @@
 // Synthetic checks of Review QA's "Record past imports as history…" dialog (app.js recordHistoryDialog) with a stand-in
 // page: it shows the live dry-run count in plain words, offers a machine's lists once a machine is chosen, can only
-// confirm when something would change, and Confirm records and reloads the page. Only a Physicist or Admin sees the
-// button. Run with node tests/test_record_history_dialog.cjs from the repository root.
+// confirm when something would change (and not while a new machine's lists are loading), and Confirm records and
+// reloads the page. Only a Physicist or Admin sees the button. Run with node tests/test_record_history_dialog.cjs from the repository root.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -21,6 +21,9 @@ function node(tag, props = {}, kids = []) {
 }
 const calls = [], toasts = [];
 let dialog = null, routed = 0;
+// Answers that can be held back, to check what the dialog shows while they are on their way.
+const slow = { lists: null, count: null };
+const held = () => { let release; const promise = new Promise((resolve) => { release = resolve; }); return [promise, release]; };
 const counts = (body) => body.assignment_id === 21 ? 0 : body.machine_id === 7 ? 1 : 307;
 const context = {
   setTimeout, Promise, Number, String,
@@ -37,7 +40,8 @@ const context = {
     calls.push([method, path, body]);
     if (path === '/api/machines') return [{ id: 7, name: 'Synthetic Gantry A' }, { id: 8, name: 'Synthetic Gantry B' }];
     if (path === '/api/machines/7/assignments') return [{ id: 21, queue_name: 'Synthetic Sphinx daily' }, { id: 22, queue_name: 'Synthetic Sphinx other' }];
-    if (path === '/api/runs/record-history') return body.dry_run ? { count: counts(body), runs: [] } : { count: counts(body) };
+    if (path === '/api/machines/8/assignments') { await slow.lists; return [{ id: 31, queue_name: 'Synthetic Sphinx daily' }]; }
+    if (path === '/api/runs/record-history') { if (body.dry_run) await slow.count; return body.dry_run ? { count: counts(body), runs: [] } : { count: counts(body) }; }
     throw new Error(`unexpected ${method} ${path}`);
   },
   toast: (message) => toasts.push(message),
@@ -79,5 +83,22 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
   await dialog.onSave({});
   assert.deepEqual(plain(calls.slice(sent)), [['POST', '/api/runs/record-history', { until: '2026-10-31', machine_id: 7, assignment_id: null }]]);
   assert.deepEqual([toasts, routed], [['1 run recorded as history'], 1]);
-  console.log('Record past imports as history: live count in plain words, lists follow the machine, Confirm only when something changes, then records and reloads.');
+
+  // Choosing another machine: until its lists are in and counted, the old count is gone and Confirm waits, even when an
+  // older count arrives in the meantime.
+  await context.open(); await settle();
+  const [machine2, , until2] = dialog.body.kids.slice(0, 3).map((f) => f.kids[0]), count2 = dialog.body.kids[3];
+  machine2.value = '7'; await machine2.fire('change'); await settle();
+  assert.deepEqual([count2.textContent.split(' will')[0], dialog.submit.disabled], ['1 imported Sphinx run', false]);
+  const [countHeld, releaseCount] = held(), [listsHeld, releaseLists] = held();
+  slow.count = countHeld; slow.lists = listsHeld;
+  until2.value = '2026-11-02'; const olderCount = until2.fire('change'); await settle();
+  machine2.value = '8'; const newLists = machine2.fire('change'); await settle();
+  assert.deepEqual([count2.textContent, dialog.submit.disabled], ['Counting…', true]);
+  releaseCount(); await olderCount; await settle();
+  assert.deepEqual([count2.textContent, dialog.submit.disabled], ['Counting…', true], 'the older count for gantry A is not shown');
+  releaseLists(); await newLists; await settle();
+  assert.deepEqual(plain(calls.at(-1)), ['POST', '/api/runs/record-history', { until: '2026-11-02', machine_id: 8, assignment_id: null, dry_run: true }]);
+  assert.deepEqual([count2.textContent.split(' will')[0], dialog.submit.disabled], ['307 imported Sphinx runs', false]);
+  console.log('Record past imports as history: live count in plain words, lists follow the machine, Confirm only when something changes and never on an old count, then records and reloads.');
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -172,6 +172,11 @@ function sphinxFile(name, n) {
   const detail = Object.fromEntries(entries.map((e) => [e.entity_id, JSON.parse(e.detail)]));
   assert.deepEqual(detail[r.first], { previous: { review_status: 'pending', therapist_approval_required: true, therapist_approved_by: null, therapist_approved_at: null }, until: '2026-10-03' });
   assert.deepEqual(detail[r.signed].previous, { review_status: 'pending', therapist_approval_required: true, therapist_approved_by: signer.therapist_approved_by, therapist_approved_at: signer.therapist_approved_at });
+  // The kept sign-off stays: a therapist cannot undo or change it on a run recorded as history (that would make it wait again).
+  const kept = await state();
+  for (const [path, body] of [[`/api/runs/${r.signed}/therapist-unapprove`, {}], [`/api/runs/${r.signed}/therapist-review`, { decision: 'clear' }]])
+    assert.equal(await refusal(as('therapist', 'POST', path, body)), 'Therapist review can be changed only before physicist review.', path);
+  assert.deepEqual(await state(), kept);
   // They leave every review queue (the Dashboard counts come from these); the rest still wait.
   const waiting = (await api('GET', '/api/runs?limit=1000')).filter((x) => x.review_status === 'pending').map((x) => x.id);
   assert.deepEqual(sorted(waiting), sorted([r.later, r.other_machine, r.other_list, r.form_sphinx, r.form_manual]));
@@ -183,5 +188,13 @@ function sphinxFile(name, n) {
   assert.deepEqual(await as('admin', 'POST', '/api/runs/record-history', { until: '2026-10-05' }, 'physicist'), { count: 1 });
   const last = (await state()).audit.at(-1);
   assert.deepEqual([last.action, last.entity_id, last.user_id, JSON.parse(last.detail).acting_role], ['record_history', viewAs.imported[0].run_id, ids.admin, 'physicist']);
+
+  // ---- a run counts as an import only by the note an import writes, never by a note typed on the form ----
+  const noted = async (comment, ref) => (await as('therapist', 'POST', `/api/assignments/${dailyB}/runs`, { qa_date: '2026-09-01', results: [], source_ref: ref, comment })).id;
+  const imports = [], typed = [];
+  for (const [i, note] of CASES.import_notes.entries()) imports.push(await noted(note, `synthetic-import-note-${i}`));
+  for (const [i, note] of CASES.typed_notes.entries()) typed.push(await noted(note, `synthetic-typed-note-${i}`));
+  for (const id of [...imports, ...typed]) assert.equal((await run(id)).source, 'sphinx');
+  assert.deepEqual(await as('physicist', 'POST', '/api/runs/record-history', { until: '2026-09-01', assignment_id: dailyB, dry_run: true }), { count: imports.length, runs: imports });
   console.log('history_before splits an import at its date; record-history picks only waiting Sphinx file imports, dry runs change nothing, refusals match service.py, and recording keeps results, verdicts and sign-offs with one audit entry per run.');
 })().catch((e) => { console.error(e); process.exit(1); });
