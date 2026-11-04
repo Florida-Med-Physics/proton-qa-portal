@@ -124,9 +124,10 @@ function fmt(value, digits) {
 }
 
 // Machine Trends shows numbers to two decimal places (77.68, 0.14); `signed` puts + or − on Δ values. Display only:
-// stored values, the CSV export, the QA forms and Review keep their own precision. A missing value shows "—".
+// stored values, the CSV export, the QA forms and Review keep their own precision. A missing value (or anything that is not
+// a number or numeric text) shows "—".
 function fmt2(value, signed = false) {
-  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "string" ? !value.trim() : typeof value !== "number") return "—";
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
   const text = Math.abs(n).toFixed(2);
@@ -525,8 +526,11 @@ function machineColorClass(name) {
 }
 function machineLabel(name,colored=false) { return el('span',{class:colored?machineColorClass(name):''},name); }
 
+// The same text every time for a date, worked out once (Machine Trends labels thousands of dots with their dates).
 function shortDate(iso) {
-  return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const memo = shortDate.memo || (shortDate.memo = new Map());
+  if (!memo.has(iso)) memo.set(iso, new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" }));
+  return memo.get(iso);
 }
 
 function renderLogin() {
@@ -3526,10 +3530,12 @@ function asDeviation(p) {
 
 const latest = (points) => points[points.length - 1];
 
-/// Nice tick step for a span, and how many decimals its labels need.
-function niceTicks(lo, hi, count) {
+/// Nice tick step for a span, and how many decimals its labels need. `fixed2` (two-decimal labels on Machine Trends):
+/// the step is a whole multiple of 0.01 (0.02 where it would be 0.025), so each label is exactly its gridline's value.
+function niceTicks(lo, hi, count, fixed2 = false) {
   const raw = (hi - lo) / count, mag = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  let step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  if (fixed2) step = Math.max(mag < 0.1 && step === 2.5 * mag ? 2 * mag : step, 0.01);
   const decimals = Math.max(0, -Math.floor(Math.log10(step) + 1e-9) + (step / mag === 2.5 ? 1 : 0));
   const ticks = [];
   for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(v);
@@ -3569,11 +3575,17 @@ function trendPlotPoints(points, delta = false) {
   const value = p => delta ? asDeviation(p).dev : p.value;
   const finite = points.filter(p => Number.isFinite(value(p)));
   if (finite.length < 5) return finite;
+  // Each value is worked out once (a Δ copies the point): the same sums, in the same order, as before, so the same
+  // points are kept, without copying every point n times (Machine Trends draws spot position as Δ on load).
+  const vals = finite.map(value), n = vals.length;
   return finite.filter((point, index) => {
-    const other = finite.filter((_, i) => i !== index).map(value);
-    const mean = other.reduce((sum, v) => sum + v, 0) / other.length;
-    const sd = Math.sqrt(other.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (other.length - 1));
-    return Math.abs(value(point) - mean) <= Math.max(5 * sd, 1e-12);
+    let sum = 0;
+    for (let j = 0; j < n; j++) if (j !== index) sum += vals[j];
+    const mean = sum / (n - 1);
+    let squares = 0;
+    for (let j = 0; j < n; j++) if (j !== index) squares += (vals[j] - mean) ** 2;
+    const sd = Math.sqrt(squares / (n - 2));
+    return Math.abs(vals[index] - mean) <= Math.max(5 * sd, 1e-12);
   });
 }
 
@@ -3624,7 +3636,7 @@ function trendSummary(series, delta = false) {
   const day = (iso) => new Date(iso + "T00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", ...(years.size > 1 ? { year: "numeric" } : {}) });
   return series.map((item, index) => {
     const color = item.colorIndex !== undefined ? `axis-${item.colorIndex}` : series.length > 1 ? `axis-${index}` : "single";
-    const points = item.points.filter((p) => Number.isFinite(delta ? asDeviation(p).dev : p.value));
+    const points = item.points.filter((p) => Number.isFinite(p.value) && Number.isFinite(delta ? asDeviation(p).dev : p.value));
     const values = points.map((p) => (delta ? asDeviation(p).dev : p.value));
     const row = { label: item.label, color, n: values.length, baseline: fmt2(item.points.at(-1)?.expected), mean: "—", sd: "—", farthest: "—", date: "—", qa_date: null };
     if (!values.length) return row;
@@ -3633,11 +3645,15 @@ function trendSummary(series, delta = false) {
   });
 }
 
-function trendSummaryTable(series, unit, delta = false) {
+function trendSummaryTable(series, unit, delta = false, name = "") {
+  const units = unit && unit !== "unitless" ? unit : "";
+  const caption = `${delta ? "Δ " : ""}${name || "Trend"} summary${units ? ` (${units})` : ""}`;
   const heads = [["Baseline", "Saved baseline of the latest result"], [delta ? "Mean Δ" : "Mean", delta ? "Mean Δ from each result's saved baseline" : "Mean of all results in the period"],
     ["SD", "Standard deviation of all results in the period"], ["Farthest from mean", "The result farthest from the mean"], ["Date", "Date of that result"]];
-  return el("div", { class: "trend-summary-wrap" }, el("table", { class: "trend-summary" },
-    el("thead", {}, el("tr", {}, el("th", { scope: "col", class: "trend-summary-unit" }, unit && unit !== "unitless" ? unit : ""),
+  // A named region that takes keyboard focus, so a table wider than a phone can be scrolled without a pointer.
+  return el("div", { class: "trend-summary-wrap", role: "region", tabindex: "0", "aria-label": caption }, el("table", { class: "trend-summary" },
+    el("caption", { class: "visually-hidden" }, caption),
+    el("thead", {}, el("tr", {}, el("th", { scope: "col", class: "trend-summary-unit", "aria-label": units ? `Series (${units})` : "Series" }, units),
       heads.map(([h, title], i) => el("th", { scope: "col", class: i < 4 ? "num" : "", title }, h)))),
     el("tbody", {}, trendSummary(series, delta).map((r) => el("tr", {},
       el("th", { scope: "row" }, el("span", { class: `key-swatch line ${r.color}`, "aria-hidden": "true" }), r.label),
@@ -3645,11 +3661,19 @@ function trendSummaryTable(series, unit, delta = false) {
       el("td", { class: "num" }, r.farthest), el("td", { title: r.qa_date ? shortDate(r.qa_date) : null }, r.date))))));
 }
 
-// Limit bands on a chart of several series only when every result in it carries the same Warning ± and Action ± (in the
-// chart's unit, from the limits saved with each result); otherwise the chart shows none and says so.
+// Limit bands on a Δ chart of several series only when, on each date, every result of that date carries the same Warning ±
+// and Action ± (in the chart's unit, from the limits saved with each result). Limits changed for the whole list part-way
+// through the period keep the bands (they step on that date); a series with other limits, or none, removes them, and the
+// chart says so. Where a band is drawn, at each result's date it is that result's own limits.
 function trendSharedLimits(series) {
   const key = (v) => (v === null || v === undefined ? "" : String(Number(Number(v).toPrecision(12))));
-  return new Set(series.flatMap((s) => s.points.map((p) => { const d = asDeviation(p); return `${key(d.warnAbs)}|${key(d.failAbs)}`; }))).size <= 1;
+  const byDate = new Map();
+  for (const s of series) for (const p of s.points) {
+    const d = asDeviation(p), limits = `${key(d.warnAbs)}|${key(d.failAbs)}`;
+    if (!byDate.has(p.qa_date)) byDate.set(p.qa_date, limits);
+    else if (byDate.get(p.qa_date) !== limits) return false;
+  }
+  return true;
 }
 
 // Machine Trends passes `trends`: two decimals and a summary table under each chart (the small charts on Perform QA and a
@@ -3663,7 +3687,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
   const box = el("div", { class: `chart-box${small ? " small" : ""}${series.length > 1 ? " multi" : ""}${trends ? " trend-box" : ""}` });
   const show = (...kids) => box.replaceChildren(...kids.filter(Boolean));     // replaceChildren would print a null as "null"
   const keyItem = (cls, text) => el("span", { class: "key-item" }, el("span", { class: `key-swatch ${cls}` }), text);
-  const bandNote = () => el("p", { class: "muted small trend-band-note" }, "No limit bands: these series do not all share the same Warning ± and Action ±.");
+  const bandNote = () => el("p", { class: "muted small trend-band-note" }, "No limit bands: these series' limits differ on some dates.");
   const draw = () => {
     const buttons = hasRef && !deltaOnly ? el("div", { class: "chart-mode" }, ["absolute", "delta"].map((m) =>
       el("button", { type: "button", class: `link small${mode === m ? " on" : ""}`, "aria-pressed": String(mode === m),
@@ -3693,7 +3717,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
           drawSeries(members, unit, { compact: true, delta, yLabel: `${yLabel} ${axis}`, prediction, bands, fixed2: trends }),
           bands ? null : bandNote(),
           trendExclusionNote(members, delta),
-          trends ? trendSummaryTable(members, unit, delta) : trendStatistics(members, unit, delta),
+          trends ? trendSummaryTable(members, unit, delta, `${yLabel} ${axis}`) : trendStatistics(members, unit, delta),
           el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), trendPassBreakdown(members)));
       }).filter(Boolean);
       show(controls, el('div', { class: 'energy-plot-grid plots-2 skewness-axis-grid' }, ...panels),
@@ -3712,10 +3736,10 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
         trends ? null : trendStatistics([x], unit, false, k)
       ))), el('div', { class: 'chart-key energy-shared-key' },
         keyItem('ref', 'Reference'), keyItem('band-warn', 'Within Warning'), keyItem('band-fail', 'Warning to Action'), ...trendKey(true, false, prediction)),
-        trends ? trendSummaryTable(series, unit, false) : null);
+        trends ? trendSummaryTable(series, unit, false, yLabel) : null);
       return;
     }
-    // A Δ chart of several series draws limit bands only when they all share the same limits.
+    // A Δ chart of several series draws limit bands only when they carry the same limits on each date.
     const bands = !(multi && delta) || trendSharedLimits(series);
     const drawRef = hasRef && !(multi && !delta);
     const key = el("div", { class: "chart-key" },
@@ -3725,7 +3749,7 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
       ...trendKey(series.some((x) => x.points.length >= 3), series.length > 1, prediction));
     show(controls, ...(multi ? [trendPassBreakdown(series)] : []), drawSeries(series, unit, { small, delta, yLabel, prediction, bands, fixed2: trends }),
       bands ? null : bandNote(), trendExclusionNote(series, delta),
-      ...(trends ? [key, trendSummaryTable(series, unit, delta)] : [trendStatistics(series, unit, delta), key]));
+      ...(trends ? [key, trendSummaryTable(series, unit, delta, yLabel)] : [trendStatistics(series, unit, delta), key]));
   };
   draw();
   return box;
@@ -3780,8 +3804,11 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     const at = (t) => my + slope * ((t - t0) / 86400000 - mx);
     return { slope, at, end: at(tEnd) };
   });
-  // Reference line and bands: around 0 on a Δ chart, around the reference on an absolute chart (one series only).
-  const ref = (multi && !delta ? [] : series[0].points).map((p) => {
+  // Reference line and bands: around 0 on a Δ chart, around the reference on an absolute chart (one series only). A Δ chart
+  // of several series takes every series' dates (with bands, their limits agree on each date: trendSharedLimits).
+  const byDay = (a, b) => (a.qa_date < b.qa_date ? -1 : a.qa_date > b.qa_date ? 1 : 0);
+  const refPoints = !multi ? series[0].points : delta ? [...new Map(series.flatMap((s) => s.points).sort(byDay).map((p) => [p.qa_date, p])).values()] : [];
+  const ref = refPoints.map((p) => {
     if (delta) { const d = asDeviation(p); return { d: p.qa_date, w: d.warnAbs, f: d.failAbs, c: 0 }; }
     return { d: p.qa_date, w: p.warn === null ? null : bandValue(p, "warn", 1) - p.expected, f: p.fail === null ? null : bandValue(p, "fail", 1) - p.expected, c: p.expected };
   }).filter((b) => b.c !== null && b.c !== undefined).map((b) => (bands ? b : { ...b, w: null, f: null }));
@@ -3824,7 +3851,7 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
   if (ref.length) plot.push(svg("polyline", { class: "expected", points: refX.map((b) => `${bx(b)},${y(b.c)}`).join(" ") }));
 
   // Y axis: gridlines, labels, and the unit as the axis title.
-  const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5);
+  const { ticks, decimals } = niceTicks(lo, hi, small ? 3 : 5, fixed2);
   const seenTickLabels = new Set();
   for (const v of ticks) {
     const tickLabel = fixed2 ? fmt2(v, delta) : (delta && v > 0 ? "+" : "") + fmt(v,decimals);
@@ -3939,6 +3966,18 @@ function trendGroups(items) {
     if (!families.has(key)) families.set(key, { base: metric, category: item.category, members: [] });
     families.get(key).members.push({ ...item, axis: `${Number(energy[1])} MeV${axis ? ` · ${axis.axis}` : ''}` });
   }
+  // Two spots at one energy (say Spot 1 and Spot 4 at 225 MeV) keep their spot number ("Spot 4 · 225 MeV · X"), so their
+  // lines, colours and summary rows stay apart. `saved_name` is the test's name as saved (before trendDisplayName).
+  for (const family of families.values()) {
+    const energyOf = (m) => m.axis.replace(/\s*·\s*[XYZ]$/, '');
+    const count = new Map();
+    for (const m of family.members) count.set(m.axis, (count.get(m.axis) || 0) + 1);
+    const shared = new Set(family.members.filter((m) => count.get(m.axis) > 1).map(energyOf));
+    for (const m of family.members) {
+      const spot = /\bSpot\s*(\d+)/i.exec(m.saved_name || '');
+      if (spot && shared.has(energyOf(m))) m.axis = `Spot ${spot[1]} · ${m.axis}`;
+    }
+  }
   const order = new Map(items.map((item, index) => [item.test_id, index]));
   return [...axisGroups(plain), ...families.values()].sort((a,b) => Math.min(...a.members.map(m => order.get(m.test_id))) - Math.min(...b.members.map(m => order.get(m.test_id))));
 }
@@ -3970,7 +4009,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
   const numberPoint=trendSourceNumberer(sourceTemplates.length?sourceTemplates:templates);
   const sections = [], insights = [];
   for (const template of templates) {
-    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range)).map(numberPoint) })).filter(i => i.points.length);
+    const items = template.items.filter(i => i.type === 'numeric').map(i => ({ ...i, saved_name: i.name, name: trendDisplayName(i.name), points: judgedByList(i, filterRange(histories[i.test_id] || [], range)).map(numberPoint) })).filter(i => i.points.length);
     // Result insertion order preserves the CSV analysis order, including for existing templates.
     const imported = Object.entries(histories).flatMap(([testId, points]) => points.filter(p => p.source === 'sphinx' && String(p.assignment_id) === String(template.assignment.id)).map(p => ({ ...p, testId })));
     const newest = imported.reduce((id, p) => Math.max(id, p.run_id), 0);
@@ -4338,7 +4377,7 @@ async function renderTrends() {
   const items = data.map((d) => {
     const li = listItems.get(String(d.test.id));
     const limits = li ? li.limits : { expected: d.test.expected, warn: d.test.warn, fail: d.test.fail, tol_mode: d.test.tol_mode };
-    return { ...d.test, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)).map(numberPoint) };
+    return { ...d.test, saved_name: d.test.name, name: trendDisplayName(d.test.name), test_id: d.test.id, limits, points: judgedByList({ limits }, filterRange(d.points, range)).map(numberPoint) };
   }).filter((i) => i.points.length);
   const head = data[0].test;
   const group = trendGroups(items)[0];
