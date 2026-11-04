@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Trends and Export CSV on the server build load long periods much faster: the server now works out the chosen period once and keeps it while the parts arrive (and for the next person who asks), instead of working the whole history out again for every part. Any change to the database, by the portal or by another program using the same file, makes it start afresh. Nothing shown, exported or sent changes. On three years of synthetic records for one gantry, all history went from about 6.3 s to about 0.9 s.
+
 - Machine Trends and Export CSV now download only the chosen period, in parts, so machines with long histories load instead of failing on the shared site; nothing shown or exported changes (chart order still follows the newest Sphinx import, even when it is older than the period). The trends endpoint takes `from=` and `page=` in both builds; see the README's Trends API paragraph.
 
 - Speed up history-wide work without changing any answer: the runs list, physicist worklist, Dashboard and a PBS run no longer scan every result per run to check the therapist sign-off; form templates, Dashboard counts, Re-evaluate and startup use one pass per call; the Perform form and a saved run's review ask the trends endpoint only for their own tests and the points they show (`tests`, `last`, `until`; without them the full history is returned, as Machine Trends and the CSV export used). A saved run's quick trend fetches its test's newest 60 points when clicked, as before. The trends options accept plain digits only, the same in both builds. The server build gets the same trends options and an index on results by run.

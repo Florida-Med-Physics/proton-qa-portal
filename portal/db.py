@@ -477,6 +477,17 @@ class Database:
         with self.lock:
             return self.conn.execute(sql, params).lastrowid
 
+    def version(self):
+        """A value that differs after any change to the file, to anything in it: PRAGMA data_version moves when another
+        connection commits (another process such as run_portal.py import-sphinx, or a second Database on the same file),
+        and this connection's total_changes with every row it inserts, updates or deletes. Neither ever moves back, so an
+        equal value means nothing changed in between. None inside an open transaction, whose writes may yet be rolled back.
+        Compare values only from the same Database: another connection counts its own."""
+        with self.lock:
+            if self.conn.in_transaction:
+                return None
+            return (self.conn.execute("PRAGMA data_version").fetchone()[0], self.conn.total_changes)
+
     def close(self):
         with self.lock:
             self.conn.close()
