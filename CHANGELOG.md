@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Saved run: the title names the machine ("GTR1 · PBS DailyQA Template - Sphinx"), the Trend column is no longer cut off, the line under each test reads as on the QA form ("WARNING ±0.5 mm · ACTION ±1 mm", nothing when there are no limits, no repeated baseline), a therapist signs the review test in one click (the form's own Yes no longer shows as already signed), and the way back fits the role (an MPA goes back to Perform QA; a run that needs no therapist sign-off says Awaiting Physics Review). Display only.
+
 - Every page opens at its top (before, a page opened at the scroll position of the page you left, e.g. a QA form opened half-way down); changing Machine Trends or Past results filters keeps your place once the page is drawn again, and one test's trend opens at its top. Saving the list in Setup QA's list editor keeps your place in the list.
 
 - QA form and saved run: History shows the answer of a Pass / Fail or Yes / No test (Pass, Yes, No…) instead of "1.000 Pass/Fail", and a saved run's History uses one decimal count per table, as on the form (101.818 kPa, not 101.8183 kPa). Display only.

@@ -340,6 +340,18 @@ function limitsText(limits, unit) {
   return parts.join(" · ");
 }
 
+// The quiet line under a measured test's name, the same on the QA form and a saved run: "WARNING ±0.5 mm · ACTION ±1 mm".
+// Nothing when the test has no Warning or Action (its baseline is in the Baseline column).
+function qaLimitsLine(limits, unit) {
+  const l = limits || {};
+  if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
+  const suf = l.tol_mode === "percent" ? "%" : unit || "";
+  const parts = [];
+  if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
+  if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
+  return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
+}
+
 const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived" };
 
 // "(Δ +0.30 mm)" in plain text after the Result chip (the chip carries the colour): the difference from the reference,
@@ -1851,16 +1863,7 @@ async function renderPerform(assignmentId) {
           : el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`)));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
-      const limitsLine = (it, unit) => {
-        if (it.type !== "numeric") return null;
-        const l = it.limits || {};
-        if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
-        const suf = l.tol_mode === "percent" ? "%" : unit;
-        const parts = [];
-        if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
-        if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
-        return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
-      };
+      const limitsLine = (it, unit) => (it.type === "numeric" ? qaLimitsLine(it.limits, unit) : null);
       const numberCell = (it) => (firstHeader !== "Test"
         ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
@@ -3416,7 +3419,7 @@ async function renderReviewMeasurements(run) {
       cell:sharedCell(parts.map(p=>[p.r,qaDisplayName(p.r),p.r.type==='numeric'?p.unit:'',testDetailsButton(p.r,run.results,numbers),
         p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('div',{class:'review-measured'},p.amount),
         has(p,'expected','warn','fail')&&!p.missing?p.result:null,
-        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},p.r.expected!=null?'Baseline ':null,limitsText(p.limits,p.unit)):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
+        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},[p.r.expected!=null?`Baseline ${fmt(p.r.expected)}`:null,qaLimitsLine(p.limits,p.unit)?.textContent].filter(Boolean).join(' · ')):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
       comment:parts.some(p=>p.r.comment)?null:'—'};
   };
   let last=null;
@@ -3436,7 +3439,8 @@ async function renderReviewMeasurements(run) {
         const measured=el('div',{class:'review-measured'},value);
         if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
           const {value:input,control}=passFailInput(r.name,false,false);
-          const original=r.value_num==null?'':r.value_num?'pass':'fail';input.value=original;
+          // The form's own Yes is not a sign-off: Pass shows as chosen once the run is signed, so one click signs it.
+          const original=r.value_num==null||r.value_num&&!run.therapist_approved_by?'':r.value_num?'pass':'fail';input.value=original;
           const sync=()=>control.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.value===input.value));sync();
           input.addEventListener('input',async()=>{
             const decision=input.value||'clear',scroll={x:scrollX,y:scrollY};control.querySelectorAll('button').forEach(b=>b.disabled=true);control.setAttribute('aria-busy','true');
@@ -3471,7 +3475,7 @@ async function renderReviewMeasurements(run) {
       }},trendIcon(16));
       const row=el('tr',{'data-test-id':lead.test_id},
         el('td',{class:'qa-n'},numberFor(lead)),
-        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
+        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?qaLimitsLine(limits,unit):null),
         shared?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
         shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
@@ -3489,7 +3493,9 @@ async function renderReviewMeasurements(run) {
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(run.queue_name, shortDate(run.qa_date), [el("a",{class:"button",href:"#/review"},"Back to Review QA"),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+  // The way back fits the role: Review QA for those who review or sign, Perform QA for those who only perform.
+  const back = can('review')||can('therapist_approve') ? ['#/review','Back to Review QA'] : ['#/perform-qa','Back to Perform QA'];
+  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0]},back[1]),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
     window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
@@ -3511,7 +3517,7 @@ async function renderRun(id) {
 
   if (!run.trashed_at && run.therapist_approval_required) {
     app.append(el('section',{class:'card review-workflow'},
-      el('div',{},el('strong',{},'Therapist review'),el('span',{class:'small'},run.therapist_approved_by?`Signed by ${run.therapist_approver_name||'therapist'} · ${run.therapist_approved_at.replace('T',' ')}`:'Mark the therapist-review test below.')),
+      el('div',{},el('strong',{},'Therapist review'),el('span',{class:'small'},run.therapist_approved_by?`Signed by ${run.therapist_approver_name||'therapist'} · ${run.therapist_approved_at.replace('T',' ')}`:'Mark the therapist-review test above.')),
       el('span',{class:'workflow-arrow','aria-hidden':'true'},'→'),
       el('div',{},el('strong',{},'Physicist approval'),el('span',{class:'small'},run.review_status==='approved'?'Approved':run.review_status==='rejected'?'Rejected':run.therapist_approved_by&&run.review_ready!==false?'Awaiting Physics Review':'Awaiting Therapy Review'))));
     if(!run.results.some(therapistReviewCheck)&&!run.therapist_approved_by&&run.review_status==='pending'&&can('therapist_approve'))app.append(el('button',{class:'primary',onclick:async()=>{try{await api('POST',`/api/runs/${id}/therapist-approve`,{});route();}catch(err){toast(err.message,true);}}},'Sign therapist review'));
@@ -3550,7 +3556,7 @@ async function renderRun(id) {
   const therapistMode=can('therapist_approve')&&!can('review');
   if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
 
-  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):'Review results'),el('span',{class:'spacer'}),el('a',{class:'button primary',href:'#/review'},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':'Back to Review QA')));
+  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):`${reviewStatusText(run)}.`),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':back[1])));
 
 }
 

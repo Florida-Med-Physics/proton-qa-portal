@@ -1342,7 +1342,7 @@ td, .measure-table td { font-size: 21px; }
 /* Review uses the same measurement language and numbered rows as Perform. */
 .review-section { padding:0; overflow:hidden; }
 .review-section-title { padding:16px; font-weight:700; color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--border); }
-.review-section .measure-wrap { margin:12px; }
+.review-section .measure-wrap { margin:12px; width:auto; }   /* inside the card: the Trend column is never cut off */
 .review-measure-table td { font-size:22px; }
 .review-measure-table td.qa-n { font-size:24px; font-weight:750; min-width:86px; }
 .review-measure-table .qa-label { min-width:300px; }

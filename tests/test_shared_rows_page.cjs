@@ -145,8 +145,8 @@ let browser;
   assert.deepEqual(['TCS Sk', 'decay table Sk', 'difference'].map((n) => saved[`Source air kerma strength — ${n}`].comment || ''), ['', 'synthetic decay note', 'synthetic difference note']);
   const runRow = `[...document.querySelectorAll('.review-measure-table tr[data-test-id]')][7]`;
   assert.deepEqual(await page(`(() => { const r = ${runRow}; return [r.querySelector('.qa-n').textContent, [...r.querySelectorAll('.qa-shared-field')].map((f) => f.innerText.replace(/\\s+/g, ' ').trim()), r.querySelector('td.qa-comment').textContent]; })()`),
-    ['1.08', ['TCS Sk (mGy·m²·h⁻¹) 12.05 (Δ +0.05 mGy·m²·h⁻¹) Baseline 12 mGy·m²·h⁻¹', 'Decay-table Sk (mGy·m²·h⁻¹) 12 (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 mGy·m²·h⁻¹ synthetic decay note',
-      'Source strength difference (%) ⓘ 0.417 PASS(Δ +0.42 %) Baseline 0 % · action ±1 % synthetic difference note'], ''], 'each note under its test; the Note column left empty');
+    ['1.08', ['TCS Sk (mGy·m²·h⁻¹) 12.05 (Δ +0.05 mGy·m²·h⁻¹) Baseline 12', 'Decay-table Sk (mGy·m²·h⁻¹) 12 (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 synthetic decay note',
+      'Source strength difference (%) ⓘ 0.417 PASS(Δ +0.42 %) Baseline 0 · ACTION ±1 % synthetic difference note'], ''], 'each note under its test, its limits as on the QA form; the Note column left empty');
   const pdf = await page(`localApi('GET', '/api/runs/${runId}').then((r) => qaReportPdf(r).text())`);
   assert.deepEqual([...pdf.matchAll(/\((\d+)\. ([^)]*)\) Tj/g)].map((m) => m[1]).slice(6, 12), ['7', '8', '8', '8', '9', '10']);
   // Back on the QA form, the row's History (now one run) says whose it is: the judged difference.

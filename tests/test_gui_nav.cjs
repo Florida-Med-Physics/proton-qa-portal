@@ -25,6 +25,30 @@ const review = between('async function renderReviewMeasurements(', 'async functi
 assert.doesNotMatch(review, /h\.value\?'Pass':'Fail'/, 'the saved run uses the same words as the form');
 assert.match(review, /fmt\(h\.value,dp\)/, 'the saved run History uses one decimal count per table');
 
+// 3. A saved run: its title names the machine, its limits line reads as on the QA form, the therapist's own Yes on the
+// form is not a sign-off, and the way back fits the role.
+context.el = (tag, props, ...kids) => ({ tag, props: props || {}, textContent: kids.flat(Infinity).join('') });
+run(between('function fmt(', '// A Pass / Fail or Yes / No answer'));
+run(between('function qaLimitsLine(', 'const TYPE_LABELS'));
+const line = (limits, unit) => context.qaLimitsLine(limits, unit)?.textContent ?? null;
+assert.equal(line({ expected: 100, warn: 0.5, fail: 1, tol_mode: 'absolute' }, 'mm'), 'WARNING ±0.5 mm · ACTION ±1 mm');
+assert.equal(line({ expected: 0, warn: null, fail: 1, tol_mode: 'percent' }, 'mGy'), 'ACTION ±1 %');
+assert.equal(line({ expected: 12, warn: null, fail: null, tol_mode: 'absolute' }, 'mm'), null, 'no limits: nothing, not "No limits"');
+assert.equal(line({ expected: null, warn: null, fail: null }, ''), null);
+assert.equal(line({ criterion: 'wl-max-delta' }, 'mm'), 'PASS < 1 mm · FAIL ≥ 1 mm');
+assert.equal(line({ warn: 2, fail: 3 }, undefined), 'WARNING ±2 · ACTION ±3');
+assert.match(between('    const measureTable = (members,', '      const numberCell = (it) =>'), /const limitsLine = \(it, unit\) => \(it\.type === "numeric" \? qaLimitsLine\(it\.limits, unit\) : null\);/);
+assert.doesNotMatch(review, /limitsText/, 'the saved run no longer says "No limits" or repeats the baseline in its limits line');
+assert.match(review, /r\.type==='numeric'\?qaLimitsLine\(limits,unit\):null/);
+assert.match(review, /\[p\.r\.expected!=null\?`Baseline \$\{fmt\(p\.r\.expected\)\}`:null,qaLimitsLine\(p\.limits,p\.unit\)\?\.textContent\]\.filter\(Boolean\)\.join\(' · '\)/);
+assert.match(review, /const original=r\.value_num==null\|\|r\.value_num&&!run\.therapist_approved_by\?'':r\.value_num\?'pass':'fail';/);
+const runPage = between('async function renderRun(', 'function bandValue(');
+assert.match(runPage, /page\(`\$\{run\.machine_name\} · \$\{run\.queue_name\}`, shortDate\(run\.qa_date\)/);
+assert.match(runPage, /const back = can\('review'\)\|\|can\('therapist_approve'\) \? \['#\/review','Back to Review QA'\] : \['#\/perform-qa','Back to Perform QA'\];/);
+assert.doesNotMatch(runPage, /'Review results'|test below/);
+assert.match(runPage, /therapistMode&&run\.therapist_approval_required&&run\.review_status==='pending'\?/);
+assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section \.measure-wrap \{ margin:12px; width:auto; \}/);
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];
