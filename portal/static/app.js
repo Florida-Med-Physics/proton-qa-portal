@@ -2963,7 +2963,8 @@ async function renderQueueEditor(id) {
       }
       modifiedMachineValues.clear();defaultLimitsDirty=false;importBlocksDirty=false;dirty=false;unsaved.hidden=true;
       toast('QA list and machine values saved');
-      if(result){location.hash=`#/queues/${result.id}`;if(!isNew)route();}else draw();
+      // Saving keeps your place in the list (a new list opens at its top).
+      if(result){location.hash=`#/queues/${result.id}`;if(!isNew){const y=scrollY;await route();requestAnimationFrame(()=>scrollTo(0,y));}}else draw();
     };
     saveTemplateChanges=save;
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
@@ -4777,7 +4778,17 @@ async function renderAccount() {
 
 // ---------------------------------------------------------------------------
 
-window.addEventListener("hashchange", route);
+// A new page opens at its top; a new query on the same page (Machine Trends or Past results filters) keeps the place,
+// once the page is drawn again (drawing it empties it first). One test's trend (test_id) is a page of its own.
+const pageKey = (hash) => { const [path, query] = hash.split("?"); return `${path}|${new URLSearchParams(query || "").get("test_id") || ""}`; };
+let routedPage = pageKey(location.hash);
+window.addEventListener("hashchange", async () => {
+  const key = pageKey(location.hash), same = key === routedPage, y = scrollY, gen = routeGen + 1;
+  routedPage = key;
+  if (!same) scrollTo(0, 0);
+  await route();
+  if (same && y && gen === routeGen) requestAnimationFrame(() => scrollTo(0, y));   // once its rows are sized; not if another page was opened meanwhile
+});
 api("GET", "/api/me").then((data) => {
   state.user = data.user;
   route();

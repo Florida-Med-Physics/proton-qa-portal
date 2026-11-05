@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Every page opens at its top (before, a page opened at the scroll position of the page you left, e.g. a QA form opened half-way down); changing Machine Trends or Past results filters keeps your place once the page is drawn again, and one test's trend opens at its top. Saving the list in Setup QA's list editor keeps your place in the list.
+
 - QA form and saved run: History shows the answer of a Pass / Fail or Yes / No test (Pass, Yes, No…) instead of "1.000 Pass/Fail", and a saved run's History uses one decimal count per table, as on the form (101.818 kPa, not 101.8183 kPa). Display only.
 
 - Opening another page while one is still loading (as on a slow connection) no longer leaves the first page's late sections on the new one, such as Review QA's "Awaiting Physics Review" and "Recently reviewed" tables under Setup QA, or a page's tables under the sign-in form when a session ends. A page you leave stops loading, and a save you started still finishes, including the list editor's New test for one machine and a Machine Trends Import Folder (which no longer redraws the page you went to). "Add them" on a QA form applies the Sphinx file again only to that list's form, never to another list's form opened meanwhile. Both builds.
