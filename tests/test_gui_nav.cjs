@@ -160,6 +160,9 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   assert.match(backup, /catch \(err\) \{\s*toast\(err\.message, true\);/);
 }
 
+// The list editor opened read-only (a therapist or MPA following a link) never shows "null" under Import blocks.
+assert.match(source, /importBlocksBox\.replaceChildren\(\.\.\.present\(\[el\('h2',\{\},'Import blocks'\),/);
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];

@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Setup QA list editor opened read-only (a therapist or MPA following a link): the Import blocks card no longer shows the word "null".
+
 - README and the quick user guide describe the new Review QA order, Approve opening the next run, Trash on the run page and Mark in Progress returning to Perform QA.
 
 - QA form: Mark in Progress saves your entries and takes you back to Perform QA ("Saved for later"); open the list again to carry on. If the save fails you stay on the form, as before. Data Administration: Save backup now shows why when a backup is refused (for example, too large for the site) instead of doing nothing.
