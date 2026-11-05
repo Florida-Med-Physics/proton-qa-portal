@@ -3283,8 +3283,8 @@ async function renderReview() {
 async function renderRuns() {
   const params = queryParams();
   const [machines, queues, runs] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), api("GET", `/api/runs?${params}`)]);
-  page("Past results", "Every recorded QA run, newest first.");
-  const filters = el("form", { class: "row" },
+  page("Past results", "Newest first.");
+  const filters = el("form", { class: "row runs-filters" },
     select("machine_id", [["", "All machines"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
     select("queue_id", [["", "All QA lists"], ...queues.map((q) => [q.id, q.name])], params.get("queue_id")),
     select("review_status", [["", "Any review status"], ...Object.entries(REVIEW_LABEL)], params.get("review_status")));
@@ -3293,12 +3293,18 @@ async function renderRuns() {
     location.hash = `#/runs${next.toString() ? "?" + next : ""}`;
   });
   app.append(filters, el("br"));
-  app.append(table(["Date", "Machine", "QA list", "Result", "Review"], runs.map((r) =>
+  app.append(fixedTable([["Date", "18%"], ["Machine", "14%"], ["QA list", "38%"], ["Result", "12%"], ["Review", "18%"]], runs.map((r) =>
     el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
-      el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
+      el("td", {}, shortDate(r.qa_date)),
       el("td", {}, machineLabel(r.machine_name)), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)),
       el("td", {}, reviewChip(r)))), "No runs match."));
+  // The list stops at its limit (200 unless the link asks for more, at most 1000): say so, and offer the rest.
+  const limit = Number(params.get("limit")) || 200;
+  if (runs.length >= limit) {
+    const more = new URLSearchParams(params); more.set("limit", "1000");
+    app.append(el("p", { class: "muted" }, `Newest ${runs.length} shown.`, limit < 1000 ? [" ", el("a", { href: `#/runs?${more}` }, "Show more")] : null));
+  }
 }
 
 // A self-contained PDF exporter shared by the server and browser builds.

@@ -83,6 +83,20 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   for (const cols of reviewPage.matchAll(/const \w+Cols = (\[\[.*?\]\]);/g)) assert.equal(JSON.parse(cols[1]).reduce((sum, [, w]) => sum + parseFloat(w), 0), 100, cols[1]);
 }
 
+// 6. Past results: the year once, the limit stated with a way to the rest, filters on one line, phone cards.
+{
+  const runsPage = between('async function renderRuns()', '// A self-contained PDF exporter');
+  assert.doesNotMatch(runsPage, /qa_date\.slice\(0, 4\)/, 'shortDate already has the year');
+  assert.match(runsPage, /page\("Past results", "Newest first\."\);/);
+  assert.match(runsPage, /el\("form", \{ class: "row runs-filters" \}/);
+  assert.match(runsPage, /fixedTable\(\[\["Date", "18%"\], \["Machine", "14%"\], \["QA list", "38%"\], \["Result", "12%"\], \["Review", "18%"\]\]/);
+  assert.match(runsPage, /`Newest \$\{runs\.length\} shown\.`, limit < 1000 \?/);
+  const css = fs.readFileSync('portal/static/app.css', 'utf8');
+  assert.match(css, /\.runs-filters select \{ width:auto; max-width:100%; \}/);
+  const phone = [...css.matchAll(/#app\[data-page="review"\]([^,{\n]*)/g)].map((m) => m[1]);
+  for (const rule of phone) assert.ok(css.includes(`#app[data-page="runs"]${rule}`), `phone card rule for Past results: ${rule}`);
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];

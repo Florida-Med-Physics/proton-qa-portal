@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Past results: the date shows its year once ("Mon, Nov 2, 2026"); the page says when it stops at its limit ("Newest 200 shown.") with a Show more link (up to 1,000 runs, which both builds already allow); the three filters sit on one line; phones show each run as a card, nothing sideways.
+
 - Review QA: your own queue comes first (Awaiting Physics Review for physicists and admins, Awaiting Therapy Review for others), then Recently reviewed, then Trash last; both queues have the same heading and count and say "Nothing is waiting for review." when empty; rows have no Open / Review / trash buttons (a row or its date opens the run; moving a run to trash is on the run page; Trash rows keep Restore), and the waiting tables have no Review column.
 
 - Saved run: Approve opens the next run waiting for your approval, in Review QA's order (never your own run or one still waiting for a therapist's sign-off); after the last one, Review QA. Reject stays on the run, as before.
