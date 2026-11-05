@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA form: Mark in Progress saves your entries and takes you back to Perform QA ("Saved for later"); open the list again to carry on. If the save fails you stay on the form, as before. Data Administration: Save backup now shows why when a backup is refused (for example, too large for the site) instead of doing nothing.
+
 - Setup: the list editor's Back returns to Setup QA, and the old "QA lists" page (templates and per-machine copies, which contradicted the one-list rule) is gone (#/queues opens Setup QA); "Values for this machine" replaces "Set tolerances" / "Adjust limits for this machine", and that page is titled "Values for <machine> · <list>"; machine menus on Machine Trends, Past results and Record past imports list machines in the Dashboard's order (GTR1 first).
 
 - Machine Trends: fewer words (no paragraphs about saved baselines, how the page is organized, or what the ring colours mean; the charts and "View values and details" stay); a ring for a measurement with no limits (air pressure, temperature, kTP…) shows a grey "—" instead of "0% passed"; category headings read "AI PBS Daily Imaging", not "AI_PBS_Daily_Imaging" (display only).

@@ -151,6 +151,15 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   assert.equal((source.match(/\.slice\(\)\.sort\(machineOrder\)/g) || []).length, 3, 'Machine Trends, Past results and Record past imports');
 }
 
+// 10. Buttons that finish what they say: Mark in Progress saves, then goes back to Perform QA (a failed save stays on the
+// form); a refused backup shows its error.
+{
+  const button = between('  const saveDraft = el(', '  const footer = el(');
+  assert.match(button, /await persistDraft\(\);[\s\S]*if \(\/\^Saved\/\.test\(draftNote\.textContent\)\) \{ toast\("Saved for later"\); location\.hash = "#\/perform-qa"; \}/);
+  const backup = source.slice(source.indexOf('}, "Save backup")') - 700, source.indexOf('}, "Save backup")'));
+  assert.match(backup, /catch \(err\) \{\s*toast\(err\.message, true\);/);
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];
@@ -184,5 +193,5 @@ async function navigation() {
 
 (async () => {
   await navigation();
-  console.log('GUI and navigation: History words; new pages open at the top.');
+  console.log('GUI and navigation: History words, the saved run, the next run to approve, Review QA and Past results order, calmer tables, Machine Trends rings, Setup wording and machine order, Mark in Progress and Save backup; new pages open at the top.');
 })().catch((e) => { console.error(e); process.exit(1); });

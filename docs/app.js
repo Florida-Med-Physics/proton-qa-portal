@@ -2173,6 +2173,8 @@ async function renderPerform(assignmentId) {
     saveDraft.disabled = true;
     await persistDraft();
     saveDraft.disabled = false;
+    // Saved: back to Perform QA, where the list is opened again to finish it. Not saved: stay; the note and toast say so.
+    if (/^Saved/.test(draftNote.textContent)) { toast("Saved for later"); location.hash = "#/perform-qa"; }
   } }, "Mark in Progress");
   const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
@@ -4735,10 +4737,14 @@ async function renderAdmin() {
       el("div", { class: "card" }, el("p", { class: "muted" }, "Save a backup file regularly, and restore it on another computer to move the data."),
         el("div", { class: "row" },
           el("button", { onclick: async () => {
-            const backup = await api("GET", "/api/backup");
-            const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
-            const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
-            document.body.append(link); link.click(); link.remove();
+            try {
+              const backup = await api("GET", "/api/backup");
+              const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+              const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
+              document.body.append(link); link.click(); link.remove();
+            } catch (err) {
+              toast(err.message, true);   // a refused backup is never silent
+            }
           } }, "Save backup"),
           el("button", { onclick: () => restore.click() }, "Restore from backup"), restore)));
   }
