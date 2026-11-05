@@ -1801,7 +1801,7 @@ async function renderPerform(assignmentId) {
         control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
           readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
       }
-      else if (item.type==='choice') control=input=select('', [['',choiceOptions(item.description).length?'Choose an answer…':'Configure devices in Setup QA'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
+      else if (item.type==='choice') control=input=select('', [['',choiceOptions(item.description).length?'Choose…':'Configure devices in Setup QA'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
       else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
       const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
       const noteToggle = el("button", { type: "button", class: "link small", onclick: () => { comment.hidden = false; noteToggle.hidden = true; comment.focus(); } }, "+ note");
@@ -1906,7 +1906,7 @@ async function renderPerform(assignmentId) {
           shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
           el("td", { class: "history-cell" }, dates.length ? [shared?.history, histChips(main.it, main.unit)] : el("span", { class: "muted small" }, "—")),
-          el("td", {class:"qa-trends"}, trend));
+          el("td", {class:"qa-trends"}, main.it.type === "numeric" ? trend : null));   // a trend only for a measured value
         for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
         const extras = el('td', {class:'qa-phone-extras', colspan:9});
         orderMeasurementRow(row);
@@ -1914,13 +1914,14 @@ async function renderPerform(assignmentId) {
         const secondary = ['qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
         secondary.forEach((cell,index) => {
           cell.classList.add('qa-secondary');
+          if (!cell.firstChild) return;   // nothing to show (no trend for a Pass / Fail test): no empty field on phones
           const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Comment','History','Trends'][index]));
           const content = el('div', {class:'qa-phone-field-content'});
           while (cell.firstChild) content.append(cell.firstChild);
           field.append(content);
           cell.append(field);
         });
-        phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
+        phoneDrawer(extras, secondary.filter(cell=>cell.firstChild).map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
       const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];

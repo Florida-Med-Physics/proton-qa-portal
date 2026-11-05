@@ -429,7 +429,6 @@ h2.section-head { font-size: 22px; }
 .fixed-wrap { display: block; width: 100%; max-width: 1080px; }
 .fixed-table { width: 100%; table-layout: fixed; }
 .fixed-table td, .fixed-table th { max-width: none; }
-.fixed-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
 .fixed-table tbody tr:hover td { background: var(--surface-2); }
 .fixed-table tr.first-of-machine td { border-top: 1px solid var(--border); }
 .fixed-table td { padding: 10px 12px; }
@@ -511,9 +510,6 @@ tr.quick-trend .spark { max-width: none; }
 .brand-logo { width: 150px; height: 30px; }
 .brand-title { border-right: 0; padding-right: 8px; }
 
-/* Light vertical separators between columns. */
-th + th, td + td { border-left: 1px solid var(--border); }
-tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, tr.group td { border-left: 0; }
 /* Setup QA action buttons wrap rather than overflow the table. */
 .fixed-table td.right .row.nowrap.end { flex-wrap: wrap; row-gap: 4px; }
 
@@ -1773,6 +1769,10 @@ td, .measure-table td { font-size: 21px; }
 .qa-shared-more { padding-bottom:6px; }
 .qa-shared-more > div:empty { display:none; }
 .qa-shared-more .chip.recorded { display:none; }   /* no verdict to show: the deviation alone */
+/* The QA form and a saved run: a result that is recorded, not judged (no limits, text, an unanswered test), shows no grey
+   "Recorded" chip; PASS / WARNING / ACTION and the deviation stay. The run's overall Result keeps its chip. */
+.measure-table .status-cell .chip.recorded { display:none; }
+.measure-table .status-cell .chip.recorded + .result-dev { margin-left:0; }
 .qa-shared-more .chip.recorded + .result-dev { margin-left:0; }
 .qa-shared-more > *, .qa-shared-field .note-input { margin-top:4px; }
 .qa-shared-note { color:var(--muted); }   /* a note, not a value */

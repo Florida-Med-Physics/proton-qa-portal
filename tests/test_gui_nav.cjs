@@ -97,6 +97,22 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   for (const rule of phone) assert.ok(css.includes(`#app[data-page="runs"]${rule}`), `phone card rule for Past results: ${rule}`);
 }
 
+// 7. Calmer tables and form: no zebra or vertical rules, no grey "Recorded" chip in result cells, "Choose…", a trend
+// button only for a measured value (and no empty Trends field on phones).
+{
+  const css = fs.readFileSync('portal/static/app.css', 'utf8');
+  assert.doesNotMatch(css, /\.fixed-table tbody tr:nth-child\(even\) td \{ background: color-mix/);
+  assert.doesNotMatch(css, /^th \+ th, td \+ td \{ border-left: 1px/m);
+  assert.match(css, /\.measure-table \.status-cell \.chip\.recorded \{ display:none; \}/);
+  assert.match(css, /\.fixed-table tbody tr:hover td \{ background: var\(--surface-2\); \}/, 'the hover highlight stays');
+  assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
+  assert.doesNotMatch(source, /Choose an answer…/);
+  assert.match(source, /choiceOptions\(item\.description\)\.length\?'Choose…':/);
+  assert.match(source, /el\("td", \{class:"qa-trends"\}, main\.it\.type === "numeric" \? trend : null\)\);/);
+  assert.match(source, /if \(!cell\.firstChild\) return;/);
+  assert.match(source, /phoneDrawer\(extras, secondary\.filter\(cell=>cell\.firstChild\)\.map\(cell=>cell\.firstChild\), 'Comment, history & trends'\);/);
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];

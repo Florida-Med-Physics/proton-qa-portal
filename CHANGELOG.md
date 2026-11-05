@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Calmer tables and QA form: no zebra stripes or vertical lines between columns (the row under the pointer still lights up); no grey "Recorded" chip in a result cell (PASS / WARNING / ACTION and the Δ stay; a run's overall Result is unchanged); choice menus read "Choose…"; the trend button only on measured values (none on Pass / Fail or Yes / No rows, and no empty Trends field on phones).
+
 - Past results: the date shows its year once ("Mon, Nov 2, 2026"); the page says when it stops at its limit ("Newest 200 shown.") with a Show more link (up to 1,000 runs, which both builds already allow); the three filters sit on one line; phones show each run as a card, nothing sideways.
 
 - Review QA: your own queue comes first (Awaiting Physics Review for physicists and admins, Awaiting Therapy Review for others), then Recently reviewed, then Trash last; both queues have the same heading and count and say "Nothing is waiting for review." when empty; rows have no Open / Review / trash buttons (a row or its date opens the run; moving a run to trash is on the run page; Trash rows keep Restore), and the waiting tables have no Review column.
