@@ -3203,7 +3203,6 @@ function qaTrashButton(run) {
     modal('Move QA to trash',el('div',{},el('p',{},`${run.machine_name} · ${run.queue_name} · ${run.qa_date}`),el('p',{class:'muted small'},'Removes this submission from review, history charts and completion counts. You can restore it from Trash.')),async()=>{await api('POST',`/api/runs/${run.id}/trash`,{trashed:true});toast('QA moved to trash');if(location.hash.startsWith('#/runs/'))location.hash='#/review';else route();},'Move to trash');
   }},run.trashed_at?'Restore':svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},svg('path',{d:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7'})));
 }
-function reviewRowActions(run) {return el('div',{class:'row qa-review-actions'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at||can('therapist_approve')&&!can('review')?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
 
 // Past Sphinx imports that still wait for review can be recorded as history (POST /api/runs/record-history): their
 // results, limits and verdicts stay, and they leave the review queues. Physicist or Admin only.
@@ -3254,25 +3253,29 @@ async function renderReview() {
   const [runs, trashed] = await apiBatch(["/api/runs?limit=400", "/api/runs?trashed=1&limit=200"]);
   page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results"),
     can("review") ? el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…") : null]);
-  const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
+  // A row (or its date) opens the run; no buttons in the rows. Moving a run to trash is on the run's own page; a run in
+  // Trash keeps its Restore button.
+  const row = (r, { review = true, trash = false } = {}) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
     el("td", {}, el("a", { href: `#/runs/${r.id}` }, shortDate(r.qa_date))),
     el("td", {}, el("strong", {}, machineLabel(r.machine_name))),
     el("td", {}, r.queue_name),
     el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
     el("td", {}, chip(r.overall)),
-    el("td", {}, reviewChip(r)),
-    el('td',{class:'center'},reviewRowActions(r)));
-  const cols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "9%"], ["Review", "13%"], ["", "10%"]];
+    review ? el("td", {}, reviewChip(r)) : null,
+    trash ? el("td", { class: "center" }, qaTrashButton(r)) : null);
+  const waitingCols = [["Date", "14%"], ["Machine", "14%"], ["QA list", "36%"], ["Performed by", "22%"], ["Result", "14%"]];
+  const reviewedCols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "32%"], ["Performed by", "18%"], ["Result", "12%"], ["Review", "14%"]];
+  const trashCols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "11%"], ["Review", "13%"], ["", "8%"]];
   const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
-  const therapyMode=can('therapist_approve')&&!can('review');
   const waitingTherapist=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false));
-  app.append(el('h2',{class:'section-head',id:'therapy-review-queue'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
-  if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
-  app.append(el("h2", { class: "section-head modality-head", id: "physics-review-queue" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
-    fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
-  app.append(el("h2", { class: "section-head" }, "Recently reviewed"),
-    fixedTable(cols, decided.map(row), "No reviews yet."));
+  const queue = (id, title, list) => [el("h2", { class: "section-head modality-head", id }, title, el("span", { class: "modality-count" }, String(list.length))),
+    fixedTable(waitingCols, list.map((r) => row(r, { review: false })), "Nothing is waiting for review.")];
+  const physics = queue("physics-review-queue", "Awaiting Physics Review", pending), therapy = queue("therapy-review-queue", "Awaiting Therapy Review", waitingTherapist);
+  // Your own queue first (a physicist's or an admin's: physics; otherwise therapy), then recent decisions, then Trash.
+  app.append(can("review") ? [physics, therapy] : [therapy, physics],
+    el("h2", { class: "section-head" }, "Recently reviewed"), fixedTable(reviewedCols, decided.map((r) => row(r)), "No reviews yet."));
+  if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(trashCols,trashed.map((r)=>row(r,{trash:true})),'Trash is empty.')));
   const stage=queryParams().get('stage');
   if(stage==='therapy'||stage==='physics') requestAnimationFrame(()=>document.getElementById(`${stage}-review-queue`)?.scrollIntoView({block:'start'}));
 }

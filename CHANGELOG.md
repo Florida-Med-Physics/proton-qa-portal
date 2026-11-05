@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Review QA: your own queue comes first (Awaiting Physics Review for physicists and admins, Awaiting Therapy Review for others), then Recently reviewed, then Trash last; both queues have the same heading and count and say "Nothing is waiting for review." when empty; rows have no Open / Review / trash buttons (a row or its date opens the run; moving a run to trash is on the run page; Trash rows keep Restore), and the waiting tables have no Review column.
+
 - Saved run: Approve opens the next run waiting for your approval, in Review QA's order (never your own run or one still waiting for a therapist's sign-off); after the last one, Review QA. Reject stays on the run, as before.
 
 - Saved run: the title names the machine ("GTR1 · PBS DailyQA Template - Sphinx"), the Trend column is no longer cut off, the line under each test reads as on the QA form ("WARNING ±0.5 mm · ACTION ±1 mm", nothing when there are no limits, no repeated baseline), a therapist signs the review test in one click (the form's own Yes no longer shows as already signed), and the way back fits the role (an MPA goes back to Perform QA; a run that needs no therapist sign-off says Awaiting Physics Review). Display only.

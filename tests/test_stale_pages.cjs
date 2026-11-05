@@ -98,7 +98,7 @@ const context = {
   fetch: (path, init) => serve(init.method, path, init.body === undefined ? undefined : JSON.parse(init.body)).then(([status, data]) => ({ status, ok: status < 400, json: async () => data })),
   el: node, renderShell() {}, renderLogin() { signIns++; app.replaceChildren(node('form', {}, 'Sign in')); }, toast: (message) => toasts.push(message),
   can: (right) => ['perform', 'review', 'configure'].includes(right), activeRole: () => 'physicist', confirm: () => true,
-  chip: (status, label) => node('span', {}, label || status), reviewChip: (r) => node('span', {}, r.review_status), reviewRowActions: () => node('a', {}, 'Open'),
+  chip: (status, label) => node('span', {}, label || status), reviewChip: (r) => node('span', {}, r.review_status), qaTrashButton: () => node('button', {}, 'Restore'),
   machineLabel: (name) => node('span', {}, name), shortDate: (d) => d, fixedTable: (cols, rows, empty) => node('table', {}, rows.length ? rows : empty),
   table: (heads, rows) => node('table', {}, rows), filterBox: () => node('input'), select: (name, options, value) => node('select', { name, value }),
   MODALITIES: ['Proton', 'Photon'], modalityOf: () => 'Proton', FREQ_ORDER: { daily: 0, monthly: 2 }, QADerived: { value: (input) => input.value },
@@ -178,7 +178,7 @@ const setupOnly = (label) => {
   assert.equal(count(/QA Template Lists/g), 1, label);
 };
 const reviewOnly = (label) => {
-  assert.match(shown(), /Review QA[\s\S]*Awaiting Therapy Review[\s\S]*Trash[\s\S]*Awaiting Physics Review[\s\S]*Recently reviewed/, label);
+  assert.match(shown(), /Review QA[\s\S]*Awaiting Physics Review[\s\S]*Awaiting Therapy Review[\s\S]*Recently reviewed[\s\S]*Trash/, label);   // a physicist's queue first, Trash last
   assert.doesNotMatch(shown(), /Setup QA|QA Template Lists|Machine Schedules/, label);
   assert.equal(count(/Awaiting Physics Review/g), 1, label);
 };

@@ -70,6 +70,19 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   assert.match(runPage, /can\("review"\) && mayApprove\(run\)\) \{/);
 }
 
+// 5. Review QA: your role's queue first, Trash last, one heading style, no buttons in the rows, one empty text.
+{
+  const reviewPage = between('async function renderReview()', 'async function renderRuns()');
+  assert.doesNotMatch(source, /reviewRowActions/);
+  assert.doesNotMatch(fs.readFileSync('portal/static/app.css', 'utf8'), /qa-review-actions/);
+  assert.match(reviewPage, /app\.append\(can\("review"\) \? \[physics, therapy\] : \[therapy, physics\],/);
+  assert.ok(reviewPage.indexOf('"Recently reviewed"') < reviewPage.indexOf('`Trash ('), 'Trash comes last');
+  assert.equal((reviewPage.match(/"Nothing is waiting for review\."/g) || []).length, 1, 'one empty text for both queues');
+  assert.doesNotMatch(reviewPage, /You are caught up/);
+  assert.match(reviewPage, /const waitingCols = \[\["Date", "14%"\], \["Machine", "14%"\], \["QA list", "36%"\], \["Performed by", "22%"\], \["Result", "14%"\]\];/);
+  for (const cols of reviewPage.matchAll(/const \w+Cols = (\[\[.*?\]\]);/g)) assert.equal(JSON.parse(cols[1]).reduce((sum, [, w]) => sum + parseFloat(w), 0), 100, cols[1]);
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];
