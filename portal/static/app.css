@@ -1210,7 +1210,6 @@ td, .measure-table td { font-size: 21px; }
 .subplot-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .subplot-title .trend-pass-donut { width: 44px; height: 44px; }
 .subplot-title .trend-pass-value { width: 32px; height: 32px; font-size: 12px; }
-.trend-pass-explainer { color: var(--muted); font-size: 15px; margin: 0 0 10px; }
 .trend-pass-breakdown { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 6px 0 12px; }
 .trend-energy-rate { display: flex; align-items: center; gap: 10px; font-size: 17px; }
 @media(max-width:600px){ .trend-chart-row > summary { padding: 12px; } .trend-pass-label { display: none; } }

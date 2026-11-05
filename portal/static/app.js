@@ -1498,7 +1498,7 @@ function sectionTitle(number, categories, named) {
 
 // How a category reads on screen; the data keeps the Sphinx sheet names ("Spot").
 const CATEGORY_LABEL = { Spot: "Spot Characteristics" };
-const categoryLabel = (c) => CATEGORY_LABEL[c] || c;
+const categoryLabel = (c) => CATEGORY_LABEL[c] || (c ? String(c).replace(/_/g, " ") : c);   // display only: "AI_PBS_Daily_Imaging" reads "AI PBS Daily Imaging"
 
 // Section label for a test on its own (Trends), e.g. "3.0 Sphinx Measurements".
 function sectionOf(item) {
@@ -3803,6 +3803,12 @@ function trendPassCounts(points) {
 
 function trendPassRing(points, label = 'Selected period') {
   const c = trendPassCounts(points), scale = c.total ? 100 / c.total : 0;
+  // Nothing judged (no Warning or Action on any result): a grey ring with "—", never "0% passed".
+  if (!c.pass && !c.warn && !c.fail) {
+    const unjudged = `${label}: no limits, not judged. ${c.total} results.`;
+    return el('span', { class: 'trend-pass-rate', title: unjudged, role: 'img', 'aria-label': unjudged },
+      el('span', { class: 'trend-pass-donut', style: 'background: var(--border)' }, el('span', { class: 'trend-pass-value' }, '—')));
+  }
   const passEnd = c.pass * scale, warningEnd = passEnd + c.warn * scale, actionEnd = warningEnd + c.fail * scale;
   const description = `${label}: ${c.percent}% passed. ${c.pass} pass, ${c.warn} warning, ${c.fail} action${c.other ? `, ${c.other} unclassified` : ''}; ${c.total} measurements in selected period. Uses the baseline and verdict saved with each result; includes extreme values.`;
   return el('span', { class: 'trend-pass-rate', title: description, role: 'img', 'aria-label': description },
@@ -4229,7 +4235,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       const draw = () => {
         if (drawn) return;
         drawn = true;
-        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
+        body.append(trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
       };
       chart.addEventListener('toggle', () => { if (chart.open) draw(); });
       // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category, closed.
@@ -4254,7 +4260,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       section.hidden = rows.every(row => row.hidden);
     }
   }});
-  app.append(el('h2', { class: 'section-head' }, 'Measurements'), el('p', { class: 'muted small' }, 'Organized by QA list and measurement type. Select a row to open its graph. Matching X and Y measurements share a graph.'), search, ...sections);
+  app.append(el('h2', { class: 'section-head' }, 'Measurements'), search, ...sections);
 }
 
 function renderTrendDetail(group, range, assignments=[]) {
@@ -4550,7 +4556,6 @@ async function renderTrends() {
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));
-  app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
   if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest, lists);
   // Several tests' trends in one request (GET /api/batch), for the same reason; one test, one request as before.
   const trendPaths = testIds.map((id) => `/api/trend?machine_id=${machineId}&test_id=${id}`);

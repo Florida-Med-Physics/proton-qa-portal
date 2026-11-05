@@ -113,6 +113,28 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   assert.match(source, /phoneDrawer\(extras, secondary\.filter\(cell=>cell\.firstChild\)\.map\(cell=>cell\.firstChild\), 'Comment, history & trends'\);/);
 }
 
+// 8. Machine Trends: fewer words; a ring with nothing judged shows "—", not "0% passed"; category headings without "_".
+{
+  run(`const CATEGORY_LABEL = { Spot: "Spot Characteristics" };\n${between('const categoryLabel =', '\n')}\nthis.categoryLabel = categoryLabel;`);
+  assert.equal(context.categoryLabel('AI_PBS_Daily_Imaging'), 'AI PBS Daily Imaging');
+  assert.equal(context.categoryLabel('Spot'), 'Spot Characteristics');
+  assert.equal(context.categoryLabel(''), '');
+  assert.equal(context.categoryLabel(null), null);
+  const ring = { el: (tag, props, ...kids) => ({ tag, props: props || {}, kids: kids.flat(Infinity).filter((k) => k != null && k !== false) }) };
+  vm.createContext(ring);
+  vm.runInContext(`${between('function trendPassCounts(', 'function trendPassBreakdown(')}\nthis.ring = trendPassRing;`, ring);
+  const words = (n) => (typeof n === 'object' ? n.kids.map(words).join(' ') : String(n));
+  const recorded = ring.ring([{ status: 'recorded' }, { status: 'recorded' }], 'Air Pressure [kPa]');
+  assert.equal(words(recorded), '—', 'no "0% passed" and no "passed" label');
+  assert.equal(recorded.props.title, 'Air Pressure [kPa]: no limits, not judged. 2 results.');
+  assert.match(recorded.kids[0].props.style, /var\(--border\)/, 'a grey ring');
+  const mixed = ring.ring([{ status: 'pass' }, { status: 'recorded' }], 'Mixed');
+  assert.equal(words(mixed), '50% passed', 'mixed cases are unchanged');
+  const trends = between('async function renderTrendOverview(', 'function renderTrendDetail(') + between('async function renderTrends()', '// Users, audit, account');
+  assert.doesNotMatch(trends, /Pass rate for the selected period|Organized by QA list|Charts use each result/);
+  assert.doesNotMatch(fs.readFileSync('portal/static/app.css', 'utf8'), /trend-pass-explainer/);
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];
