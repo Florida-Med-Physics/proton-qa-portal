@@ -123,6 +123,12 @@ function fmt(value, digits) {
   return digits === undefined ? String(Math.round(n * 10000) / 10000) : n.toFixed(digits);
 }
 
+// A Pass / Fail or Yes / No answer in History reads as its word, not as the stored 1 or 0 (Yes = pass = 1).
+function answerWord(type, unit, value, status) {
+  if (type === "status") return { pass: "Pass", warn: "Warning", fail: "Fail" }[status] || "—";
+  return unit === "Yes/No" ? (value ? "Yes" : "No") : (value ? "Pass" : "Fail");
+}
+
 // Machine Trends shows numbers to two decimal places (77.68, 0.14); `signed` puts + or − on Δ values. Display only:
 // stored values, the CSV export, the QA forms and Review keep their own precision. A missing value (or anything that is not
 // a number or numeric text) shows "—".
@@ -1836,9 +1842,13 @@ async function renderPerform(assignmentId) {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-3).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
+      // A Pass / Fail or Yes / No test shows its answer (Pass, No, ...), never the stored 1 or 0 with its unit.
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`) : el("span", { class: "hist empty" }, "—")));
+        const answered = it.type === "boolean" || it.type === "status";
+        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => !h ? el("span", { class: "hist empty" }, "—")
+          : answered ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${answerWord(it.type, it.unit, h.value, h.status)}` }, answerWord(it.type, it.unit, h.value, h.status))
+          : el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`)));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => {
@@ -3411,6 +3421,8 @@ async function renderReviewMeasurements(run) {
   let last=null;
   for(const[key,results]of [...groups].sort(([a],[b])=>Number(a.split('|')[0])-Number(b.split('|')[0]))){
     const [n,category]=key.split('|');
+    // One decimal count for the section's History, as on the QA form (Measured and Baseline keep their own precision).
+    const dp=decimalsOf(results.filter(r=>r.type==='numeric').flatMap(r=>[...(history[r.test_id]||[]).slice(-5).map(h=>h.value),r.expected]));
     if(n!==last){app.append(el('h2',{class:'section-head'},sectionTitle(Number(n),[...groups.keys()].filter(k=>k.startsWith(n+'|')).map(k=>k.split('|')[1]),sectionNameOf(results[0]))));last=n;}
     const tbody=el('tbody');
     for(const group of sharedRows(results,numbers)){
@@ -3441,7 +3453,8 @@ async function renderReviewMeasurements(run) {
       const shared=parts.length>1?sharedCells(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=shared?shared.main:parts[0];
       const prior=(history[r.test_id]||[]).filter(h=>h.run_id!==run.id&&h.qa_date<=run.qa_date);
       const recent=[...prior].reverse().slice(0,3);
-      const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+' '+unit}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+(unit?' '+unit:''))))):el('span',{class:'muted small'},'—');
+      const answered=r.type==='boolean'||r.type==='status',histText=h=>answered?answerWord(r.type,r.unit,h.value,h.status):fmt(h.value,dp)+(unit?' '+unit:'');
+      const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${histText(h)}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},histText(h))))):el('span',{class:'muted small'},'—');
       const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:9}));
       // The quick trend shows the newest 60 points of this test, fetched on the first click: the page's own history
       // stops at this run's date, which would leave an early or trashed run's chart empty.
