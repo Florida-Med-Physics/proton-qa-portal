@@ -3522,7 +3522,7 @@ async function renderRun(id) {
       el('div',{},el('strong',{},'Physicist approval'),el('span',{class:'small'},run.review_status==='approved'?'Approved':run.review_status==='rejected'?'Rejected':run.therapist_approved_by&&run.review_ready!==false?'Awaiting Physics Review':'Awaiting Therapy Review'))));
     if(!run.results.some(therapistReviewCheck)&&!run.therapist_approved_by&&run.review_status==='pending'&&can('therapist_approve'))app.append(el('button',{class:'primary',onclick:async()=>{try{await api('POST',`/api/runs/${id}/therapist-approve`,{});route();}catch(err){toast(err.message,true);}}},'Sign therapist review'));
   }
-  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && activeRole() === 'physicist'))) {
+  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && mayApprove(run)) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
@@ -3530,17 +3530,22 @@ async function renderRun(id) {
       const error = el("p", { class: "error" });
       const decide = (decision) => async () => {
         error.textContent = "";
+        buttons.forEach((b) => { b.disabled = true; });
         try {
           await api("POST", `/api/runs/${id}/review`, { decision, comment: comment.value });
-          toast(decision === "approved" ? "Approved" : "Rejected");
-          route();
+          if (decision !== "approved") { toast("Rejected"); route(); return; }
+          toast("Approved");
+          // Approve opens the next run waiting for this physicist (none left: Review QA).
+          const next = nextToApprove(await api("GET", "/api/runs?review_status=pending&limit=400").catch(() => []), id);
+          location.hash = next ? `#/runs/${next.id}` : "#/review";
         } catch (err) {
           error.textContent = err.message;
+        } finally {
+          buttons.forEach((b) => { b.disabled = false; });
         }
       };
-      const actions=el('div',{class:'review-action-bar'},el('strong',{},'Your review'),error,el('span',{class:'spacer'}),
-        el("button", { class: "primary", onclick: decide("approved") }, "Approve"),
-        el("button", { class: "danger", onclick: decide("rejected") }, "Reject"));
+      const buttons = [el("button", { class: "primary", onclick: decide("approved") }, "Approve"), el("button", { class: "danger", onclick: decide("rejected") }, "Reject")];
+      const actions=el('div',{class:'review-action-bar'},el('strong',{},'Your review'),error,el('span',{class:'spacer'}),buttons);
       app.append(el("div", { class: "card review-box" }, el("strong", {}, "Review note (optional)"), comment, actions));
       const resize=new ResizeObserver(()=>app.style.setProperty('--review-actions-height',`${actions.getBoundingClientRect().height}px`));
       resize.observe(actions);qaTableObservers.add(resize);
@@ -3558,6 +3563,13 @@ async function renderRun(id) {
 
   app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):`${reviewStatusText(run)}.`),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':back[1])));
 
+}
+
+// A physicist may approve a run that needs no therapist sign-off, or one a therapist has signed (an Admin acting as one).
+const mayApprove = (r) => !r.therapist_approval_required || (r.therapist_approved_by && activeRole() === 'physicist');
+// The next run waiting for this person's approval, in Review QA's order: never this run, their own, or one not ready.
+function nextToApprove(runs, id) {
+  return runs.find((r) => r.id !== Number(id) && r.review_status === 'pending' && r.review_ready !== false && r.performed_by !== state.user.id && mayApprove(r));
 }
 
 function bandValue(point, key, sign) {

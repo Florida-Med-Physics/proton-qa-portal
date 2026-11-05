@@ -49,6 +49,27 @@ assert.doesNotMatch(runPage, /'Review results'|test below/);
 assert.match(runPage, /therapistMode&&run\.therapist_approval_required&&run\.review_status==='pending'\?/);
 assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section \.measure-wrap \{ margin:12px; width:auto; \}/);
 
+// 4. Approve opens the next run waiting for this physicist: never this run, their own, one not ready, or one waiting for a
+// therapist's sign-off; an Admin (not acting as a physicist) skips runs that need one.
+{
+  const ctx = { state: { user: { id: 5 } }, role: 'physicist' };
+  vm.createContext(ctx);
+  vm.runInContext(`function activeRole() { return role; }\n${between('const mayApprove =', 'function bandValue(')}\nthis.next = nextToApprove; this.may = mayApprove;`, ctx);
+  const r = (id, more = {}) => ({ id, review_status: 'pending', review_ready: true, performed_by: 9, therapist_approval_required: false, therapist_approved_by: null, ...more });
+  const runs = [r(10), r(11, { performed_by: 5 }), r(12, { review_ready: false }), r(13, { therapist_approval_required: true }), r(14, { review_status: 'approved' }),
+    r(15, { therapist_approval_required: true, therapist_approved_by: 2 }), r(16)];
+  assert.equal(ctx.next(runs, '10').id, 15, 'skips this run, own runs, review_ready false, unsigned therapist runs and decided runs');
+  assert.equal(ctx.next(runs, 15).id, 10);
+  ctx.role = 'admin';
+  assert.equal(ctx.next(runs, 10).id, 16, 'an Admin not acting as a physicist does not approve therapist-signed runs');
+  assert.equal(ctx.next([r(10)], 10), undefined, 'none left');
+  assert.equal(ctx.next([], 10), undefined);
+  const decide = between('      const decide = (decision) => async () => {', '      const actions=el(');
+  assert.match(decide, /nextToApprove\(await api\("GET", "\/api\/runs\?review_status=pending&limit=400"\)\.catch\(\(\) => \[\]\), id\);\s*location\.hash = next \? `#\/runs\/\$\{next\.id\}` : "#\/review";/);
+  assert.match(decide, /if \(decision !== "approved"\) \{ toast\("Rejected"\); route\(\); return; \}/, 'Reject stays and redraws');
+  assert.match(runPage, /can\("review"\) && mayApprove\(run\)\) \{/);
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];
