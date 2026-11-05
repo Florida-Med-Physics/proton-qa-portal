@@ -26,7 +26,7 @@ const slow = { lists: null, count: null };
 const held = () => { let release; const promise = new Promise((resolve) => { release = resolve; }); return [promise, release]; };
 const counts = (body) => body.assignment_id === 21 ? 0 : body.machine_id === 7 ? 1 : 307;
 const context = {
-  setTimeout, Promise, Number, String,
+  setTimeout, Promise, Number, String, machineOrder: (a, b) => a.name.localeCompare(b.name),
   Date: class extends Date { constructor(...a) { super(...(a.length ? a : ['2026-11-04T09:30:00'])); } },
   el: (tag, props, ...kids) => node(tag, props || {}, kids.flat()),
   select: (name, options, value) => node('select', { name, value: String(value ?? '') }, options.map(([v, label]) => node('option', { value: v }, [label]))),

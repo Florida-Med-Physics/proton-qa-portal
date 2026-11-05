@@ -65,7 +65,7 @@ assert.deepEqual(typeInto({ type: 'boolean', name: 'Interlock', unit: '', limits
 
 // No Deviation column on either page; the columns, widths and spans agree on nine columns.
 assert.deepEqual(Array.from(context.qaHeaders(), (th) => th.text), ['#', 'Test', 'Measured', 'Unit', 'Result', 'Baseline', 'History', 'Note', 'Trend']);
-const perform = between('async function renderPerform(', 'async function renderQueues(');
+const perform = between('async function renderPerform(', 'function importSphinxDialog(');
 const review = between('async function renderReviewMeasurements(', 'async function renderRun(');
 for (const [name, code] of [['QA form', perform], ['saved run', review]]) {
   assert.doesNotMatch(code, /qa-dev|deltaBadge|'Deviation'/, name);

@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Setup: the list editor's Back returns to Setup QA, and the old "QA lists" page (templates and per-machine copies, which contradicted the one-list rule) is gone (#/queues opens Setup QA); "Values for this machine" replaces "Set tolerances" / "Adjust limits for this machine", and that page is titled "Values for <machine> · <list>"; machine menus on Machine Trends, Past results and Record past imports list machines in the Dashboard's order (GTR1 first).
+
 - Machine Trends: fewer words (no paragraphs about saved baselines, how the page is organized, or what the ring colours mean; the charts and "View values and details" stay); a ring for a measurement with no limits (air pressure, temperature, kTP…) shows a grey "—" instead of "0% passed"; category headings read "AI PBS Daily Imaging", not "AI_PBS_Daily_Imaging" (display only).
 
 - Calmer tables and QA form: no zebra stripes or vertical lines between columns (the row under the pointer still lights up); no grey "Recorded" chip in a result cell (PASS / WARNING / ACTION and the Δ stay; a run's overall Result is unchanged); choice menus read "Choose…"; the trend button only on measured values (none on Pass / Fail or Yes / No rows, and no empty Trends field on phones).

@@ -135,6 +135,22 @@ assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.review-section
   assert.doesNotMatch(fs.readFileSync('portal/static/app.css', 'utf8'), /trend-pass-explainer/);
 }
 
+// 9. Setup: one list of lists (Setup QA), "Values for this machine", one machine order (GTR1 first, as on the Dashboard).
+{
+  assert.doesNotMatch(source, /master copy|Instantiate|async function renderQueues\(/);
+  assert.match(source, /\[\/\^#\\\/queues\$\/, renderSetup\],/);
+  assert.match(source, /el\("a", \{ class: "button", href: "#\/setup" \}, "Back"\),\s*saveBtn = /);
+  assert.doesNotMatch(source, /Set tolerances for this machine|Adjust limits for this machine|`Limits: \$\{/);
+  // "tolerances" is left only in the list editor's Machine-Specific Tolerances dialog (a Playwright test names it).
+  const left = source.split('\n').filter((l) => /tolerances/.test(l) && !/^\s*\/\//.test(l));
+  assert.ok(left.every((l) => /machine-tolerances|MachineTolerances|open machine tolerances/.test(l)), left.join('\n'));
+  run(`const MODALITIES = ["Proton", "Photon", "Brachytherapy", "Simulation"];\n${between('const modalityOf =', '// A table with fixed column widths')}\nthis.machineOrder = machineOrder;`);
+  const machines = [['MRI Sim', 'MRI simulator'], ['Ethos', 'Varian Ethos'], ['GTR5', 'Proton gantry'], ['Eyeline GTR4', 'Proton eyeline'], ['HDR Flexitron', 'HDR brachytherapy'],
+    ['Big Bore CT (7064)', 'CT simulator'], ['GTR1', 'Proton gantry'], ['TrueBeam', 'Linac'], ['GTR2', 'Proton gantry']].map(([name, kind]) => ({ name, kind }));
+  assert.deepEqual(machines.sort(context.machineOrder).map((m) => m.name), ['GTR1', 'GTR2', 'GTR5', 'Eyeline GTR4', 'TrueBeam', 'Ethos', 'HDR Flexitron', 'Big Bore CT (7064)', 'MRI Sim']);
+  assert.equal((source.match(/\.slice\(\)\.sort\(machineOrder\)/g) || []).length, 3, 'Machine Trends, Past results and Record past imports');
+}
+
 // 2. A new page opens at its top; a new query on the same page keeps the place; every hash change still draws the page.
 async function navigation() {
   const listeners = {}, routes = [];

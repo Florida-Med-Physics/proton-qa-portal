@@ -629,7 +629,7 @@ const ROUTES = [
   [/^#\/machines\/(\d+)$/, renderMachine],
   [/^#\/assignments\/(\d+)\/limits$/, renderLimits],
   [/^#\/perform\/(\d+)$/, renderPerform],
-  [/^#\/queues$/, renderQueues],
+  [/^#\/queues$/, renderSetup],   // the one list of lists is Setup QA
   [/^#\/queues\/(new|\d+)$/, renderQueueEditor],
   [/^#\/tests$/, renderTests],
   [/^#\/review$/, renderReview],
@@ -674,6 +674,8 @@ const MODALITIES = ["Proton", "Photon", "Brachytherapy", "Simulation"];
 const modalityOf = (kind) => (/hdr|brachy/i.test(kind || "") ? "Brachytherapy" : /proton/i.test(kind || "") ? "Proton" : /simulat/i.test(kind || "") ? "Simulation" : "Photon");
 const KIND_RANK = ["Proton gantry", "Linac", "Elekta Synergy", "Varian Ethos", "CT simulator", "MRI simulator", "HDR brachytherapy"];
 const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RANK.length : i; };
+// One machine order for every machine menu, as on the Dashboard: by modality, then kind, then name (GTR1 first).
+const machineOrder = (a, b) => MODALITIES.indexOf(modalityOf(a.kind)) - MODALITIES.indexOf(modalityOf(b.kind)) || kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name);
 
 // A table with fixed column widths, so the Proton and Photon tables line up at the same width.
 function fixedTable(columns, rows, emptyText) {
@@ -842,7 +844,7 @@ async function renderSetup() {
     } catch (err) { toast(err.message, true); }
   };
   const duplicateSchedule = (a, q, m) => modal(`Duplicate ${q.name} for ${m.name}`,
-    el("div", {}, el("p", { class: "muted" }, "Creates a separate list with this machine's included tests and tolerances. The copy starts inactive."),
+    el("div", {}, el("p", { class: "muted" }, "Creates a separate list with this machine's included tests and values. The copy starts inactive."),
       field("New list name", el("input", { name: "name", required: true, value: `${q.name} – ${m.name} (copy)` }))),
     async (data) => {
       await api("POST", `/api/assignments/${a.id}/duplicate`, data);
@@ -850,7 +852,7 @@ async function renderSetup() {
     }, "Duplicate");
 
   app.append(el("h2", { class: "section-head" }, "QA Template Lists"),
-    el("p", { class: "muted small" }, "Edit shared tests here. Each machine keeps its own exceptions and tolerances."));
+    el("p", { class: "muted small" }, "Edit shared tests here. Each machine keeps its own exceptions and values."));
   const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
   const templateRow = (q) => el("tr", {},
     el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editable ? moreMenu([
@@ -930,9 +932,9 @@ async function renderSetup() {
           }, "Save schedule")) : null,
           editable ? moreMenu([
             [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active)],
-            ["Set tolerances for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
+            ["Values for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
             ["Duplicate", () => duplicateSchedule(a, q, m)],
-            ["Re-evaluate", () => { if (confirm(`Re-evaluate recorded results for "${q.name}" on ${m.name} using its current tolerances? This updates stored results and is logged.`)) scheduleAction(a, "reevaluate"); }],
+            ["Re-evaluate", () => { if (confirm(`Re-evaluate recorded results for "${q.name}" on ${m.name} using its current values? This updates stored results and is logged.`)) scheduleAction(a, "reevaluate"); }],
             ["Archive", () => scheduleAction(a, "archive", { archived: true }), "Archive only this machine's schedule"],
             ["Delete", () => { if (confirm(`Delete "${q.name}" from ${m.name}? The shared template stays. Schedules with recorded results must be archived instead.`)) scheduleAction(a, "delete"); }, "Remove only this machine's schedule; available only without results"],
           ]) : null,
@@ -1286,7 +1288,7 @@ async function renderMachine(id) {
           toast("Schedule saved");
           route();
         }) }, "Change schedule"),
-        el("a", { href: `#/assignments/${a.id}/limits` }, "Adjust limits for this machine"),
+        el("a", { href: `#/assignments/${a.id}/limits` }, "Values for this machine"),
         el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
     return el("div", { class: "card list-row" },
       el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule)),
@@ -1300,7 +1302,7 @@ async function renderMachine(id) {
 
 async function renderLimits(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
-  page(`Limits: ${t.queue.name}`,
+  page(`Values for ${t.machine.name} · ${t.queue.name}`,
     "Only fill in what is different on this machine. Blank fields use the list's value, shown in grey.");
   const numeric = t.items.filter((i) => i.type === "numeric");
   if (!numeric.length) {
@@ -2237,7 +2239,6 @@ function importSphinxDialog(a) {
 // Queues and test library
 // ---------------------------------------------------------------------------
 
-// Save a machine's list back as a template: a new master copy; the machine keeps its own list untouched.
 // Schedule one list on machines: every ticked machine runs this same list (no copies).
 async function scheduleDialog(list, machines, schedules) {
   if (!schedules) { const all = await api("GET", "/api/assignments"); schedules = machines.flatMap((m) => machineSchedules(all, m.id)); }
@@ -2292,25 +2293,6 @@ function stickyHead() {
   const set = () => document.documentElement.style.setProperty("--sticky-top", `${head.offsetHeight}px`);
   set();
   if (window.ResizeObserver) new ResizeObserver(set).observe(head);
-}
-
-async function renderQueues() {
-  const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
-  page("QA lists", "A template is the master copy. Instantiate it on each machine; each instance owns its tests and limits.",
-    can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA Template List")] : []);
-  const templates = queues.filter((q) => q.is_template);
-  const lists = queues.filter((q) => !q.is_template);
-  const row = (q) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/queues/${q.id}`) },
-    el("td", {}, el("strong", {}, q.name)),
-    el("td", { class: "num" }, q.item_count),
-    el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
-    el("td", {}, q.active ? "" : chip("", "Inactive")),
-    el("td", {}, can("configure") ? el("button", { onclick: (e) => { e.stopPropagation(); copyDialog(q); } }, "Duplicate") : null));
-  app.append(el("h2", {}, "QA List Templates"));
-  app.append(templates.length ? table(["QA List Template", "#Tests", "Machines", "", ""], templates.map(row))
-    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
-  app.append(el("h2", {}, "Machine lists"));
-  app.append(table(["QA list", "#Tests", "Scheduled on", "", ""], lists.map(row), "No machine lists yet. Duplicate a template to make one."));
 }
 
 const TEMPLATE_IMPORT_COLUMNS = {
@@ -2972,7 +2954,7 @@ async function renderQueueEditor(id) {
     };
     saveTemplateChanges=save;
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
-    app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/queues" }, "Back"),
+    app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/setup" }, "Back"),
       saveBtn = el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
   }
   app.append(el('datalist', { id: 'template-category-options' }, [...new Set(tests.map(t => t.category).filter(Boolean))].sort().map(category => el('option', { value: category }))));
@@ -3211,7 +3193,7 @@ async function recordHistoryDialog() {
   const machines = await api('GET', '/api/machines');
   const d = new Date(); d.setDate(d.getDate() - 1);
   const until = el('input', { type: 'date', name: 'until', required: true, value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` });
-  const machine = select('machine_id', [['', 'All'], ...machines.map((m) => [m.id, m.name])], '');
+  const machine = select('machine_id', [['', 'All'], ...machines.slice().sort(machineOrder).map((m) => [m.id, m.name])], '');
   const list = select('assignment_id', [['', 'All']], '');
   const count = el('p', { role: 'status' });
   const body = () => ({ until: until.value, machine_id: machine.value ? Number(machine.value) : null, assignment_id: list.value ? Number(list.value) : null });
@@ -3286,7 +3268,7 @@ async function renderRuns() {
   const [machines, queues, runs] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), api("GET", `/api/runs?${params}`)]);
   page("Past results", "Newest first.");
   const filters = el("form", { class: "row runs-filters" },
-    select("machine_id", [["", "All machines"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
+    select("machine_id", [["", "All machines"], ...machines.slice().sort(machineOrder).map((m) => [m.id, m.name])], params.get("machine_id")),
     select("queue_id", [["", "All QA lists"], ...queues.map((q) => [q.id, q.name])], params.get("queue_id")),
     select("review_status", [["", "Any review status"], ...Object.entries(REVIEW_LABEL)], params.get("review_status")));
   filters.addEventListener("change", () => {
@@ -4549,7 +4531,7 @@ async function renderTrends() {
   }
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
-    select('machine_id', machines.map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
+    select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
     lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
     testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);

@@ -101,7 +101,7 @@ const context = {
   chip: (status, label) => node('span', {}, label || status), reviewChip: (r) => node('span', {}, r.review_status), qaTrashButton: () => node('button', {}, 'Restore'),
   machineLabel: (name) => node('span', {}, name), shortDate: (d) => d, fixedTable: (cols, rows, empty) => node('table', {}, rows.length ? rows : empty),
   table: (heads, rows) => node('table', {}, rows), filterBox: () => node('input'), select: (name, options, value) => node('select', { name, value }),
-  MODALITIES: ['Proton', 'Photon'], modalityOf: () => 'Proton', FREQ_ORDER: { daily: 0, monthly: 2 }, QADerived: { value: (input) => input.value },
+  MODALITIES: ['Proton', 'Photon'], modalityOf: () => 'Proton', machineOrder: (a, b) => a.name.localeCompare(b.name), FREQ_ORDER: { daily: 0, monthly: 2 }, QADerived: { value: (input) => input.value },
   trendSourceNumberer: () => (p) => p, trendFileTools: () => node('div', {}, 'Import Folder', 'Export CSV'),
   // Stand-in for the chart overview: it waits for what the real one waits for (the period's history, which renderTrends
   // has already asked for; the lists and templates come from renderTrends).
@@ -130,7 +130,7 @@ const context = {
     app.append(node('section', {}, 'Synthetic measurements'));
   },
 };
-for (const name of ['renderHome', 'renderDashboard', 'renderAdmin', 'renderMachines', 'renderMachine', 'renderLimits', 'renderQueues', 'renderQueueEditor', 'renderTests',
+for (const name of ['renderHome', 'renderDashboard', 'renderAdmin', 'renderMachines', 'renderMachine', 'renderLimits', 'renderQueueEditor', 'renderTests',
   'renderRuns', 'renderSearch', 'renderUsers', 'renderAudit', 'recordHistoryDialog', 'machineForm', 'scheduleDialog', 'copyDialog', 'archiveList', 'deleteList', 'scheduleForm', 'scheduleData']) context[name] = async () => {};
 vm.createContext(context);
 const addThem = between('can("configure") ? el("button", { onclick: async () => {', '} }, "Add them")');
@@ -340,7 +340,7 @@ const reviewOnly = (label) => {
   let saved = false;
   context.newTestSave('21')({ name: 'Synthetic test', type: 'numeric' }).then(() => { saved = true; }); await settle();
   release('POST /api/tests'); await settle();
-  await go('#/queues');                                                       // while the new test is read back
+  await go('#/tests');                                                        // while the new test is read back
   release('GET /api/tests'); await settle();
   release('PUT /api/assignments/21/tests'); await settle();
   await go('#/queues/1');                                                     // while the machine's list is read again
@@ -393,7 +393,7 @@ const reviewOnly = (label) => {
   release('GET /api/assignments/21/file?path=synthetic-1.xls'); await settle();
   release('POST /api/assignments/21/sphinx/import'); await settle();
   assert.equal(pending.filter((r) => `${r.method} ${r.path}` === 'GET /api/machines').length, 2, 'Machine Trends drawn again');
-  await go('#/queues');
+  await go('#/tests');
   for (let i = 0; i < 2; i++) { release('GET /api/machines'); release('GET /api/assignments'); } await settle();
   assert.equal(pending.length, 0);
   console.log('Import Folder left mid-import: all files imported, summary shown, the other page not redrawn; on Machine Trends it redraws.');
