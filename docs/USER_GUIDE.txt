@@ -3,8 +3,8 @@ GatorQA — Quick User Guide
 1. Sign in and choose a QA list from Dashboard or Perform QA.
 2. Check the QA date. Use the matching report found in your import folder, or choose a measurement file. Check the import summary; HDR PDFs require review before filling values.
 3. Enter the remaining measurements or Pass/Fail answers. Next unanswered jumps to the next missing answer. Show unfinished only hides answered tests; switch it off to review all results.
-4. Mark in Progress keeps your entries without submitting. Submit for review when ready. Unanswered tests are not passes. Reports download only when requested.
-5. In Review QA, complete the therapist review or the physicist approval for your role. Review notes are optional. If old Sphinx files were imported as waiting for review, a Physicist or Admin can use Record past imports as history… there; their results and verdicts are kept.
+4. Mark in Progress keeps your entries without submitting and takes you back to Perform QA; open the list again to carry on. Submit for review when ready. Unanswered tests are not passes. Reports download only when requested.
+5. In Review QA, your queue comes first: complete the therapist review or the physicist approval for your role. After Approve, the next run waiting for you opens. Review notes are optional. If old Sphinx files were imported as waiting for review, a Physicist or Admin can use Record past imports as history… there; their results and verdicts are kept.
 6. Use Machine Trends for measurements over time, one QA list at a time. In Setup QA, open Machines to edit machine limits, then Save template.
 
 Import setup: In Setup QA, choose Add import block. Select a reader preset or map Excel cells, CSV/TXT columns, or report labels to tests. Preview a sample, choose Use mapping, then Save template. During Perform QA, review imported values before filling answers. PDF scans use OCR; check recognized values carefully.
