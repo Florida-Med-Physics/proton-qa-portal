@@ -1337,10 +1337,13 @@ async function renderLimits(assignmentId) {
       el("td", {}, el("input", { name: "fail", type: "number", step: "any", min: 0, value: o.fail ?? "", placeholder: fmt(q.fail) })),
       el("td", {}, select("tol_mode", [["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || q.tol_mode || "absolute")));
   });
-  app.append(table(["Test", "Expected", "Warning ±", "Action ±", "Limits are"], rows));
+  app.append(table(["Test", "Baseline", "Warning ±", "Action ±", "Limits are"], rows));
   const error = el("p", { class: "error" });
+  // Back (and after Save) to where this page was opened from: Setup QA, the machine page or the list editor; opened on
+  // its own (no history in this tab), Setup QA.
+  const back = () => { if (history.length > 1) history.back(); else location.hash = "#/setup"; };
   app.append(error, el("div", { class: "row" },
-    el("a", { class: "button", href: `#/machines/${t.machine.id}` }, "Back"),
+    el("a", { class: "button", href: "#/setup", onclick: (e) => { e.preventDefault(); back(); } }, "Back"),
     el("button", { class: "primary", onclick: async () => {
       error.textContent = "";
       const overrides = rows.map((row) => {
@@ -1351,7 +1354,7 @@ async function renderLimits(assignmentId) {
       try {
         await api("PUT", `/api/assignments/${assignmentId}/overrides`, { overrides });
         toast("Limits saved");
-        location.hash = `#/machines/${t.machine.id}`;
+        back();
       } catch (err) {
         error.textContent = err.message;
       }

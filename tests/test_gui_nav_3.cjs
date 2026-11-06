@@ -292,5 +292,16 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.doesNotMatch(source, /\bstartable\(/, 'nothing left uses startable');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list.');
+// 9. "Values for this machine": Back, and Save, go back to where it was opened from (Setup QA, the machine page, the list
+// editor), or to Setup QA in a tab with no history (it sent everyone to the old machine page); its column says Baseline.
+{
+  const limits = between('async function renderLimits(', '// ---------------------------------------------------------------------------\n// Performing a QA list');
+  assert.match(limits, /table\(\["Test", "Baseline", "Warning ±", "Action ±", "Limits are"\], rows\)/);
+  assert.match(limits, /const back = \(\) => \{ if \(history\.length > 1\) history\.back\(\); else location\.hash = "#\/setup"; \};/);
+  assert.match(limits, /el\("a", \{ class: "button", href: "#\/setup", onclick: \(e\) => \{ e\.preventDefault\(\); back\(\); \} \}, "Back"\)/);
+  assert.match(limits, /toast\("Limits saved"\);\n\s+back\(\);/);
+  assert.doesNotMatch(limits, /#\/machines\//, 'never the old machine page');
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from.');
 })().catch((err) => { console.error(err); process.exit(1); });

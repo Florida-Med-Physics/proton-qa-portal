@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Values for this machine (Setup QA ⋮): Back and Save limits go back to the page it was opened from (Setup QA, at the place you left, the machine page or the list editor) instead of the old machine page, and its column is headed "Baseline" as everywhere else (it said "Expected"). Navigation and wording only: the same save.
+
 - Machine page (from a machine's name): its lists are in the Dashboard's order (daily first) with a green ▶ before each active list, as on Perform QA (a Start button showed only on due lists); a therapist sees no monthly list there, as on the Dashboard; "Add a QA list" is "Schedule a QA list", and Edit, Retire and Delete machine are in one ⋮ menu after it, with ⋮ (not "More") on each list; on a phone the status is its own width and the menus open on screen. Display only: the same actions.
 
 - Machine Trends links: a run opened from Machine Trends (a chart dot, a value or an insight) says "Back to Machine Trends" and goes back to the place you left, with a long values table you opened open again (it said "Back to Review QA"); a pass-rate ring with no result yet (HDR Source Exchange) is a plain "—", not a link to an empty page, and the Dashboard shows no trends icon for a machine with no QA list (Ethos). Navigation only.
