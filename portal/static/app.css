@@ -581,6 +581,9 @@ tr.quick-trend .spark { max-width: none; }
 .hist.empty { background: transparent; color: var(--muted); }
 .hist.date { background: transparent; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; padding: 0 2px; white-space: nowrap; }
 .measure-table tr.hist-dates th { padding-top: 0; border-top: 0; }
+/* A table under one with the same columns: its column-names row takes no room on screen but stays in the table, so
+   screen readers still read each cell's column names (Measured, Unit, Result…). */
+.measure-table tr.qa-col-names.repeat > th { height:0 !important; padding-top:0 !important; padding-bottom:0 !important; border:0 !important; line-height:0 !important; font-size:0 !important; overflow:hidden; }
 
 .result-input.from-file { background: var(--surface-2); color: var(--text); cursor: default; }
 .result-input.from-file::placeholder { font-style: italic; }
@@ -1293,12 +1296,20 @@ td, .measure-table td { font-size: 21px; }
   .measure-table .quick-trend[hidden] { display:none; }
   .submit-bar { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); bottom:0; left:0; right:0; width:100%; margin:0; border-radius:12px 12px 0 0; }
   .submit-bar > .spacer { display:none; }
-  .submit-bar > button.primary { grid-column:2; grid-row:1; min-height:48px; font-size:17px; }
+  .submit-bar > button.primary { grid-column:2; grid-row:1; min-height:48px; }
   .submit-bar > .phone-details { grid-column:1/-1; }
   .submit-bar .phone-details-body { max-height:40vh; overflow:auto; padding:8px 0; grid-template-columns:1fr 1fr; }
   .submit-bar .phone-details-body label { grid-column:1/-1; flex-wrap:wrap; }
   .submit-bar input[type=date] { max-width:100%; min-height:44px; }
   .submit-bar .phone-details > summary { min-height:30px; padding:2px 0; font-size:14px; }
+  /* The QA form's bar: Mark in Progress beside Submit, in two equal buttons under the count, each label on one line down
+     to about 350px: 17px at most (the form sizes everything through --qa-form-font-size, with !important) and less padding. */
+  .submit-bar:has(> .save-draft) { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .submit-bar > .save-draft { grid-column:1; grid-row:2; min-height:48px; }
+  .submit-bar:has(> .save-draft) > button.primary { grid-column:2; grid-row:2; }
+  .submit-bar:has(> .save-draft) > button { align-self:stretch; padding-left:8px; padding-right:8px; --qa-form-font-size:min(17px, 1em); }
+  .submit-bar .phone-details-body > .muted.small { grid-column:1/-1; }   /* the draft note on its own line, Cancel after it */
+  .submit-bar .phone-details-body > .muted.small:empty { display:none; }
   .energy-plot-grid, .energy-plot-grid.plots-2, .trend-comparison-grid, .trend-highlight-grid { grid-template-columns:minmax(0,1fr); }
   .trend-chart-row, .energy-subplot, .trend-chart-panel { min-width:0; max-width:100%; }
   .trend-chart-row > summary { gap:8px; flex-wrap:wrap; }
@@ -1517,6 +1528,7 @@ td, .measure-table td { font-size: 21px; }
 
 .qa-calculation-info { display:inline-flex; align-items:center; justify-content:center; width:36px; min-height:36px; padding:0; margin-top:6px; color:var(--accent); background:var(--surface); }
 .calculation-dialog { max-width:min(720px,calc(100vw - 24px)); color:var(--text); background:var(--surface); border:1px solid var(--border); }
+.calculation-dialog .pre { overflow-wrap:anywhere; }   /* a note with a long unbroken path wraps in its box, never sideways */
 @media(max-width:1200px) { .qa-calculation-info { width:44px; min-height:44px; } }
 
 /* Keep directions readable while bringing axis labels next to their readings. */

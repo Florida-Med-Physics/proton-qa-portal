@@ -123,13 +123,13 @@ const asResults = (list) => list.map((i) => ({ ...i, value_num: i.type === 'nume
   const cell = sharedCell([
     [{ test_id: 1 }, 'TCS Sk', 'mGy·m²·h⁻¹', null, el('input'), el('div', { class: 'status-cell' }, '(Δ +0.20)'), el('span', { class: 'qa-limits' }, 'Baseline 12.000'), el('input', { class: 'note-input' })],
     [{ test_id: 2 }, 'Decay-table Sk', 'mGy·m²·h⁻¹', null, el('input'), null, null, el('input', { class: 'note-input' })],
-    [{ test_id: 3 }, 'Source strength difference', '%', info('Calculation details'), el('input'), el('div', { class: 'status-cell' }, 'PASS'), el('span', { class: 'qa-limits' }, 'Baseline 0.000 · ACTION ±1 %'), el('input', { class: 'note-input' })]]);
+    [{ test_id: 3 }, 'Source strength difference', '%', info('Calculation details'), el('input'), el('div', { class: 'status-cell' }, 'PASS'), el('span', { class: 'qa-limits' }, 'Baseline 0.000 · Action ±1 %'), el('input', { class: 'note-input' })]]);
   assert.equal(cell.tag, 'td'); assert.equal(cell.props.colspan, 5); assert.equal(cell.props.class, 'qa-measured qa-shared-cell');
   const fields = cell.kids[0].kids;
   assert.deepEqual(fields.map((f) => [f.props['data-test-id'], f.kids.map((k) => k.props.class || k.tag)]), [1, 2, 3].map((id) => [id, ['qa-shared-name', 'input', 'qa-shared-more']]));
   assert.deepEqual(fields.map((f) => f.kids[0].text), ['TCS Sk (mGy·m²·h⁻¹)', 'Decay-table Sk (mGy·m²·h⁻¹)', 'Source strength difference (%)ⓘ']);
   assert.deepEqual(fields.map((f) => f.kids[2].kids.map((k) => `${k.props.class || k.tag}:${k.text}`)),
-    [['status-cell:(Δ +0.20)', 'qa-shared-info:Baseline 12.000', 'note-input:'], ['note-input:'], ['status-cell:PASS', 'qa-shared-info:Baseline 0.000 · ACTION ±1 %', 'note-input:']]);
+    [['status-cell:(Δ +0.20)', 'qa-shared-info:Baseline 12.000', 'note-input:'], ['note-input:'], ['status-cell:PASS', 'qa-shared-info:Baseline 0.000 · Action ±1 %', 'note-input:']]);
   assert.deepEqual([fields[2].kids[0].kids[1].props.title, fields[2].kids[0].kids[1].props['aria-label']], Array(2).fill('Calculation details: Source strength difference'));
   assert.ok(!/null|undefined|\[object/.test(cell.text));
   console.log('Row tag: round trip, hidden in directions; numbering with joined rows and edge cases; where the box is offered; equation letters; PDF numbers; shared cell layout.');

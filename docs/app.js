@@ -337,20 +337,21 @@ function limitsText(limits, unit) {
   }
   const suffix = limits.tol_mode === "percent" ? "%" : unit ? ` ${unit}` : "";
   const parts = [`${fmt(limits.expected)}${unit ? " " + unit : ""}`];
-  if (limits.warn !== null && limits.warn !== undefined) parts.push(`warning ±${fmt(limits.warn)}${suffix}`);
-  if (limits.fail !== null && limits.fail !== undefined) parts.push(`action ±${fmt(limits.fail)}${suffix}`);
+  if (limits.warn !== null && limits.warn !== undefined) parts.push(`Warning ±${fmt(limits.warn)}${suffix}`);
+  if (limits.fail !== null && limits.fail !== undefined) parts.push(`Action ±${fmt(limits.fail)}${suffix}`);
   return parts.join(" · ");
 }
 
-// The quiet line under a measured test's name, the same on the QA form and a saved run: "WARNING ±0.5 mm · ACTION ±1 mm".
+// The quiet line under a measured test's name, the same on the QA form and a saved run: "Warning ±0.5 mm · Action ±1 mm"
+// (limits read Warning / Action; the verdict chips stay PASS / WARNING / ACTION). Winston-Lutz: "Pass < 1 mm · Action ≥ 1 mm".
 // Nothing when the test has no Warning or Action (its baseline is in the Baseline column).
 function qaLimitsLine(limits, unit) {
   const l = limits || {};
-  if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
+  if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "Pass < 1 mm · Action ≥ 1 mm");
   const suf = l.tol_mode === "percent" ? "%" : unit || "";
   const parts = [];
-  if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
-  if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
+  if (l.warn !== null && l.warn !== undefined) parts.push(`Warning ±${fmt(l.warn)} ${suf}`.trim());
+  if (l.fail !== null && l.fail !== undefined) parts.push(`Action ±${fmt(l.fail)} ${suf}`.trim());
   return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
 }
 
@@ -1384,6 +1385,12 @@ function infoPopup(content,label='Calculation details') {
     dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }},'ⓘ');
 }
+// A saved run's note behind a pencil, as on the QA form: the note shows on hover, and in full in a box on a click.
+function noteButton(text) {
+  const button=infoPopup(el('p',{class:'pre'},text),'Note');
+  button.className='icon-btn note-btn has-note';button.textContent='✎';button.title=text;button.setAttribute('aria-label',`Note: ${text}`);
+  return button;
+}
 function qaDisplayName(item) {
   if(item.category!=='HDR treatment-day QA')return item.name;
   return ({
@@ -1766,11 +1773,16 @@ async function renderPerform(assignmentId) {
     for(const entry of inputs){if(!entry.row)continue;entry.row.hidden=unfinishedOnly&&(entry.rowEntries||[entry]).every(e=>!e.required||!!e.status());if(entry.row.hidden)entry.chart.hidden=true;}
     for (const s of sections){
       s.refresh();const hide=unfinishedOnly&&!s.entries.some(e=>e.required&&!e.status());s.box.hidden=hide;if(s.heading)s.heading.hidden=hide;
+      let above=null;   // the columns of the table shown above, in this section
       for(const block of s.box.querySelectorAll('.measure-block')){
         const rows=[...block.querySelectorAll('tr[data-qa-entry]')],visible=rows.filter(row=>!row.hidden);
         block.hidden=unfinishedOnly&&!visible.length;
         const number=block.querySelector('.qa-n-span');
         if(number&&visible.length){visible[0].prepend(number);number.rowSpan=visible.length*2;}
+        // Under a table with the same columns, a table shows its dates but not the column names again ("repeat" collapses
+        // the row on screen and keeps it for screen readers, which read each cell's column names from it).
+        const names=block.querySelector('tr.qa-col-names');
+        if(names&&!block.hidden){names.classList.toggle('repeat',!!block.querySelector('tr.hist-dates')&&above===block.dataset.cols);above=block.dataset.cols;}
       }
     }
   };
@@ -1931,7 +1943,7 @@ async function renderPerform(assignmentId) {
       const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, qaHeaders(firstHeader)),
+          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // collapsed under a table with the same columns (refresh)
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 6 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
           el("tbody", {}, trRows.flat()));
@@ -1942,7 +1954,8 @@ async function renderPerform(assignmentId) {
         const line = withLimits && limitsLine(withLimits, withLimits.unit && withLimits.unit !== "unitless" ? withLimits.unit : "");
         if (line) title.append(line);
       }
-      return el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+      // Same first heading and as many History dates: the same columns, at the same widths.
+      return el("div", { class: "measure-block", "data-cols": `${firstHeader}|${dates.length}` }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
     };
     const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : qaDisplayName(it);
     // Single measurements that follow one another share one table; the row carries the number, name and directions.
@@ -2170,7 +2183,7 @@ async function renderPerform(assignmentId) {
     draftNote.textContent = "Unsaved changes";
     autosaveTimer = setTimeout(persistDraft, 600);
   };
-  const saveDraft = el("button", { type: "button", onclick: async () => {
+  const saveDraft = el("button", { type: "button", class: "save-draft", onclick: async () => {
     clearTimeout(autosaveTimer);
     saveDraft.disabled = true;
     const gen = routeGen;
@@ -2183,7 +2196,8 @@ async function renderPerform(assignmentId) {
   const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
   app.append(footer);
-  phoneDrawer(footer, [footer.children[0], draftNote, footer.children[5], saveDraft], 'Date & draft options');
+  // On a phone Mark in Progress stays beside Submit; the date, the draft note and Cancel go in the drawer.
+  phoneDrawer(footer, [footer.children[0], draftNote, footer.children[5]], 'Date & draft options');
   refresh();
   try {
     const draft = await api("GET", `/api/assignments/${assignmentId}/draft`);
@@ -3479,7 +3493,7 @@ async function renderReviewMeasurements(run) {
         shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
         shared?null:el('td',{class:'qa-result','data-label':'Result'},result),
-        el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment||'—'),
+        el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment?noteButton(r.comment):'—'),
         el('td',{class:'history-cell','data-label':'History'},recent.length?shared?.history:null,hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
       orderMeasurementRow(row);
@@ -3839,6 +3853,12 @@ function trendSummary(series, delta = false) {
   });
 }
 
+// Where a series name in that table may wrap besides its spaces: after an underscore (Field1_Exp_IsoDepth) and before a
+// bracket (Factor(Proton)), so a narrow phone table fits without breaking a word; a short symbol such as k_Q stays whole.
+function seriesNameWraps(name) {
+  return String(name ?? "").replace(/(\w\w_)(?=\w)|(\w)(?=\()/g, "$1$2\u0001").split("\u0001").flatMap((part, i) => (i ? [el("wbr"), part] : [part]));
+}
+
 function trendSummaryTable(series, unit, delta = false, name = "") {
   const units = unit && unit !== "unitless" ? unit : "";
   const caption = `${delta ? "Δ " : ""}${name || "Trend"} summary${units ? ` (${units})` : ""}`;
@@ -3850,7 +3870,7 @@ function trendSummaryTable(series, unit, delta = false, name = "") {
     el("thead", {}, el("tr", {}, el("th", { scope: "col", class: "trend-summary-unit", "aria-label": units ? `Series (${units})` : "Series" }, units),
       heads.map(([h, title], i) => el("th", { scope: "col", class: i < 4 ? "num" : "", title }, h)))),
     el("tbody", {}, trendSummary(series, delta).map((r) => el("tr", {},
-      el("th", { scope: "row" }, el("span", { class: `key-swatch line ${r.color}`, "aria-hidden": "true" }), r.label),
+      el("th", { scope: "row" }, el("span", { class: `key-swatch line ${r.color}`, "aria-hidden": "true" }), seriesNameWraps(r.label)),
       el("td", { class: "num" }, r.baseline), el("td", { class: "num" }, r.mean), el("td", { class: "num" }, r.sd),
       el("td", { class: "num" }, r.farthest), el("td", { title: r.qa_date ? shortDate(r.qa_date) : null }, r.date))))));
 }
