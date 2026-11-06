@@ -4,8 +4,8 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const source = fs.readFileSync('portal/static/app.js', 'utf8');
-assert.equal(fs.readFileSync('docs/app.js', 'utf8'), source, 'docs/app.js is out of step: copy portal/static/app.js');
+const source = fs.readFileSync('portal/static/app.js', 'utf8').replace(/\r\n/g, '\n');   // the same on a Windows checkout
+assert.equal(fs.readFileSync('docs/app.js', 'utf8').replace(/\r\n/g, '\n'), source, 'docs/app.js is out of step: copy portal/static/app.js');
 const css = fs.readFileSync('portal/static/app.css', 'utf8').replace(/\r\n/g, '\n');
 assert.equal(fs.readFileSync('docs/app.css', 'utf8').replace(/\r\n/g, '\n'), css, 'docs/app.css is out of step: copy portal/static/app.css');
 const between = (from, to) => { const a = source.indexOf(from), b = source.indexOf(to, a + 1); assert.ok(a >= 0 && b > a, `${from} … ${to}`); return source.slice(a, b); };

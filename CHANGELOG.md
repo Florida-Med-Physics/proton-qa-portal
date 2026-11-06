@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Tests: tests/test_gui_nav_3.cjs reads app.js the same way on a Windows checkout (Windows line endings), as the other checks already do.
+
 - View As on People (#/users, GatorQA's own builds): choosing Physicist opens the Dashboard, as before round 3, instead of keeping the page and showing only "You do not have permission to do that."; People needs the Manage users right, more than its Data Administration tab. Navigation only.
 
 - Back buttons go Back only to the GatorQA page they were opened from: each page in the tab's history notes the page before it. "Back to Machine Trends" on a run, Back and Save limits on Values for this machine, and "← All tests" no longer leave GatorQA after a bookmark or a link from another page, land on Review QA, a run or a QA form, or (browser-only build) lose a Save; otherwise they follow their link (a run's own machine and list, Setup QA, the overview). Navigation only.
