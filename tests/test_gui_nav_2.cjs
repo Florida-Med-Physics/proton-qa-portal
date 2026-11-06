@@ -61,4 +61,21 @@ assert.equal(shown2.length, 1, 'a click opens the note in a box');
 assert.deepEqual([shown2[0].tag, shown2[0].kids[0].kids[0], shown2[0].kids[1].props.class, shown2[0].kids[1].kids[0]], ['dialog', 'Note', 'pre', 'Synthetic note: chamber re-seated.']);
 assert.match(between('async function renderReviewMeasurements(', 'async function renderRun('), /el\('td',\{class:'qa-comment','data-label':'Comment'\},shared\?shared\.comment:r\.comment\?noteButton\(r\.comment\):'—'\)/);
 
-console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±; a saved run note behind a pencil.');
+// 5. Phone: Mark in Progress stays in the QA form's bar beside Submit (the same button and handler); the drawer keeps the
+// date, the draft note and Cancel. The bar's phone layout is in GatorQA's 1200px block (floridaphysics.com moves it to 767px).
+const footer = between('  const saveDraft = el(', '  refresh();');
+assert.match(footer, /const saveDraft = el\("button", \{ type: "button", class: "save-draft", onclick: async \(\) => \{/);
+assert.match(footer, /phoneDrawer\(footer, \[footer\.children\[0\], draftNote, footer\.children\[5\]\], 'Date & draft options'\);/);
+assert.doesNotMatch(footer, /phoneDrawer\([^;]*saveDraft/, 'Mark in Progress is not moved into the drawer');
+const css = fs.readFileSync('portal/static/app.css', 'utf8');
+assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
+const cssLF = css.replace(/\r\n/g, '\n');
+const phoneStart = cssLF.indexOf('@media (max-width: 1200px) {\n  html, body { max-width: 100%; }');
+assert.ok(phoneStart >= 0, "GatorQA's phone block");
+const phoneRules = cssLF.slice(phoneStart, cssLF.indexOf('\n}\n', phoneStart));
+for (const rule of ['.submit-bar:has(> .save-draft) { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }',
+  '.submit-bar > .save-draft { grid-column:1; grid-row:2; min-height:48px; font-size:17px; }',
+  '.submit-bar:has(> .save-draft) > button.primary { grid-column:2; grid-row:2; }']) assert.ok(phoneRules.includes(rule), rule);
+assert.match(css, /\.submit-bar > button\.primary \{ grid-column:2; grid-row:1;/, "other bars (a saved run's) keep their layout");
+
+console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±; a saved run note behind a pencil; Mark in Progress beside Submit on a phone.');

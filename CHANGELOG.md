@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA form on a phone: Mark in Progress sits beside Submit for review in the bar at the end of the form (the same button: it saves and goes back to Perform QA), no longer inside "Date & draft options"; that drawer keeps the QA date, the draft note and Cancel. Display only.
+
 - Saved run: a test's note sits behind a pencil (✎), as on the QA form: the note shows on hover and in full in a box on a click (no note: "—"), so the Note column stays narrow. Display only.
 
 - Limits read as Brook asked: "Warning ±0.5 mm · Action ±1 mm" under a test (QA form and saved run) instead of "WARNING ±0.5 mm · ACTION ±1 mm", Winston-Lutz "Pass < 1 mm · Action ≥ 1 mm" instead of "PASS < 1 mm · FAIL ≥ 1 mm", and a Sphinx file's differing limits "Warning ±… · Action ±…"; the verdict chips stay PASS / WARNING / ACTION. Display only (the PDF report already says Warning / Action).

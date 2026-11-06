@@ -1299,6 +1299,12 @@ td, .measure-table td { font-size: 21px; }
   .submit-bar .phone-details-body label { grid-column:1/-1; flex-wrap:wrap; }
   .submit-bar input[type=date] { max-width:100%; min-height:44px; }
   .submit-bar .phone-details > summary { min-height:30px; padding:2px 0; font-size:14px; }
+  /* The QA form's bar: Mark in Progress beside Submit, in two equal buttons under the count. */
+  .submit-bar:has(> .save-draft) { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .submit-bar > .save-draft { grid-column:1; grid-row:2; min-height:48px; font-size:17px; }
+  .submit-bar:has(> .save-draft) > button.primary { grid-column:2; grid-row:2; }
+  .submit-bar .phone-details-body > .muted.small { grid-column:1/-1; }   /* the draft note on its own line, Cancel after it */
+  .submit-bar .phone-details-body > .muted.small:empty { display:none; }
   .energy-plot-grid, .energy-plot-grid.plots-2, .trend-comparison-grid, .trend-highlight-grid { grid-template-columns:minmax(0,1fr); }
   .trend-chart-row, .energy-subplot, .trend-chart-panel { min-width:0; max-width:100%; }
   .trend-chart-row > summary { gap:8px; flex-wrap:wrap; }

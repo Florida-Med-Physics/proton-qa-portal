@@ -2182,7 +2182,7 @@ async function renderPerform(assignmentId) {
     draftNote.textContent = "Unsaved changes";
     autosaveTimer = setTimeout(persistDraft, 600);
   };
-  const saveDraft = el("button", { type: "button", onclick: async () => {
+  const saveDraft = el("button", { type: "button", class: "save-draft", onclick: async () => {
     clearTimeout(autosaveTimer);
     saveDraft.disabled = true;
     const gen = routeGen;
@@ -2195,7 +2195,8 @@ async function renderPerform(assignmentId) {
   const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
   app.append(footer);
-  phoneDrawer(footer, [footer.children[0], draftNote, footer.children[5], saveDraft], 'Date & draft options');
+  // On a phone Mark in Progress stays beside Submit; the date, the draft note and Cancel go in the drawer.
+  phoneDrawer(footer, [footer.children[0], draftNote, footer.children[5]], 'Date & draft options');
   refresh();
   try {
     const draft = await api("GET", `/api/assignments/${assignmentId}/draft`);
