@@ -1766,11 +1766,15 @@ async function renderPerform(assignmentId) {
     for(const entry of inputs){if(!entry.row)continue;entry.row.hidden=unfinishedOnly&&(entry.rowEntries||[entry]).every(e=>!e.required||!!e.status());if(entry.row.hidden)entry.chart.hidden=true;}
     for (const s of sections){
       s.refresh();const hide=unfinishedOnly&&!s.entries.some(e=>e.required&&!e.status());s.box.hidden=hide;if(s.heading)s.heading.hidden=hide;
+      let above=null;   // the columns of the table shown above, in this section
       for(const block of s.box.querySelectorAll('.measure-block')){
         const rows=[...block.querySelectorAll('tr[data-qa-entry]')],visible=rows.filter(row=>!row.hidden);
         block.hidden=unfinishedOnly&&!visible.length;
         const number=block.querySelector('.qa-n-span');
         if(number&&visible.length){visible[0].prepend(number);number.rowSpan=visible.length*2;}
+        // Under a table with the same columns, a table shows its dates but not the column names again.
+        const names=block.querySelector('tr.qa-col-names');
+        if(names&&!block.hidden){names.hidden=!!block.querySelector('tr.hist-dates')&&above===block.dataset.cols;above=block.dataset.cols;}
       }
     }
   };
@@ -1931,7 +1935,7 @@ async function renderPerform(assignmentId) {
       const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", {}, qaHeaders(firstHeader)),
+          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // hidden under a table with the same columns (refresh)
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 6 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
           el("tbody", {}, trRows.flat()));
@@ -1942,7 +1946,8 @@ async function renderPerform(assignmentId) {
         const line = withLimits && limitsLine(withLimits, withLimits.unit && withLimits.unit !== "unitless" ? withLimits.unit : "");
         if (line) title.append(line);
       }
-      return el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+      // Same first heading and as many History dates: the same columns, at the same widths.
+      return el("div", { class: "measure-block", "data-cols": `${firstHeader}|${dates.length}` }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
     };
     const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : qaDisplayName(it);
     // Single measurements that follow one another share one table; the row carries the number, name and directions.
