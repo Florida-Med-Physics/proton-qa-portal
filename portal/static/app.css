@@ -1129,6 +1129,8 @@ th { font-size: 16px; }
   #app[data-page="setup"] .filter-box { max-width: 100%; width: 100%; }
   .trend-dashboard-summary { gap: 10px; }
   .trend-metric { padding: 14px; }
+  /* The machine page's ⋮ menus: a finger's size, as the ▶ beside them. */
+  .page-head details.more > summary.icon-action, .list-row details.more > summary.icon-action { width: 44px; height: 44px; }
 }
 
 .home-machine-block { padding: 12px 0; border-bottom: 1px solid var(--border); }

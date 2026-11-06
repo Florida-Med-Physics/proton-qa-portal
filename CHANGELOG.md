@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine page on a phone: the ⋮ menus (the machine's Edit, Retire and Delete, and each list's actions) are 44 px, the size of the ▶ beside them; they were 32 px, smaller than the buttons they replaced. Display only.
+
 - Review QA: "Record past imports as history…", a one-off clean-up, is no longer a permanent button at the top (the first queue starts about 45 px higher on a phone for a physicist or admin); it is a quiet button on Data Administration under Import folders, with the same dialog. README and quick guide updated. Navigation only.
 
 - Search for a therapist or MPA: a QA list opens where it is performed (its QA form when it is on one machine, otherwise Perform QA) instead of the read-only list editor, unscheduled lists are left out, and a therapist sees no monthly list, as on the Dashboard. Navigation only: physicists and admins keep the list editor.

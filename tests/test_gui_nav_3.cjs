@@ -289,6 +289,9 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.equal(therapist.c.head.length, 0);
   assert.ok(css.includes('  .list-row > .chip { justify-self: start; }') && css.includes('  .list-row details.more .menu { left: 0; right: auto; }'), 'phone: the status at its width, the menu on screen');
   assert.ok(css.includes('.page-head details.more .menu { min-width: 0; white-space: nowrap; }'));
+  // On a phone the ⋮ menus (the only way to Edit, Retire or Delete a machine) are a finger's size, 44 px as the ▶ beside
+  // them (they were 32 px, smaller than the buttons they replaced); Setup QA's ⋮ and ✎ buttons are not changed here.
+  assert.ok(phoneBlock.includes('  .page-head details.more > summary.icon-action, .list-row details.more > summary.icon-action { width: 44px; height: 44px; }'), 'phone: ⋮ 44 px');
   assert.doesNotMatch(source, /\bstartable\(/, 'nothing left uses startable');
 }
 
