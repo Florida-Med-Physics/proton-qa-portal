@@ -45,10 +45,11 @@ assert.match(review, /\[p\.r\.expected!=null\?`Baseline \$\{fmt\(p\.r\.expected\
 assert.match(review, /const original=r\.value_num==null\|\|r\.value_num&&!run\.therapist_approved_by\?'':r\.value_num\?'pass':'fail';/);
 const runPage = between('async function renderRun(', 'function bandValue(');
 assert.match(runPage, /page\(`\$\{run\.machine_name\} · \$\{run\.queue_name\}`, shortDate\(run\.qa_date\)/);
-// The way back is where the run was opened from: Perform QA after Submit (or a last result there), otherwise Review QA,
-// the tab that holds runs, for every role (an MPA who opened it from Review QA goes back there).
-assert.match(runPage, /const back = queryParams\(\)\.get\('from'\) === 'perform' \? \['#\/perform-qa', 'Perform QA'\] : \['#\/review', 'Review QA'\];/);
-assert.match(runPage, /el\("a",\{class:"button",href:back\[0\]\},`Back to \$\{back\[1\]\}`\)/);
+// The way back is where the run was opened from: Perform QA after Submit (or a last result there), Machine Trends from
+// a chart (tests/test_gui_nav_3.cjs), otherwise Review QA, the tab that holds runs, for every role (an MPA who opened it
+// from Review QA goes back there).
+assert.match(runPage, /const back = from === 'perform' \? \['#\/perform-qa', 'Perform QA'\] : from === 'trends' \? \[`#\/trends\?machine_id=\$\{run\.machine_id\}&list=\$\{run\.assignment_id\}`, 'Machine Trends'\] : \['#\/review', 'Review QA'\];/);
+assert.match(runPage, /el\("a",\{class:"button",href:back\[0\],onclick:backClick\},`Back to \$\{back\[1\]\}`\)/);
 assert.match(runPage, /`\$\{therapistMode&&run\.therapist_approved_by&&run\.review_ready!==false\?'Done — back':'Back'\} to \$\{back\[1\]\}`/);
 assert.doesNotMatch(runPage, /can\('review'\)\|\|can\('therapist_approve'\) \?/, 'not by role');
 assert.match(source, /location\.hash = `#\/runs\/\$\{result\.id\}\?from=perform`;/, 'Submit opens the run with the way back to Perform QA');
@@ -243,7 +244,7 @@ async function navigation() {
   let log = [];
   const entries = [{ hash: '#/perform-qa', state: null }];
   let at = 0;
-  const nav = { location: { hash: '#/perform-qa' }, window: { addEventListener: (type, fn) => { nav.listeners[type] = fn; } }, listeners: {}, URLSearchParams, Map, Math,
+  const nav = { location: { hash: '#/perform-qa' }, window: { addEventListener: (type, fn) => { nav.listeners[type] = fn; } }, listeners: {}, URLSearchParams, URL, Map, Math,
     routeGen: 0, topOnDraw: null, scrollY: 0, requestAnimationFrame: (fn) => fn(), routes: [],
     history: { scrollRestoration: 'auto', get state() { return entries[at].state; }, replaceState(state) { entries[at].state = state; } },
     scrollTo: (x, y) => { log.push([x, y]); nav.scrollY = y; },
@@ -254,11 +255,16 @@ async function navigation() {
   vm.runInContext(`${between('const qaTableObservers = new Set();', 'function table(')}\nthis.page = page;`, nav);
   vm.runInContext(`${between('// A new page opens at its top', 'api("GET", "/api/me")')}\nthis.newPage = newPage;`, nav);
   assert.equal(nav.history.scrollRestoration, 'manual', 'GatorQA puts the place back itself');
-  const arrive = async () => { log = []; await nav.listeners.hashchange(); return log; };
-  const change = async (hash, y = 1200) => { nav.scrollY = y; entries.splice(at + 1, Infinity, { hash, state: null }); at++; nav.location.hash = hash; return arrive(); };
-  const back = async (y) => { nav.scrollY = y; at--; nav.location.hash = entries[at].hash; return arrive(); };
-  const forward = async (y) => { nav.scrollY = y; at++; nav.location.hash = entries[at].hash; return arrive(); };
+  // The browser's hashchange event names the address it left (oldURL).
+  const arrive = async (old) => { log = []; await nav.listeners.hashchange({ oldURL: `http://127.0.0.1/gatorqa/index.html${old}` }); return log; };
+  const change = async (hash, y = 1200) => { const old = nav.location.hash; nav.scrollY = y; entries.splice(at + 1, Infinity, { hash, state: null }); at++; nav.location.hash = hash; return arrive(old); };
+  const back = async (y) => { const old = nav.location.hash; nav.scrollY = y; at--; nav.location.hash = entries[at].hash; return arrive(old); };
+  const forward = async (y) => { const old = nav.location.hash; nav.scrollY = y; at++; nav.location.hash = entries[at].hash; return arrive(old); };
   assert.deepEqual(await change('#/perform/1'), ['draw', [0, 0]], 'a new page opens at its top, as it is drawn');
+  // Each new entry notes the GatorQA page it was opened from (gatorqaFrom), which the Back buttons go Back to; the page
+  // the tab opened on (a bookmark, a link from elsewhere) came from none, so its Back buttons follow their links.
+  assert.equal(entries[0].state.gatorqaFrom, undefined, 'opened on its own: from no GatorQA page');
+  assert.equal(entries[1].state.gatorqaFrom, '#/perform-qa', 'a new entry: the page it was opened from');
   assert.deepEqual(await change('#/perform-qa', 5000), ['draw', [0, 0]]);
   assert.deepEqual(await change('#/trends?a=1'), ['draw', [0, 0]]);
   assert.deepEqual(await change('#/trends?a=2', 1500), ['draw', [0, 1500]], 'a new query on the same page keeps the place once drawn');
@@ -279,6 +285,7 @@ async function navigation() {
   assert.deepEqual(await forward(100), ['draw', [0, 800]], 'Forward to the run: where it was left');
   assert.deepEqual(await back(900), ['draw', [0, 100]], 'Review QA was last left at 100');
   assert.deepEqual(await back(3000), ['draw', [0, 300]]);
+  assert.deepEqual([nav.location.hash, nav.history.state.gatorqaFrom], ['#/review', '#/runs?machine_id=2'], 'Back and Forward keep where an entry came from');
   assert.deepEqual(await change('#/runs/7', 300), ['draw', [0, 0]], 'a new page after Back: at its top');
   assert.deepEqual(await back(0), ['draw', [0, 300]]);
   // Another page opened while this one loads: its place is not applied there, and the page drawn meanwhile is not moved.

@@ -47,7 +47,7 @@ const {chromium}=require('playwright');
           const chart=judgedByList(changed,[point])[0];
           for(const field of ['expected','warn','fail','tol_mode','status'])if(chart[field]!==result[field])failures.push(`${machine.name}/${assignment.queue_name}/${result.name}: ${field} differs (${chart[field]} vs ${result[field]})`);
           if(chart.value!==result.value_num)failures.push(`${result.name}: measurement differs`);
-          if(trendRunHref(chart)!==`#/runs/${run.id}?test_id=${result.test_id}`)failures.push(`${result.name}: wrong source link`);
+          if(trendRunHref(chart)!==`#/runs/${run.id}?test_id=${result.test_id}&from=trends`)failures.push(`${result.name}: wrong source link`);
           checked++;statuses.add(result.status);covered.add(`${machine.name}|${assignment.queue_name}`);
           if(QADerived.read(result.description)||/\[calc:/.test(result.description||''))derived++;
         }

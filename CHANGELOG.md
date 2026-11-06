@@ -9,6 +9,44 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- View As on People (#/users, GatorQA's own builds): choosing Physicist opens the Dashboard, as before round 3, instead of keeping the page and showing only "You do not have permission to do that."; People needs the Manage users right, more than its Data Administration tab. Navigation only.
+
+- Back buttons go Back only to the GatorQA page they were opened from: each page in the tab's history notes the page before it. "Back to Machine Trends" on a run, Back and Save limits on Values for this machine, and "← All tests" no longer leave GatorQA after a bookmark or a link from another page, land on Review QA, a run or a QA form, or (browser-only build) lose a Save; otherwise they follow their link (a run's own machine and list, Setup QA, the overview). Navigation only.
+
+- Machine Trends with nothing recorded in the period: Import Folder stays (GatorQA's own builds, a role that performs QA, a list to import into) and only Export CSV goes; the card says "Import reports" only when that button is there. Round 3 had removed both while the card still said to import. Display only.
+
+- Data Administration, Import folders: the Machine column is 18% wide (from 14%; Folder 46%), so "TrueBeam" no longer breaks mid-word at 768-785 px (an iPad held upright, on floridaphysics.com). Display only.
+
+- Data Administration: "Record past imports as history…" is a normal button again (37 px tall, as on Review QA and as Save backup below it); as a small button it was 29 px on a phone. Display only.
+
+- Machine page on a phone: the ⋮ menus (the machine's Edit, Retire and Delete, and each list's actions) are 44 px, the size of the ▶ beside them; they were 32 px, smaller than the buttons they replaced. Display only.
+
+- Review QA: "Record past imports as history…", a one-off clean-up, is no longer a permanent button at the top (the first queue starts about 45 px higher on a phone for a physicist or admin); it is a quiet button on Data Administration under Import folders, with the same dialog. README and quick guide updated. Navigation only.
+
+- Search for a therapist or MPA: a QA list opens where it is performed (its QA form when it is on one machine, otherwise Perform QA) instead of the read-only list editor, unscheduled lists are left out, and a therapist sees no monthly list, as on the Dashboard. Navigation only: physicists and admins keep the list editor.
+
+- List editor opened read-only (a therapist or MPA following a link): no "Import blocks" card, which offered them nothing to do; the tests start about 170 px higher on a phone. Display only.
+
+- QA form: the Protocol box starts closed at every width (one click opens it), so the first test starts 50-90 px higher; on floridaphysics.com it opened on every computer screen. Display only.
+
+- Values for this machine (Setup QA ⋮): Back and Save limits go back to the page it was opened from (Setup QA, at the place you left, the machine page or the list editor) instead of the old machine page, and its column is headed "Baseline" as everywhere else (it said "Expected"). Navigation and wording only: the same save.
+
+- Machine page (from a machine's name): its lists are in the Dashboard's order (daily first) with a green ▶ before each active list, as on Perform QA (a Start button showed only on due lists); a therapist sees no monthly list there, as on the Dashboard; "Add a QA list" is "Schedule a QA list", and Edit, Retire and Delete machine are in one ⋮ menu after it, with ⋮ (not "More") on each list; on a phone the status is its own width and the menus open on screen. Display only: the same actions.
+
+- Machine Trends links: a run opened from Machine Trends (a chart dot, a value or an insight) says "Back to Machine Trends" and goes back to the place you left, with a long values table you opened open again (it said "Back to Review QA"); a pass-rate ring with no result yet (HDR Source Exchange) is a plain "—", not a link to an empty page, and the Dashboard shows no trends icon for a machine with no QA list (Ethos). Navigation only.
+
+- Machine Trends: a test you opened stays open, with its chart, when you come back to the overview (Back after "View values and details" or a run, or another period), and "← All tests" on that test page goes Back to the same place instead of the top; the QA list menu is in the Dashboard's order (daily first), so with no runs yet the daily list opens, not the monthly one; a machine with nothing to show (no QA list, a list with no measured tests, or no QA in the period) shows one card saying which, without Export CSV or an empty trend summary. Display and navigation only: the most-runs rule, the period and the CSV are unchanged.
+
+- View As: choosing a role keeps the page you are on when that role may open its tab (Review QA, a saved run, Machine Trends, Perform QA), and opens the Dashboard only when it may not (Setup QA, Data Administration for a therapist or MPA); the "Active" word beside the menu is gone and the banner reads "Viewing as Therapist · saved as <name> (Admin)". Navigation and wording only: requests still carry the chosen role as before.
+
+- List editor on a phone: the column names row no longer sits 131-168 px down inside the table over the first tests (1.01-1.03); it scrolls away with the table. A computer keeps it pinned. Display only.
+
+- Perform QA: an as-needed list (TrueBeam SRS, HDR daily and source exchange) says "As needed" once, in Status, with no schedule line under its name and no date in the chip (its last run stays under Last result). On a phone each card is shorter: the name beside its ▶, "Status" on one line, the History ring left to the Dashboard and Machine Trends (admin 3,306 px at 390 instead of 4,657; therapist 2,636 instead of 3,634). Display only.
+
+- Data Administration: what each role may do is one table that every role sees, and an admin's people table is Username · Name · Role · Status with active accounts first (the five rights columns repeated the role); Import folders shows its example path once and a quiet Save only after a folder is changed. On a phone both become cards: nothing scrolls sideways and no word breaks mid-word (admin page 4,339 px at 390 instead of 5,457 with two sideways tables; therapist 2,323 instead of 4,211). Display only: the same saves.
+
+- Review QA and Past results on a phone: each run is a compact card with no column names (date and machine, then the QA list on its own line, then who, result and review), 88-120 px tall instead of 213-303; Review QA is about 5,900 px long instead of 13,900 and Past results about 20,300 instead of 46,100 at 390 px. Display only.
+
 - Every record the browser build keeps now has its own id, as on the server: the PBS daily list's checks re-added at start-up (after the shared list was renamed, or on an older list) and a machine's own values kept when an old per-machine copy is folded back were added without one, and a host that stores records by id (floridaphysics.com) kept only one of them. Start-up and Restore give any such record already saved the next free id and log it once ("upgrade ids"); nothing else in a record changes (`tests/test_row_ids.cjs`).
 
 - Tests: the regression checks tests/test_report.cjs and tests/test_autosave.cjs run again (they loaded only part of app.js and had missed helpers added in October: reviewStatusText and QADerived); the report check expects the review label "Awaiting Physics Review".

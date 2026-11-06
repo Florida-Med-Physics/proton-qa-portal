@@ -72,6 +72,7 @@ function load({ host, localApi = true, picker = true, role = 'physicist' } = {})
     `function chip(status, label) { return el("span", { class: "chip " + status }, label); }
      function page(title, subtitle, actions) { app.replaceChildren(el("div", { class: "page-head" }, el("h1", {}, title), el("div", {}, actions || []))); }
      function table(headers, rows, emptyText) { return rows.length ? el("table", {}, el("thead", {}, el("tr", {}, headers.map((h) => el("th", {}, h)))), el("tbody", {}, rows)) : el("div", { class: "card empty" }, emptyText); }
+     function fixedTable(columns, rows, emptyText) { return table(columns.map(([h]) => h), rows, emptyText); }
      this.autoLine = (t) => ${/const autoLine = (.+);\r?\n/.exec(source)[1]};`]) vm.runInContext(code, context);
   return { context, calls, bodies, app, buttons: (node) => node.find((n) => n.tagName === 'button').map((b) => b.textContent) };
 }

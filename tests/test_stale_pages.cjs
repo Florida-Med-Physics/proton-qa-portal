@@ -101,7 +101,7 @@ const context = {
   chip: (status, label) => node('span', {}, label || status), reviewChip: (r) => node('span', {}, r.review_status), qaTrashButton: () => node('button', {}, 'Restore'),
   machineLabel: (name) => node('span', {}, name), shortDate: (d) => d, fixedTable: (cols, rows, empty) => node('table', {}, rows.length ? rows : empty),
   table: (heads, rows) => node('table', {}, rows), filterBox: () => node('input'), select: (name, options, value) => node('select', { name, value }),
-  MODALITIES: ['Proton', 'Photon'], modalityOf: () => 'Proton', machineOrder: (a, b) => a.name.localeCompare(b.name), FREQ_ORDER: { daily: 0, monthly: 2 }, QADerived: { value: (input) => input.value },
+  MODALITIES: ['Proton', 'Photon'], modalityOf: () => 'Proton', machineOrder: (a, b) => a.name.localeCompare(b.name), FREQ_ORDER: { daily: 0, monthly: 2 }, scheduleOrder: () => 0, QADerived: { value: (input) => input.value },
   trendSourceNumberer: () => (p) => p, trendFileTools: () => node('div', {}, 'Import Folder', 'Export CSV'),
   // Stand-in for the chart overview: it waits for what the real one waits for (the period's history, which renderTrends
   // has already asked for; the lists and templates come from renderTrends).

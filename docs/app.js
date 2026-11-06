@@ -24,8 +24,6 @@ const ROLE_LABEL = { admin: "Admin", physicist: "Physicist", therapist: "Therapi
 const STATE_LABEL = { overdue: "Overdue", due: "Due", done: "Done today", upcoming: "Upcoming" };
 const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", semiannual: "Semiannual", annual: "Annual", custom: "Custom interval",
   asneeded: "As needed (e.g. SRS days)" };
-// A list can be started when it is due, overdue, or "as needed".
-const startable = (state) => state === "due" || state === "overdue" || state === "ready";
 // Daily QA is due at 6 AM; other lists are due at the end of the scheduled day.
 const DAILY_DUE_TIME = "06:00";
 function dueIn(iso, frequency, now = Date.now()) {
@@ -427,6 +425,8 @@ function homeIcon() {
 
 // Dashboard: one look at every machine — today's QA, last result, and what is waiting for review.
 const FREQ_ORDER = { daily: 0, weekly: 1, monthly: 2, quarterly: 3, semiannual: 4, annual: 5, custom: 6, asneeded: 7 };
+// A machine's lists in the order the Dashboard and Perform QA show them: daily first, then monthly, …, then by name.
+const scheduleOrder = (a, b) => (FREQ_ORDER[a.frequency] ?? 9) - (FREQ_ORDER[b.frequency] ?? 9) || a.queue_name.localeCompare(b.queue_name);
 
 function frequentQaAssignments(data,runs,userId) {
   const schedules=data.machines.flatMap(m=>m.queues.filter(q=>q.active!==0).map(q=>({...q,machine_name:m.name})));
@@ -477,7 +477,7 @@ async function renderHome() {
       body.append(el('div',{class:'home-machine-block'},
         el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
           el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
-            el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
+            m.queues.length?el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)):null)),
         scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
     }
     if(!machines.length)body.append(el('p',{class:'muted small'},'No active machines.'));
@@ -535,8 +535,17 @@ function viewAsControl() {
   if(state.user?.role!=='admin') { state.actingRole=null; return null; }
   const pick=el('select',{'aria-label':'View As role'},...['admin','physicist','therapist','mpa'].map(role=>el('option',{value:role},ROLE_LABEL[role])));
   pick.value=state.actingRole||'admin';
-  pick.addEventListener('change',()=>{state.actingRole=pick.value==='admin'?null:pick.value;if(state.actingRole)sessionStorage.setItem('qa_admin_acting_role',state.actingRole);else sessionStorage.removeItem('qa_admin_acting_role');location.hash='#/';renderShell();route();});
-  return el('label',{class:'inline view-as-control',title:'Operate with the selected role. Your Admin identity remains in the audit trail.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick,state.actingRole?el('span',{class:'small'},'Active'):null);
+  // The page stays when the chosen role may open its tab (the test renderShell uses for the tabs); otherwise the Dashboard.
+  pick.addEventListener('change',()=>{state.actingRole=pick.value==='admin'?null:pick.value;if(state.actingRole)sessionStorage.setItem('qa_admin_acting_role',state.actingRole);else sessionStorage.removeItem('qa_admin_acting_role');if(!mayOpenTab(location.hash))location.hash='#/';renderShell();route();});
+  return el('label',{class:'inline view-as-control',title:'Operate with the selected role. Your Admin identity remains in the audit trail.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick);
+}
+// Whether the role now in use may open the tab a page belongs to (a page in no tab, such as Search, is open to all), and
+// the page itself: People (#/users) needs manage_users, more than its tab.
+function mayOpenTab(hash) {
+  const current = hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
+  if (current === "#/users") return can("manage_users");
+  const tab = NAV.find(([, , , owns]) => owns.includes(current));
+  return !tab || !tab[2] || can(tab[2]);
 }
 
 function renderShell() {
@@ -571,7 +580,7 @@ function renderShell() {
     el('a',{href:'#/account',class:'button small password-link'},'Change password'),
     themeToggle());
   document.getElementById('acting-role-notice')?.remove();
-  if(state.user.role==='admin'&&state.actingRole)bar.after(el('div',{id:'acting-role-notice',class:'acting-role-notice',role:'status'},`Operating as ${ROLE_LABEL[state.actingRole]} · Actions are saved as ${personName(state.user.full_name,state.user.username)} (Admin).`));
+  if(state.user.role==='admin'&&state.actingRole)bar.after(el('div',{id:'acting-role-notice',class:'acting-role-notice',role:'status'},`Viewing as ${ROLE_LABEL[state.actingRole]} · saved as ${personName(state.user.full_name,state.user.username)} (Admin)`));
 }
 
 function machineColorClass(name) {
@@ -701,7 +710,8 @@ function historyRing(counts={}, href, label="") {
   const p=total?pass/total*100:0,w=total?(pass+warn)/total*100:0;
   const percent=total&&pass===total?100:Math.min(99,Number(p.toPrecision(2)));
   const description=`${label?label+" · ":""}History, all dates: ${pass} pass, ${warn} warning, ${fail} fail. ${counts.recorded||0} unanswered or unjudged results excluded.`;
-  return el('a',{href,class:'history-rate',title:description,'aria-label':description},
+  // No result at all yet: the "—" is not a link (Machine Trends would have nothing to show).
+  return el(total||counts.recorded?'a':'span',{href:total||counts.recorded?href:null,class:'history-rate',title:description,'aria-label':description},
     el('span',{class:'trend-pass-donut',style:total?`background:conic-gradient(var(--pass) 0% ${p}%,var(--warn) ${p}% ${w}%,var(--fail) ${w}% 100%)`:'background:var(--border)'},el('span',{class:'trend-pass-value'},total?`${percent}%`:'—')));
 }
 
@@ -735,8 +745,9 @@ async function renderDashboard() {
         // A small green start button in front of the list name opens the list.
         const go = can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}` }, "▶") : null;
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
-          el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
-          el("td", {class:"qa-schedule-status"}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
+          // An as-needed list says so once: "As needed" in Status, no schedule line, its last run under Last result.
+          el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, q.frequency === "asneeded" ? null : el("div", { class: "muted small" }, q.schedule))),
+          el("td", {class:"qa-schedule-status"}, chip(q.state, q.state === "ready" ? "As needed" : scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}?from=perform` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
           el('td',{class:'center'},historyRing(q.history_counts,`#/trends?machine_id=${machine.id}&list=${q.id}`)));
       })];
@@ -1252,15 +1263,9 @@ async function renderMachine(id) {
   const [machines, assignments] = await Promise.all([api("GET", "/api/machines"), api("GET", `/api/machines/${id}/assignments`)]);
   const machine = machines.find((m) => String(m.id) === id);
   if (!machine) throw new Error("Machine not found.");
+  // The one main action, then the machine's own actions in one ⋮ menu (as on Setup QA), last so the menu opens on screen.
   const actions = [];
   if (can("configure")) {
-    actions.push(el("button", { onclick: () => modal(`Edit ${machine.name}`, machineForm(machine), async (data) => {
-      await api("PUT", `/api/machines/${id}`, data);
-      toast("Machine saved");
-      route();
-    }) }, "Edit"));
-    actions.push(el("button", { onclick: () => retireMachine(machine) }, machine.active ? "Retire machine" : "Restore machine"),
-      el("button", { class: "danger", onclick: () => deleteMachine(machine) }, "Delete machine"));
     actions.push(el("button", { class: "primary", onclick: async () => {
       const all = await api("GET", "/api/queues");
       const offered = all.filter((q) => q.active && !assignments.some((a) => a.queue_id === q.id));
@@ -1268,23 +1273,33 @@ async function renderMachine(id) {
       const pick = el("div", { class: "form-grid" },
         field("QA list", select("queue_id", offered.map((q) => [q.id, q.name]), offered[0].id), "wide"),
         scheduleForm(null));
-      modal(`Add a QA list to ${machine.name}`, pick, async (data, form) => {
+      modal(`Schedule a QA list on ${machine.name}`, pick, async (data, form) => {
         await api("POST", "/api/assignments", { ...scheduleData(data, form), machine_id: Number(id), queue_id: Number(data.queue_id) });
-        toast("QA list added");
+        toast("QA list scheduled");
         route();
-      }, "Add");
-    } }, "Add a QA list"));
+      }, "Schedule");
+    } }, "Schedule a QA list"));
+    actions.push(el("details", { class: "more" }, el("summary", { class: "icon-action", title: "More actions", "aria-label": "More actions" }, "⋮"),
+      el("div", { class: "menu" },
+        el("button", { class: "link", onclick: () => modal(`Edit ${machine.name}`, machineForm(machine), async (data) => {
+          await api("PUT", `/api/machines/${id}`, data);
+          toast("Machine saved");
+          route();
+        }) }, "Edit machine"),
+        el("button", { class: "link", onclick: () => retireMachine(machine) }, machine.active ? "Retire machine" : "Restore machine"),
+        el("button", { class: "link danger", onclick: () => deleteMachine(machine) }, "Delete machine"))));
   }
   page(machine.name, [machine.kind, machine.location, machine.active ? null : "Retired"].filter(Boolean).join(" · "), actions);
   if (machine.notes) app.append(el("p", { class: "muted" }, machine.notes));
-  if (!assignments.length) {
-    app.append(el("div", { class: "card empty" }, "No QA lists scheduled on this machine yet."));
+  // The lists as the Dashboard and Perform QA show them: daily first, then by name; a therapist's without monthly lists.
+  const lists = assignments.filter((a) => activeRole() !== "therapist" || a.frequency !== "monthly").sort(scheduleOrder);
+  if (!lists.length) {
+    app.append(el("div", { class: "card empty" }, "Nothing scheduled."));
     return;
   }
-  app.append(el("div", { class: "stack" }, assignments.map((a) => {
-    const due = a.active && startable(a.state);
+  app.append(el("div", { class: "stack" }, lists.map((a) => {
     const status = scheduleStatus(a);
-    const more = can("configure") ? el("details", { class: "more" }, el("summary", { class: "button" }, "More"),
+    const more = can("configure") ? el("details", { class: "more" }, el("summary", { class: "icon-action", title: "More actions", "aria-label": `More actions for ${a.queue_name}` }, "⋮"),
       el("div", { class: "menu" },
         el("button", { class: "link", onclick: () => modal(`${a.queue_name}: schedule`, scheduleForm(a), async (data, form) => {
           await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
@@ -1293,11 +1308,13 @@ async function renderMachine(id) {
         }) }, "Change schedule"),
         el("a", { href: `#/assignments/${a.id}/limits` }, "Values for this machine"),
         el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
+    // A green ▶ before every list (as on Perform QA and the Dashboard), not a Start button on due lists only.
     return el("div", { class: "card list-row" },
-      el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule)),
+      el("div", { class: "list-line" },
+        a.active && can("perform") ? el("a", { class: "start-dot", href: `#/perform/${a.id}`, title: `Start ${a.queue_name}`, "aria-label": `Start ${a.queue_name}` }, "▶") : null,
+        el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule))),
       chip(a.active ? a.state : "", status),
       el("div", { class: "row" },
-        due && can("perform") ? el("a", { class: a.state === "ready" ? "button" : "button primary", href: `#/perform/${a.id}` }, "Start") : null,
         el("a", { class: "button", href: `#/runs?machine_id=${id}&queue_id=${a.queue_id}` }, "History"),
         more));
   })));
@@ -1322,10 +1339,13 @@ async function renderLimits(assignmentId) {
       el("td", {}, el("input", { name: "fail", type: "number", step: "any", min: 0, value: o.fail ?? "", placeholder: fmt(q.fail) })),
       el("td", {}, select("tol_mode", [["absolute", "Absolute"], ["percent", "Percent"]], o.tol_mode || q.tol_mode || "absolute")));
   });
-  app.append(table(["Test", "Expected", "Warning ±", "Action ±", "Limits are"], rows));
+  app.append(table(["Test", "Baseline", "Warning ±", "Action ±", "Limits are"], rows));
   const error = el("p", { class: "error" });
+  // Back (and after Save) to where this page was opened from: Setup QA, the machine page or the list editor; opened on
+  // its own (a bookmark, a link from elsewhere), Setup QA.
+  const back = () => { if (history.state?.gatorqaFrom) history.back(); else location.hash = "#/setup"; };
   app.append(error, el("div", { class: "row" },
-    el("a", { class: "button", href: `#/machines/${t.machine.id}` }, "Back"),
+    el("a", { class: "button", href: "#/setup", onclick: (e) => { e.preventDefault(); back(); } }, "Back"),
     el("button", { class: "primary", onclick: async () => {
       error.textContent = "";
       const overrides = rows.map((row) => {
@@ -1336,7 +1356,7 @@ async function renderLimits(assignmentId) {
       try {
         await api("PUT", `/api/assignments/${assignmentId}/overrides`, { overrides });
         toast("Limits saved");
-        location.hash = `#/machines/${t.machine.id}`;
+        back();
       } catch (err) {
         error.textContent = err.message;
       }
@@ -1735,7 +1755,8 @@ async function renderPerform(assignmentId) {
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions", open: !QAHdrDaily.supported(t)&&!matchMedia("(max-width: 1200px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description)));
+    // Closed at every width: the protocol is one click away and the first test starts higher on the screen.
+    app.append(el("details", { class: "card instructions" }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description)));
   }
   const inputs = [];
   const sections = [];
@@ -2596,7 +2617,7 @@ async function renderQueueEditor(id) {
     const edit=block=>importMappingEditor(block,importItems,value=>{const index=importBlocks.findIndex(b=>b.id===value.id);if(index<0)importBlocks.push(value);else importBlocks[index]=value;importBlocksDirty=true;markDirty();drawImportBlocks();},q.schedules?.[0]?.id,inferred);
     importBlocksBox.replaceChildren(...present([el('h2',{},'Import blocks'),el('p',{class:'muted small'},'Map workbook cells, CSV/TXT columns, or PDF/TXT labels to tests. Values are reviewed before filling answers; machine limits remain unchanged.'),...importBlocks.map(block=>el('div',{class:'row import-block-summary'},el('strong',{},block.name),el('span',{class:'muted small'},IMPORT_READERS.find(r=>r[0]===block.reader)?.[1]),editable?el('button',{type:'button',onclick:()=>edit(block)},'Edit mapping'):null,editable?el('button',{type:'button',onclick:()=>{importBlocks=importBlocks.filter(b=>b.id!==block.id);importBlocksDirty=true;markDirty();drawImportBlocks();}},'Remove'):null)),editable?el('button',{type:'button',onclick:()=>edit(null)},'Add import block'):null]));   // present(): a read-only view never shows "null"
   };
-  drawImportBlocks();app.append(importBlocksBox);
+  if(editable){drawImportBlocks();app.append(importBlocksBox);}   // read-only (a therapist or MPA by link): nothing to map, no card
   const machineSelections = {};
   await Promise.all((q.schedules||[]).map(async schedule=>{
     const template=await api('GET',`/api/assignments/${schedule.id}/template`);
@@ -3255,8 +3276,7 @@ async function recordHistoryDialog() {
 async function renderReview() {
   // Submitted runs and the trash in one request: one round trip, not two in a row.
   const [runs, trashed] = await apiBatch(["/api/runs?limit=400", "/api/runs?trashed=1&limit=200"]);
-  page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results"),
-    can("review") ? el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…") : null]);
+  page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
   // A row (or its date) opens the run; no buttons in the rows. Moving a run to trash is on the run's own page; a run in
   // Trash keeps its Restore button.
   const row = (r, { review = true, trash = false } = {}) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
@@ -3506,9 +3526,13 @@ async function renderReviewMeasurements(run) {
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  // The way back: Perform QA when the run was opened from there (Submit, a last result), otherwise Review QA (its tab).
-  const back = queryParams().get('from') === 'perform' ? ['#/perform-qa', 'Perform QA'] : ['#/review', 'Review QA'];
-  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0]},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+  // The way back: Perform QA when the run was opened from there (Submit, a last result); Machine Trends when opened from
+  // a chart, a value or an insight (Back, to the place it was left there, when it was opened from there in this tab; else
+  // that machine and list); otherwise Review QA (its tab).
+  const from = queryParams().get('from');
+  const back = from === 'perform' ? ['#/perform-qa', 'Perform QA'] : from === 'trends' ? [`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}`, 'Machine Trends'] : ['#/review', 'Review QA'];
+  const backClick = from === 'trends' ? (e) => { if (history.state?.gatorqaFrom?.startsWith('#/trends')) { e.preventDefault(); history.back(); } } : null;
+  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0],onclick:backClick},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
     window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
@@ -3576,7 +3600,7 @@ async function renderRun(id) {
   const therapistMode=can('therapist_approve')&&!can('review');
   if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
 
-  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&!run.trashed_at&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):null),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},`${therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back':'Back'} to ${back[1]}`)));
+  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&!run.trashed_at&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):null),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0],onclick:backClick},`${therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back':'Back'} to ${back[1]}`)));
 
 }
 
@@ -3972,8 +3996,9 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
 const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
 
 let activePointTooltip=null;
+// A run opened from Machine Trends (a chart dot, a value, an insight) says so (from=trends): its way back is Machine Trends.
 function trendRunHref(point) {
-  return `#/runs/${point.run_id}${point.source_test_id?'?test_id='+point.source_test_id:''}`;
+  return `#/runs/${point.run_id}?${point.source_test_id?`test_id=${point.source_test_id}&`:''}from=trends`;
 }
 function pointTooltip(dot,point,label,unit,event,fixed2=false) {
   let tip=document.getElementById('qa-point-tooltip');
@@ -4247,9 +4272,12 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
         drawn = true;
         body.append(trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
       };
-      chart.addEventListener('toggle', () => { if (chart.open) draw(); });
-      // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category, closed.
+      const key = `${machineId}|${template.assignment.id}|${group.base}`;
+      chart.addEventListener('toggle', () => { if (chart.open) { openTrendGroups.add(key); draw(); } else openTrendGroups.delete(key); });
+      // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category,
+      // closed unless it was opened here before.
       if (keyCheck) { chart.open = true; draw(); keyChecks.push({ keyCheck, chart }); continue; }
+      if (openTrendGroups.has(key)) { chart.open = true; draw(); }
       if (!categories.has(category)) categories.set(category, []);
       categories.get(category).push(chart);
     }
@@ -4260,8 +4288,18 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       sections.push(section);
     }
   }
+  // Nothing to show: one card that says why, without Export CSV or the trend summary. Import Folder stays where this page
+  // offers it (GatorQA's own builds) and there is a list to import into; only then does the card say to import.
+  if (!sections.length) {
+    const canImport = lists.length > 0 && can('perform') && browserFolders();
+    const tools = app.querySelector('.trend-file-tools');
+    if (canImport) tools?.querySelector('.trend-export')?.remove(); else tools?.remove();
+    const machine = machines.find((m) => String(m.id) === String(machineId));
+    return app.append(el('div', { class: 'card empty' }, !lists.length ? 'Nothing scheduled.'
+      : !templates.some((t) => t.items.some((i) => i.type === 'numeric')) ? 'This list has no measured values.'
+      : `No QA recorded on ${machine?.name || 'this machine'} in this period.${canImport ? ' Import reports or choose a longer period.' : ''}`));
+  }
   app.append(trendInsightsCard(insights));
-  if (!sections.length) return app.append(el('div', { class: 'card empty' }, 'No measurements in this period. Import reports or choose a longer period.'));
   const search = el('input', { type: 'search', class: 'filter-box', placeholder: 'Find an energy or measurement…', 'aria-label': 'Find measurements', oninput: e => {
     const words = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
     for (const section of sections) {
@@ -4297,13 +4335,17 @@ function renderTrendDetail(group, range, assignments=[]) {
           p.source_test_number?el('span',{class:'small'},`Test ${p.source_test_number}`):null,
           el('span',{},`${fmt2(p.value)} ${unit}`.trim()),chip(p.status)):'');
       });
-      return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}`},row.qa_date)),
+      return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}?from=trends`},row.qa_date)),
         el('td',{},assignments.find(a=>String(a.id)===String(row.cells.find(Boolean)?.assignment_id))?.queue_name||'Recorded QA'),cells);
     });
     const title=`${byRun.size>100?'Latest 100 runs':'Values'}${axis?` · ${yAxisLabel(members.map(m=>m.name)).replace(/\s+[XY]$/,'')} ${axis}`:''}`;
-    app.append(el('details',{class:'card',open:rows.length<=20},
+    // A long values table starts closed; opened, it opens again when this page is drawn again (Back from a run).
+    const key=`values|${members.map(m=>m.test_id).join(',')}`;
+    const card=el('details',{class:'card',open:rows.length<=20||openTrendGroups.has(key)},
       el('summary',{},title),
-      table(['QA date','Source QA list',...members.map(m=>(axis?energyOf(m):m.axis)||'Value')],valueRows)));
+      table(['QA date','Source QA list',...members.map(m=>(axis?energyOf(m):m.axis)||'Value')],valueRows));
+    card.addEventListener('toggle',()=>{if(card.open)openTrendGroups.add(key);else openTrendGroups.delete(key);});
+    app.append(card);
   }
 }
 
@@ -4318,7 +4360,13 @@ async function renderSearch() {
   if (!q) return;
   const words = q.toLowerCase().split(/\s+/);
   const hit = (text) => words.every((w) => String(text || "").toLowerCase().includes(w));
-  const [machines, queues, tests] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), can("configure") ? api("GET", "/api/tests") : []]);
+  const editor = can("configure");
+  const [machines, queues, tests, schedules] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), editor ? api("GET", "/api/tests") : [],
+    editor ? [] : api("GET", "/api/assignments")]);
+  // Without setup rights a QA list opens where it is performed (its QA form on one machine, else Perform QA), never the
+  // read-only list editor; only lists scheduled somewhere, and for a therapist no monthly list, as on the Dashboard.
+  const performedOn = (x) => schedules.filter((a) => a.queue_id === x.id && a.active && (activeRole() !== "therapist" || a.frequency !== "monthly"));
+  const listHref = (x) => { if (editor) return `#/queues/${x.id}`; const on = performedOn(x); return on.length === 1 ? `#/perform/${on[0].id}` : "#/perform-qa"; };
   const section = (title, rows, cols) => {
     if (!rows.length) return;
     app.append(el("h2", { class: "section-head" }, `${title} (${rows.length})`), fixedTable(cols, rows));
@@ -4327,8 +4375,8 @@ async function renderSearch() {
     el("td", {}, el("a", { href: `#/machines/${m.id}` }, el("strong", {}, m.name))), el("td", { class: "muted" }, m.kind || "—"),
     el("td", {}, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}` }, "Trends")))),
     [["Machine", "40%"], ["Kind", "40%"], ["", "20%"]]);
-  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.machines || ""}`)).map((x) => el("tr", {},
-    el("td", {}, el("a", { href: `#/queues/${x.id}` }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.machines || "Not scheduled"),
+  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.machines || ""}`) && (editor || (x.active && performedOn(x).length))).map((x) => el("tr", {},
+    el("td", {}, el("a", { href: listHref(x) }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.machines || "Not scheduled"),
     el("td", { class: "center" }, x.item_count))),
     [["QA list", "50%"], ["Where", "40%"], ["Tests", "10%"]]);
   const byQueue = new Map(queues.map((x) => [x.id, x]));
@@ -4444,7 +4492,7 @@ function trendFileTools(machine, lists, listId, range, testIds, importListId = l
         summary.skipped.length ? el('details', {}, el('summary', {}, 'Skipped files'), el('ul', {class:'small'}, summary.skipped.map(x=>el('li',{},`${x.file}: ${x.reason}`)))) : null), async()=>{}, 'Done');
     } finally { refreshStatus(); }
   };
-  const exportButton = el('button', { type: 'button', onclick: async () => {
+  const exportButton = el('button', { type: 'button', class: 'trend-export', onclick: async () => {
     exportButton.disabled = true;
     try {
       // Read permissions while the export button still has browser user activation.
@@ -4526,6 +4574,9 @@ function busiestList(lists, histories) {
   const count = (a) => runs.get(String(a.id))?.size || 0;
   return lists.reduce((best, a) => (count(a) > count(best) ? a : best), lists[0]);
 }
+// The tests opened on Machine Trends in this tab (machine|list|test), opened and drawn again when the overview is drawn
+// again (Back, "← All tests", another period), so the place Back returns to shows what it showed.
+const openTrendGroups = new Set();
 async function renderTrends() {
   const params = queryParams();
   // The machines and every machine's lists in one request; the lists of the machine shown are picked out below.
@@ -4537,7 +4588,8 @@ async function renderTrends() {
   const range = params.get("range") || "90";
   let testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
-  const lists = machineId ? machineSchedules(schedules, machineId).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
+  // In the Dashboard's order (daily first), so a tie for the busiest list opens the daily one.
+  const lists = machineId ? machineSchedules(schedules, machineId).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')).sort(scheduleOrder) : [];
   const templates=lists.length?await apiBatch(lists.map(a=>`/api/assignments/${a.id}/template`)):[];   // every list's template, in one request
   // The overview then reads the chosen period's history (in parts): after the templates, not beside them. On a site that
   // runs the backend once per request, two requests at once need two servers, and the second may first have to start or
@@ -4562,7 +4614,9 @@ async function renderTrends() {
     select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => { newPage(); go({ machine_id: e.target.value, range }); } }),
     lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => { newPage(); go({ machine_id: machineId, list: e.target.value, range }); } }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
-    testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
+    // Opened from the overview (the page before it in this tab): Back, to its place and open tests. Otherwise a link.
+    testIds.length ? el("a", { class: "button", onclick: (e) => { if (pageKey(history.state?.gatorqaFrom || "") === "#/trends|") { e.preventDefault(); history.back(); } },
+      href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));
@@ -4641,26 +4695,30 @@ async function renderAdmin() {
     window.localApi ? null : api("GET", "/api/dbinfo").catch(() => null)]);
   const users = can("manage_users") ? answers.shift() : null, [machines, schedules] = answers;
 
-  // 1. Users and rights (admins only; others see what each role may do).
+  // 1. Users and rights. Rights come from the role, so they are shown once, per role (every role sees this table); an
+  // admin also gets the people, with their role and no rights columns: active accounts first, disabled ones last.
   app.append(el("h2", { class: "section-head" }, "Users and rights"));
-  if (!users) {
-    app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"),
-      table(["Role", ...RIGHTS.map(([, label]) => label)], Object.entries(ROLE_RIGHTS).map(([role, rights]) => el("tr", {},
-        el("td", {}, el("strong", {}, ROLE_LABEL[role])), RIGHTS.map(([key]) => el("td", { class: "center" }, rights.includes(key) ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—")))))));
+  const roleRights = fixedTable([["Role", "16%"], ...RIGHTS.map(([key, label]) => [label, key === "configure" ? "24%" : "15%"])],
+    Object.entries(ROLE_RIGHTS).map(([role, rights]) => el("tr", {},
+      el("td", {}, el("strong", {}, ROLE_LABEL[role])),
+      RIGHTS.map(([key]) => rights.includes(key) ? el("td", { class: "center has-right" }, el("span", { class: "tick" }, "✓")) : el("td", { class: "center no-right" }, el("span", { class: "muted" }, "—"))))));
+  roleRights.className += " role-rights";
+  if (!users) app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"), roleRights);
+  if (users) {
+    const people = [...users].sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));   // stable: the server's order within each
+    app.append(el('p', { class: 'muted' }, 'Rights come from each person’s role. Use Add user at the top to create an account.'),
+      fixedTable([["Username", "34%"], ["Name", "26%"], ["Role", "16%"], ["Status", "14%"], ["", "10%"]], people.map((u) => el("tr", { class: "person-row" },
+        el("td", {}, el("strong", {}, u.username)),
+        el("td", {}, u.full_name || ""),
+        el("td", {}, ROLE_LABEL[u.role]),
+        el("td", {}, u.active ? chip("pass", "Active") : chip("", "Disabled")),
+        el("td", { class: "right" }, el("button", { class: "small", onclick: () => modal(`Edit ${u.username}`, userForm(u), async (data) => {
+          await api("PUT", `/api/users/${u.id}`, data);
+          toast("User saved");
+          route();
+        }) }, "Edit"))))),
+      el("p", { class: "muted" }, "What each role may do:"), roleRights);
   }
-  if (users) app.append(el('p', { class: 'muted' }, 'Rights come from each person’s role. Use Add user at the top to create an account.'));
-  const tick = (on) => el("td", { class: "center" }, on ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—"));
-  if (users) app.append(table(["Username", "Name", "Role", ...RIGHTS.map(([, label]) => label), "Status", ""], users.map((u) => el("tr", {},
-    el("td", {}, el("strong", {}, u.username)),
-    el("td", {}, u.full_name),
-    el("td", {}, ROLE_LABEL[u.role]),
-    RIGHTS.map(([key]) => tick(ROLE_RIGHTS[u.role].includes(key))),
-    el("td", {}, u.active ? chip("pass", "Active") : chip("", "Disabled")),
-    el("td", { class: "right" }, el("button", { class: "small", onclick: () => modal(`Edit ${u.username}`, userForm(u), async (data) => {
-      await api("PUT", `/api/users/${u.id}`, data);
-      toast("User saved");
-      route();
-    }) }, "Edit"))))));
 
   // 2. Import folders: one per scheduled QA list. When a list has a folder, its newest unrecorded export
   // is read automatically when someone starts that list's QA (no file dialog). Without browser folders
@@ -4714,25 +4772,32 @@ async function renderAdmin() {
       } else if (!scans && !can("configure")) {
         pathCell = a.import_folder || "No folder";
       } else {
-        const input = el("input", { value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\…\\ProtonDaily\\G1 Sphinx" });
-        const save = el("button", { class: "small primary", onclick: async () => {
+        // One example (on the first row), and a quiet Save that shows once the folder is changed.
+        const input = el("input", { value: a.import_folder || "", "aria-label": `Folder for ${m.name} · ${a.queue_name}`, placeholder: rows.length ? null : "e.g. G:\\My Drive\\…\\ProtonDaily\\G1 Sphinx" });
+        const save = el("button", { class: "small", hidden: true, onclick: async () => {
           try {
             await api("PUT", `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(",").map(Number),
               start_date: a.start_date, active: !!a.active, import_folder: input.value.trim() });
             a.import_folder = input.value.trim();
+            save.hidden = true;
             toast("Folder saved");
             check();
           } catch (err) {
             toast(err.message, true);
           }
         } }, "Save");
-        pathCell = el("div", { class: "row nowrap" }, input, save);
+        input.addEventListener("input", () => { save.hidden = input.value.trim() === (a.import_folder || ""); });
+        pathCell = el("div", { class: "row nowrap folder-field" }, input, save);
       }
       rows.push(el("tr", {}, el("td", {}, el("strong", {}, m.name)), el("td", {}, a.queue_name), el("td", { class: "folder-cell" }, pathCell), scans ? el("td", {}, status) : null));
       check();
     }
   }
-  app.append(table(["Machine", "QA list", "Folder", ...(scans ? ["Status"] : [])], rows, "No QA lists are scheduled yet."));
+  // Machine at 18%: "TrueBeam" stays whole at 768 px, where floridaphysics.com still shows this table (cards from 767 px).
+  app.append(fixedTable(scans ? [["Machine", "12%"], ["QA list", "28%"], ["Folder", "36%"], ["Status", "24%"]] : [["Machine", "18%"], ["QA list", "36%"], ["Folder", "46%"]],
+    rows, "No QA lists are scheduled yet."));
+  // Past imports still waiting for review (a one-off clean-up): here with the folders they came from, for the review right.
+  if (can("review")) app.append(el("p", {}, el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…")));
 
   // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
   if (!window.localApi) {
@@ -4834,14 +4899,16 @@ const pageKey = (hash) => { const [path, query] = hash.split("?"); return `${pat
 const places = new Map();   // where each page in this tab's history was left
 let routedPage = pageKey(location.hash), entry;
 const newPage = () => { routedPage = ""; };
-const markEntry = () => { entry = Math.random(); history.replaceState({ ...history.state, gatorqaEntry: entry }, ""); };
+// Each new entry also notes the GatorQA page it was opened from (gatorqaFrom), so a Back button goes Back only to that
+// page: never out of GatorQA (a bookmark, a pasted link, another page before it in the tab) or to an unrelated page.
+const markEntry = (from) => { entry = Math.random(); history.replaceState({ ...history.state, gatorqaEntry: entry, ...(from && { gatorqaFrom: from }) }, ""); };
 markEntry();
-window.addEventListener("hashchange", async () => {
+window.addEventListener("hashchange", async (e) => {
   places.set(entry, scrollY);
   const key = pageKey(location.hash), gen = routeGen + 1, visited = history.state?.gatorqaEntry;
   let y = 0;
   if (visited !== undefined) { entry = visited; y = places.get(visited) || 0; }   // Back or Forward
-  else { if (key === routedPage) y = scrollY; markEntry(); }
+  else { if (key === routedPage) y = scrollY; markEntry(new URL(e.oldURL).hash || "#/"); }
   routedPage = key;
   if (!y) topOnDraw = gen;
   await route();
