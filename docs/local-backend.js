@@ -105,7 +105,9 @@
     saveTimer = setTimeout(async () => {
       try {
         const db = await openDb();
-        db.transaction(STORE, "readwrite").objectStore(STORE).put(JSON.parse(JSON.stringify(S)), "state");
+        // A page hosting these rules may keep the state itself (it must copy what it keeps before returning).
+        if (typeof window.QA_HOST?.saveState === "function") window.QA_HOST.saveState(S);
+        else db.transaction(STORE, "readwrite").objectStore(STORE).put(JSON.parse(JSON.stringify(S)), "state");
       } catch (err) {
         console.error("Could not save", err);
       }
