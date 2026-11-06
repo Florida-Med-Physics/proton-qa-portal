@@ -1385,6 +1385,12 @@ function infoPopup(content,label='Calculation details') {
     dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
   }},'ⓘ');
 }
+// A saved run's note behind a pencil, as on the QA form: the note shows on hover, and in full in a box on a click.
+function noteButton(text) {
+  const button=infoPopup(el('p',{class:'pre'},text),'Note');
+  button.className='icon-btn note-btn has-note';button.textContent='✎';button.title=text;button.setAttribute('aria-label',`Note: ${text}`);
+  return button;
+}
 function qaDisplayName(item) {
   if(item.category!=='HDR treatment-day QA')return item.name;
   return ({
@@ -3485,7 +3491,7 @@ async function renderReviewMeasurements(run) {
         shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
         shared?null:el('td',{class:'qa-result','data-label':'Result'},result),
-        el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment||'—'),
+        el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment?noteButton(r.comment):'—'),
         el('td',{class:'history-cell','data-label':'History'},recent.length?shared?.history:null,hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
       orderMeasurementRow(row);

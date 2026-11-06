@@ -46,4 +46,19 @@ assert.equal(limitsLine({ criterion: 'wl-max-delta' }, 'mm'), 'Pass < 1 mm · Ac
 assert.equal(words.limitsText({ expected: 100, warn: 0.5, fail: 1 }, 'mm'), '100 mm · Warning ±0.5 mm · Action ±1 mm', "a Sphinx file's differing limits");
 assert.doesNotMatch(between('function limitsText(', 'const TYPE_LABELS'), /WARNING ±|ACTION ±|FAIL|warning ±|action ±/);
 
-console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±.');
+// 3a. A saved run's note sits behind a pencil, as on the QA form (Brook: comments behind a pencil icon): the note on hover,
+// in full in a box on a click; no note, a dash. The narrow Note column then never holds a paragraph.
+const shown2 = [];
+const notes = { document: { body: { append: (d) => shown2.push(d) } },
+  el: (tag, props, ...kids) => ({ tag, props: props || {}, kids: kids.flat(Infinity), attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, addEventListener() {}, showModal() {} }) };
+vm.createContext(notes);
+vm.runInContext(between('function infoPopup(', 'function qaDisplayName('), notes);
+const pencil = notes.noteButton('Synthetic note: chamber re-seated.');
+assert.deepEqual([pencil.tag, pencil.className, pencil.textContent, pencil.title, pencil.attrs['aria-label']],
+  ['button', 'icon-btn note-btn has-note', '✎', 'Synthetic note: chamber re-seated.', 'Note: Synthetic note: chamber re-seated.']);
+pencil.props.onclick();
+assert.equal(shown2.length, 1, 'a click opens the note in a box');
+assert.deepEqual([shown2[0].tag, shown2[0].kids[0].kids[0], shown2[0].kids[1].props.class, shown2[0].kids[1].kids[0]], ['dialog', 'Note', 'pre', 'Synthetic note: chamber re-seated.']);
+assert.match(between('async function renderReviewMeasurements(', 'async function renderRun('), /el\('td',\{class:'qa-comment','data-label':'Comment'\},shared\?shared\.comment:r\.comment\?noteButton\(r\.comment\):'—'\)/);
+
+console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±; a saved run note behind a pencil.');

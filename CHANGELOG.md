@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Saved run: a test's note sits behind a pencil (✎), as on the QA form: the note shows on hover and in full in a box on a click (no note: "—"), so the Note column stays narrow. Display only.
+
 - Limits read as Brook asked: "Warning ±0.5 mm · Action ±1 mm" under a test (QA form and saved run) instead of "WARNING ±0.5 mm · ACTION ±1 mm", Winston-Lutz "Pass < 1 mm · Action ≥ 1 mm" instead of "PASS < 1 mm · FAIL ≥ 1 mm", and a Sphinx file's differing limits "Warning ±… · Action ±…"; the verdict chips stay PASS / WARNING / ACTION. Display only (the PDF report already says Warning / Action).
 
 - QA form: a table under one with the same columns (the per-energy tables of a PBS daily list, for example) shows only its History dates, not the column names again; GTR1's PBS daily form is about 330 px shorter. "Show unfinished only" brings the names back on the first table it shows. Display only.
