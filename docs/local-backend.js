@@ -1470,6 +1470,32 @@
     audit(null, "seed", "portal", null, { templates: templates.map((t) => t.name), machines: machines.map((m) => m.name) });
   }
 
+  // Every table row has its own id (insert()). A state saved before 2026-11-06 may hold rows without one (two start-up
+  // passes added rows without insert()), and a hand-edited or partly saved backup a counter behind its table's largest
+  // id. Each state taken from storage, a database file or a restore comes through here: a counter behind is raised to
+  // the largest id, then each row without an id gets the next one, in table order. Nothing else in a row changes.
+  // Duplicate ids are left as they are (other rows may point at either one). Logged when it gives ids; a state with
+  // nothing to do is left exactly as it is.
+  function numberRows() {
+    const given = {};
+    let changed = false;
+    for (const t of TABLES) {
+      let top = 0, missing = 0;
+      for (const r of S[t]) {
+        if (r === null || typeof r !== "object") continue;
+        if (r.id == null) missing++;
+        else if (Number.isFinite(r.id) && r.id > top) top = r.id;
+      }
+      if (!(S.seq[t] >= top)) { S.seq[t] = top; changed = true; }
+      if (!missing) continue;
+      for (const r of S[t]) if (r !== null && typeof r === "object" && r.id == null) r.id = ++S.seq[t];
+      given[t] = missing;
+      changed = true;
+    }
+    if (Object.keys(given).length) audit(null, "upgrade", "ids", null, { given });
+    if (changed) save();
+  }
+
   // ---- router -------------------------------------------------------------------
 
   const ready = (async () => {
@@ -1479,6 +1505,7 @@
     if (fromFile) S = fromFile;
     else if (stored) S = stored;
     else { seed(); save(); }
+    numberRows();
     await setupDemoAccounts();
     if (!S.demoMpaAccountV1) {
       let user = S.users.find(u => u.username.toLowerCase() === 'mpa');
@@ -1534,7 +1561,7 @@
       for(const check of template.checks){
         let item=prior.find(i=>[check.name,check._previous_name].includes(byId('tests',i.test_id)?.name));
         if(item){const test=byId('tests',item.test_id);used.add(item.test_id);test.name=check.name;test.description=check.description;}
-        else{const tid=insert('tests',{...check,active:1,owner_queue_id:q.id,unit:check.unit||'',expected:check.expected??null,warn:check.warn??null,fail:check.fail??null,tol_mode:check.tol_mode||'absolute'});item={queue_id:q.id,test_id:tid,position:0};S.queue_items.push(item);}
+        else{const tid=insert('tests',{...check,active:1,owner_queue_id:q.id,unit:check.unit||'',expected:check.expected??null,warn:check.warn??null,fail:check.fail??null,tol_mode:check.tol_mode||'absolute'});item={queue_id:q.id,test_id:tid,position:0};insert('queue_items',item);}
         ordered.push(item);
       }
       for(const item of prior){const test=byId('tests',item.test_id);if(revision.removed.includes(test.name))S.queue_items=S.queue_items.filter(i=>i!==item);else if(!used.has(item.test_id))ordered.push(item);}
@@ -1724,7 +1751,7 @@
         const own = resolveLimits(byId("tests", i.test_id), i), shared = resolveLimits(byId("tests", theirs[k].test_id), theirs[k]);
         if (["expected", "warn", "fail", "tol_mode"].every((f) => (own[f] ?? null) === (shared[f] ?? null))) return;
         for (const a of schedules) if (!S.overrides.some((o) => o.assignment_id === a.id && o.test_id === theirs[k].test_id)) {
-          S.overrides.push({ assignment_id: a.id, test_id: theirs[k].test_id, expected: own.expected, warn: own.warn, fail: own.fail, tol_mode: own.tol_mode });
+          insert("overrides", { assignment_id: a.id, test_id: theirs[k].test_id, expected: own.expected, warn: own.warn, fail: own.fail, tol_mode: own.tol_mode });
         }
       });
       for (const r of S.results) if (pair.has(r.test_id)) r.test_id = pair.get(r.test_id);
@@ -2119,6 +2146,7 @@
     const s = body.state;
     if (!s || !TABLES.every((t) => Array.isArray(s[t])) || !s.seq) throw new Error("That file is not a portal backup.");
     S = s;
+    numberRows();
     save();
     audit(u.id, "restore", "portal", null, { exported_at: body.exported_at });
     return { ok: true };
@@ -2184,6 +2212,7 @@
         if (!validState(backup.state)) throw new Error(`${handle.name} is not a portal database file.`);
         if (!confirm(`${handle.name} already holds a portal database (saved ${backup.exported_at || "unknown"}). Load it and replace what is in this browser?`)) return null;
         S = backup.state;
+        numberRows();
       }
       await kvPut(DB_FILE_KEY, handle);
       save();
@@ -2196,7 +2225,7 @@
       const permission = await handle.requestPermission({ mode: "readwrite" });
       if (permission === "granted") {
         const fromFile = await readDbFile();
-        if (fromFile) { S = fromFile; save(); }
+        if (fromFile) { S = fromFile; numberRows(); save(); }
       }
       return permission;
     },
