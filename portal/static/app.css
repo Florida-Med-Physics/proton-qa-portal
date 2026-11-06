@@ -1341,6 +1341,8 @@ td, .measure-table td { font-size: 21px; }
 
 @media(max-width:1200px) {
   .table-wrap { display:block; width:100%; overflow-x:auto; }
+  /* That frame would hold the list editor's pinned column row, which then sat over its first tests: it scrolls away. */
+  table.list-editor thead th { position:static; }
   .measure-wrap { overflow:visible; }
   /* #app[data-page] outranks the card layout's display:block on every cell. */
   #app[data-page] .measure-table td.qa-unit:empty, #app[data-page] .measure-table td.qa-baseline:empty,

@@ -153,5 +153,13 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.match(between('async function renderDashboard(', '// Click a list'), /fixedTable\(\[\["QA list", "40%"\], \["Status", "24%"\], \["Last result", "24%"\], \["History", "12%"\]\], rows\)/, 'History is the 4th cell');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter.');
+// 4. List editor on a phone: the table's frame scrolls sideways, which makes it the pinned column row's scroll box; the
+// row then sat --sticky-top (131-168 px) down inside the table, over tests 1.01-1.03. On a phone it scrolls away.
+{
+  assert.ok(phoneRules.includes('  .table-wrap { display:block; width:100%; overflow-x:auto; }\n  /* That frame would hold the list editor\'s pinned column row, which then sat over its first tests: it scrolls away. */\n  table.list-editor thead th { position:static; }'),
+    'the column row is static wherever its frame scrolls sideways');
+  assert.match(css, /^table\.list-editor thead th \{ position: sticky; top: var\(--sticky-top, 0px\);/m, 'a computer keeps the pinned column row');
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone.');
 })().catch((err) => { console.error(err); process.exit(1); });
