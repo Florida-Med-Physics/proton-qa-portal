@@ -172,6 +172,9 @@ const cells = (row) => row.children.map((td) => td.textContent);
   const lands = (role, hash) => { c.state.actingRole = role === 'admin' ? null : role; return c.mayOpenTab(hash) ? hash : '#/'; };
   assert.deepEqual(['therapist', 'admin', 'physicist', 'mpa'].map((r) => lands(r, '#/review')), ['#/review', '#/review', '#/review', '#/review']);
   assert.deepEqual(['therapist', 'mpa', 'physicist'].map((r) => lands(r, '#/admin')), ['#/', '#/', '#/admin'], 'Data Administration needs configure');
+  // People is under Data Administration but needs manage_users (GET /api/users): a Physicist goes to the Dashboard, not to
+  // "You do not have permission to do that." on the page kept.
+  assert.deepEqual(['physicist', 'therapist', 'mpa', 'admin'].map((r) => lands(r, '#/users')), ['#/', '#/', '#/', '#/users'], 'People needs manage_users');
   assert.equal(lands('therapist', '#/queues/6'), '#/', 'a list editor is under Setup QA');
   assert.equal(lands('therapist', '#/trends?machine_id=2&range=90'), '#/trends?machine_id=2&range=90');
   assert.equal(lands('mpa', '#/runs/2053'), '#/runs/2053', 'a saved run is under Review QA');

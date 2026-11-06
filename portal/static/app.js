@@ -539,9 +539,11 @@ function viewAsControl() {
   pick.addEventListener('change',()=>{state.actingRole=pick.value==='admin'?null:pick.value;if(state.actingRole)sessionStorage.setItem('qa_admin_acting_role',state.actingRole);else sessionStorage.removeItem('qa_admin_acting_role');if(!mayOpenTab(location.hash))location.hash='#/';renderShell();route();});
   return el('label',{class:'inline view-as-control',title:'Operate with the selected role. Your Admin identity remains in the audit trail.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick);
 }
-// Whether the role now in use may open the tab a page belongs to (a page in no tab, such as Search, is open to all).
+// Whether the role now in use may open the tab a page belongs to (a page in no tab, such as Search, is open to all), and
+// the page itself: People (#/users) needs manage_users, more than its tab.
 function mayOpenTab(hash) {
   const current = hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
+  if (current === "#/users") return can("manage_users");
   const tab = NAV.find(([, , , owns]) => owns.includes(current));
   return !tab || !tab[2] || can(tab[2]);
 }

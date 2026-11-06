@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- View As on People (#/users, GatorQA's own builds): choosing Physicist opens the Dashboard, as before round 3, instead of keeping the page and showing only "You do not have permission to do that."; People needs the Manage users right, more than its Data Administration tab. Navigation only.
+
 - Back buttons go Back only to the GatorQA page they were opened from: each page in the tab's history notes the page before it. "Back to Machine Trends" on a run, Back and Save limits on Values for this machine, and "← All tests" no longer leave GatorQA after a bookmark or a link from another page, land on Review QA, a run or a QA form, or (browser-only build) lose a Save; otherwise they follow their link (a run's own machine and list, Setup QA, the overview). Navigation only.
 
 - Machine Trends with nothing recorded in the period: Import Folder stays (GatorQA's own builds, a role that performs QA, a list to import into) and only Export CSV goes; the card says "Import reports" only when that button is there. Round 3 had removed both while the card still said to import. Display only.
