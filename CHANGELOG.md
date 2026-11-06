@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Data Administration, Import folders: the Machine column is 18% wide (from 14%; Folder 46%), so "TrueBeam" no longer breaks mid-word at 768-785 px (an iPad held upright, on floridaphysics.com). Display only.
+
 - Data Administration: "Record past imports as history…" is a normal button again (37 px tall, as on Review QA and as Save backup below it); as a small button it was 29 px on a phone. Display only.
 
 - Machine page on a phone: the ⋮ menus (the machine's Edit, Retire and Delete, and each list's actions) are 44 px, the size of the ▶ beside them; they were 32 px, smaller than the buttons they replaced. Display only.

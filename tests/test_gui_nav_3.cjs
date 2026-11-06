@@ -123,6 +123,9 @@ const cells = (row) => row.children.map((td) => td.textContent);
     '#app[data-page="admin"] .role-rights td.no-right, #app[data-page="admin"] .role-rights td.has-right > .tick { display: none; }',
     '#app[data-page="admin"] .role-rights td.has-right::before { content: attr(data-label); }']) assert.ok(phoneBlock.includes(rule), rule);
   assert.match(css, /\.folder-cell \.folder-field > input \{ flex: 1 1 auto; width: auto; min-width: 0; \}/, 'the folder field and its Save share the cell');
+  // floridaphysics.com shows this table from 768 px (cards from 767 px): Machine at 18% keeps "TrueBeam" whole there (at
+  // 14% it broke "TrueBea|m" from 768 to about 785 px); the QA list keeps its 36%.
+  assert.match(between('async function renderAdmin(', 'async function renderUsers('), /: \[\["Machine", "18%"\], \["QA list", "36%"\], \["Folder", "46%"\]\],\n/, 'Machine 18%');
 }
 
 // 3. Perform QA: an as-needed list says "As needed" once (Status), with no schedule line under its name and no date in

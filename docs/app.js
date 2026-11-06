@@ -4794,7 +4794,8 @@ async function renderAdmin() {
       check();
     }
   }
-  app.append(fixedTable(scans ? [["Machine", "12%"], ["QA list", "28%"], ["Folder", "36%"], ["Status", "24%"]] : [["Machine", "14%"], ["QA list", "36%"], ["Folder", "50%"]],
+  // Machine at 18%: "TrueBeam" stays whole at 768 px, where floridaphysics.com still shows this table (cards from 767 px).
+  app.append(fixedTable(scans ? [["Machine", "12%"], ["QA list", "28%"], ["Folder", "36%"], ["Status", "24%"]] : [["Machine", "18%"], ["QA list", "36%"], ["Folder", "46%"]],
     rows, "No QA lists are scheduled yet."));
   // Past imports still waiting for review (a one-off clean-up): here with the folders they came from, for the review right.
   if (can("review")) app.append(el("p", {}, el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…")));
