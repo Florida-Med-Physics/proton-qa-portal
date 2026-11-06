@@ -6,7 +6,8 @@ const source = fs.readFileSync('portal/static/app.js', 'utf8');
 const writes = [];
 let activeWrites = 0;
 const input = { item: { test_id: 1 }, input: { value: '1' }, comment: { value: '' } };
-const context = { inputs: [input], qaDate: { value: '2026-10-22' }, runComment: { value: 'Synthetic draft' }, draftNote: {}, assignmentId: 1, setTimeout, clearTimeout, toast() {},
+// QADerived (derived.js) reads an input's value; a typed value is its own value here.
+const context = { QADerived: { value: (i) => i.value }, inputs: [input], qaDate: { value: '2026-10-22' }, runComment: { value: 'Synthetic draft' }, draftNote: {}, assignmentId: 1, setTimeout, clearTimeout, toast() {},
   api: async (method, path, data) => { assert.equal(++activeWrites, 1); await new Promise((r) => setTimeout(r, 5)); writes.push(data); activeWrites--; return { saved_at: '2026-10-22T22:00:00' }; } };
 vm.createContext(context);
 vm.runInContext(source.slice(source.indexOf('  let autosaveTimer, autosaveStopped'), source.indexOf('  const saveDraft = el(')) + '\nthis.persist = persistDraft; this.stop = () => { autosaveStopped = true; };', context);
