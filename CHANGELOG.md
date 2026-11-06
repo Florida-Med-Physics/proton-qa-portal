@@ -9,6 +9,32 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Navigation fixes after review: browser Back returns to where you were on a page (Review QA, Past results…); a new page moves to its top only once it has loaded; Approve opens the next run below the one approved (not the newest) and is sent once; Approve and Mark in Progress no longer pull you back if you opened another page meanwhile; a run opened from Perform QA (after Submit) goes back there, from anywhere else back to Review QA, for every role; the run's bottom bar no longer repeats its review status; another machine or list on Machine Trends opens at its top; the list editor's Save template dialog closes when the editor link had a query; old #/queues links become #/setup; Machine Trends shows no ring for a measurement with no limits; Past results filters full width on phones; Review QA headings as wide as their tables. Both builds.
+
+- Setup QA list editor opened read-only (a therapist or MPA following a link): the Import blocks card no longer shows the word "null".
+
+- README and the quick user guide describe the new Review QA order, Approve opening the next run, Trash on the run page and Mark in Progress returning to Perform QA.
+
+- QA form: Mark in Progress saves your entries and takes you back to Perform QA ("Saved for later"); open the list again to carry on. If the save fails you stay on the form, as before. Data Administration: Save backup now shows why when a backup is refused (for example, too large for the site) instead of doing nothing.
+
+- Setup: the list editor's Back returns to Setup QA, and the old "QA lists" page (templates and per-machine copies, which contradicted the one-list rule) is gone (#/queues opens Setup QA); "Values for this machine" replaces "Set tolerances" / "Adjust limits for this machine", and that page is titled "Values for <machine> · <list>"; machine menus on Machine Trends, Past results and Record past imports list machines in the Dashboard's order (GTR1 first).
+
+- Machine Trends: fewer words (no paragraphs about saved baselines, how the page is organized, or what the ring colours mean; the charts and "View values and details" stay); a ring for a measurement with no limits (air pressure, temperature, kTP…) shows a grey "—" instead of "0% passed"; category headings read "AI PBS Daily Imaging", not "AI_PBS_Daily_Imaging" (display only).
+
+- Calmer tables and QA form: no zebra stripes or vertical lines between columns (the row under the pointer still lights up); no grey "Recorded" chip in a result cell (PASS / WARNING / ACTION and the Δ stay; a run's overall Result is unchanged); choice menus read "Choose…"; the trend button only on measured values (none on Pass / Fail or Yes / No rows, and no empty Trends field on phones).
+
+- Past results: the date shows its year once ("Mon, Nov 2, 2026"); the page says when it stops at its limit ("Newest 200 shown.") with a Show more link (up to 1,000 runs, which both builds already allow); the three filters sit on one line; phones show each run as a card, nothing sideways.
+
+- Review QA: your own queue comes first (Awaiting Physics Review for physicists and admins, Awaiting Therapy Review for others), then Recently reviewed, then Trash last; both queues have the same heading and count and say "Nothing is waiting for review." when empty; rows have no Open / Review / trash buttons (a row or its date opens the run; moving a run to trash is on the run page; Trash rows keep Restore), and the waiting tables have no Review column.
+
+- Saved run: Approve opens the next run waiting for your approval, in Review QA's order (never your own run or one still waiting for a therapist's sign-off); after the last one, Review QA. Reject stays on the run, as before.
+
+- Saved run: the title names the machine ("GTR1 · PBS DailyQA Template - Sphinx"), the Trend column is no longer cut off, the line under each test reads as on the QA form ("WARNING ±0.5 mm · ACTION ±1 mm", nothing when there are no limits, no repeated baseline), a therapist signs the review test in one click (the form's own Yes no longer shows as already signed), and the way back fits the role (an MPA goes back to Perform QA; a run that needs no therapist sign-off says Awaiting Physics Review). Display only.
+
+- Every page opens at its top (before, a page opened at the scroll position of the page you left, e.g. a QA form opened half-way down); changing Machine Trends or Past results filters keeps your place once the page is drawn again, and one test's trend opens at its top. Saving the list in Setup QA's list editor keeps your place in the list.
+
+- QA form and saved run: History shows the answer of a Pass / Fail or Yes / No test (Pass, Yes, No…) instead of "1.000 Pass/Fail", and a saved run's History uses one decimal count per table, as on the form (101.818 kPa, not 101.8183 kPa). Display only.
+
 - Opening another page while one is still loading (as on a slow connection) no longer leaves the first page's late sections on the new one, such as Review QA's "Awaiting Physics Review" and "Recently reviewed" tables under Setup QA, or a page's tables under the sign-in form when a session ends. A page you leave stops loading, and a save you started still finishes, including the list editor's New test for one machine and a Machine Trends Import Folder (which no longer redraws the page you went to). "Add them" on a QA form applies the Sphinx file again only to that list's form, never to another list's form opened meanwhile. Both builds.
 
 - **[Physics review]** Past Sphinx imports that wait for review can be recorded as history: on Review QA a Physicist or Admin chooses **Record past imports as history…**, picks a machine, QA list and last QA date, sees how many runs will change, and confirms (`POST /api/runs/record-history`, with a dry run). Only runs made by a Sphinx file import that still wait for review change (known by the note the import writes), never runs performed on the Perform page with a note of their own, or trashed, approved or rejected runs; their values, limits, verdicts, comments and therapist sign-offs stay (a sign-off still shows on the run page and in the PDF report), and each gets an audit entry. A Sphinx import also takes `history_before` (a date): files dated before it come in as history, files on or after it wait for review. Both builds; see the README.

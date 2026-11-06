@@ -429,12 +429,12 @@ h2.section-head { font-size: 22px; }
 .fixed-wrap { display: block; width: 100%; max-width: 1080px; }
 .fixed-table { width: 100%; table-layout: fixed; }
 .fixed-table td, .fixed-table th { max-width: none; }
-.fixed-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
 .fixed-table tbody tr:hover td { background: var(--surface-2); }
 .fixed-table tr.first-of-machine td { border-top: 1px solid var(--border); }
 .fixed-table td { padding: 10px 12px; }
 .fixed-table .row.nowrap.end { flex-wrap: wrap; justify-content: flex-end; }
 .modality-head { display: flex; align-items: baseline; gap: 10px; max-width: 1080px; }
+#app[data-page="review"] .modality-head { max-width: none; }   /* as wide as the Review QA tables under it */
 .modality-head .modality-count { font-size: 15px; font-weight: 500; color: var(--muted); }
 .modality-head.proton { border-bottom-color: var(--uf-orange); }
 .modality-head.photon { border-bottom-color: #3a7bd5; }
@@ -511,9 +511,6 @@ tr.quick-trend .spark { max-width: none; }
 .brand-logo { width: 150px; height: 30px; }
 .brand-title { border-right: 0; padding-right: 8px; }
 
-/* Light vertical separators between columns. */
-th + th, td + td { border-left: 1px solid var(--border); }
-tr.section-row td, tr.directions-row td, tr.machine-row td, tr.quick-trend td, tr.group td { border-left: 0; }
 /* Setup QA action buttons wrap rather than overflow the table. */
 .fixed-table td.right .row.nowrap.end { flex-wrap: wrap; row-gap: 4px; }
 
@@ -1068,27 +1065,35 @@ th { font-size: 16px; }
   .page-head select, .page-head .button, .page-head button { max-width: 100%; }
   .home-card-heading h2 { font-size: 22px; }
   #app[data-page="review"] .fixed-table colgroup,
+  #app[data-page="runs"] .fixed-table colgroup,
   #app[data-page="review"] .fixed-table thead,
+  #app[data-page="runs"] .fixed-table thead,
   #app[data-page="setup"] .template-modality table colgroup,
   #app[data-page="setup"] .template-modality table thead,
   .machine-schedules-table table colgroup,
   .machine-schedules-table table thead { display: none; }
   #app[data-page="review"] .fixed-wrap,
+  #app[data-page="runs"] .fixed-wrap,
   #app[data-page="setup"] .template-modality .fixed-wrap,
   .machine-schedules-table { border: 0; background: transparent; }
   #app[data-page="review"] .fixed-table,
+  #app[data-page="runs"] .fixed-table,
   #app[data-page="review"] .fixed-table tbody,
+  #app[data-page="runs"] .fixed-table tbody,
   #app[data-page="setup"] .template-modality table,
   #app[data-page="setup"] .template-modality tbody,
   .machine-schedules-table table,
   .machine-schedules-table tbody { display: block; width: 100%; }
   #app[data-page="review"] .fixed-table tbody tr,
+  #app[data-page="runs"] .fixed-table tbody tr,
   #app[data-page="setup"] .template-modality tbody tr,
   .machine-schedules-table tbody tr { display: block; width: 100%; border: 1px solid var(--border); border-radius: 10px; margin: 12px 0; background: var(--surface); }
   #app[data-page="review"] .fixed-table tbody td,
+  #app[data-page="runs"] .fixed-table tbody td,
   #app[data-page="setup"] .template-modality td,
   .machine-schedules-table td { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: none; padding: 10px 12px; border: 0; text-align: left; gap: 12px; }
   #app[data-page="review"] td[data-label]::before,
+  #app[data-page="runs"] td[data-label]::before,
   #app[data-page="setup"] .template-modality td[data-label]::before,
   .machine-schedules-table td[data-label]::before { content: attr(data-label); color: var(--muted); font-size: 14px; flex: none; }
   #app[data-page="setup"] .template-modality td:first-child::before,
@@ -1206,7 +1211,6 @@ td, .measure-table td { font-size: 21px; }
 .subplot-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .subplot-title .trend-pass-donut { width: 44px; height: 44px; }
 .subplot-title .trend-pass-value { width: 32px; height: 32px; font-size: 12px; }
-.trend-pass-explainer { color: var(--muted); font-size: 15px; margin: 0 0 10px; }
 .trend-pass-breakdown { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 6px 0 12px; }
 .trend-energy-rate { display: flex; align-items: center; gap: 10px; font-size: 17px; }
 @media(max-width:600px){ .trend-chart-row > summary { padding: 12px; } .trend-pass-label { display: none; } }
@@ -1342,7 +1346,7 @@ td, .measure-table td { font-size: 21px; }
 /* Review uses the same measurement language and numbered rows as Perform. */
 .review-section { padding:0; overflow:hidden; }
 .review-section-title { padding:16px; font-weight:700; color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--border); }
-.review-section .measure-wrap { margin:12px; }
+.review-section .measure-wrap { margin:12px; width:auto; }   /* inside the card: the Trend column is never cut off */
 .review-measure-table td { font-size:22px; }
 .review-measure-table td.qa-n { font-size:24px; font-weight:750; min-width:86px; }
 .review-measure-table .qa-label { min-width:300px; }
@@ -1363,6 +1367,8 @@ td, .measure-table td { font-size: 21px; }
 .dot { cursor:pointer; }
 .dot:focus-visible { outline:2px solid var(--accent); }
 .qa-trash-list { margin-top:18px; }
+/* Past results: the three filters on one line at their natural width; on a phone each takes the full width. */
+@media (min-width: 641px) { .runs-filters select { width:auto; max-width:100%; } }
 
 .review-measure-table .hist { width:auto; min-width:76px; white-space:nowrap; }
 .review-measure-table .history-cell { min-width:96px; }
@@ -1389,7 +1395,6 @@ td, .measure-table td { font-size: 21px; }
 .review-close-bar { z-index:10; }
 @media(max-width:1200px) { .review-close-bar { display:flex; flex-wrap:wrap; gap:10px; } .review-close-bar .button { width:100%; text-align:center; } .review-close-message { font-size:16px; } .review-workflow { gap:10px; } }
 
-.qa-review-actions { justify-content:flex-end; flex-wrap:nowrap; gap:8px; }
 .qa-trash-icon { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:8px; flex:none; }
 
 .dashboard-review-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; align-items:start; }
@@ -1764,6 +1769,10 @@ td, .measure-table td { font-size: 21px; }
 .qa-shared-more { padding-bottom:6px; }
 .qa-shared-more > div:empty { display:none; }
 .qa-shared-more .chip.recorded { display:none; }   /* no verdict to show: the deviation alone */
+/* The QA form and a saved run: a result that is recorded, not judged (no limits, text, an unanswered test), shows no grey
+   "Recorded" chip; PASS / WARNING / ACTION and the deviation stay. The run's overall Result keeps its chip. */
+.measure-table .status-cell .chip.recorded { display:none; }
+.measure-table .status-cell .chip.recorded + .result-dev { margin-left:0; }
 .qa-shared-more .chip.recorded + .result-dev { margin-left:0; }
 .qa-shared-more > *, .qa-shared-field .note-input { margin-top:4px; }
 .qa-shared-note { color:var(--muted); }   /* a note, not a value */

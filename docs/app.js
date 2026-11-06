@@ -123,6 +123,12 @@ function fmt(value, digits) {
   return digits === undefined ? String(Math.round(n * 10000) / 10000) : n.toFixed(digits);
 }
 
+// A Pass / Fail or Yes / No answer in History reads as its word, not as the stored 1 or 0 (Yes = pass = 1).
+function answerWord(type, unit, value, status) {
+  if (type === "status") return { pass: "Pass", warn: "Warning", fail: "Fail" }[status] || "—";
+  return unit === "Yes/No" ? (value ? "Yes" : "No") : (value ? "Pass" : "Fail");
+}
+
 // Machine Trends shows numbers to two decimal places (77.68, 0.14); `signed` puts + or − on Δ values. Display only:
 // stored values, the CSV export, the QA forms and Review keep their own precision. A missing value (or anything that is not
 // a number or numeric text) shows "—".
@@ -165,6 +171,7 @@ function toast(message, bad) {
 // Writes (POST, PUT, ...) always finish, with their own toast or note. A read that is one step of a save calls
 // request() instead, so the save does not stop half-way when a page is drawn meanwhile.
 let routeGen = 0;
+let topOnDraw = null;   // the route() whose page opens at its top, as page() draws it (the hashchange listener sets it)
 function api(method, path, body) {
   const gen = routeGen, reply = request(method, path, body);
   if (method !== "GET") return reply;
@@ -260,6 +267,7 @@ function page(title, subtitle, actions) {
   app.replaceChildren(el("div", { class: "page-head" },
     el("div", {}, el("h1", {}, title), subtitle ? el("div", { class: "muted" }, subtitle) : null),
     el("div", { class: "row" }, actions || [])));
+  if (topOnDraw === routeGen) { topOnDraw = null; scrollTo(0, 0); }   // with the new page, not before it has loaded
 }
 
 function table(headers, rows, emptyText) {
@@ -332,6 +340,18 @@ function limitsText(limits, unit) {
   if (limits.warn !== null && limits.warn !== undefined) parts.push(`warning ±${fmt(limits.warn)}${suffix}`);
   if (limits.fail !== null && limits.fail !== undefined) parts.push(`action ±${fmt(limits.fail)}${suffix}`);
   return parts.join(" · ");
+}
+
+// The quiet line under a measured test's name, the same on the QA form and a saved run: "WARNING ±0.5 mm · ACTION ±1 mm".
+// Nothing when the test has no Warning or Action (its baseline is in the Baseline column).
+function qaLimitsLine(limits, unit) {
+  const l = limits || {};
+  if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
+  const suf = l.tol_mode === "percent" ? "%" : unit || "";
+  const parts = [];
+  if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
+  if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
+  return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
 }
 
 const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived" };
@@ -611,7 +631,7 @@ const ROUTES = [
   [/^#\/machines\/(\d+)$/, renderMachine],
   [/^#\/assignments\/(\d+)\/limits$/, renderLimits],
   [/^#\/perform\/(\d+)$/, renderPerform],
-  [/^#\/queues$/, renderQueues],
+  [/^#\/queues$/, () => location.replace("#/setup")],   // old links: the one list of lists is Setup QA
   [/^#\/queues\/(new|\d+)$/, renderQueueEditor],
   [/^#\/tests$/, renderTests],
   [/^#\/review$/, renderReview],
@@ -656,6 +676,8 @@ const MODALITIES = ["Proton", "Photon", "Brachytherapy", "Simulation"];
 const modalityOf = (kind) => (/hdr|brachy/i.test(kind || "") ? "Brachytherapy" : /proton/i.test(kind || "") ? "Proton" : /simulat/i.test(kind || "") ? "Simulation" : "Photon");
 const KIND_RANK = ["Proton gantry", "Linac", "Elekta Synergy", "Varian Ethos", "CT simulator", "MRI simulator", "HDR brachytherapy"];
 const kindRank = (k) => { const i = KIND_RANK.indexOf(k); return i < 0 ? KIND_RANK.length : i; };
+// One machine order for every machine menu, as on the Dashboard: by modality, then kind, then name (GTR1 first).
+const machineOrder = (a, b) => MODALITIES.indexOf(modalityOf(a.kind)) - MODALITIES.indexOf(modalityOf(b.kind)) || kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name);
 
 // A table with fixed column widths, so the Proton and Photon tables line up at the same width.
 function fixedTable(columns, rows, emptyText) {
@@ -714,7 +736,7 @@ async function renderDashboard() {
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
           el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
           el("td", {class:"qa-schedule-status"}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
-          el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
+          el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}?from=perform` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
           el('td',{class:'center'},historyRing(q.history_counts,`#/trends?machine_id=${machine.id}&list=${q.id}`)));
       })];
     });
@@ -824,7 +846,7 @@ async function renderSetup() {
     } catch (err) { toast(err.message, true); }
   };
   const duplicateSchedule = (a, q, m) => modal(`Duplicate ${q.name} for ${m.name}`,
-    el("div", {}, el("p", { class: "muted" }, "Creates a separate list with this machine's included tests and tolerances. The copy starts inactive."),
+    el("div", {}, el("p", { class: "muted" }, "Creates a separate list with this machine's included tests and values. The copy starts inactive."),
       field("New list name", el("input", { name: "name", required: true, value: `${q.name} – ${m.name} (copy)` }))),
     async (data) => {
       await api("POST", `/api/assignments/${a.id}/duplicate`, data);
@@ -832,7 +854,7 @@ async function renderSetup() {
     }, "Duplicate");
 
   app.append(el("h2", { class: "section-head" }, "QA Template Lists"),
-    el("p", { class: "muted small" }, "Edit shared tests here. Each machine keeps its own exceptions and tolerances."));
+    el("p", { class: "muted small" }, "Edit shared tests here. Each machine keeps its own exceptions and values."));
   const editPencil = (q) => iconBtn("✎", editable ? "Edit tests" : "View tests", () => (location.hash = `#/queues/${q.id}`));
   const templateRow = (q) => el("tr", {},
     el("td", {}, el("div", { class: "name-with-edit" }, editPencil(q), editable ? moreMenu([
@@ -912,9 +934,9 @@ async function renderSetup() {
           }, "Save schedule")) : null,
           editable ? moreMenu([
             [a.active ? "Set Inactive" : "Set Active", () => setActive(a, !a.active)],
-            ["Set tolerances for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
+            ["Values for this machine", () => (location.hash = `#/assignments/${a.id}/limits`)],
             ["Duplicate", () => duplicateSchedule(a, q, m)],
-            ["Re-evaluate", () => { if (confirm(`Re-evaluate recorded results for "${q.name}" on ${m.name} using its current tolerances? This updates stored results and is logged.`)) scheduleAction(a, "reevaluate"); }],
+            ["Re-evaluate", () => { if (confirm(`Re-evaluate recorded results for "${q.name}" on ${m.name} using its current values? This updates stored results and is logged.`)) scheduleAction(a, "reevaluate"); }],
             ["Archive", () => scheduleAction(a, "archive", { archived: true }), "Archive only this machine's schedule"],
             ["Delete", () => { if (confirm(`Delete "${q.name}" from ${m.name}? The shared template stays. Schedules with recorded results must be archived instead.`)) scheduleAction(a, "delete"); }, "Remove only this machine's schedule; available only without results"],
           ]) : null,
@@ -1268,7 +1290,7 @@ async function renderMachine(id) {
           toast("Schedule saved");
           route();
         }) }, "Change schedule"),
-        el("a", { href: `#/assignments/${a.id}/limits` }, "Adjust limits for this machine"),
+        el("a", { href: `#/assignments/${a.id}/limits` }, "Values for this machine"),
         el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
     return el("div", { class: "card list-row" },
       el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule)),
@@ -1282,7 +1304,7 @@ async function renderMachine(id) {
 
 async function renderLimits(assignmentId) {
   const t = await api("GET", `/api/assignments/${assignmentId}/template`);
-  page(`Limits: ${t.queue.name}`,
+  page(`Values for ${t.machine.name} · ${t.queue.name}`,
     "Only fill in what is different on this machine. Blank fields use the list's value, shown in grey.");
   const numeric = t.items.filter((i) => i.type === "numeric");
   if (!numeric.length) {
@@ -1480,7 +1502,7 @@ function sectionTitle(number, categories, named) {
 
 // How a category reads on screen; the data keeps the Sphinx sheet names ("Spot").
 const CATEGORY_LABEL = { Spot: "Spot Characteristics" };
-const categoryLabel = (c) => CATEGORY_LABEL[c] || c;
+const categoryLabel = (c) => CATEGORY_LABEL[c] || (c ? String(c).replace(/_/g, " ") : c);   // display only: "AI_PBS_Daily_Imaging" reads "AI PBS Daily Imaging"
 
 // Section label for a test on its own (Trends), e.g. "3.0 Sphinx Measurements".
 function sectionOf(item) {
@@ -1783,7 +1805,7 @@ async function renderPerform(assignmentId) {
         control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
           readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
       }
-      else if (item.type==='choice') control=input=select('', [['',choiceOptions(item.description).length?'Choose an answer…':'Configure devices in Setup QA'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
+      else if (item.type==='choice') control=input=select('', [['',choiceOptions(item.description).length?'Choose…':'Configure devices in Setup QA'],...choiceOptions(item.description).map(c=>[c,c])], '', {'aria-label':item.name,class:'result-input'});
       else control = input = el("input", { type: "text", class: "text-input", "aria-label": item.name });
       const comment = el("input", { type: "text", placeholder: "Note", class: "note-input", hidden: true, "aria-label": `${item.name} note` });
       const noteToggle = el("button", { type: "button", class: "link small", onclick: () => { comment.hidden = false; noteToggle.hidden = true; comment.focus(); } }, "+ note");
@@ -1836,21 +1858,16 @@ async function renderPerform(assignmentId) {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-3).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
+      // A Pass / Fail or Yes / No test shows its answer (Pass, No, ...), never the stored 1 or 0 with its unit.
       const histChips = (it, unit) => {
         const byDate = new Map((history[it.test_id] || []).map((h) => [h.qa_date, h]));
-        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => h ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`) : el("span", { class: "hist empty" }, "—")));
+        const answered = it.type === "boolean" || it.type === "status";
+        return el("span", { class: "hist-row" }, dates.map((d) => byDate.get(d) || null).map((h) => !h ? el("span", { class: "hist empty" }, "—")
+          : answered ? el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${answerWord(it.type, it.unit, h.value, h.status)}` }, answerWord(it.type, it.unit, h.value, h.status))
+          : el("span", { class: `hist ${h.status}`, title: `${dateLabel(h.qa_date)}: ${fmt(h.value, dp)} ${unit}${h.expected !== null && h.expected !== undefined ? ` (Δ ${signed(h.value - h.expected)} ${unit})` : ""}`.trim() }, `${fmt(h.value, dp)}${unit ? ` ${unit}` : ""}`)));
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
-      const limitsLine = (it, unit) => {
-        if (it.type !== "numeric") return null;
-        const l = it.limits || {};
-        if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
-        const suf = l.tol_mode === "percent" ? "%" : unit;
-        const parts = [];
-        if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
-        if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
-        return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
-      };
+      const limitsLine = (it, unit) => (it.type === "numeric" ? qaLimitsLine(it.limits, unit) : null);
       const numberCell = (it) => (firstHeader !== "Test"
         ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
@@ -1893,7 +1910,7 @@ async function renderPerform(assignmentId) {
           shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
           el("td", { class: "history-cell" }, dates.length ? [shared?.history, histChips(main.it, main.unit)] : el("span", { class: "muted small" }, "—")),
-          el("td", {class:"qa-trends"}, trend));
+          el("td", {class:"qa-trends"}, main.it.type === "numeric" ? trend : null));   // a trend only for a measured value
         for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
         const extras = el('td', {class:'qa-phone-extras', colspan:9});
         orderMeasurementRow(row);
@@ -1901,13 +1918,14 @@ async function renderPerform(assignmentId) {
         const secondary = ['qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
         secondary.forEach((cell,index) => {
           cell.classList.add('qa-secondary');
+          if (!cell.firstChild) return;   // nothing to show (no trend for a Pass / Fail test): no empty field on phones
           const field = el('div', {class:'qa-phone-field'}, el('strong', {class:'small muted'}, ['Comment','History','Trends'][index]));
           const content = el('div', {class:'qa-phone-field-content'});
           while (cell.firstChild) content.append(cell.firstChild);
           field.append(content);
           cell.append(field);
         });
-        phoneDrawer(extras, secondary.map(cell=>cell.firstChild), 'Comment, history & trends');
+        phoneDrawer(extras, secondary.filter(cell=>cell.firstChild).map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
       const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];
@@ -2122,7 +2140,7 @@ async function renderPerform(assignmentId) {
       const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef, clear_draft: true });
       if (result.draft_cleared !== true) await api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
       toast(`Submitted. Overall: ${capitalize(result.overall)}`);
-      location.hash = `#/runs/${result.id}`;
+      location.hash = `#/runs/${result.id}?from=perform`;   // the way back is Perform QA
     } catch (err) {
       autosaveStopped = false;
       error.textContent = err.message;
@@ -2155,8 +2173,12 @@ async function renderPerform(assignmentId) {
   const saveDraft = el("button", { type: "button", onclick: async () => {
     clearTimeout(autosaveTimer);
     saveDraft.disabled = true;
+    const gen = routeGen;
     await persistDraft();
     saveDraft.disabled = false;
+    // Saved: back to Perform QA, where the list is opened again to finish it (not if another page was opened meanwhile).
+    // Not saved: stay; the note and toast say so.
+    if (/^Saved/.test(draftNote.textContent)) { toast("Saved for later"); if (gen === routeGen) location.hash = "#/perform-qa"; }
   } }, "Mark in Progress");
   const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
@@ -2223,7 +2245,6 @@ function importSphinxDialog(a) {
 // Queues and test library
 // ---------------------------------------------------------------------------
 
-// Save a machine's list back as a template: a new master copy; the machine keeps its own list untouched.
 // Schedule one list on machines: every ticked machine runs this same list (no copies).
 async function scheduleDialog(list, machines, schedules) {
   if (!schedules) { const all = await api("GET", "/api/assignments"); schedules = machines.flatMap((m) => machineSchedules(all, m.id)); }
@@ -2278,25 +2299,6 @@ function stickyHead() {
   const set = () => document.documentElement.style.setProperty("--sticky-top", `${head.offsetHeight}px`);
   set();
   if (window.ResizeObserver) new ResizeObserver(set).observe(head);
-}
-
-async function renderQueues() {
-  const [queues, machines] = await Promise.all([api("GET", "/api/queues"), api("GET", "/api/machines")]);
-  page("QA lists", "A template is the master copy. Instantiate it on each machine; each instance owns its tests and limits.",
-    can("configure") ? [el("a", { class: "button primary", href: "#/queues/new" }, "New QA Template List")] : []);
-  const templates = queues.filter((q) => q.is_template);
-  const lists = queues.filter((q) => !q.is_template);
-  const row = (q) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/queues/${q.id}`) },
-    el("td", {}, el("strong", {}, q.name)),
-    el("td", { class: "num" }, q.item_count),
-    el("td", {}, q.machines || el("span", { class: "muted" }, "not scheduled")),
-    el("td", {}, q.active ? "" : chip("", "Inactive")),
-    el("td", {}, can("configure") ? el("button", { onclick: (e) => { e.stopPropagation(); copyDialog(q); } }, "Duplicate") : null));
-  app.append(el("h2", {}, "QA List Templates"));
-  app.append(templates.length ? table(["QA List Template", "#Tests", "Machines", "", ""], templates.map(row))
-    : el("div", { class: "card empty" }, "No templates yet. Open a list and tick \"Template\" to make it one."));
-  app.append(el("h2", {}, "Machine lists"));
-  app.append(table(["QA list", "#Tests", "Scheduled on", "", ""], lists.map(row), "No machine lists yet. Duplicate a template to make one."));
 }
 
 const TEMPLATE_IMPORT_COLUMNS = {
@@ -2578,7 +2580,7 @@ async function renderQueueEditor(id) {
   const drawImportBlocks=()=>{
     const inferred=/PBS.*Sphinx/i.test(q.name)?'sphinx':/Monthly.*Proton|Proton.*Monthly/i.test(q.name)?'proton-monthly':/HDR|Flexitron/i.test(q.name)?'hdr':'excel';
     const edit=block=>importMappingEditor(block,importItems,value=>{const index=importBlocks.findIndex(b=>b.id===value.id);if(index<0)importBlocks.push(value);else importBlocks[index]=value;importBlocksDirty=true;markDirty();drawImportBlocks();},q.schedules?.[0]?.id,inferred);
-    importBlocksBox.replaceChildren(el('h2',{},'Import blocks'),el('p',{class:'muted small'},'Map workbook cells, CSV/TXT columns, or PDF/TXT labels to tests. Values are reviewed before filling answers; machine limits remain unchanged.'),...importBlocks.map(block=>el('div',{class:'row import-block-summary'},el('strong',{},block.name),el('span',{class:'muted small'},IMPORT_READERS.find(r=>r[0]===block.reader)?.[1]),editable?el('button',{type:'button',onclick:()=>edit(block)},'Edit mapping'):null,editable?el('button',{type:'button',onclick:()=>{importBlocks=importBlocks.filter(b=>b.id!==block.id);importBlocksDirty=true;markDirty();drawImportBlocks();}},'Remove'):null)),editable?el('button',{type:'button',onclick:()=>edit(null)},'Add import block'):null);
+    importBlocksBox.replaceChildren(...present([el('h2',{},'Import blocks'),el('p',{class:'muted small'},'Map workbook cells, CSV/TXT columns, or PDF/TXT labels to tests. Values are reviewed before filling answers; machine limits remain unchanged.'),...importBlocks.map(block=>el('div',{class:'row import-block-summary'},el('strong',{},block.name),el('span',{class:'muted small'},IMPORT_READERS.find(r=>r[0]===block.reader)?.[1]),editable?el('button',{type:'button',onclick:()=>edit(block)},'Edit mapping'):null,editable?el('button',{type:'button',onclick:()=>{importBlocks=importBlocks.filter(b=>b.id!==block.id);importBlocksDirty=true;markDirty();drawImportBlocks();}},'Remove'):null)),editable?el('button',{type:'button',onclick:()=>edit(null)},'Add import block'):null]));   // present(): a read-only view never shows "null"
   };
   drawImportBlocks();app.append(importBlocksBox);
   const machineSelections = {};
@@ -2953,11 +2955,13 @@ async function renderQueueEditor(id) {
       }
       modifiedMachineValues.clear();defaultLimitsDirty=false;importBlocksDirty=false;dirty=false;unsaved.hidden=true;
       toast('QA list and machine values saved');
-      if(result){location.hash=`#/queues/${result.id}`;if(!isNew)route();}else draw();
+      // Saving keeps your place in the list (a new list opens at its top). A new address is drawn by the hashchange
+      // listener; the same address is drawn here, so the save (and a dialog waiting for it) finishes.
+      if(!result)draw();else if(location.hash!==`#/queues/${result.id}`)location.hash=`#/queues/${result.id}`;else{const y=scrollY;await route();requestAnimationFrame(()=>scrollTo(0,y));}
     };
     saveTemplateChanges=save;
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
-    app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/queues" }, "Back"),
+    app.append(error, el("div", { class: "row template-save-bar" }, el("a", { class: "button", href: "#/setup" }, "Back"),
       saveBtn = el("button", { class: "primary", onclick: () => save().catch((err) => (error.textContent = err.message)) }, "Save"), unsaved));
   }
   app.append(el('datalist', { id: 'template-category-options' }, [...new Set(tests.map(t => t.category).filter(Boolean))].sort().map(category => el('option', { value: category }))));
@@ -3189,7 +3193,6 @@ function qaTrashButton(run) {
     modal('Move QA to trash',el('div',{},el('p',{},`${run.machine_name} · ${run.queue_name} · ${run.qa_date}`),el('p',{class:'muted small'},'Removes this submission from review, history charts and completion counts. You can restore it from Trash.')),async()=>{await api('POST',`/api/runs/${run.id}/trash`,{trashed:true});toast('QA moved to trash');if(location.hash.startsWith('#/runs/'))location.hash='#/review';else route();},'Move to trash');
   }},run.trashed_at?'Restore':svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'},svg('path',{d:'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7'})));
 }
-function reviewRowActions(run) {return el('div',{class:'row qa-review-actions'},el('a',{class:'button small',href:`#/runs/${run.id}`,onclick:e=>e.stopPropagation()},run.trashed_at||can('therapist_approve')&&!can('review')?'Open':run.review_ready===false?'Open':'Review'),qaTrashButton(run));}
 
 // Past Sphinx imports that still wait for review can be recorded as history (POST /api/runs/record-history): their
 // results, limits and verdicts stay, and they leave the review queues. Physicist or Admin only.
@@ -3197,7 +3200,7 @@ async function recordHistoryDialog() {
   const machines = await api('GET', '/api/machines');
   const d = new Date(); d.setDate(d.getDate() - 1);
   const until = el('input', { type: 'date', name: 'until', required: true, value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` });
-  const machine = select('machine_id', [['', 'All'], ...machines.map((m) => [m.id, m.name])], '');
+  const machine = select('machine_id', [['', 'All'], ...machines.slice().sort(machineOrder).map((m) => [m.id, m.name])], '');
   const list = select('assignment_id', [['', 'All']], '');
   const count = el('p', { role: 'status' });
   const body = () => ({ until: until.value, machine_id: machine.value ? Number(machine.value) : null, assignment_id: list.value ? Number(list.value) : null });
@@ -3240,25 +3243,29 @@ async function renderReview() {
   const [runs, trashed] = await apiBatch(["/api/runs?limit=400", "/api/runs?trashed=1&limit=200"]);
   page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results"),
     can("review") ? el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…") : null]);
-  const row = (r) => el("tr", { class: `clickable${r.review_status === "pending" ? "" : ""}`, onclick: () => (location.hash = `#/runs/${r.id}`) },
+  // A row (or its date) opens the run; no buttons in the rows. Moving a run to trash is on the run's own page; a run in
+  // Trash keeps its Restore button.
+  const row = (r, { review = true, trash = false } = {}) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
     el("td", {}, el("a", { href: `#/runs/${r.id}` }, shortDate(r.qa_date))),
     el("td", {}, el("strong", {}, machineLabel(r.machine_name))),
     el("td", {}, r.queue_name),
     el("td", {}, r.performer_name || r.performer || el("span", { class: "muted" }, "—")),
     el("td", {}, chip(r.overall)),
-    el("td", {}, reviewChip(r)),
-    el('td',{class:'center'},reviewRowActions(r)));
-  const cols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "9%"], ["Review", "13%"], ["", "10%"]];
+    review ? el("td", {}, reviewChip(r)) : null,
+    trash ? el("td", { class: "center" }, qaTrashButton(r)) : null);
+  const waitingCols = [["Date", "14%"], ["Machine", "14%"], ["QA list", "36%"], ["Performed by", "22%"], ["Result", "14%"]];
+  const reviewedCols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "32%"], ["Performed by", "18%"], ["Result", "12%"], ["Review", "14%"]];
+  const trashCols = [["Date", "12%"], ["Machine", "12%"], ["QA list", "28%"], ["Performed by", "16%"], ["Result", "11%"], ["Review", "13%"], ["", "8%"]];
   const pending = runs.filter((r) => r.review_status === "pending" && r.review_ready !== false);
-  const therapyMode=can('therapist_approve')&&!can('review');
   const waitingTherapist=runs.filter(r=>r.review_status==='pending'&&r.therapist_approval_required&&(!r.therapist_approved_by||r.review_ready===false));
-  app.append(el('h2',{class:'section-head',id:'therapy-review-queue'},`Awaiting Therapy Review (${waitingTherapist.length})`),fixedTable(cols,waitingTherapist.map(row),'You are caught up. No QA is waiting for your review.'));
-  if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(cols,trashed.map(row),'Trash is empty.')));
   const decided = runs.filter((r) => r.review_status === "approved" || r.review_status === "rejected").slice(0, 25);
-  app.append(el("h2", { class: "section-head modality-head", id: "physics-review-queue" }, "Awaiting Physics Review", el("span", { class: "modality-count" }, String(pending.length))),
-    fixedTable(cols, pending.map(row), "Nothing is waiting for review."));
-  app.append(el("h2", { class: "section-head" }, "Recently reviewed"),
-    fixedTable(cols, decided.map(row), "No reviews yet."));
+  const queue = (id, title, list) => [el("h2", { class: "section-head modality-head", id }, title, el("span", { class: "modality-count" }, String(list.length))),
+    fixedTable(waitingCols, list.map((r) => row(r, { review: false })), "Nothing is waiting for review.")];
+  const physics = queue("physics-review-queue", "Awaiting Physics Review", pending), therapy = queue("therapy-review-queue", "Awaiting Therapy Review", waitingTherapist);
+  // Your own queue first (a physicist's or an admin's: physics; otherwise therapy), then recent decisions, then Trash.
+  app.append(can("review") ? [physics, therapy] : [therapy, physics],
+    el("h2", { class: "section-head" }, "Recently reviewed"), fixedTable(reviewedCols, decided.map((r) => row(r)), "No reviews yet."));
+  if(trashed.length)app.append(el('details',{class:'card qa-trash-list'},el('summary',{},`Trash (${trashed.length})`),fixedTable(trashCols,trashed.map((r)=>row(r,{trash:true})),'Trash is empty.')));
   const stage=queryParams().get('stage');
   if(stage==='therapy'||stage==='physics') requestAnimationFrame(()=>document.getElementById(`${stage}-review-queue`)?.scrollIntoView({block:'start'}));
 }
@@ -3266,9 +3273,9 @@ async function renderReview() {
 async function renderRuns() {
   const params = queryParams();
   const [machines, queues, runs] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), api("GET", `/api/runs?${params}`)]);
-  page("Past results", "Every recorded QA run, newest first.");
-  const filters = el("form", { class: "row" },
-    select("machine_id", [["", "All machines"], ...machines.map((m) => [m.id, m.name])], params.get("machine_id")),
+  page("Past results", "Newest first.");
+  const filters = el("form", { class: "row runs-filters" },
+    select("machine_id", [["", "All machines"], ...machines.slice().sort(machineOrder).map((m) => [m.id, m.name])], params.get("machine_id")),
     select("queue_id", [["", "All QA lists"], ...queues.map((q) => [q.id, q.name])], params.get("queue_id")),
     select("review_status", [["", "Any review status"], ...Object.entries(REVIEW_LABEL)], params.get("review_status")));
   filters.addEventListener("change", () => {
@@ -3276,12 +3283,18 @@ async function renderRuns() {
     location.hash = `#/runs${next.toString() ? "?" + next : ""}`;
   });
   app.append(filters, el("br"));
-  app.append(table(["Date", "Machine", "QA list", "Result", "Review"], runs.map((r) =>
+  app.append(fixedTable([["Date", "18%"], ["Machine", "14%"], ["QA list", "38%"], ["Result", "12%"], ["Review", "18%"]], runs.map((r) =>
     el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
-      el("td", {}, shortDate(r.qa_date), " ", el("span", { class: "muted small" }, r.qa_date.slice(0, 4))),
+      el("td", {}, shortDate(r.qa_date)),
       el("td", {}, machineLabel(r.machine_name)), el("td", {}, r.queue_name),
       el("td", {}, chip(r.overall)),
       el("td", {}, reviewChip(r)))), "No runs match."));
+  // The list stops at its limit (200 unless the link asks for more, at most 1000): say so, and offer the rest.
+  const limit = Number(params.get("limit")) || 200;
+  if (runs.length >= limit) {
+    const more = new URLSearchParams(params); more.set("limit", "1000");
+    app.append(el("p", { class: "muted" }, `Newest ${runs.length} shown.`, limit < 1000 ? [" ", el("a", { href: `#/runs?${more}` }, "Show more")] : null));
+  }
 }
 
 // A self-contained PDF exporter shared by the server and browser builds.
@@ -3405,12 +3418,14 @@ async function renderReviewMeasurements(run) {
       cell:sharedCell(parts.map(p=>[p.r,qaDisplayName(p.r),p.r.type==='numeric'?p.unit:'',testDetailsButton(p.r,run.results,numbers),
         p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('div',{class:'review-measured'},p.amount),
         has(p,'expected','warn','fail')&&!p.missing?p.result:null,
-        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},p.r.expected!=null?'Baseline ':null,limitsText(p.limits,p.unit)):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
+        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},[p.r.expected!=null?`Baseline ${fmt(p.r.expected)}`:null,qaLimitsLine(p.limits,p.unit)?.textContent].filter(Boolean).join(' · ')):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
       comment:parts.some(p=>p.r.comment)?null:'—'};
   };
   let last=null;
   for(const[key,results]of [...groups].sort(([a],[b])=>Number(a.split('|')[0])-Number(b.split('|')[0]))){
     const [n,category]=key.split('|');
+    // One decimal count for the section's History, as on the QA form (Measured and Baseline keep their own precision).
+    const dp=decimalsOf(results.filter(r=>r.type==='numeric').flatMap(r=>[...(history[r.test_id]||[]).slice(-5).map(h=>h.value),r.expected]));
     if(n!==last){app.append(el('h2',{class:'section-head'},sectionTitle(Number(n),[...groups.keys()].filter(k=>k.startsWith(n+'|')).map(k=>k.split('|')[1]),sectionNameOf(results[0]))));last=n;}
     const tbody=el('tbody');
     for(const group of sharedRows(results,numbers)){
@@ -3423,7 +3438,8 @@ async function renderReviewMeasurements(run) {
         const measured=el('div',{class:'review-measured'},value);
         if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
           const {value:input,control}=passFailInput(r.name,false,false);
-          const original=r.value_num==null?'':r.value_num?'pass':'fail';input.value=original;
+          // The form's own Yes is not a sign-off: Pass shows as chosen once the run is signed, so one click signs it.
+          const original=r.value_num==null||r.value_num&&!run.therapist_approved_by?'':r.value_num?'pass':'fail';input.value=original;
           const sync=()=>control.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.value===input.value));sync();
           input.addEventListener('input',async()=>{
             const decision=input.value||'clear',scroll={x:scrollX,y:scrollY};control.querySelectorAll('button').forEach(b=>b.disabled=true);control.setAttribute('aria-busy','true');
@@ -3441,7 +3457,8 @@ async function renderReviewMeasurements(run) {
       const shared=parts.length>1?sharedCells(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=shared?shared.main:parts[0];
       const prior=(history[r.test_id]||[]).filter(h=>h.run_id!==run.id&&h.qa_date<=run.qa_date);
       const recent=[...prior].reverse().slice(0,3);
-      const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+' '+unit}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},r.type==='boolean'?(h.value?'Pass':'Fail'):fmt(h.value)+(unit?' '+unit:''))))):el('span',{class:'muted small'},'—');
+      const answered=r.type==='boolean'||r.type==='status',histText=h=>answered?answerWord(r.type,r.unit,h.value,h.status):fmt(h.value,dp)+(unit?' '+unit:'');
+      const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${histText(h)}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},histText(h))))):el('span',{class:'muted small'},'—');
       const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:9}));
       // The quick trend shows the newest 60 points of this test, fetched on the first click: the page's own history
       // stops at this run's date, which would leave an early or trashed run's chart empty.
@@ -3457,7 +3474,7 @@ async function renderReviewMeasurements(run) {
       }},trendIcon(16));
       const row=el('tr',{'data-test-id':lead.test_id},
         el('td',{class:'qa-n'},numberFor(lead)),
-        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?el('div',{class:'qa-limits'},limitsText(limits,unit)):null),
+        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?qaLimitsLine(limits,unit):null),
         shared?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
         shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
@@ -3475,7 +3492,9 @@ async function renderReviewMeasurements(run) {
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  page(run.queue_name, shortDate(run.qa_date), [el("a",{class:"button",href:"#/review"},"Back to Review QA"),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+  // The way back: Perform QA when the run was opened from there (Submit, a last result), otherwise Review QA (its tab).
+  const back = queryParams().get('from') === 'perform' ? ['#/perform-qa', 'Perform QA'] : ['#/review', 'Review QA'];
+  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0]},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
     window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
@@ -3497,12 +3516,12 @@ async function renderRun(id) {
 
   if (!run.trashed_at && run.therapist_approval_required) {
     app.append(el('section',{class:'card review-workflow'},
-      el('div',{},el('strong',{},'Therapist review'),el('span',{class:'small'},run.therapist_approved_by?`Signed by ${run.therapist_approver_name||'therapist'} · ${run.therapist_approved_at.replace('T',' ')}`:'Mark the therapist-review test below.')),
+      el('div',{},el('strong',{},'Therapist review'),el('span',{class:'small'},run.therapist_approved_by?`Signed by ${run.therapist_approver_name||'therapist'} · ${run.therapist_approved_at.replace('T',' ')}`:'Mark the therapist-review test above.')),
       el('span',{class:'workflow-arrow','aria-hidden':'true'},'→'),
       el('div',{},el('strong',{},'Physicist approval'),el('span',{class:'small'},run.review_status==='approved'?'Approved':run.review_status==='rejected'?'Rejected':run.therapist_approved_by&&run.review_ready!==false?'Awaiting Physics Review':'Awaiting Therapy Review'))));
     if(!run.results.some(therapistReviewCheck)&&!run.therapist_approved_by&&run.review_status==='pending'&&can('therapist_approve'))app.append(el('button',{class:'primary',onclick:async()=>{try{await api('POST',`/api/runs/${id}/therapist-approve`,{});route();}catch(err){toast(err.message,true);}}},'Sign therapist review'));
   }
-  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && (!run.therapist_approval_required || (run.therapist_approved_by && activeRole() === 'physicist'))) {
+  if (!run.trashed_at && run.review_status === "pending" && run.review_ready !== false && can("review") && mayApprove(run)) {
     if (run.performed_by === state.user.id) {
       app.append(el("p", { class: "muted" }, "Someone else needs to review this run, because you performed it."));
     } else {
@@ -3510,17 +3529,24 @@ async function renderRun(id) {
       const error = el("p", { class: "error" });
       const decide = (decision) => async () => {
         error.textContent = "";
+        buttons.forEach((b) => { b.disabled = true; });   // until the next page is drawn: a decision is sent once
+        const gen = routeGen;
         try {
           await api("POST", `/api/runs/${id}/review`, { decision, comment: comment.value });
-          toast(decision === "approved" ? "Approved" : "Rejected");
-          route();
         } catch (err) {
           error.textContent = err.message;
+          buttons.forEach((b) => { b.disabled = false; });
+          return;
         }
+        toast(decision === "approved" ? "Approved" : "Rejected");
+        if (gen !== routeGen) return;   // saved; a page opened meanwhile stays as it is
+        if (decision !== "approved") return route();   // Reject stays on the run
+        // Approve opens the next run waiting for this physicist (none left: Review QA).
+        const next = nextToApprove(await api("GET", "/api/runs?review_status=pending&limit=400").catch(() => []), run);
+        location.hash = next ? `#/runs/${next.id}` : "#/review";
       };
-      const actions=el('div',{class:'review-action-bar'},el('strong',{},'Your review'),error,el('span',{class:'spacer'}),
-        el("button", { class: "primary", onclick: decide("approved") }, "Approve"),
-        el("button", { class: "danger", onclick: decide("rejected") }, "Reject"));
+      const buttons = [el("button", { class: "primary", onclick: decide("approved") }, "Approve"), el("button", { class: "danger", onclick: decide("rejected") }, "Reject")];
+      const actions=el('div',{class:'review-action-bar'},el('strong',{},'Your review'),error,el('span',{class:'spacer'}),buttons);
       app.append(el("div", { class: "card review-box" }, el("strong", {}, "Review note (optional)"), comment, actions));
       const resize=new ResizeObserver(()=>app.style.setProperty('--review-actions-height',`${actions.getBoundingClientRect().height}px`));
       resize.observe(actions);qaTableObservers.add(resize);
@@ -3536,8 +3562,18 @@ async function renderRun(id) {
   const therapistMode=can('therapist_approve')&&!can('review');
   if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
 
-  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):'Review results'),el('span',{class:'spacer'}),el('a',{class:'button primary',href:'#/review'},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':'Back to Review QA')));
+  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&!run.trashed_at&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):null),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},`${therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back':'Back'} to ${back[1]}`)));
 
+}
+
+// A physicist may approve a run that needs no therapist sign-off, or one a therapist has signed (an Admin acting as one).
+const mayApprove = (r) => !r.therapist_approval_required || (r.therapist_approved_by && activeRole() === 'physicist');
+// The next run waiting for this person's approval: the one after this run in Review QA's order (newest first), else the
+// first from the top. Never this run, their own, or one not ready.
+function nextToApprove(runs, run) {
+  const ok = (r) => r.id !== run.id && r.review_status === 'pending' && r.review_ready !== false && r.performed_by !== state.user.id && mayApprove(r);
+  const after = (r) => r.qa_date < run.qa_date || (r.qa_date === run.qa_date && r.id < run.id);
+  return runs.find((r) => ok(r) && after(r)) || runs.find(ok);
 }
 
 function bandValue(point, key, sign) {
@@ -3761,16 +3797,18 @@ function trendPassCounts(points) {
 
 function trendPassRing(points, label = 'Selected period') {
   const c = trendPassCounts(points), scale = c.total ? 100 / c.total : 0;
+  if (!c.pass && !c.warn && !c.fail) return null;   // nothing judged (no Warning or Action on any result): no ring
   const passEnd = c.pass * scale, warningEnd = passEnd + c.warn * scale, actionEnd = warningEnd + c.fail * scale;
   const description = `${label}: ${c.percent}% passed. ${c.pass} pass, ${c.warn} warning, ${c.fail} action${c.other ? `, ${c.other} unclassified` : ''}; ${c.total} measurements in selected period. Uses the baseline and verdict saved with each result; includes extreme values.`;
   return el('span', { class: 'trend-pass-rate', title: description, role: 'img', 'aria-label': description },
     el('span', { class: 'trend-pass-donut', style: `background: conic-gradient(var(--pass) 0% ${passEnd}%, var(--warn) ${passEnd}% ${warningEnd}%, var(--fail) ${warningEnd}% ${actionEnd}%, var(--border) ${actionEnd}% 100%)` },
-      el('span', { class: 'trend-pass-value' }, c.total ? `${c.percent}%` : '—')),
+      el('span', { class: 'trend-pass-value' }, `${c.percent}%`)),
     el('span', { class: 'trend-pass-label' }, 'passed'));
 }
 
 function trendPassBreakdown(series) {
-  return el('div', { class: 'trend-pass-breakdown', 'aria-label': 'Pass rate by energy' }, series.map(item => el('div', { class: 'trend-energy-rate' }, el('strong', {}, item.label), trendPassRing(item.points, item.label))));
+  const rings = series.map(item => [item.label, trendPassRing(item.points, item.label)]).filter(([, ring]) => ring);
+  return rings.length ? el('div', { class: 'trend-pass-breakdown', 'aria-label': 'Pass rate by energy' }, rings.map(([label, ring]) => el('div', { class: 'trend-energy-rate' }, el('strong', {}, label), ring))) : null;
 }
 
 function trendStatistics(series, unit, delta = false, colorIndex = null) {
@@ -3867,14 +3905,14 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
           return { ...item, label, colorIndex: energies.get(label) };
         }).sort((a, b) => a.colorIndex - b.colorIndex);              // the same energy order (and colours) in X and in Y
         if (!members.length) return null;
-        const bands = !delta || trendSharedLimits(members);
+        const bands = !delta || trendSharedLimits(members), breakdown = trendPassBreakdown(members);
         if (delta && bands) banded.push(...members);
         return el('section', { class: 'subplot skewness-axis-panel' }, el('div', { class: 'subplot-title' }, `${yLabel} ${axis}`, trendPassRing(members.flatMap(item => item.points), `${yLabel} ${axis}`)),
           drawSeries(members, unit, { compact: true, delta, yLabel: `${yLabel} ${axis}`, prediction, bands, fixed2: trends }),
           bands ? null : bandNote(),
           trendExclusionNote(members, delta),
           trends ? trendSummaryTable(members, unit, delta, `${yLabel} ${axis}`) : trendStatistics(members, unit, delta),
-          el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), trendPassBreakdown(members)));
+          breakdown && el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), breakdown));
       }).filter(Boolean);
       show(controls, el('div', { class: 'energy-plot-grid plots-2 skewness-axis-grid' }, ...panels),
         el('div', { class: 'chart-key' }, delta && hasRef ? keyItem('ref', 'Reference (0)') : null,
@@ -4187,7 +4225,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       const draw = () => {
         if (drawn) return;
         drawn = true;
-        body.append(el('p', { class: 'trend-pass-explainer' }, 'Pass rate for the selected period · ', el('span', { class: 'pass' }, 'Green: pass'), ' · ', el('span', { class: 'warn' }, 'Warning'), ' · ', el('span', { class: 'fail' }, 'Red: action'), '. All measurements count, including values excluded from plotting.'), trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
+        body.append(trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
       };
       chart.addEventListener('toggle', () => { if (chart.open) draw(); });
       // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category, closed.
@@ -4212,7 +4250,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       section.hidden = rows.every(row => row.hidden);
     }
   }});
-  app.append(el('h2', { class: 'section-head' }, 'Measurements'), el('p', { class: 'muted small' }, 'Organized by QA list and measurement type. Select a row to open its graph. Matching X and Y measurements share a graph.'), search, ...sections);
+  app.append(el('h2', { class: 'section-head' }, 'Measurements'), search, ...sections);
 }
 
 function renderTrendDetail(group, range, assignments=[]) {
@@ -4501,14 +4539,13 @@ async function renderTrends() {
   }
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
-    select('machine_id', machines.map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
-    lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }) : null,
+    select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => { newPage(); go({ machine_id: e.target.value, range }); } }),
+    lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => { newPage(); go({ machine_id: machineId, list: e.target.value, range }); } }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
     testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));
-  app.append(el('p',{class:'muted trend-baseline-context'},'Charts use each result’s saved baseline and verdict, matching Review QA. Source QA lists and test numbers are shown below.'));
   if (!testIds.length) return renderTrendOverview(machines, machineId, range, listId, templates, historyRequest, lists);
   // Several tests' trends in one request (GET /api/batch), for the same reason; one test, one request as before.
   const trendPaths = testIds.map((id) => `/api/trend?machine_id=${machineId}&test_id=${id}`);
@@ -4706,10 +4743,14 @@ async function renderAdmin() {
       el("div", { class: "card" }, el("p", { class: "muted" }, "Save a backup file regularly, and restore it on another computer to move the data."),
         el("div", { class: "row" },
           el("button", { onclick: async () => {
-            const backup = await api("GET", "/api/backup");
-            const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
-            const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
-            document.body.append(link); link.click(); link.remove();
+            try {
+              const backup = await api("GET", "/api/backup");
+              const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
+              const link = el("a", { href: URL.createObjectURL(blob), download: `qa-portal-backup-${today()}.json` });
+              document.body.append(link); link.click(); link.remove();
+            } catch (err) {
+              toast(err.message, true);   // a refused backup is never silent
+            }
           } }, "Save backup"),
           el("button", { onclick: () => restore.click() }, "Restore from backup"), restore)));
   }
@@ -4764,7 +4805,28 @@ async function renderAccount() {
 
 // ---------------------------------------------------------------------------
 
-window.addEventListener("hashchange", route);
+// A new page opens at its top, as page() draws it. Back and Forward return to the place a page was left. A new query on
+// the same page (a Machine Trends period, Past results filters or Show more) keeps the place. Each place is put back once
+// the page is drawn again (drawing it empties it first). One test's trend (test_id) is a page of its own, and so is
+// another machine or QA list on Machine Trends (newPage()).
+history.scrollRestoration = "manual";   // GatorQA puts the place back itself, once the page has loaded
+const pageKey = (hash) => { const [path, query] = hash.split("?"); return `${path}|${new URLSearchParams(query || "").get("test_id") || ""}`; };
+const places = new Map();   // where each page in this tab's history was left
+let routedPage = pageKey(location.hash), entry;
+const newPage = () => { routedPage = ""; };
+const markEntry = () => { entry = Math.random(); history.replaceState({ ...history.state, gatorqaEntry: entry }, ""); };
+markEntry();
+window.addEventListener("hashchange", async () => {
+  places.set(entry, scrollY);
+  const key = pageKey(location.hash), gen = routeGen + 1, visited = history.state?.gatorqaEntry;
+  let y = 0;
+  if (visited !== undefined) { entry = visited; y = places.get(visited) || 0; }   // Back or Forward
+  else { if (key === routedPage) y = scrollY; markEntry(); }
+  routedPage = key;
+  if (!y) topOnDraw = gen;
+  await route();
+  if (y && gen === routeGen) requestAnimationFrame(() => scrollTo(0, y));   // once its rows are sized; not if another page was opened meanwhile
+});
 api("GET", "/api/me").then((data) => {
   state.user = data.user;
   route();

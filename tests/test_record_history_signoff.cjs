@@ -34,7 +34,7 @@ const text = (n) => typeof n === 'string' ? n : (n.kids || []).map(text).join(''
 let shown = [];
 const page = {
   el: (tag, props, ...kids) => node(tag, props || {}, kids), page: () => {}, toast: () => {}, route: () => {}, downloadQaReport: async () => {},
-  window: {}, qaTrashButton: () => null, personName: (name, user) => name || user, shortDate: (d) => d, chip: (s) => s, reviewChip: (run) => run.review_status,
+  window: {}, qaTrashButton: () => null, personName: (name, user) => name || user, shortDate: (d) => d, chip: (s) => s, reviewChip: (run) => run.review_status, reviewStatusText: (run) => run.review_status,
   app: { append: (...n) => shown.push(...n), querySelectorAll: () => [], style: { setProperty() {} } },
   renderReviewMeasurements: async () => {}, can: (perm) => perm === 'review', activeRole: () => 'physicist', state: { user: { id: 99 } },
   queryParams: () => new URLSearchParams(''), requestAnimationFrame: () => {}, therapistReviewCheck: () => false,
