@@ -3274,8 +3274,7 @@ async function recordHistoryDialog() {
 async function renderReview() {
   // Submitted runs and the trash in one request: one round trip, not two in a row.
   const [runs, trashed] = await apiBatch(["/api/runs?limit=400", "/api/runs?trashed=1&limit=200"]);
-  page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results"),
-    can("review") ? el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…") : null]);
+  page("Review QA", can("therapist_approve")&&!can("review")?"Check submitted QA and sign your therapist review.":"Submitted QA waiting for review, then recent decisions.", [el("a", { class: "button", href: "#/runs" }, "All past results")]);
   // A row (or its date) opens the run; no buttons in the rows. Moving a run to trash is on the run's own page; a run in
   // Trash keeps its Restore button.
   const row = (r, { review = true, trash = false } = {}) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/runs/${r.id}`) },
@@ -4797,6 +4796,8 @@ async function renderAdmin() {
   }
   app.append(fixedTable(scans ? [["Machine", "12%"], ["QA list", "28%"], ["Folder", "36%"], ["Status", "24%"]] : [["Machine", "14%"], ["QA list", "36%"], ["Folder", "50%"]],
     rows, "No QA lists are scheduled yet."));
+  // Past imports still waiting for review (a one-off clean-up): here with the folders they came from, for the review right.
+  if (can("review")) app.append(el("p", {}, el("button", { type: "button", class: "small", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…")));
 
   // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
   if (!window.localApi) {

@@ -1,4 +1,4 @@
-// Synthetic checks of Review QA's "Record past imports as history…" dialog (app.js recordHistoryDialog) with a stand-in
+// Synthetic checks of the "Record past imports as history…" dialog (app.js recordHistoryDialog) with a stand-in
 // page: it shows the live dry-run count in plain words, offers a machine's lists once a machine is chosen, can only
 // confirm when something would change (and not while a new machine's lists are loading), and Confirm records and
 // reloads the page. Only a Physicist or Admin sees the button. Run with node tests/test_record_history_dialog.cjs from the repository root.
@@ -8,9 +8,10 @@ const vm = require('node:vm');
 const source = fs.readFileSync('portal/static/app.js', 'utf8');
 assert.equal(fs.readFileSync('docs/app.js', 'utf8'), source, 'docs/app.js is out of step: run python build_pages.py');
 
-// The button sits on Review QA for the review right only.
-const review = source.slice(source.indexOf('async function renderReview()'), source.indexOf('async function renderRuns()'));
-assert.match(review, /can\("review"\) \? el\("button", \{ type: "button", onclick: \(\) => recordHistoryDialog\(\)[^\n]*"Record past imports as history…"\) : null/);
+// The button sits on Data Administration, under Import folders, for the review right only (it was on Review QA).
+const admin = source.slice(source.indexOf('async function renderAdmin()'), source.indexOf('async function renderUsers()'));
+assert.match(admin, /if \(can\("review"\)\) app\.append\(el\("p", \{\}, el\("button", \{ type: "button", class: "small", onclick: \(\) => recordHistoryDialog\(\)[^\n]*"Record past imports as history…"\)\)\);/);
+assert.doesNotMatch(source.slice(source.indexOf('async function renderReview()'), source.indexOf('async function renderRuns()')), /recordHistoryDialog/);
 
 function node(tag, props = {}, kids = []) {
   const listeners = {};

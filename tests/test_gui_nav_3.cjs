@@ -343,5 +343,14 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.deepEqual((await links('therapist')).links, ['Synthetic SRS #/perform/9', 'Synthetic PBS daily #/perform-qa'], 'no monthly list for a therapist');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol box starts closed; no Import blocks card on a read-only list; a search opens a list where it is performed.');
+// 13. "Record past imports as history…" (a one-off clean-up) is a quiet button on Data Administration under Import folders,
+// for the review right, not a permanent top button on Review QA (tests/test_record_history_dialog.cjs checks the dialog).
+{
+  assert.doesNotMatch(between('async function renderReview()', 'async function renderRuns()'), /Record past imports/);
+  const admin = between('async function renderAdmin()', 'async function renderUsers()');
+  assert.ok(admin.indexOf('Record past imports as history…') > admin.indexOf('rows, "No QA lists are scheduled yet."'), 'under the Import folders table');
+  for (const p of ['README.md', 'docs/USER_GUIDE.txt']) assert.match(fs.readFileSync(p, 'utf8'), /Record past imports as history…(\*\*)? on Data Administration, under Import folders/, p);
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol box starts closed; no Import blocks card on a read-only list; a search opens a list where it is performed; Record past imports moves to Data Administration.');
 })().catch((err) => { console.error(err); process.exit(1); });

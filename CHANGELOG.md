@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Review QA: "Record past imports as history…", a one-off clean-up, is no longer a permanent button at the top (the first queue starts about 45 px higher on a phone for a physicist or admin); it is a quiet button on Data Administration under Import folders, with the same dialog. README and quick guide updated. Navigation only.
+
 - Search for a therapist or MPA: a QA list opens where it is performed (its QA form when it is on one machine, otherwise Perform QA) instead of the read-only list editor, unscheduled lists are left out, and a therapist sees no monthly list, as on the Dashboard. Navigation only: physicists and admins keep the list editor.
 
 - List editor opened read-only (a therapist or MPA following a link): no "Import blocks" card, which offered them nothing to do; the tests start about 170 px higher on a phone. Display only.
