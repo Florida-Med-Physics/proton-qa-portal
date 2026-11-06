@@ -319,5 +319,29 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.equal((editor.match(/app\.append\(importBlocksBox\)/g) || []).length, 1);
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol box starts closed; no Import blocks card on a read-only list.');
+// 12. Search without setup rights: a QA list opens where it is performed (its QA form when on one machine, else Perform
+// QA), not the read-only list editor; only lists scheduled somewhere, and a therapist sees no monthly list (Dashboard).
+{
+  const queues = [{ id: 5, name: 'Synthetic SRS', machines: 'LinacA', active: 1 }, { id: 6, name: 'Synthetic PBS daily', machines: 'G1, G2', active: 1 },
+    { id: 8, name: 'Synthetic monthly', machines: 'G1', active: 1 }, { id: 9, name: 'Synthetic unscheduled', machines: '', active: 1 }];
+  const schedules = [{ id: 9, queue_id: 5, active: 1, frequency: 'asneeded' }, { id: 1, queue_id: 6, active: 1, frequency: 'daily' }, { id: 4, queue_id: 6, active: 1, frequency: 'daily' },
+    { id: 2, queue_id: 8, active: 1, frequency: 'monthly' }];
+  const links = async (role) => {
+    const asked = [];
+    const c = dom({ state: { user: { id: 1, role }, actingRole: null }, location: { hash: '#/search?q=Synthetic' },
+      api: async (m, path) => { asked.push(path); return path === '/api/queues' ? queues : path === '/api/assignments' ? schedules : path === '/api/tests' ? [] : []; },
+      page() {}, categoryLabel: (x) => x });
+    vm.runInContext(between('function activeRole(', 'let toastTimer;') + between('function queryParams(', '// -----') + between('async function renderSearch(', '// Folder handles stay')
+      + 'function fixedTable(cols, rows) { return el("table", {}, rows); }', c);
+    await c.renderSearch();
+    return { asked, links: c.app.find((n) => n.tagName === 'a').map((a) => `${a.textContent} ${a.getAttribute('href')}`) };
+  };
+  const admin = await links('admin');
+  assert.deepEqual(admin.links, ['Synthetic SRS #/queues/5', 'Synthetic PBS daily #/queues/6', 'Synthetic monthly #/queues/8', 'Synthetic unscheduled #/queues/9'], 'setup rights: the list editor, as before');
+  assert.ok(!admin.asked.includes('/api/assignments'));
+  assert.deepEqual((await links('mpa')).links, ['Synthetic SRS #/perform/9', 'Synthetic PBS daily #/perform-qa', 'Synthetic monthly #/perform/2']);
+  assert.deepEqual((await links('therapist')).links, ['Synthetic SRS #/perform/9', 'Synthetic PBS daily #/perform-qa'], 'no monthly list for a therapist');
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol box starts closed; no Import blocks card on a read-only list; a search opens a list where it is performed.');
 })().catch((err) => { console.error(err); process.exit(1); });

@@ -4360,7 +4360,13 @@ async function renderSearch() {
   if (!q) return;
   const words = q.toLowerCase().split(/\s+/);
   const hit = (text) => words.every((w) => String(text || "").toLowerCase().includes(w));
-  const [machines, queues, tests] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), can("configure") ? api("GET", "/api/tests") : []]);
+  const editor = can("configure");
+  const [machines, queues, tests, schedules] = await Promise.all([api("GET", "/api/machines"), api("GET", "/api/queues"), editor ? api("GET", "/api/tests") : [],
+    editor ? [] : api("GET", "/api/assignments")]);
+  // Without setup rights a QA list opens where it is performed (its QA form on one machine, else Perform QA), never the
+  // read-only list editor; only lists scheduled somewhere, and for a therapist no monthly list, as on the Dashboard.
+  const performedOn = (x) => schedules.filter((a) => a.queue_id === x.id && a.active && (activeRole() !== "therapist" || a.frequency !== "monthly"));
+  const listHref = (x) => { if (editor) return `#/queues/${x.id}`; const on = performedOn(x); return on.length === 1 ? `#/perform/${on[0].id}` : "#/perform-qa"; };
   const section = (title, rows, cols) => {
     if (!rows.length) return;
     app.append(el("h2", { class: "section-head" }, `${title} (${rows.length})`), fixedTable(cols, rows));
@@ -4369,8 +4375,8 @@ async function renderSearch() {
     el("td", {}, el("a", { href: `#/machines/${m.id}` }, el("strong", {}, m.name))), el("td", { class: "muted" }, m.kind || "—"),
     el("td", {}, el("a", { class: "button small", href: `#/trends?machine_id=${m.id}` }, "Trends")))),
     [["Machine", "40%"], ["Kind", "40%"], ["", "20%"]]);
-  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.machines || ""}`)).map((x) => el("tr", {},
-    el("td", {}, el("a", { href: `#/queues/${x.id}` }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.machines || "Not scheduled"),
+  section("QA lists", queues.filter((x) => hit(`${x.name} ${x.machines || ""}`) && (editor || (x.active && performedOn(x).length))).map((x) => el("tr", {},
+    el("td", {}, el("a", { href: listHref(x) }, el("strong", {}, x.name))), el("td", { class: "muted" }, x.machines || "Not scheduled"),
     el("td", { class: "center" }, x.item_count))),
     [["QA list", "50%"], ["Where", "40%"], ["Tests", "10%"]]);
   const byQueue = new Map(queues.map((x) => [x.id, x]));

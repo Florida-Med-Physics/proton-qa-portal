@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Search for a therapist or MPA: a QA list opens where it is performed (its QA form when it is on one machine, otherwise Perform QA) instead of the read-only list editor, unscheduled lists are left out, and a therapist sees no monthly list, as on the Dashboard. Navigation only: physicists and admins keep the list editor.
+
 - List editor opened read-only (a therapist or MPA following a link): no "Import blocks" card, which offered them nothing to do; the tests start about 170 px higher on a phone. Display only.
 
 - QA form: the Protocol box starts closed at every width (one click opens it), so the first test starts 50-90 px higher; on floridaphysics.com it opened on every computer screen. Display only.
