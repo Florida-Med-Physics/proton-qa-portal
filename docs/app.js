@@ -4797,7 +4797,7 @@ async function renderAdmin() {
   app.append(fixedTable(scans ? [["Machine", "12%"], ["QA list", "28%"], ["Folder", "36%"], ["Status", "24%"]] : [["Machine", "14%"], ["QA list", "36%"], ["Folder", "50%"]],
     rows, "No QA lists are scheduled yet."));
   // Past imports still waiting for review (a one-off clean-up): here with the folders they came from, for the review right.
-  if (can("review")) app.append(el("p", {}, el("button", { type: "button", class: "small", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…")));
+  if (can("review")) app.append(el("p", {}, el("button", { type: "button", onclick: () => recordHistoryDialog().catch((err) => toast(err.message, true)) }, "Record past imports as history…")));
 
   // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
   if (!window.localApi) {

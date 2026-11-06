@@ -10,7 +10,7 @@ assert.equal(fs.readFileSync('docs/app.js', 'utf8'), source, 'docs/app.js is out
 
 // The button sits on Data Administration, under Import folders, for the review right only (it was on Review QA).
 const admin = source.slice(source.indexOf('async function renderAdmin()'), source.indexOf('async function renderUsers()'));
-assert.match(admin, /if \(can\("review"\)\) app\.append\(el\("p", \{\}, el\("button", \{ type: "button", class: "small", onclick: \(\) => recordHistoryDialog\(\)[^\n]*"Record past imports as history…"\)\)\);/);
+assert.match(admin, /if \(can\("review"\)\) app\.append\(el\("p", \{\}, el\("button", \{ type: "button", onclick: \(\) => recordHistoryDialog\(\)[^\n]*"Record past imports as history…"\)\)\);/);
 assert.doesNotMatch(source.slice(source.indexOf('async function renderReview()'), source.indexOf('async function renderRuns()')), /recordHistoryDialog/);
 
 function node(tag, props = {}, kids = []) {

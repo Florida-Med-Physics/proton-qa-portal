@@ -352,6 +352,9 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.doesNotMatch(between('async function renderReview()', 'async function renderRuns()'), /Record past imports/);
   const admin = between('async function renderAdmin()', 'async function renderUsers()');
   assert.ok(admin.indexOf('Record past imports as history…') > admin.indexOf('rows, "No QA lists are scheduled yet."'), 'under the Import folders table');
+  // A normal (secondary) button, 37 px tall as on Review QA and as Save backup below it; "small" made it 29 px on a phone.
+  assert.match(admin, /el\("button", \{ type: "button", onclick: \(\) => recordHistoryDialog\(\)/);
+  assert.doesNotMatch(admin.slice(admin.indexOf('recordHistoryDialog()') - 200, admin.indexOf('recordHistoryDialog()')), /class: "small"/, 'not a small button');
   for (const p of ['README.md', 'docs/USER_GUIDE.txt']) assert.match(fs.readFileSync(p, 'utf8'), /Record past imports as history…(\*\*)? on Data Administration, under Import folders/, p);
 }
 
