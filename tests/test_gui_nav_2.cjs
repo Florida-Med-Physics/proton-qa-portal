@@ -82,8 +82,12 @@ const phoneStart = cssLF.indexOf('@media (max-width: 1200px) {\n  html, body { m
 assert.ok(phoneStart >= 0, "GatorQA's phone block");
 const phoneRules = cssLF.slice(phoneStart, cssLF.indexOf('\n}\n', phoneStart));
 for (const rule of ['.submit-bar:has(> .save-draft) { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }',
-  '.submit-bar > .save-draft { grid-column:1; grid-row:2; min-height:48px; font-size:17px; }',
-  '.submit-bar:has(> .save-draft) > button.primary { grid-column:2; grid-row:2; }']) assert.ok(phoneRules.includes(rule), rule);
+  '.submit-bar > .save-draft { grid-column:1; grid-row:2; min-height:48px; }',
+  '.submit-bar:has(> .save-draft) > button.primary { grid-column:2; grid-row:2; }',
+  // The two buttons the same height, each label on one line down to 350-360 px: 17px at most (the form sets every size
+  // through --qa-form-font-size with !important, so a plain font-size here never applied) and narrower side padding.
+  '.submit-bar:has(> .save-draft) > button { align-self:stretch; padding-left:8px; padding-right:8px; --qa-form-font-size:min(17px, 1em); }']) assert.ok(phoneRules.includes(rule), rule);
+assert.doesNotMatch(phoneRules, /\.submit-bar[^{]*\{[^}]*font-size:17px/, 'no font-size the form-wide rule overrides');
 assert.match(css, /\.submit-bar > button\.primary \{ grid-column:2; grid-row:1;/, "other bars (a saved run's) keep their layout");
 
 console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±; a saved run note behind a pencil; Mark in Progress beside Submit on a phone.');

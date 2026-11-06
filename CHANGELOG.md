@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA form on a phone: Mark in Progress and Submit for review are the same size and each fits on one line down to a 360 px phone (17 px labels with less side padding; the 17 px set before never applied, the form's own size overrode it, so both labels took two lines). Display only.
+
 - Saved run: a note with a long unbroken path or file name wraps inside its box instead of scrolling sideways. Display only.
 
 - QA form: a table under one with the same columns keeps its column names for screen readers (the repeated row is collapsed on screen, no longer removed), so Measured, Unit and Result are read out in every table; the screen looks the same. Display only.
