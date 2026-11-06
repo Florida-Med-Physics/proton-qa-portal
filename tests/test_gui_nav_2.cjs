@@ -35,4 +35,15 @@ assert.deepEqual(thin(unfinished, true), ['names', 'hidden', 'names', 'dates'], 
 unfinished.forEach((b) => { b.querySelectorAll('tr[data-qa-entry]').forEach((r) => { r.hidden = false; }); });
 assert.deepEqual(thin(unfinished, false), ['names', 'names', 'dates', 'dates'], 'and back');
 
-console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them).');
+// 2. Limits read "Warning ±" / "Action ±" (never WARNING / ACTION / FAIL; the verdict chips keep PASS / WARNING / ACTION).
+const words = { el: (tag, props, ...kids) => ({ tag, props: props || {}, textContent: kids.flat(Infinity).join('') }) };
+vm.createContext(words);
+vm.runInContext(between('function fmt(', '// A Pass / Fail or Yes / No answer') + between('function limitsText(', 'const TYPE_LABELS'), words);
+const limitsLine = (limits, unit) => words.qaLimitsLine(limits, unit)?.textContent ?? null;
+assert.equal(limitsLine({ expected: 100, warn: 0.5, fail: 1 }, 'mm'), 'Warning ±0.5 mm · Action ±1 mm');
+assert.equal(limitsLine({ expected: 0, warn: 2, fail: 3, tol_mode: 'percent' }, 'mGy'), 'Warning ±2 % · Action ±3 %');
+assert.equal(limitsLine({ criterion: 'wl-max-delta' }, 'mm'), 'Pass < 1 mm · Action ≥ 1 mm');
+assert.equal(words.limitsText({ expected: 100, warn: 0.5, fail: 1 }, 'mm'), '100 mm · Warning ±0.5 mm · Action ±1 mm', "a Sphinx file's differing limits");
+assert.doesNotMatch(between('function limitsText(', 'const TYPE_LABELS'), /WARNING ±|ACTION ±|FAIL|warning ±|action ±/);
+
+console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±.');

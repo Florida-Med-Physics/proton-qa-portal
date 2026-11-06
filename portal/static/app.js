@@ -337,20 +337,21 @@ function limitsText(limits, unit) {
   }
   const suffix = limits.tol_mode === "percent" ? "%" : unit ? ` ${unit}` : "";
   const parts = [`${fmt(limits.expected)}${unit ? " " + unit : ""}`];
-  if (limits.warn !== null && limits.warn !== undefined) parts.push(`warning ±${fmt(limits.warn)}${suffix}`);
-  if (limits.fail !== null && limits.fail !== undefined) parts.push(`action ±${fmt(limits.fail)}${suffix}`);
+  if (limits.warn !== null && limits.warn !== undefined) parts.push(`Warning ±${fmt(limits.warn)}${suffix}`);
+  if (limits.fail !== null && limits.fail !== undefined) parts.push(`Action ±${fmt(limits.fail)}${suffix}`);
   return parts.join(" · ");
 }
 
-// The quiet line under a measured test's name, the same on the QA form and a saved run: "WARNING ±0.5 mm · ACTION ±1 mm".
+// The quiet line under a measured test's name, the same on the QA form and a saved run: "Warning ±0.5 mm · Action ±1 mm"
+// (limits read Warning / Action; the verdict chips stay PASS / WARNING / ACTION). Winston-Lutz: "Pass < 1 mm · Action ≥ 1 mm".
 // Nothing when the test has no Warning or Action (its baseline is in the Baseline column).
 function qaLimitsLine(limits, unit) {
   const l = limits || {};
-  if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "PASS < 1 mm · FAIL ≥ 1 mm");
+  if (l.criterion === "wl-max-delta") return el("div", {class:"small"}, "Pass < 1 mm · Action ≥ 1 mm");
   const suf = l.tol_mode === "percent" ? "%" : unit || "";
   const parts = [];
-  if (l.warn !== null && l.warn !== undefined) parts.push(`WARNING ±${fmt(l.warn)} ${suf}`.trim());
-  if (l.fail !== null && l.fail !== undefined) parts.push(`ACTION ±${fmt(l.fail)} ${suf}`.trim());
+  if (l.warn !== null && l.warn !== undefined) parts.push(`Warning ±${fmt(l.warn)} ${suf}`.trim());
+  if (l.fail !== null && l.fail !== undefined) parts.push(`Action ±${fmt(l.fail)} ${suf}`.trim());
   return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
 }
 

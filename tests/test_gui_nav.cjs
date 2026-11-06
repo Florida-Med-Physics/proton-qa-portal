@@ -32,12 +32,12 @@ context.el = (tag, props, ...kids) => ({ tag, props: props || {}, textContent: k
 run(between('function fmt(', '// A Pass / Fail or Yes / No answer'));
 run(between('function qaLimitsLine(', 'const TYPE_LABELS'));
 const line = (limits, unit) => context.qaLimitsLine(limits, unit)?.textContent ?? null;
-assert.equal(line({ expected: 100, warn: 0.5, fail: 1, tol_mode: 'absolute' }, 'mm'), 'WARNING ±0.5 mm · ACTION ±1 mm');
-assert.equal(line({ expected: 0, warn: null, fail: 1, tol_mode: 'percent' }, 'mGy'), 'ACTION ±1 %');
+assert.equal(line({ expected: 100, warn: 0.5, fail: 1, tol_mode: 'absolute' }, 'mm'), 'Warning ±0.5 mm · Action ±1 mm');
+assert.equal(line({ expected: 0, warn: null, fail: 1, tol_mode: 'percent' }, 'mGy'), 'Action ±1 %');
 assert.equal(line({ expected: 12, warn: null, fail: null, tol_mode: 'absolute' }, 'mm'), null, 'no limits: nothing, not "No limits"');
 assert.equal(line({ expected: null, warn: null, fail: null }, ''), null);
-assert.equal(line({ criterion: 'wl-max-delta' }, 'mm'), 'PASS < 1 mm · FAIL ≥ 1 mm');
-assert.equal(line({ warn: 2, fail: 3 }, undefined), 'WARNING ±2 · ACTION ±3');
+assert.equal(line({ criterion: 'wl-max-delta' }, 'mm'), 'Pass < 1 mm · Action ≥ 1 mm');
+assert.equal(line({ warn: 2, fail: 3 }, undefined), 'Warning ±2 · Action ±3');
 assert.match(between('    const measureTable = (members,', '      const numberCell = (it) =>'), /const limitsLine = \(it, unit\) => \(it\.type === "numeric" \? qaLimitsLine\(it\.limits, unit\) : null\);/);
 assert.doesNotMatch(review, /limitsText/, 'the saved run no longer says "No limits" or repeats the baseline in its limits line');
 assert.match(review, /r\.type==='numeric'\?qaLimitsLine\(limits,unit\):null/);

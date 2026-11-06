@@ -111,11 +111,11 @@ let browser;
   const typeIn = (i, v) => page(`(() => { const x = ${shared}.querySelectorAll('.qa-shared-field > input')[${i}]; x.value = '${v}'; x.dispatchEvent(new Event('input')); })()`);
   const more = (i) => page(`${shared}.querySelectorAll('.qa-shared-more')[${i}].innerText.replace(/\\s+/g, ' ').trim()`);
   const mores = async () => [await more(0), await more(1), await more(2)].join(' | ').replace(/Baseline (\d+)\.0+(?!\d)/g, 'Baseline $1');   // decimals follow the history
-  assert.equal(await mores(), 'Baseline 12 | Baseline 12 | Baseline 0 · ACTION ±1 %', 'each test its own baseline and limits');
+  assert.equal(await mores(), 'Baseline 12 | Baseline 12 | Baseline 0 · Action ±1 %', 'each test its own baseline and limits');
   assert.equal(await page(`${shared}.querySelectorAll('td.qa-result, td.qa-baseline, td.qa-unit').length`), 0, 'the shared cell spans Result and Baseline');
   await typeIn(0, '12.2'); await typeIn(1, '12');
   assert.equal(await page(`${shared}.querySelectorAll('.qa-shared-field > input')[2].value`), '1.67');
-  assert.equal(await mores(), '(Δ +0.20 mGy·m²·h⁻¹) Baseline 12 | (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 | ACTION(Δ +1.67 %) Baseline 0 · ACTION ±1 %',
+  assert.equal(await mores(), '(Δ +0.20 mGy·m²·h⁻¹) Baseline 12 | (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 | ACTION(Δ +1.67 %) Baseline 0 · Action ±1 %',
     'the result and deviation of every test with a baseline, under its input (no "Recorded" chip where nothing is judged)');
   await typeIn(0, '12.05');
   assert.match(await more(2), /^PASS ?\(Δ \+0\.42 %\) Baseline/);
@@ -146,7 +146,7 @@ let browser;
   const runRow = `[...document.querySelectorAll('.review-measure-table tr[data-test-id]')][7]`;
   assert.deepEqual(await page(`(() => { const r = ${runRow}; return [r.querySelector('.qa-n').textContent, [...r.querySelectorAll('.qa-shared-field')].map((f) => f.innerText.replace(/\\s+/g, ' ').trim()), r.querySelector('td.qa-comment').textContent]; })()`),
     ['1.08', ['TCS Sk (mGy·m²·h⁻¹) 12.05 (Δ +0.05 mGy·m²·h⁻¹) Baseline 12', 'Decay-table Sk (mGy·m²·h⁻¹) 12 (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 synthetic decay note',
-      'Source strength difference (%) ⓘ 0.417 PASS(Δ +0.42 %) Baseline 0 · ACTION ±1 % synthetic difference note'], ''], 'each note under its test, its limits as on the QA form; the Note column left empty');
+      'Source strength difference (%) ⓘ 0.417 PASS(Δ +0.42 %) Baseline 0 · Action ±1 % synthetic difference note'], ''], 'each note under its test, its limits as on the QA form; the Note column left empty');
   const pdf = await page(`localApi('GET', '/api/runs/${runId}').then((r) => qaReportPdf(r).text())`);
   assert.deepEqual([...pdf.matchAll(/\((\d+)\. ([^)]*)\) Tj/g)].map((m) => m[1]).slice(6, 12), ['7', '8', '8', '8', '9', '10']);
   // Back on the QA form, the row's History (now one run) says whose it is: the judged difference.
