@@ -197,7 +197,7 @@ const cells = (row) => row.children.map((td) => td.textContent);
   const trends = between('async function renderTrends()', '// Users, audit, account');
   assert.match(trends, /\.filter\(\(a\) => a\.active && \(activeRole\(\)!=='therapist'\|\|a\.frequency!=='monthly'\)\)\.sort\(scheduleOrder\) : \[\];/, 'the menu, the templates and the busiest-list tie in that order');
   const c = dom({ window: {}, location: { hash: '#/trends?machine_id=1&list=7&range=90' }, rangeStart: () => '', filterRange: (p) => p, judgedByList: (i, p) => p,
-    trendSourceNumberer: () => (p) => p, trendDisplayName: (n) => n, categoryLabel: (c) => c, trendPassRing: () => null, browserFolders: () => false,
+    trendSourceNumberer: () => (p) => p, trendDisplayName: (n) => n, categoryLabel: (c) => c, trendPassRing: () => null, browserFolders: () => false, can: () => true,
     trendKeyCheck: (g) => (g.base === 'Distal Depth [mm]' ? 'depth' : null), trendGroups: (items) => items.map((i) => ({ base: i.name, category: 'Range', members: [i] })) });
   vm.runInContext(between('async function renderTrendOverview(', 'function renderTrendDetail(') + between('const openTrendGroups = new Set();', 'async function renderTrends()')
     + `function trendGroupChart(g) { return el('figure', {}, g.base); }
@@ -205,8 +205,14 @@ const cells = (row) => row.children.map((td) => td.textContent);
   const item = (test_id, name, points = 3) => ({ test_id, name, type: 'numeric', points: Array.from({ length: points }, (_, k) => ({ qa_date: `2026-10-0${k + 1}`, run_id: k + 1 })) });
   const template = (items) => ({ assignment: { id: 7 }, queue: { name: 'Synthetic daily' }, items });
   const histories = (items) => Object.fromEntries(items.map((i) => [i.test_id, i.points]));
+  // The toolbar renderTrends puts above the overview (trendFileTools): Import Folder where the page offers it, Export CSV.
+  const firstWithClass = (node, sel) => node.find((n) => n !== node && n.className.split(/\s+/).includes(sel.slice(1)))[0] || null;
+  const removable = (n) => Object.assign(n, { querySelector: (sel) => firstWithClass(n, sel), remove: () => { n.parentNode.childNodes = n.parentNode.childNodes.filter((k) => k !== n); } });
+  c.app.querySelector = (sel) => firstWithClass(c.app, sel);
   const draw = async (items, lists = [{ id: 7 }], templates = [template(items)]) => {
     c.app.childNodes = [];
+    c.app.append(removable(c.el('div', { class: 'row trend-file-tools' }, c.can('perform') && c.browserFolders() ? removable(c.el('button', { type: 'button' }, 'Import Folder')) : null,
+      removable(c.el('button', { type: 'button', class: 'trend-export' }, 'Export CSV')))));
     await c.renderTrendOverview([{ id: 1, name: 'G1' }], '1', '90', '7', templates, Promise.resolve({ histories: histories(items), order: {} }), lists);
     return c.app;
   };
@@ -227,14 +233,23 @@ const cells = (row) => row.children.map((td) => td.textContent);
   await section.fire('click', { target: { closest: (sel) => (sel === 'a[href^="#/trends?"][href*="test_id="]' ? { getAttribute: () => href } : null) } });
   assert.equal(vm.runInContext('trendBack', c), href);
   assert.match(trends, /testIds\.length \? el\("a", \{ class: "button", onclick: \(e\) => \{ if \(trendBack === location\.hash && history\.length > 1\) \{ e\.preventDefault\(\); history\.back\(\); \} \},\n\s+href: `#\/trends\?\$\{new URLSearchParams/);
-  // (d) One card, no Export CSV (removed), no trend summary.
-  const empty = async (...args) => { const a = await draw(...args); return [a.find((n) => n.className === 'card empty').map((n) => n.textContent), a.find((n) => /trend-insights/.test(n.className)).length]; };
-  assert.deepEqual(await empty([], [], []), [['Nothing scheduled.'], 0], 'a machine with no QA list');
-  assert.deepEqual(await empty([], [{ id: 7 }], [template([{ test_id: 9, name: 'Source check', type: 'boolean' }])]), [['This list has no measured values.'], 0], 'a list with no measured tests');
-  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period.'], 0], 'nothing recorded in the period');
+  // (d) One card, no Export CSV (removed), no trend summary. Import Folder stays where the page offers it (GatorQA's own
+  // builds, a role that performs QA) and there is a list to import into, and only then does the card say to import.
+  const toolbar = () => c.app.find((n) => /trend-file-tools/.test(n.className)).map((row) => row.children.map((b) => b.textContent).join(' + '));
+  const empty = async (...args) => { const a = await draw(...args); return [a.find((n) => n.className === 'card empty').map((n) => n.textContent), a.find((n) => /trend-insights/.test(n.className)).length, toolbar()]; };
+  assert.deepEqual(await empty([], [], []), [['Nothing scheduled.'], 0, []], 'a machine with no QA list');
+  assert.deepEqual(await empty([], [{ id: 7 }], [template([{ test_id: 9, name: 'Source check', type: 'boolean' }])]), [['This list has no measured values.'], 0, []], 'a list with no measured tests');
+  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period.'], 0, []], 'nothing recorded in the period');
   c.browserFolders = () => true;
-  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period. Import reports or choose a longer period.'], 0], 'the browser build can import here');
-  assert.match(between('async function renderTrendOverview(', 'function renderTrendDetail('), /app\.querySelector\('\.trend-file-tools'\)\?\.remove\(\);/);
+  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period. Import reports or choose a longer period.'], 0, ['Import Folder']],
+    'the browser build can import here: Import Folder stays, Export CSV goes');
+  assert.deepEqual(await empty([], [], []), [['Nothing scheduled.'], 0, []], 'no list to import into: no toolbar');
+  c.can = (right) => right !== 'perform';
+  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period.'], 0, []], 'a role that cannot import is not told to');
+  c.can = () => true;
+  await draw(tests);
+  assert.deepEqual(toolbar(), ['Import Folder + Export CSV'], 'with something to show, both');
+  assert.match(between('function trendFileTools(', 'function trendPattern('), /const exportButton = el\('button', \{ type: 'button', class: 'trend-export', onclick:/, 'the button the empty page removes');
 }
 
 // 7. Links into and out of Machine Trends. A run opened from it (a chart dot, a value, an insight) says from=trends, and

@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Trends with nothing recorded in the period: Import Folder stays (GatorQA's own builds, a role that performs QA, a list to import into) and only Export CSV goes; the card says "Import reports" only when that button is there. Round 3 had removed both while the card still said to import. Display only.
+
 - Data Administration, Import folders: the Machine column is 18% wide (from 14%; Folder 46%), so "TrueBeam" no longer breaks mid-word at 768-785 px (an iPad held upright, on floridaphysics.com). Display only.
 
 - Data Administration: "Record past imports as history…" is a normal button again (37 px tall, as on Review QA and as Save backup below it); as a small button it was 29 px on a phone. Display only.

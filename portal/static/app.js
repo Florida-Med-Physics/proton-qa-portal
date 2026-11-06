@@ -4285,13 +4285,16 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       sections.push(section);
     }
   }
-  // Nothing to show: one card that says why, without Export CSV or the trend summary.
+  // Nothing to show: one card that says why, without Export CSV or the trend summary. Import Folder stays where this page
+  // offers it (GatorQA's own builds) and there is a list to import into; only then does the card say to import.
   if (!sections.length) {
-    app.querySelector('.trend-file-tools')?.remove();
+    const canImport = lists.length > 0 && can('perform') && browserFolders();
+    const tools = app.querySelector('.trend-file-tools');
+    if (canImport) tools?.querySelector('.trend-export')?.remove(); else tools?.remove();
     const machine = machines.find((m) => String(m.id) === String(machineId));
     return app.append(el('div', { class: 'card empty' }, !lists.length ? 'Nothing scheduled.'
       : !templates.some((t) => t.items.some((i) => i.type === 'numeric')) ? 'This list has no measured values.'
-      : `No QA recorded on ${machine?.name || 'this machine'} in this period.${browserFolders() ? ' Import reports or choose a longer period.' : ''}`));
+      : `No QA recorded on ${machine?.name || 'this machine'} in this period.${canImport ? ' Import reports or choose a longer period.' : ''}`));
   }
   // A test opened from here (its values, or an insight's graph): "← All tests" there comes Back to this place.
   const fromHere = (e) => { const a = e.target.closest?.('a[href^="#/trends?"][href*="test_id="]'); if (a) trendBack = a.getAttribute('href'); };
@@ -4491,7 +4494,7 @@ function trendFileTools(machine, lists, listId, range, testIds, importListId = l
         summary.skipped.length ? el('details', {}, el('summary', {}, 'Skipped files'), el('ul', {class:'small'}, summary.skipped.map(x=>el('li',{},`${x.file}: ${x.reason}`)))) : null), async()=>{}, 'Done');
     } finally { refreshStatus(); }
   };
-  const exportButton = el('button', { type: 'button', onclick: async () => {
+  const exportButton = el('button', { type: 'button', class: 'trend-export', onclick: async () => {
     exportButton.disabled = true;
     try {
       // Read permissions while the export button still has browser user activation.
