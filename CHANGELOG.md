@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Saved run: a note with a long unbroken path or file name wraps inside its box instead of scrolling sideways. Display only.
+
 - QA form: a table under one with the same columns keeps its column names for screen readers (the repeated row is collapsed on screen, no longer removed), so Measured, Unit and Result are read out in every table; the screen looks the same. Display only.
 
 - QA form on a phone: Mark in Progress sits beside Submit for review in the bar at the end of the form (the same button: it saves and goes back to Perform QA), no longer inside "Date & draft options"; that drawer keeps the QA date, the draft note and Cancel. Display only.

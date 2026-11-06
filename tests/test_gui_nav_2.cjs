@@ -67,6 +67,9 @@ pencil.props.onclick();
 assert.equal(shown2.length, 1, 'a click opens the note in a box');
 assert.deepEqual([shown2[0].tag, shown2[0].kids[0].kids[0], shown2[0].kids[1].props.class, shown2[0].kids[1].kids[0]], ['dialog', 'Note', 'pre', 'Synthetic note: chamber re-seated.']);
 assert.match(between('async function renderReviewMeasurements(', 'async function renderRun('), /el\('td',\{class:'qa-comment','data-label':'Comment'\},shared\?shared\.comment:r\.comment\?noteButton\(r\.comment\):'—'\)/);
+// 3b. The note's box never scrolls sideways: a long unbroken path or file name wraps inside it (the box is outside #app,
+// so the table cells' overflow-wrap does not reach it).
+assert.match(css, /\.calculation-dialog \.pre \{ overflow-wrap:anywhere; \}/, 'a note with a long unbroken path wraps in its box');
 
 // 5. Phone: Mark in Progress stays in the QA form's bar beside Submit (the same button and handler); the drawer keeps the
 // date, the draft note and Cancel. The bar's phone layout is in GatorQA's 1200px block (floridaphysics.com moves it to 767px).
