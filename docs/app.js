@@ -24,8 +24,6 @@ const ROLE_LABEL = { admin: "Admin", physicist: "Physicist", therapist: "Therapi
 const STATE_LABEL = { overdue: "Overdue", due: "Due", done: "Done today", upcoming: "Upcoming" };
 const FREQ_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly", semiannual: "Semiannual", annual: "Annual", custom: "Custom interval",
   asneeded: "As needed (e.g. SRS days)" };
-// A list can be started when it is due, overdue, or "as needed".
-const startable = (state) => state === "due" || state === "overdue" || state === "ready";
 // Daily QA is due at 6 AM; other lists are due at the end of the scheduled day.
 const DAILY_DUE_TIME = "06:00";
 function dueIn(iso, frequency, now = Date.now()) {
@@ -1263,15 +1261,9 @@ async function renderMachine(id) {
   const [machines, assignments] = await Promise.all([api("GET", "/api/machines"), api("GET", `/api/machines/${id}/assignments`)]);
   const machine = machines.find((m) => String(m.id) === id);
   if (!machine) throw new Error("Machine not found.");
+  // The one main action, then the machine's own actions in one ⋮ menu (as on Setup QA), last so the menu opens on screen.
   const actions = [];
   if (can("configure")) {
-    actions.push(el("button", { onclick: () => modal(`Edit ${machine.name}`, machineForm(machine), async (data) => {
-      await api("PUT", `/api/machines/${id}`, data);
-      toast("Machine saved");
-      route();
-    }) }, "Edit"));
-    actions.push(el("button", { onclick: () => retireMachine(machine) }, machine.active ? "Retire machine" : "Restore machine"),
-      el("button", { class: "danger", onclick: () => deleteMachine(machine) }, "Delete machine"));
     actions.push(el("button", { class: "primary", onclick: async () => {
       const all = await api("GET", "/api/queues");
       const offered = all.filter((q) => q.active && !assignments.some((a) => a.queue_id === q.id));
@@ -1279,23 +1271,33 @@ async function renderMachine(id) {
       const pick = el("div", { class: "form-grid" },
         field("QA list", select("queue_id", offered.map((q) => [q.id, q.name]), offered[0].id), "wide"),
         scheduleForm(null));
-      modal(`Add a QA list to ${machine.name}`, pick, async (data, form) => {
+      modal(`Schedule a QA list on ${machine.name}`, pick, async (data, form) => {
         await api("POST", "/api/assignments", { ...scheduleData(data, form), machine_id: Number(id), queue_id: Number(data.queue_id) });
-        toast("QA list added");
+        toast("QA list scheduled");
         route();
-      }, "Add");
-    } }, "Add a QA list"));
+      }, "Schedule");
+    } }, "Schedule a QA list"));
+    actions.push(el("details", { class: "more" }, el("summary", { class: "icon-action", title: "More actions", "aria-label": "More actions" }, "⋮"),
+      el("div", { class: "menu" },
+        el("button", { class: "link", onclick: () => modal(`Edit ${machine.name}`, machineForm(machine), async (data) => {
+          await api("PUT", `/api/machines/${id}`, data);
+          toast("Machine saved");
+          route();
+        }) }, "Edit machine"),
+        el("button", { class: "link", onclick: () => retireMachine(machine) }, machine.active ? "Retire machine" : "Restore machine"),
+        el("button", { class: "link danger", onclick: () => deleteMachine(machine) }, "Delete machine"))));
   }
   page(machine.name, [machine.kind, machine.location, machine.active ? null : "Retired"].filter(Boolean).join(" · "), actions);
   if (machine.notes) app.append(el("p", { class: "muted" }, machine.notes));
-  if (!assignments.length) {
-    app.append(el("div", { class: "card empty" }, "No QA lists scheduled on this machine yet."));
+  // The lists as the Dashboard and Perform QA show them: daily first, then by name; a therapist's without monthly lists.
+  const lists = assignments.filter((a) => activeRole() !== "therapist" || a.frequency !== "monthly").sort(scheduleOrder);
+  if (!lists.length) {
+    app.append(el("div", { class: "card empty" }, "Nothing scheduled."));
     return;
   }
-  app.append(el("div", { class: "stack" }, assignments.map((a) => {
-    const due = a.active && startable(a.state);
+  app.append(el("div", { class: "stack" }, lists.map((a) => {
     const status = scheduleStatus(a);
-    const more = can("configure") ? el("details", { class: "more" }, el("summary", { class: "button" }, "More"),
+    const more = can("configure") ? el("details", { class: "more" }, el("summary", { class: "icon-action", title: "More actions", "aria-label": `More actions for ${a.queue_name}` }, "⋮"),
       el("div", { class: "menu" },
         el("button", { class: "link", onclick: () => modal(`${a.queue_name}: schedule`, scheduleForm(a), async (data, form) => {
           await api("PUT", `/api/assignments/${a.id}`, scheduleData(data, form));
@@ -1304,11 +1306,13 @@ async function renderMachine(id) {
         }) }, "Change schedule"),
         el("a", { href: `#/assignments/${a.id}/limits` }, "Values for this machine"),
         el("button", { class: "link", onclick: () => importSphinxDialog(a) }, "Import past Sphinx files"))) : null;
+    // A green ▶ before every list (as on Perform QA and the Dashboard), not a Start button on due lists only.
     return el("div", { class: "card list-row" },
-      el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule)),
+      el("div", { class: "list-line" },
+        a.active && can("perform") ? el("a", { class: "start-dot", href: `#/perform/${a.id}`, title: `Start ${a.queue_name}`, "aria-label": `Start ${a.queue_name}` }, "▶") : null,
+        el("div", {}, el("strong", {}, a.queue_name), el("div", { class: "muted small" }, a.schedule))),
       chip(a.active ? a.state : "", status),
       el("div", { class: "row" },
-        due && can("perform") ? el("a", { class: a.state === "ready" ? "button" : "button primary", href: `#/perform/${a.id}` }, "Start") : null,
         el("a", { class: "button", href: `#/runs?machine_id=${id}&queue_id=${a.queue_id}` }, "History"),
         more));
   })));

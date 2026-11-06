@@ -257,5 +257,40 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.match(between('async function renderHome(', '// Dark mode on/off'), /m\.queues\.length\?el\('a',\{class:'icon-link',href:`#\/trends\?machine_id=\$\{m\.id\}`/, 'the trends icon only for a machine with a list');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links.');
+// 8. The machine page (from Dashboard and Setup QA machine names): its lists in the Dashboard's order (daily first) with a
+// green ▶ before each active list (no Start button on due lists only); a therapist's without monthly lists, as on the
+// Dashboard and Perform QA; "Schedule a QA list" and the machine's own actions in one ⋮ menu after it; ⋮ per list.
+{
+  const assignments = [
+    { id: 31, queue_id: 3, queue_name: 'Monthly QA template', frequency: 'monthly', state: 'upcoming', active: 1, next_due: '2026-11-30', schedule: 'Monthly (due at month end)' },
+    { id: 32, queue_id: 4, queue_name: 'PBS DailyQA Template', frequency: 'daily', state: 'overdue', active: 1, next_due: '2026-11-03', schedule: 'Daily (weekdays)' },
+    { id: 33, queue_id: 5, queue_name: 'Paused daily', frequency: 'daily', state: 'due', active: 0, next_due: '2026-11-06', schedule: 'Daily (weekdays)' }];
+  const draw = async (role) => {
+    const c = dom({ state: { user: { id: 1, role }, actingRole: null }, shortDate: (d) => d, Date,
+      api: async (method, path) => (path === '/api/machines' ? [{ id: 1, name: 'G1', kind: 'Proton gantry', active: 1 }] : assignments.map((a) => ({ ...a }))),
+      page: (title, subtitle, actions) => { c.head = actions; }, modal() {}, toast() {}, route() {}, importSphinxDialog() {}, machineForm() {}, retireMachine() {}, deleteMachine() {} });
+    vm.runInContext(between('const FREQ_LABEL', 'const WEEKDAYS') + between('function activeRole(', 'let toastTimer;') + between('const FREQ_ORDER', 'function frequentQaAssignments(')
+      + between('async function renderMachine(', 'async function renderLimits('), c);
+    await c.renderMachine('1');
+    const cards = c.app.find((n) => n.className === 'card list-row');
+    return { c, cards, names: cards.map((card) => card.find((n) => n.tagName === 'strong')[0].textContent), dots: cards.map((card) => card.find((n) => n.className === 'start-dot').map((a) => a.getAttribute('href'))[0] || null),
+      buttons: cards.flatMap((card) => card.find((n) => /\bbutton\b/.test(n.className)).map((n) => n.textContent)) };
+  };
+  const admin = await draw('admin');
+  assert.deepEqual(admin.names, ['Paused daily', 'PBS DailyQA Template', 'Monthly QA template'], 'daily first, then by name');
+  assert.deepEqual(admin.dots, [null, '#/perform/32', '#/perform/31'], 'a ▶ before every active list, due or not');
+  assert.deepEqual(admin.buttons, ['History', 'History', 'History'], 'no Start or More buttons');
+  assert.deepEqual(admin.cards.map((card) => card.find((n) => n.tagName === 'summary').map((s) => [s.textContent, s.className])[0]), [['⋮', 'icon-action'], ['⋮', 'icon-action'], ['⋮', 'icon-action']]);
+  assert.deepEqual([...admin.c.head].map((n) =>  // (an array from the page's realm)
+    (n.tagName === 'details' ? `⋮ ${n.find((m) => m.tagName === 'button').map((b) => b.textContent).join(' / ')}` : n.textContent)),
+    ['Schedule a QA list', '⋮ Edit machine / Retire machine / Delete machine'], 'the main action, then the menu');
+  const therapist = await draw('therapist');
+  assert.deepEqual(therapist.names, ['Paused daily', 'PBS DailyQA Template'], 'no monthly list for a therapist');
+  assert.equal(therapist.c.head.length, 0);
+  assert.ok(css.includes('  .list-row > .chip { justify-self: start; }') && css.includes('  .list-row details.more .menu { left: 0; right: auto; }'), 'phone: the status at its width, the menu on screen');
+  assert.ok(css.includes('.page-head details.more .menu { min-width: 0; white-space: nowrap; }'));
+  assert.doesNotMatch(source, /\bstartable\(/, 'nothing left uses startable');
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list.');
 })().catch((err) => { console.error(err); process.exit(1); });

@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine page (from a machine's name): its lists are in the Dashboard's order (daily first) with a green ▶ before each active list, as on Perform QA (a Start button showed only on due lists); a therapist sees no monthly list there, as on the Dashboard; "Add a QA list" is "Schedule a QA list", and Edit, Retire and Delete machine are in one ⋮ menu after it, with ⋮ (not "More") on each list; on a phone the status is its own width and the menus open on screen. Display only: the same actions.
+
 - Machine Trends links: a run opened from Machine Trends (a chart dot, a value or an insight) says "Back to Machine Trends" and goes back to the place you left, with a long values table you opened open again (it said "Back to Review QA"); a pass-rate ring with no result yet (HDR Source Exchange) is a plain "—", not a link to an empty page, and the Dashboard shows no trends icon for a machine with no QA list (Ethos). Navigation only.
 
 - Machine Trends: a test you opened stays open, with its chart, when you come back to the overview (Back after "View values and details" or a run, or another period), and "← All tests" on that test page goes Back to the same place instead of the top; the QA list menu is in the Dashboard's order (daily first), so with no runs yet the daily list opens, not the monthly one; a machine with nothing to show (no QA list, a list with no measured tests, or no QA in the period) shows one card saying which, without Export CSV or an empty trend summary. Display and navigation only: the most-runs rule, the period and the CSV are unchanged.

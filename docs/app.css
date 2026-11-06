@@ -247,6 +247,9 @@ details.more .menu {
 }
 details.more .menu a, details.more .menu button { text-align: left; padding: 8px 10px; border-radius: 6px; color: var(--text); text-decoration: none; font: inherit; }
 details.more .menu a:hover, details.more .menu button:hover { background: var(--surface-2); }
+details.more > summary.icon-action { display: inline-flex; align-items: center; justify-content: center; }   /* ⋮, as on Setup QA */
+details.more .menu button.danger { color: var(--fail); }
+.page-head details.more .menu { min-width: 0; white-space: nowrap; }   /* as wide as its words: on screen beside a short button */
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .seg { border: 0; border-radius: 0; padding: 8px 18px; background: var(--surface); font-weight: 600; color: var(--muted); }
 .seg + .seg { border-left: 1px solid var(--border); }
@@ -294,6 +297,8 @@ label.inline input { width: auto; }
 
 @media (max-width: 640px) {
   .list-row, .check-row { grid-template-columns: 1fr; }
+  .list-row > .chip { justify-self: start; }   /* the status at its own width, not across the card */
+  .list-row details.more .menu { left: 0; right: auto; }   /* its ⋮ is at the left now: the menu opens rightwards, on screen */
   .topbar { padding: 10px 16px; gap: 8px; }
   main { padding: 16px 16px 48px; }
   .grid { grid-template-columns: 1fr; }
