@@ -1779,9 +1779,10 @@ async function renderPerform(assignmentId) {
         block.hidden=unfinishedOnly&&!visible.length;
         const number=block.querySelector('.qa-n-span');
         if(number&&visible.length){visible[0].prepend(number);number.rowSpan=visible.length*2;}
-        // Under a table with the same columns, a table shows its dates but not the column names again.
+        // Under a table with the same columns, a table shows its dates but not the column names again ("repeat" collapses
+        // the row on screen and keeps it for screen readers, which read each cell's column names from it).
         const names=block.querySelector('tr.qa-col-names');
-        if(names&&!block.hidden){names.hidden=!!block.querySelector('tr.hist-dates')&&above===block.dataset.cols;above=block.dataset.cols;}
+        if(names&&!block.hidden){names.classList.toggle('repeat',!!block.querySelector('tr.hist-dates')&&above===block.dataset.cols);above=block.dataset.cols;}
       }
     }
   };
@@ -1942,7 +1943,7 @@ async function renderPerform(assignmentId) {
       const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // hidden under a table with the same columns (refresh)
+          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // collapsed under a table with the same columns (refresh)
             dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 6 }, () => el("th", {})),
               el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
           el("tbody", {}, trRows.flat()));

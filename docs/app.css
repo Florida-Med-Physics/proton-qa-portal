@@ -581,6 +581,9 @@ tr.quick-trend .spark { max-width: none; }
 .hist.empty { background: transparent; color: var(--muted); }
 .hist.date { background: transparent; color: var(--muted); font-weight: 600; text-transform: none; letter-spacing: 0; padding: 0 2px; white-space: nowrap; }
 .measure-table tr.hist-dates th { padding-top: 0; border-top: 0; }
+/* A table under one with the same columns: its column-names row takes no room on screen but stays in the table, so
+   screen readers still read each cell's column names (Measured, Unit, Result…). */
+.measure-table tr.qa-col-names.repeat > th { height:0 !important; padding-top:0 !important; padding-bottom:0 !important; border:0 !important; line-height:0 !important; font-size:0 !important; overflow:hidden; }
 
 .result-input.from-file { background: var(--surface-2); color: var(--text); cursor: default; }
 .result-input.from-file::placeholder { font-style: italic; }

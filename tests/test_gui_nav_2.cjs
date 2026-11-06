@@ -18,12 +18,15 @@ const thinning = between('      let above=null;', '  const named = t.items.some(
 const form = {};
 vm.createContext(form);
 vm.runInContext(`this.thin = (s, unfinishedOnly) => {\n${thinning}\n};`, form);
+// The repeated names row is collapsed with the class "repeat", never removed with hidden: screen readers still read each
+// cell's column names (Measured, Unit, Result…) from it.
+const classList = () => { const on = new Set(); return { toggle: (c, force) => { if (force) on.add(c); else on.delete(c); return !!force; }, contains: (c) => on.has(c) }; };
 const block = (cols, { rows = 2, answered = 0, dates = true } = {}) => {
-  const names = { hidden: false }, entries = Array.from({ length: rows }, (_, i) => ({ hidden: i < answered }));
+  const names = { hidden: false, classList: classList() }, entries = Array.from({ length: rows }, (_, i) => ({ hidden: i < answered }));
   return { hidden: false, dataset: { cols }, names, querySelectorAll: (sel) => (sel === 'tr[data-qa-entry]' ? entries : []),
     querySelector: (sel) => (sel === 'tr.qa-col-names' ? names : sel === 'tr.hist-dates' ? (dates ? {} : null) : null) };
 };
-const shown = (blocks) => blocks.map((b) => (b.hidden ? 'hidden' : b.names.hidden ? 'dates' : 'names'));
+const shown = (blocks) => blocks.map((b) => (b.hidden ? 'hidden' : b.names.hidden ? 'names removed' : b.names.classList.contains('repeat') ? 'dates' : 'names'));
 const thin = (blocks, unfinishedOnly = false) => { form.thin({ box: { querySelectorAll: () => blocks } }, unfinishedOnly); return shown(blocks); };
 assert.deepEqual(thin([block('Test|3'), block('Energy|3'), block('Energy|3'), block('Energy|3'), block('Test|3')]),
   ['names', 'names', 'dates', 'dates', 'names'], 'per-energy tables under the first: dates only');
@@ -34,6 +37,10 @@ const unfinished = [block('Test|3'), block('Energy|3', { answered: 2 }), block('
 assert.deepEqual(thin(unfinished, true), ['names', 'hidden', 'names', 'dates'], 'unfinished only: the first table shown gets the names');
 unfinished.forEach((b) => { b.querySelectorAll('tr[data-qa-entry]').forEach((r) => { r.hidden = false; }); });
 assert.deepEqual(thin(unfinished, false), ['names', 'names', 'dates', 'dates'], 'and back');
+const css = fs.readFileSync('portal/static/app.css', 'utf8');
+assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
+assert.ok(css.includes('.measure-table tr.qa-col-names.repeat > th { height:0 !important; padding-top:0 !important; padding-bottom:0 !important; border:0 !important; line-height:0 !important; font-size:0 !important; overflow:hidden; }'),
+  'the repeated names row takes no room on screen');
 
 // 2. Limits read "Warning ±" / "Action ±" (never WARNING / ACTION / FAIL; the verdict chips keep PASS / WARNING / ACTION).
 const words = { el: (tag, props, ...kids) => ({ tag, props: props || {}, textContent: kids.flat(Infinity).join('') }) };
@@ -67,8 +74,6 @@ const footer = between('  const saveDraft = el(', '  refresh();');
 assert.match(footer, /const saveDraft = el\("button", \{ type: "button", class: "save-draft", onclick: async \(\) => \{/);
 assert.match(footer, /phoneDrawer\(footer, \[footer\.children\[0\], draftNote, footer\.children\[5\]\], 'Date & draft options'\);/);
 assert.doesNotMatch(footer, /phoneDrawer\([^;]*saveDraft/, 'Mark in Progress is not moved into the drawer');
-const css = fs.readFileSync('portal/static/app.css', 'utf8');
-assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
 const cssLF = css.replace(/\r\n/g, '\n');
 const phoneStart = cssLF.indexOf('@media (max-width: 1200px) {\n  html, body { max-width: 100%; }');
 assert.ok(phoneStart >= 0, "GatorQA's phone block");
