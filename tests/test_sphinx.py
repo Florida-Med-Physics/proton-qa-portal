@@ -236,6 +236,17 @@ class ImportTests(unittest.TestCase):
         run = service.get_run(self.db, self.users["admin"], result["imported"][0]["run_id"])
         self.assertEqual(run["review_status"], "pending")
 
+    def test_no_review_import_is_judged_by_the_list_but_needs_no_approval(self, _):
+        # The scheduled folder import sends review: false: the list's limits still decide the verdict, but the run
+        # is recorded without a review step, so nobody has to approve every daily file.
+        result = service.import_sphinx_uploads(self.db, self.users["physicist"], self.assignment,
+                                               {"files": [upload("auto.xls", fake_file("auto"))], "historical": False, "review": False})
+        run = service.get_run(self.db, self.users["admin"], result["imported"][0]["run_id"])
+        self.assertEqual((run["review_status"], bool(run["therapist_approval_required"])), ("imported", False))
+        dose = next(r for r in run["results"] if r["name"] == "Output – Absolute Dose")
+        self.assertEqual((dose["status"], dose["warn"]), ("warn", 1.0))  # the list's ±1 % warning, not the file's verdict
+        self.assertIn("judged by this list's limits", dose["comment"])
+
 
 @mock.patch("portal.sphinx.read_rows", side_effect=fake_read_rows)
 class CommandLineTests(unittest.TestCase):

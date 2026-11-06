@@ -1404,7 +1404,9 @@
       });
       if (!rows.length) { skipped.push({ file: u.name, reason: "No included tests match this machine's list." }); continue; }
       const comment = `Imported from ${parsed.filename}. Sphinx finished ${parsed.finished.replace("T", " ")}${parsed.sphinx_user ? " by " + parsed.sphinx_user : ""}.`;
-      const run = insertRun(user, t, parsed.qa_date, rows, comment, "sphinx", parsed.sha256, historical ? "imported" : "pending");
+      // review: false (the scheduled folder import): judged by the list's limits like a new run, but recorded without a
+      // review step, so trending fills in on its own.
+      const run = insertRun(user, t, parsed.qa_date, rows, comment, "sphinx", parsed.sha256, historical || data.review === false ? "imported" : "pending");
       imported.push({ file: parsed.filename, run_id: run.id, qa_date: parsed.qa_date, overall: run.overall });
     }
     return { imported, skipped };

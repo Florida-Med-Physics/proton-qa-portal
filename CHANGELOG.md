@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Sphinx import takes `review: false` (both builds): the run is judged by the list's limits like any new import but is recorded without a review step (Historical import), so the scheduled folder import can fill in trending without anyone approving every daily file. Manual imports are unchanged. **[Physics review]**: auto-imported runs no longer pass through therapy or physics review.
+
+- Server build: a `style` given to the element helper is applied through the CSSOM, which the server's Content Security Policy allows; the pass-rate donut on the Dashboard and Machine Trends was being blocked and logging an error for each one. Display only.
+
 - Tests: tests/test_gui_nav_3.cjs reads app.js the same way on a Windows checkout (Windows line endings), as the other checks already do.
 
 - View As on People (#/users, GatorQA's own builds): choosing Physicist opens the Dashboard, as before round 3, instead of keeping the page and showing only "You do not have permission to do that."; People needs the Manage users right, more than its Data Administration tab. Navigation only.

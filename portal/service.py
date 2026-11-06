@@ -1131,10 +1131,13 @@ def sphinx_add_tests(db, user, assignment_id, upload):
     return {"added": added}
 
 
-def import_sphinx(db, user, assignment_id, files, historical=True, history_before=None):
+def import_sphinx(db, user, assignment_id, files, historical=True, history_before=None, review=True):
     """Record Sphinx files as runs. New runs (historical=False, awaiting review) are judged by the list's limits;
     history (historical=True) keeps the limits and verdict from its own file. With history_before ('YYYY-MM-DD'),
     each file dated before it is history and each file on or after it awaits review; historical is then ignored.
+    With review=False, a new run is still judged by the list's limits but is recorded without a review step
+    (review_status 'imported'): the scheduled import from the QA folders uses this, so trending fills in on its
+    own and nobody has to approve every daily file.
 
     files: iterable of (filename, bytes). Duplicate files (same content) are skipped.
     """
@@ -1185,7 +1188,7 @@ def import_sphinx(db, user, assignment_id, files, historical=True, history_befor
         comment = f"Imported from {name}. Sphinx finished {parsed['finished'].replace('T', ' ')}" + \
                   (f" by {parsed['sphinx_user']}." if parsed["sphinx_user"] else ".")
         run = _insert_run(db, user, template, parsed["qa_date"], rows, comment, "sphinx", parsed["sha256"],
-                          "imported" if as_history else "pending")
+                          "imported" if as_history or not review else "pending")
         imported.append({"file": name, "run_id": run["id"], "qa_date": parsed["qa_date"], "overall": run["overall"]})
     return {"imported": imported, "skipped": skipped}
 
@@ -1240,7 +1243,8 @@ def import_sphinx_uploads(db, user, assignment_id, data):
     files = [_decode_upload(u) for u in data.get("files") or []]
     if not files:
         raise PortalError("Choose one or more Sphinx .xls files.")
-    return import_sphinx(db, user, assignment_id, files, historical=bool(data.get("historical", True)), history_before=history_before)
+    return import_sphinx(db, user, assignment_id, files, historical=bool(data.get("historical", True)), history_before=history_before,
+                         review=data.get("review") is not False)
 
 
 # The note a Sphinx file import writes: "Imported from <file>. Sphinx finished <date> <time>…" (import_sphinx), or

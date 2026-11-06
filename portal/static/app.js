@@ -54,6 +54,9 @@ function el(tag, props, ...kids) {
     else if (key === "class") node.className = value;
     else if (key === "value") node.value = value;
     else if (key === "checked") node.checked = !!value;
+    // The server's Content Security Policy forbids inline style attributes; setting styles through the
+    // CSSOM is allowed, so a "style" prop is applied that way.
+    else if (key === "style") node.style.cssText = value;
     else node.setAttribute(key, value === true ? "" : value);
   }
   for (const kid of kids.flat(Infinity)) {
