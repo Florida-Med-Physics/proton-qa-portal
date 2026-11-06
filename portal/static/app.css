@@ -393,6 +393,7 @@ td .muted.small, td.small { overflow-wrap: break-word; }
 td.trend-cell, td.folder-cell { max-width: none; }
 .folder-cell button { white-space: nowrap; flex: none; }
 .folder-cell input { width: 360px; }
+.folder-cell .folder-field > input { flex: 1 1 auto; width: auto; min-width: 0; }   /* the field and its Save share the cell */
 
 /* Perform: title, then the directions block across the row, then the result (as in the myQA template). */
 .check-row.with-directions .directions { grid-column: 1 / -1; }
@@ -1069,20 +1070,25 @@ th { font-size: 16px; }
   .home-card-heading h2 { font-size: 22px; }
   #app[data-page="review"] .fixed-table colgroup,
   #app[data-page="runs"] .fixed-table colgroup,
+  #app[data-page="admin"] .fixed-table colgroup,
   #app[data-page="review"] .fixed-table thead,
   #app[data-page="runs"] .fixed-table thead,
+  #app[data-page="admin"] .fixed-table thead,
   #app[data-page="setup"] .template-modality table colgroup,
   #app[data-page="setup"] .template-modality table thead,
   .machine-schedules-table table colgroup,
   .machine-schedules-table table thead { display: none; }
   #app[data-page="review"] .fixed-wrap,
   #app[data-page="runs"] .fixed-wrap,
+  #app[data-page="admin"] .fixed-wrap,
   #app[data-page="setup"] .template-modality .fixed-wrap,
   .machine-schedules-table { border: 0; background: transparent; }
   #app[data-page="review"] .fixed-table,
   #app[data-page="runs"] .fixed-table,
+  #app[data-page="admin"] .fixed-table,
   #app[data-page="review"] .fixed-table tbody,
   #app[data-page="runs"] .fixed-table tbody,
+  #app[data-page="admin"] .fixed-table tbody,
   #app[data-page="setup"] .template-modality table,
   #app[data-page="setup"] .template-modality tbody,
   .machine-schedules-table table,
@@ -1096,12 +1102,20 @@ th { font-size: 16px; }
   #app[data-page="setup"] .template-modality td:first-child::before,
   .machine-schedules-table td:first-child::before { display: none; }
   .machine-schedules-table .machine-row { border: 0; background: transparent; margin-top: 20px; }
-  /* Review QA and Past results: compact cards, no column names. A row's words flow over three lines, with its QA list
-     on a line of its own. */
-  #app:is([data-page="review"], [data-page="runs"]) .fixed-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; width: 100%; padding: 8px 12px; margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
-  #app:is([data-page="review"], [data-page="runs"]) .fixed-table tbody td { display: block; width: auto; max-width: 100%; min-width: 0; padding: 0; border: 0; text-align: left; }
-  #app:is([data-page="review"], [data-page="runs"]) .fixed-table tbody tr:hover td { background: transparent; }
-  #app:is([data-page="review"], [data-page="runs"]) .fixed-table tbody td:nth-child(3) { flex: 1 0 100%; }
+  /* Review QA, Past results and Data Administration: compact cards, no column names. A row's words flow over two or
+     three lines, with its QA list (a person's username, a list's folder) on a line of its own. */
+  #app:is([data-page="review"], [data-page="runs"], [data-page="admin"]) .fixed-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; width: 100%; padding: 8px 12px; margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  #app:is([data-page="review"], [data-page="runs"], [data-page="admin"]) .fixed-table tbody td { display: block; width: auto; max-width: 100%; min-width: 0; padding: 0; border: 0; text-align: left; }
+  #app:is([data-page="review"], [data-page="runs"], [data-page="admin"]) .fixed-table tbody tr:hover td { background: transparent; }
+  #app:is([data-page="review"], [data-page="runs"]) .fixed-table tbody td:nth-child(3),
+  #app[data-page="admin"] .fixed-table tbody tr.person-row > td:first-child,
+  #app[data-page="admin"] .role-rights tbody td:first-child,
+  #app[data-page="admin"] .fixed-table tbody td.folder-cell { flex: 1 0 100%; overflow-wrap: anywhere; }
+  #app[data-page="admin"] .fixed-table tbody td:empty { display: none; }
+  /* What each role may do: a card per role, listing the rights it has. */
+  #app[data-page="admin"] .role-rights td.no-right, #app[data-page="admin"] .role-rights td.has-right > .tick { display: none; }
+  #app[data-page="admin"] .role-rights td.has-right { flex: 1 0 100%; }
+  #app[data-page="admin"] .role-rights td.has-right::before { content: attr(data-label); }
   .machine-schedules-table .machine-row td { justify-content: flex-start; padding-left: 0; }
   .machine-schedules-table .schedule-with-edit { flex: 1; }
   .name-with-edit { min-width: 0; }

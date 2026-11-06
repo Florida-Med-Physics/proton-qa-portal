@@ -4641,26 +4641,30 @@ async function renderAdmin() {
     window.localApi ? null : api("GET", "/api/dbinfo").catch(() => null)]);
   const users = can("manage_users") ? answers.shift() : null, [machines, schedules] = answers;
 
-  // 1. Users and rights (admins only; others see what each role may do).
+  // 1. Users and rights. Rights come from the role, so they are shown once, per role (every role sees this table); an
+  // admin also gets the people, with their role and no rights columns: active accounts first, disabled ones last.
   app.append(el("h2", { class: "section-head" }, "Users and rights"));
-  if (!users) {
-    app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"),
-      table(["Role", ...RIGHTS.map(([, label]) => label)], Object.entries(ROLE_RIGHTS).map(([role, rights]) => el("tr", {},
-        el("td", {}, el("strong", {}, ROLE_LABEL[role])), RIGHTS.map(([key]) => el("td", { class: "center" }, rights.includes(key) ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—")))))));
+  const roleRights = fixedTable([["Role", "16%"], ...RIGHTS.map(([key, label]) => [label, key === "configure" ? "24%" : "15%"])],
+    Object.entries(ROLE_RIGHTS).map(([role, rights]) => el("tr", {},
+      el("td", {}, el("strong", {}, ROLE_LABEL[role])),
+      RIGHTS.map(([key]) => rights.includes(key) ? el("td", { class: "center has-right" }, el("span", { class: "tick" }, "✓")) : el("td", { class: "center no-right" }, el("span", { class: "muted" }, "—"))))));
+  roleRights.className += " role-rights";
+  if (!users) app.append(el("p", { class: "muted" }, "Only an admin can add users or change roles. What each role may do:"), roleRights);
+  if (users) {
+    const people = [...users].sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));   // stable: the server's order within each
+    app.append(el('p', { class: 'muted' }, 'Rights come from each person’s role. Use Add user at the top to create an account.'),
+      fixedTable([["Username", "34%"], ["Name", "26%"], ["Role", "16%"], ["Status", "14%"], ["", "10%"]], people.map((u) => el("tr", { class: "person-row" },
+        el("td", {}, el("strong", {}, u.username)),
+        el("td", {}, u.full_name || ""),
+        el("td", {}, ROLE_LABEL[u.role]),
+        el("td", {}, u.active ? chip("pass", "Active") : chip("", "Disabled")),
+        el("td", { class: "right" }, el("button", { class: "small", onclick: () => modal(`Edit ${u.username}`, userForm(u), async (data) => {
+          await api("PUT", `/api/users/${u.id}`, data);
+          toast("User saved");
+          route();
+        }) }, "Edit"))))),
+      el("p", { class: "muted" }, "What each role may do:"), roleRights);
   }
-  if (users) app.append(el('p', { class: 'muted' }, 'Rights come from each person’s role. Use Add user at the top to create an account.'));
-  const tick = (on) => el("td", { class: "center" }, on ? el("span", { class: "tick" }, "✓") : el("span", { class: "muted" }, "—"));
-  if (users) app.append(table(["Username", "Name", "Role", ...RIGHTS.map(([, label]) => label), "Status", ""], users.map((u) => el("tr", {},
-    el("td", {}, el("strong", {}, u.username)),
-    el("td", {}, u.full_name),
-    el("td", {}, ROLE_LABEL[u.role]),
-    RIGHTS.map(([key]) => tick(ROLE_RIGHTS[u.role].includes(key))),
-    el("td", {}, u.active ? chip("pass", "Active") : chip("", "Disabled")),
-    el("td", { class: "right" }, el("button", { class: "small", onclick: () => modal(`Edit ${u.username}`, userForm(u), async (data) => {
-      await api("PUT", `/api/users/${u.id}`, data);
-      toast("User saved");
-      route();
-    }) }, "Edit"))))));
 
   // 2. Import folders: one per scheduled QA list. When a list has a folder, its newest unrecorded export
   // is read automatically when someone starts that list's QA (no file dialog). Without browser folders
@@ -4714,25 +4718,29 @@ async function renderAdmin() {
       } else if (!scans && !can("configure")) {
         pathCell = a.import_folder || "No folder";
       } else {
-        const input = el("input", { value: a.import_folder || "", placeholder: "e.g. G:\\My Drive\\…\\ProtonDaily\\G1 Sphinx" });
-        const save = el("button", { class: "small primary", onclick: async () => {
+        // One example (on the first row), and a quiet Save that shows once the folder is changed.
+        const input = el("input", { value: a.import_folder || "", "aria-label": `Folder for ${m.name} · ${a.queue_name}`, placeholder: rows.length ? null : "e.g. G:\\My Drive\\…\\ProtonDaily\\G1 Sphinx" });
+        const save = el("button", { class: "small", hidden: true, onclick: async () => {
           try {
             await api("PUT", `/api/assignments/${a.id}`, { frequency: a.frequency, interval_days: a.interval_days, weekdays: String(a.weekdays).split(",").map(Number),
               start_date: a.start_date, active: !!a.active, import_folder: input.value.trim() });
             a.import_folder = input.value.trim();
+            save.hidden = true;
             toast("Folder saved");
             check();
           } catch (err) {
             toast(err.message, true);
           }
         } }, "Save");
-        pathCell = el("div", { class: "row nowrap" }, input, save);
+        input.addEventListener("input", () => { save.hidden = input.value.trim() === (a.import_folder || ""); });
+        pathCell = el("div", { class: "row nowrap folder-field" }, input, save);
       }
       rows.push(el("tr", {}, el("td", {}, el("strong", {}, m.name)), el("td", {}, a.queue_name), el("td", { class: "folder-cell" }, pathCell), scans ? el("td", {}, status) : null));
       check();
     }
   }
-  app.append(table(["Machine", "QA list", "Folder", ...(scans ? ["Status"] : [])], rows, "No QA lists are scheduled yet."));
+  app.append(fixedTable(scans ? [["Machine", "12%"], ["QA list", "28%"], ["Folder", "36%"], ["Status", "24%"]] : [["Machine", "14%"], ["QA list", "36%"], ["Folder", "50%"]],
+    rows, "No QA lists are scheduled yet."));
 
   // 3. Database location. Server build: one SQLite file on the host PC (set with --db or PROTON_QA_DB when starting).
   if (!window.localApi) {
