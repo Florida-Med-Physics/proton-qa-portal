@@ -1340,8 +1340,8 @@ async function renderLimits(assignmentId) {
   app.append(table(["Test", "Baseline", "Warning ±", "Action ±", "Limits are"], rows));
   const error = el("p", { class: "error" });
   // Back (and after Save) to where this page was opened from: Setup QA, the machine page or the list editor; opened on
-  // its own (no history in this tab), Setup QA.
-  const back = () => { if (history.length > 1) history.back(); else location.hash = "#/setup"; };
+  // its own (a bookmark, a link from elsewhere), Setup QA.
+  const back = () => { if (history.state?.gatorqaFrom) history.back(); else location.hash = "#/setup"; };
   app.append(error, el("div", { class: "row" },
     el("a", { class: "button", href: "#/setup", onclick: (e) => { e.preventDefault(); back(); } }, "Back"),
     el("button", { class: "primary", onclick: async () => {
@@ -3525,10 +3525,11 @@ async function renderReviewMeasurements(run) {
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
   // The way back: Perform QA when the run was opened from there (Submit, a last result); Machine Trends when opened from
-  // a chart, a value or an insight (Back, to the place it was left there); otherwise Review QA (its tab).
+  // a chart, a value or an insight (Back, to the place it was left there, when it was opened from there in this tab; else
+  // that machine and list); otherwise Review QA (its tab).
   const from = queryParams().get('from');
-  const back = from === 'perform' ? ['#/perform-qa', 'Perform QA'] : from === 'trends' ? ['#/trends', 'Machine Trends'] : ['#/review', 'Review QA'];
-  const backClick = from === 'trends' ? (e) => { if (history.length > 1) { e.preventDefault(); history.back(); } } : null;
+  const back = from === 'perform' ? ['#/perform-qa', 'Perform QA'] : from === 'trends' ? [`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}`, 'Machine Trends'] : ['#/review', 'Review QA'];
+  const backClick = from === 'trends' ? (e) => { if (history.state?.gatorqaFrom?.startsWith('#/trends')) { e.preventDefault(); history.back(); } } : null;
   page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0],onclick:backClick},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
     window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
@@ -4296,11 +4297,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       : !templates.some((t) => t.items.some((i) => i.type === 'numeric')) ? 'This list has no measured values.'
       : `No QA recorded on ${machine?.name || 'this machine'} in this period.${canImport ? ' Import reports or choose a longer period.' : ''}`));
   }
-  // A test opened from here (its values, or an insight's graph): "← All tests" there comes Back to this place.
-  const fromHere = (e) => { const a = e.target.closest?.('a[href^="#/trends?"][href*="test_id="]'); if (a) trendBack = a.getAttribute('href'); };
-  const insightsCard = trendInsightsCard(insights);
-  insightsCard.addEventListener('click', fromHere);
-  app.append(insightsCard);
+  app.append(trendInsightsCard(insights));
   const search = el('input', { type: 'search', class: 'filter-box', placeholder: 'Find an energy or measurement…', 'aria-label': 'Find measurements', oninput: e => {
     const words = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
     for (const section of sections) {
@@ -4309,7 +4306,6 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       section.hidden = rows.every(row => row.hidden);
     }
   }});
-  for (const section of sections) section.addEventListener('click', fromHere);
   app.append(el('h2', { class: 'section-head' }, 'Measurements'), search, ...sections);
 }
 
@@ -4579,8 +4575,6 @@ function busiestList(lists, histories) {
 // The tests opened on Machine Trends in this tab (machine|list|test), opened and drawn again when the overview is drawn
 // again (Back, "← All tests", another period), so the place Back returns to shows what it showed.
 const openTrendGroups = new Set();
-// The test page last opened from an overview (its link): "← All tests" there goes Back to that overview.
-let trendBack = null;
 async function renderTrends() {
   const params = queryParams();
   // The machines and every machine's lists in one request; the lists of the machine shown are picked out below.
@@ -4618,8 +4612,8 @@ async function renderTrends() {
     select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => { newPage(); go({ machine_id: e.target.value, range }); } }),
     lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => { newPage(); go({ machine_id: machineId, list: e.target.value, range }); } }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
-    // Opened from the overview (and still the page opened): Back, to its place and open tests. Otherwise a link.
-    testIds.length ? el("a", { class: "button", onclick: (e) => { if (trendBack === location.hash && history.length > 1) { e.preventDefault(); history.back(); } },
+    // Opened from the overview (the page before it in this tab): Back, to its place and open tests. Otherwise a link.
+    testIds.length ? el("a", { class: "button", onclick: (e) => { if (pageKey(history.state?.gatorqaFrom || "") === "#/trends|") { e.preventDefault(); history.back(); } },
       href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
@@ -4903,14 +4897,16 @@ const pageKey = (hash) => { const [path, query] = hash.split("?"); return `${pat
 const places = new Map();   // where each page in this tab's history was left
 let routedPage = pageKey(location.hash), entry;
 const newPage = () => { routedPage = ""; };
-const markEntry = () => { entry = Math.random(); history.replaceState({ ...history.state, gatorqaEntry: entry }, ""); };
+// Each new entry also notes the GatorQA page it was opened from (gatorqaFrom), so a Back button goes Back only to that
+// page: never out of GatorQA (a bookmark, a pasted link, another page before it in the tab) or to an unrelated page.
+const markEntry = (from) => { entry = Math.random(); history.replaceState({ ...history.state, gatorqaEntry: entry, ...(from && { gatorqaFrom: from }) }, ""); };
 markEntry();
-window.addEventListener("hashchange", async () => {
+window.addEventListener("hashchange", async (e) => {
   places.set(entry, scrollY);
   const key = pageKey(location.hash), gen = routeGen + 1, visited = history.state?.gatorqaEntry;
   let y = 0;
   if (visited !== undefined) { entry = visited; y = places.get(visited) || 0; }   // Back or Forward
-  else { if (key === routedPage) y = scrollY; markEntry(); }
+  else { if (key === routedPage) y = scrollY; markEntry(new URL(e.oldURL).hash || "#/"); }
   routedPage = key;
   if (!y) topOnDraw = gen;
   await route();

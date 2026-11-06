@@ -227,12 +227,25 @@ const cells = (row) => row.children.map((td) => td.textContent);
   const again = app.find((n) => n.tagName === 'details' && n.childNodes[0].textContent === 'Distal Fall Off [mm]')[0];
   again.open = false; await again.fire('toggle');
   assert.deepEqual(charts(await draw(tests)), { 'Distal Depth [mm]': 'open, drawn', 'Proximal Depth [mm]': 'closed', 'Distal Fall Off [mm]': 'closed' }, 'closed again: closed');
-  // (c) A click on a test's link in the overview remembers that test page; "← All tests" there goes Back.
-  const section = (await draw(tests)).find((n) => n.tagName === 'section' && n.className === 'trend-organized-list')[0];
-  const href = '#/trends?machine_id=1&list=7&test_id=2&range=90';
-  await section.fire('click', { target: { closest: (sel) => (sel === 'a[href^="#/trends?"][href*="test_id="]' ? { getAttribute: () => href } : null) } });
-  assert.equal(vm.runInContext('trendBack', c), href);
-  assert.match(trends, /testIds\.length \? el\("a", \{ class: "button", onclick: \(e\) => \{ if \(trendBack === location\.hash && history\.length > 1\) \{ e\.preventDefault\(\); history\.back\(\); \} \},\n\s+href: `#\/trends\?\$\{new URLSearchParams/);
+  // (c) "← All tests" goes Back only when the page before it in this tab is the overview (its history entry notes the page
+  // it was opened from, gatorqaFrom). After a run's "Full trend" (the same address), a QA form or another period it is the
+  // link to the overview; round 3 compared addresses and went Back to the run, the form or the other period.
+  const allTests = trends.match(/testIds\.length \? el\("a", \{ class: "button", onclick: (\(e\) => \{[^\n]*\}),\n\s+href: `#\/trends\?\$\{new URLSearchParams\(Object\.entries\(\{ machine_id: machineId, list: listId, range \}\)/)[1];
+  const testPage = '#/trends?machine_id=1&list=1&test_id=179&range=365';
+  const clickAllTests = (from) => {
+    const did = [];
+    const ctx = vm.createContext({ URLSearchParams, location: { hash: testPage }, trendBack: testPage, history: { length: 6, state: { gatorqaEntry: 0.5, ...(from && { gatorqaFrom: from }) }, back: () => did.push('back') } });
+    vm.runInContext(between('const pageKey = ', 'const places = '), ctx);
+    vm.runInContext(`(${allTests})`, ctx)({ preventDefault: () => did.push('preventDefault') });
+    return did.join(' ') || 'link';
+  };
+  assert.equal(clickAllTests('#/trends?machine_id=1&list=1&range=365'), 'preventDefault back', 'opened from the overview: Back, to its place and open tests');
+  assert.equal(clickAllTests('#/trends'), 'preventDefault back', 'the overview as its tab opens it');
+  assert.equal(clickAllTests('#/runs/2053?from=trends'), 'link', "after a run's Full trend: the overview, not the run");
+  assert.equal(clickAllTests('#/perform/1'), 'link', "after a QA form's Full trend: the overview, not the form");
+  assert.equal(clickAllTests('#/trends?machine_id=1&list=1&test_id=179&range=90'), 'link', 'after another period: the overview, not that period');
+  assert.equal(clickAllTests(undefined), 'link', 'opened on its own');
+  assert.doesNotMatch(source, /\btrendBack\b/, 'no address is remembered for it');
   // (d) One card, no Export CSV (removed), no trend summary. Import Folder stays where the page offers it (GatorQA's own
   // builds, a role that performs QA) and there is a list to import into, and only then does the card say to import.
   const toolbar = () => c.app.find((n) => /trend-file-tools/.test(n.className)).map((row) => row.children.map((b) => b.textContent).join(' + '));
@@ -262,8 +275,22 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.equal(c.trendRunHref({ run_id: 17 }), '#/runs/17?from=trends');
   assert.match(between('function renderTrendDetail(', 'function stat('), /el\('a',\{href:`#\/runs\/\$\{row\.run_id\}\?from=trends`\},row\.qa_date\)/, "a value's date");
   const run = between('async function renderRun(', 'function bandValue(');
-  assert.match(run, /from === 'trends' \? \['#\/trends', 'Machine Trends'\]/);
-  assert.match(run, /const backClick = from === 'trends' \? \(e\) => \{ if \(history\.length > 1\) \{ e\.preventDefault\(\); history\.back\(\); \} \} : null;/);
+  // Back only when the page before it in this tab is Machine Trends (gatorqaFrom); otherwise its link, to the run's own
+  // machine and list. Round 3 went Back whenever the tab had history: out of GatorQA after a bookmark or a link from
+  // another page, or to Review QA when the address was pasted there; and a new tab opened GTR1 for any machine.
+  assert.match(run, /from === 'trends' \? \[`#\/trends\?machine_id=\$\{run\.machine_id\}&list=\$\{run\.assignment_id\}`, 'Machine Trends'\]/);
+  const backClick = run.match(/const backClick = from === 'trends' \? (\(e\) => \{[^\n]*\}) : null;/)[1];
+  const clickRunBack = (from, length = 5) => {
+    const did = [];
+    const ctx = vm.createContext({ history: { length, state: { gatorqaEntry: 1, ...(from && { gatorqaFrom: from }) }, back: () => did.push('back') } });
+    vm.runInContext(`(${backClick})`, ctx)({ preventDefault: () => did.push('preventDefault') });
+    return did.join(' ') || 'link';
+  };
+  assert.equal(clickRunBack('#/trends?machine_id=1&list=1&test_id=179&range=365'), 'preventDefault back', 'opened from Machine Trends: Back, to the place left there');
+  assert.equal(clickRunBack('#/trends?machine_id=1'), 'preventDefault back');
+  assert.equal(clickRunBack('#/review'), 'link', 'the address pasted on Review QA: Machine Trends, not Review QA');
+  assert.equal(clickRunBack(undefined), 'link', 'a bookmark or a link from another page: Machine Trends, not out of GatorQA');
+  assert.equal(clickRunBack(undefined, 1), 'link', 'a new tab');
   assert.equal((run.match(/href:back\[0\],onclick:backClick\}/g) || []).length, 2, 'both Back buttons');
   const detail = between('function renderTrendDetail(', 'function stat(');
   assert.match(detail, /open:rows\.length<=20\|\|openTrendGroups\.has\(key\)/);
@@ -314,11 +341,24 @@ const cells = (row) => row.children.map((td) => td.textContent);
 }
 
 // 9. "Values for this machine": Back, and Save, go back to where it was opened from (Setup QA, the machine page, the list
-// editor), or to Setup QA in a tab with no history (it sent everyone to the old machine page); its column says Baseline.
+// editor), or to Setup QA when it was opened on its own (it sent everyone to the old machine page); its column says Baseline.
 {
   const limits = between('async function renderLimits(', '// ---------------------------------------------------------------------------\n// Performing a QA list');
   assert.match(limits, /table\(\["Test", "Baseline", "Warning ±", "Action ±", "Limits are"\], rows\)/);
-  assert.match(limits, /const back = \(\) => \{ if \(history\.length > 1\) history\.back\(\); else location\.hash = "#\/setup"; \};/);
+  // Back only to a GatorQA page it was opened from (gatorqaFrom). Round 3 went Back whenever the tab had history, which left
+  // GatorQA after a bookmark or a link from another page, and in the browser-only build lost a Save made just before.
+  const limitsBack = limits.match(/const back = (\(\) => \{[^\n]*\});/)[1];
+  const leave = (from, length = 4) => {
+    const did = [];
+    const ctx = vm.createContext({ history: { length, state: { gatorqaEntry: 1, ...(from && { gatorqaFrom: from }) }, back: () => did.push('back') }, location: { set hash(h) { did.push(h); } } });
+    vm.runInContext(`(${limitsBack})`, ctx)();
+    return did.join(' ');
+  };
+  assert.equal(leave('#/setup'), 'back', 'opened from Setup QA: Back there, to the place left');
+  assert.equal(leave('#/machines/1'), 'back', 'from the machine page');
+  assert.equal(leave('#/queues/6'), 'back', 'from the list editor');
+  assert.equal(leave(undefined), '#/setup', 'opened on its own after another page in the tab: Setup QA, not out of GatorQA');
+  assert.equal(leave(undefined, 1), '#/setup', 'a new tab');
   assert.match(limits, /el\("a", \{ class: "button", href: "#\/setup", onclick: \(e\) => \{ e\.preventDefault\(\); back\(\); \} \}, "Back"\)/);
   assert.match(limits, /toast\("Limits saved"\);\n\s+back\(\);/);
   assert.doesNotMatch(limits, /#\/machines\//, 'never the old machine page');
