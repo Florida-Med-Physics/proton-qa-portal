@@ -535,8 +535,15 @@ function viewAsControl() {
   if(state.user?.role!=='admin') { state.actingRole=null; return null; }
   const pick=el('select',{'aria-label':'View As role'},...['admin','physicist','therapist','mpa'].map(role=>el('option',{value:role},ROLE_LABEL[role])));
   pick.value=state.actingRole||'admin';
-  pick.addEventListener('change',()=>{state.actingRole=pick.value==='admin'?null:pick.value;if(state.actingRole)sessionStorage.setItem('qa_admin_acting_role',state.actingRole);else sessionStorage.removeItem('qa_admin_acting_role');location.hash='#/';renderShell();route();});
-  return el('label',{class:'inline view-as-control',title:'Operate with the selected role. Your Admin identity remains in the audit trail.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick,state.actingRole?el('span',{class:'small'},'Active'):null);
+  // The page stays when the chosen role may open its tab (the test renderShell uses for the tabs); otherwise the Dashboard.
+  pick.addEventListener('change',()=>{state.actingRole=pick.value==='admin'?null:pick.value;if(state.actingRole)sessionStorage.setItem('qa_admin_acting_role',state.actingRole);else sessionStorage.removeItem('qa_admin_acting_role');if(!mayOpenTab(location.hash))location.hash='#/';renderShell();route();});
+  return el('label',{class:'inline view-as-control',title:'Operate with the selected role. Your Admin identity remains in the audit trail.'},svg('svg',{viewBox:'0 0 24 24',width:20,height:20,fill:'none',stroke:'currentColor','stroke-width':1.8,'aria-hidden':'true'},svg('path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z'}),svg('circle',{cx:12,cy:12,r:3})),'View As ',pick);
+}
+// Whether the role now in use may open the tab a page belongs to (a page in no tab, such as Search, is open to all).
+function mayOpenTab(hash) {
+  const current = hash.split("?")[0].split("/").slice(0, 2).join("/") || "#/";
+  const tab = NAV.find(([, , , owns]) => owns.includes(current));
+  return !tab || !tab[2] || can(tab[2]);
 }
 
 function renderShell() {
@@ -571,7 +578,7 @@ function renderShell() {
     el('a',{href:'#/account',class:'button small password-link'},'Change password'),
     themeToggle());
   document.getElementById('acting-role-notice')?.remove();
-  if(state.user.role==='admin'&&state.actingRole)bar.after(el('div',{id:'acting-role-notice',class:'acting-role-notice',role:'status'},`Operating as ${ROLE_LABEL[state.actingRole]} · Actions are saved as ${personName(state.user.full_name,state.user.username)} (Admin).`));
+  if(state.user.role==='admin'&&state.actingRole)bar.after(el('div',{id:'acting-role-notice',class:'acting-role-notice',role:'status'},`Viewing as ${ROLE_LABEL[state.actingRole]} · saved as ${personName(state.user.full_name,state.user.username)} (Admin)`));
 }
 
 function machineColorClass(name) {

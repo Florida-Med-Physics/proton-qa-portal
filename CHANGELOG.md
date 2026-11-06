@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- View As: choosing a role keeps the page you are on when that role may open its tab (Review QA, a saved run, Machine Trends, Perform QA), and opens the Dashboard only when it may not (Setup QA, Data Administration for a therapist or MPA); the "Active" word beside the menu is gone and the banner reads "Viewing as Therapist · saved as <name> (Admin)". Navigation and wording only: requests still carry the chosen role as before.
+
 - List editor on a phone: the column names row no longer sits 131-168 px down inside the table over the first tests (1.01-1.03); it scrolls away with the table. A computer keeps it pinned. Display only.
 
 - Perform QA: an as-needed list (TrueBeam SRS, HDR daily and source exchange) says "As needed" once, in Status, with no schedule line under its name and no date in the chip (its last run stays under Last result). On a phone each card is shorter: the name beside its ▶, "Status" on one line, the History ring left to the Dashboard and Machine Trends (admin 3,306 px at 390 instead of 4,657; therapist 2,636 instead of 3,634). Display only.

@@ -161,5 +161,24 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.match(css, /^table\.list-editor thead th \{ position: sticky; top: var\(--sticky-top, 0px\);/m, 'a computer keeps the pinned column row');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone.');
+// 5. View As keeps the page when the chosen role may open its tab (the tabs' own test), else opens the Dashboard; no
+// "Active" beside the menu; the banner names the person once: "Viewing as Therapist · saved as <name> (Admin)".
+{
+  const c = dom({ state: { user: { id: 1, role: 'admin' }, actingRole: null } });
+  vm.runInContext(between('function activeRole(', 'let toastTimer;') + between('const NAV = [', 'function personIcon(') + between('function mayOpenTab(', 'function renderShell('), c);
+  const lands = (role, hash) => { c.state.actingRole = role === 'admin' ? null : role; return c.mayOpenTab(hash) ? hash : '#/'; };
+  assert.deepEqual(['therapist', 'admin', 'physicist', 'mpa'].map((r) => lands(r, '#/review')), ['#/review', '#/review', '#/review', '#/review']);
+  assert.deepEqual(['therapist', 'mpa', 'physicist'].map((r) => lands(r, '#/admin')), ['#/', '#/', '#/admin'], 'Data Administration needs configure');
+  assert.equal(lands('therapist', '#/queues/6'), '#/', 'a list editor is under Setup QA');
+  assert.equal(lands('therapist', '#/trends?machine_id=2&range=90'), '#/trends?machine_id=2&range=90');
+  assert.equal(lands('mpa', '#/runs/2053'), '#/runs/2053', 'a saved run is under Review QA');
+  assert.equal(lands('therapist', '#/search?q=PBS'), '#/search?q=PBS', 'a page in no tab stays');
+  assert.equal(lands('therapist', ''), '', 'the Dashboard stays');
+  const control = between('function viewAsControl(', 'function mayOpenTab(');
+  assert.match(control, /if\(!mayOpenTab\(location\.hash\)\)location\.hash='#\/';renderShell\(\);route\(\);/);
+  assert.doesNotMatch(control, /'Active'/);
+  assert.match(between('function renderShell(', 'function machineColorClass('), /`Viewing as \$\{ROLE_LABEL\[state\.actingRole\]\} · saved as \$\{personName\(state\.user\.full_name,state\.user\.username\)\} \(Admin\)`/);
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open.');
 })().catch((err) => { console.error(err); process.exit(1); });
