@@ -90,4 +90,15 @@ for (const rule of ['.submit-bar:has(> .save-draft) { grid-template-columns:minm
 assert.doesNotMatch(phoneRules, /\.submit-bar[^{]*\{[^}]*font-size:17px/, 'no font-size the form-wide rule overrides');
 assert.match(css, /\.submit-bar > button\.primary \{ grid-column:2; grid-row:1;/, "other bars (a saved run's) keep their layout");
 
+// 6. Machine Trends statistics on a phone: a long series name may wrap after an underscore and before a bracket besides its
+// spaces (never inside a word), so a narrow table fits; a short symbol such as k_Q stays whole; the text is unchanged.
+const wraps = { el: (tag, props, ...kids) => ({ tag, props: props || {}, kids: kids.flat(Infinity) }) };
+vm.createContext(wraps);
+vm.runInContext(between('function seriesNameWraps(', 'function trendSummaryTable('), wraps);
+const pieces = (name) => wraps.seriesNameWraps(name).map((k) => (typeof k === 'string' ? k : `<${k.tag}>`)).join('');
+assert.equal(pieces('Field1_Exp_IsoDepth [cm]'), 'Field1_<wbr>Exp_<wbr>IsoDepth [cm]');
+assert.equal(pieces('Chamber Cal. Factor(Proton), Gy/C'), 'Chamber Cal. Factor<wbr>(Proton), Gy/C');
+assert.equal(pieces('k_Q'), 'k_Q'); assert.equal(pieces(null), ''); assert.equal(pieces('Chamber k_pol'), 'Chamber k_pol'); assert.equal(pieces('Range (D90) [cm]'), 'Range (D90) [cm]');
+assert.match(between('function trendSummaryTable(', '// Limit bands on a Δ chart'), /el\("th", \{ scope: "row" \}, el\("span", \{ class: `key-swatch line \$\{r\.color\}`, "aria-hidden": "true" \}\), seriesNameWraps\(r\.label\)\)/);
+
 console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±; a saved run note behind a pencil; Mark in Progress beside Submit on a phone.');

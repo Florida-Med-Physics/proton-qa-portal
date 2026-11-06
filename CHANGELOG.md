@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Trends: in the statistics table under a chart, a long series name may also wrap after an underscore and before a bracket ("Field1_Exp_" / "IsoDepth", "Factor" / "(Proton)"), so a narrow phone table fits without breaking a word; short symbols such as k_Q stay whole and the names read the same. Display only.
+
 - QA form on a phone: Mark in Progress and Submit for review are the same size and each fits on one line down to a 360 px phone (17 px labels with less side padding; the 17 px set before never applied, the form's own size overrode it, so both labels took two lines). Display only.
 
 - Saved run: a note with a long unbroken path or file name wraps inside its box instead of scrolling sideways. Display only.

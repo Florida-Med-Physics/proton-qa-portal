@@ -3853,6 +3853,12 @@ function trendSummary(series, delta = false) {
   });
 }
 
+// Where a series name in that table may wrap besides its spaces: after an underscore (Field1_Exp_IsoDepth) and before a
+// bracket (Factor(Proton)), so a narrow phone table fits without breaking a word; a short symbol such as k_Q stays whole.
+function seriesNameWraps(name) {
+  return String(name ?? "").replace(/(\w\w_)(?=\w)|(\w)(?=\()/g, "$1$2\u0001").split("\u0001").flatMap((part, i) => (i ? [el("wbr"), part] : [part]));
+}
+
 function trendSummaryTable(series, unit, delta = false, name = "") {
   const units = unit && unit !== "unitless" ? unit : "";
   const caption = `${delta ? "Δ " : ""}${name || "Trend"} summary${units ? ` (${units})` : ""}`;
@@ -3864,7 +3870,7 @@ function trendSummaryTable(series, unit, delta = false, name = "") {
     el("thead", {}, el("tr", {}, el("th", { scope: "col", class: "trend-summary-unit", "aria-label": units ? `Series (${units})` : "Series" }, units),
       heads.map(([h, title], i) => el("th", { scope: "col", class: i < 4 ? "num" : "", title }, h)))),
     el("tbody", {}, trendSummary(series, delta).map((r) => el("tr", {},
-      el("th", { scope: "row" }, el("span", { class: `key-swatch line ${r.color}`, "aria-hidden": "true" }), r.label),
+      el("th", { scope: "row" }, el("span", { class: `key-swatch line ${r.color}`, "aria-hidden": "true" }), seriesNameWraps(r.label)),
       el("td", { class: "num" }, r.baseline), el("td", { class: "num" }, r.mean), el("td", { class: "num" }, r.sd),
       el("td", { class: "num" }, r.farthest), el("td", { title: r.qa_date ? shortDate(r.qa_date) : null }, r.date))))));
 }
