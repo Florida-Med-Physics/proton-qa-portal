@@ -427,6 +427,8 @@ function homeIcon() {
 
 // Dashboard: one look at every machine — today's QA, last result, and what is waiting for review.
 const FREQ_ORDER = { daily: 0, weekly: 1, monthly: 2, quarterly: 3, semiannual: 4, annual: 5, custom: 6, asneeded: 7 };
+// A machine's lists in the order the Dashboard and Perform QA show them: daily first, then monthly, …, then by name.
+const scheduleOrder = (a, b) => (FREQ_ORDER[a.frequency] ?? 9) - (FREQ_ORDER[b.frequency] ?? 9) || a.queue_name.localeCompare(b.queue_name);
 
 function frequentQaAssignments(data,runs,userId) {
   const schedules=data.machines.flatMap(m=>m.queues.filter(q=>q.active!==0).map(q=>({...q,machine_name:m.name})));
@@ -4255,9 +4257,12 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
         drawn = true;
         body.append(trendGroupChart(group), el('a', { href, class: 'button small' }, 'View values and details'));
       };
-      chart.addEventListener('toggle', () => { if (chart.open) draw(); });
-      // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category, closed.
+      const key = `${machineId}|${template.assignment.id}|${group.base}`;
+      chart.addEventListener('toggle', () => { if (chart.open) { openTrendGroups.add(key); draw(); } else openTrendGroups.delete(key); });
+      // Distal depth and spot position open (drawn) on load, under Key checks; every other group stays in its category,
+      // closed unless it was opened here before.
       if (keyCheck) { chart.open = true; draw(); keyChecks.push({ keyCheck, chart }); continue; }
+      if (openTrendGroups.has(key)) { chart.open = true; draw(); }
       if (!categories.has(category)) categories.set(category, []);
       categories.get(category).push(chart);
     }
@@ -4268,8 +4273,19 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       sections.push(section);
     }
   }
-  app.append(trendInsightsCard(insights));
-  if (!sections.length) return app.append(el('div', { class: 'card empty' }, 'No measurements in this period. Import reports or choose a longer period.'));
+  // Nothing to show: one card that says why, without Export CSV or the trend summary.
+  if (!sections.length) {
+    app.querySelector('.trend-file-tools')?.remove();
+    const machine = machines.find((m) => String(m.id) === String(machineId));
+    return app.append(el('div', { class: 'card empty' }, !lists.length ? 'Nothing scheduled.'
+      : !templates.some((t) => t.items.some((i) => i.type === 'numeric')) ? 'This list has no measured values.'
+      : `No QA recorded on ${machine?.name || 'this machine'} in this period.${browserFolders() ? ' Import reports or choose a longer period.' : ''}`));
+  }
+  // A test opened from here (its values, or an insight's graph): "← All tests" there comes Back to this place.
+  const fromHere = (e) => { const a = e.target.closest?.('a[href^="#/trends?"][href*="test_id="]'); if (a) trendBack = a.getAttribute('href'); };
+  const insightsCard = trendInsightsCard(insights);
+  insightsCard.addEventListener('click', fromHere);
+  app.append(insightsCard);
   const search = el('input', { type: 'search', class: 'filter-box', placeholder: 'Find an energy or measurement…', 'aria-label': 'Find measurements', oninput: e => {
     const words = e.target.value.toLowerCase().split(/\s+/).filter(Boolean);
     for (const section of sections) {
@@ -4278,6 +4294,7 @@ async function renderTrendOverview(machines, machineId, range, listId = "", sour
       section.hidden = rows.every(row => row.hidden);
     }
   }});
+  for (const section of sections) section.addEventListener('click', fromHere);
   app.append(el('h2', { class: 'section-head' }, 'Measurements'), search, ...sections);
 }
 
@@ -4534,6 +4551,11 @@ function busiestList(lists, histories) {
   const count = (a) => runs.get(String(a.id))?.size || 0;
   return lists.reduce((best, a) => (count(a) > count(best) ? a : best), lists[0]);
 }
+// The tests opened on Machine Trends in this tab (machine|list|test), opened and drawn again when the overview is drawn
+// again (Back, "← All tests", another period), so the place Back returns to shows what it showed.
+const openTrendGroups = new Set();
+// The test page last opened from an overview (its link): "← All tests" there goes Back to that overview.
+let trendBack = null;
 async function renderTrends() {
   const params = queryParams();
   // The machines and every machine's lists in one request; the lists of the machine shown are picked out below.
@@ -4545,7 +4567,8 @@ async function renderTrends() {
   const range = params.get("range") || "90";
   let testIds = (params.get("test_id") || "").split(",").filter(Boolean);
   // The machine, QA list and range stay frozen at the top while the tests scroll under them (as on Perform QA).
-  const lists = machineId ? machineSchedules(schedules, machineId).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')) : [];
+  // In the Dashboard's order (daily first), so a tie for the busiest list opens the daily one.
+  const lists = machineId ? machineSchedules(schedules, machineId).filter((a) => a.active && (activeRole()!=='therapist'||a.frequency!=='monthly')).sort(scheduleOrder) : [];
   const templates=lists.length?await apiBatch(lists.map(a=>`/api/assignments/${a.id}/template`)):[];   // every list's template, in one request
   // The overview then reads the chosen period's history (in parts): after the templates, not beside them. On a site that
   // runs the backend once per request, two requests at once need two servers, and the second may first have to start or
@@ -4570,7 +4593,9 @@ async function renderTrends() {
     select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => { newPage(); go({ machine_id: e.target.value, range }); } }),
     lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => { newPage(); go({ machine_id: machineId, list: e.target.value, range }); } }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
-    testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
+    // Opened from the overview (and still the page opened): Back, to its place and open tests. Otherwise a link.
+    testIds.length ? el("a", { class: "button", onclick: (e) => { if (trendBack === location.hash && history.length > 1) { e.preventDefault(); history.back(); } },
+      href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
   if (!machines.length) return app.append(el("div", { class: "card empty" }, "No machines yet."));
   app.append(trendFileTools(machines.find((m) => String(m.id) === String(machineId)), lists, listId, range, testIds, namedListId));

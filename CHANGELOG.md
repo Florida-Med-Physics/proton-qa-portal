@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Machine Trends: a test you opened stays open, with its chart, when you come back to the overview (Back after "View values and details" or a run, or another period), and "← All tests" on that test page goes Back to the same place instead of the top; the QA list menu is in the Dashboard's order (daily first), so with no runs yet the daily list opens, not the monthly one; a machine with nothing to show (no QA list, a list with no measured tests, or no QA in the period) shows one card saying which, without Export CSV or an empty trend summary. Display and navigation only: the most-runs rule, the period and the CSV are unchanged.
+
 - View As: choosing a role keeps the page you are on when that role may open its tab (Review QA, a saved run, Machine Trends, Perform QA), and opens the Dashboard only when it may not (Setup QA, Data Administration for a therapist or MPA); the "Active" word beside the menu is gone and the banner reads "Viewing as Therapist · saved as <name> (Admin)". Navigation and wording only: requests still carry the chosen role as before.
 
 - List editor on a phone: the column names row no longer sits 131-168 px down inside the table over the first tests (1.01-1.03); it scrolls away with the table. A computer keeps it pinned. Display only.

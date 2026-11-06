@@ -180,5 +180,59 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.match(between('function renderShell(', 'function machineColorClass('), /`Viewing as \$\{ROLE_LABEL\[state\.actingRole\]\} · saved as \$\{personName\(state\.user\.full_name,state\.user\.username\)\} \(Admin\)`/);
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open.');
+// 6. Machine Trends. (a) A machine's lists in the Dashboard's order (daily first, then by name), in the menu and for the
+// busiest-list tie (a new install opens the daily list, not the monthly one). (b) A test opened on the overview opens and
+// is drawn again when the overview is drawn again (Back, "← All tests", another period); one closed is closed again.
+// (c) "← All tests" on a test opened from the overview goes Back (its place and open tests); otherwise it is a link.
+// (d) Nothing to show: one card that says why, without Export CSV or the trend summary.
+{
+  const order = dom();
+  vm.runInContext(between('const FREQ_ORDER', 'function frequentQaAssignments('), order);
+  const menu = [{ id: 1, queue_name: 'Monthly QA template', frequency: 'monthly' }, { id: 2, queue_name: 'Synthetic SRS', frequency: 'asneeded' },
+    { id: 3, queue_name: 'PBS DailyQA Template', frequency: 'daily' }, { id: 4, queue_name: 'Another daily', frequency: 'daily' }];
+  assert.deepEqual([...menu].sort(vm.runInContext('scheduleOrder', order)).map((a) => a.id), [4, 3, 1, 2]);
+  const trends = between('async function renderTrends()', '// Users, audit, account');
+  assert.match(trends, /\.filter\(\(a\) => a\.active && \(activeRole\(\)!=='therapist'\|\|a\.frequency!=='monthly'\)\)\.sort\(scheduleOrder\) : \[\];/, 'the menu, the templates and the busiest-list tie in that order');
+  const c = dom({ window: {}, location: { hash: '#/trends?machine_id=1&list=7&range=90' }, rangeStart: () => '', filterRange: (p) => p, judgedByList: (i, p) => p,
+    trendSourceNumberer: () => (p) => p, trendDisplayName: (n) => n, categoryLabel: (c) => c, trendPassRing: () => null, browserFolders: () => false,
+    trendKeyCheck: (g) => (g.base === 'Distal Depth [mm]' ? 'depth' : null), trendGroups: (items) => items.map((i) => ({ base: i.name, category: 'Range', members: [i] })) });
+  vm.runInContext(between('async function renderTrendOverview(', 'function renderTrendDetail(') + between('const openTrendGroups = new Set();', 'async function renderTrends()')
+    + `function trendGroupChart(g) { return el('figure', {}, g.base); }
+       function trendInsightsCard() { return el('section', { class: 'card trend-insights' }, 'Trend summary'); }`, c);
+  const item = (test_id, name, points = 3) => ({ test_id, name, type: 'numeric', points: Array.from({ length: points }, (_, k) => ({ qa_date: `2026-10-0${k + 1}`, run_id: k + 1 })) });
+  const template = (items) => ({ assignment: { id: 7 }, queue: { name: 'Synthetic daily' }, items });
+  const histories = (items) => Object.fromEntries(items.map((i) => [i.test_id, i.points]));
+  const draw = async (items, lists = [{ id: 7 }], templates = [template(items)]) => {
+    c.app.childNodes = [];
+    await c.renderTrendOverview([{ id: 1, name: 'G1' }], '1', '90', '7', templates, Promise.resolve({ histories: histories(items), order: {} }), lists);
+    return c.app;
+  };
+  const tests = [item(1, 'Distal Depth [mm]'), item(2, 'Proximal Depth [mm]'), item(3, 'Distal Fall Off [mm]')];
+  const charts = (app) => Object.fromEntries(app.find((n) => n.tagName === 'details').map((d) => [d.childNodes[0].textContent, d.open ? (d.childNodes[1].childNodes.length ? 'open, drawn' : 'open, empty') : 'closed']));
+  let app = await draw(tests);
+  assert.deepEqual(charts(app), { 'Distal Depth [mm]': 'open, drawn', 'Proximal Depth [mm]': 'closed', 'Distal Fall Off [mm]': 'closed' }, 'key checks open, the rest closed');
+  const fallOff = app.find((n) => n.tagName === 'details' && n.childNodes[0].textContent === 'Distal Fall Off [mm]')[0];
+  fallOff.open = true; await fallOff.fire('toggle');
+  app = await draw(tests);
+  assert.deepEqual(charts(app), { 'Distal Depth [mm]': 'open, drawn', 'Proximal Depth [mm]': 'closed', 'Distal Fall Off [mm]': 'open, drawn' }, 'drawn again: the test opened before is open');
+  const again = app.find((n) => n.tagName === 'details' && n.childNodes[0].textContent === 'Distal Fall Off [mm]')[0];
+  again.open = false; await again.fire('toggle');
+  assert.deepEqual(charts(await draw(tests)), { 'Distal Depth [mm]': 'open, drawn', 'Proximal Depth [mm]': 'closed', 'Distal Fall Off [mm]': 'closed' }, 'closed again: closed');
+  // (c) A click on a test's link in the overview remembers that test page; "← All tests" there goes Back.
+  const section = (await draw(tests)).find((n) => n.tagName === 'section' && n.className === 'trend-organized-list')[0];
+  const href = '#/trends?machine_id=1&list=7&test_id=2&range=90';
+  await section.fire('click', { target: { closest: (sel) => (sel === 'a[href^="#/trends?"][href*="test_id="]' ? { getAttribute: () => href } : null) } });
+  assert.equal(vm.runInContext('trendBack', c), href);
+  assert.match(trends, /testIds\.length \? el\("a", \{ class: "button", onclick: \(e\) => \{ if \(trendBack === location\.hash && history\.length > 1\) \{ e\.preventDefault\(\); history\.back\(\); \} \},\n\s+href: `#\/trends\?\$\{new URLSearchParams/);
+  // (d) One card, no Export CSV (removed), no trend summary.
+  const empty = async (...args) => { const a = await draw(...args); return [a.find((n) => n.className === 'card empty').map((n) => n.textContent), a.find((n) => /trend-insights/.test(n.className)).length]; };
+  assert.deepEqual(await empty([], [], []), [['Nothing scheduled.'], 0], 'a machine with no QA list');
+  assert.deepEqual(await empty([], [{ id: 7 }], [template([{ test_id: 9, name: 'Source check', type: 'boolean' }])]), [['This list has no measured values.'], 0], 'a list with no measured tests');
+  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period.'], 0], 'nothing recorded in the period');
+  c.browserFolders = () => true;
+  assert.deepEqual(await empty([item(1, 'Distal Depth [mm]', 0)]), [['No QA recorded on G1 in this period. Import reports or choose a longer period.'], 0], 'the browser build can import here');
+  assert.match(between('async function renderTrendOverview(', 'function renderTrendDetail('), /app\.querySelector\('\.trend-file-tools'\)\?\.remove\(\);/);
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card.');
 })().catch((err) => { console.error(err); process.exit(1); });
