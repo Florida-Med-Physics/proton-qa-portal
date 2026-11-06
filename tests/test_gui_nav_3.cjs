@@ -125,5 +125,33 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.match(css, /\.folder-cell \.folder-field > input \{ flex: 1 1 auto; width: auto; min-width: 0; \}/, 'the folder field and its Save share the cell');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save.');
+// 3. Perform QA: an as-needed list says "As needed" once (Status), with no schedule line under its name and no date in
+// the chip (its last run is under Last result); other lists are unchanged. On a phone each card is shorter: the list's
+// name beside its ▶, "Status" on one line, the History ring left to the Dashboard and Machine Trends.
+{
+  const c = dom({ window: {}, state: { user: { id: 9, role: 'therapist' }, actingRole: null }, Date, shortDate: (iso) => `D${iso}`,
+    api: async () => ({ today: '2026-11-06', machines: [{ id: 3, name: 'HDR', kind: 'HDR brachytherapy', queues: [
+      { id: 21, queue_name: 'Synthetic Source Exchange', frequency: 'asneeded', state: 'ready', schedule: 'As needed (run on the days it applies)', last_done: '2026-10-13', last_run: { id: 5, overall: 'recorded', qa_date: '2026-10-13' }, history_counts: {} },
+      { id: 22, queue_name: 'Synthetic Daily', frequency: 'daily', state: 'overdue', schedule: 'Daily (weekdays)', next_due: '2026-11-03', history_counts: { pass: 3 } }] }] }),
+    databaseBanner: async () => null, page: () => {}, machineLabel: (n) => n });
+  vm.runInContext(`function historyRing() { return el('a', { class: 'history-rate' }, '100%'); }
+    function fixedTable(columns, rows) { return el('table', { 'data-cols': columns.map(([h]) => h).join('|') }, rows); }
+    function modalityHead(name) { return el('h2', {}, name); }`, c);
+  vm.runInContext(between('const ROLE_LABEL', 'const STATE_LABEL') + between('const FREQ_LABEL', 'const WEEKDAYS') + between('function activeRole(', 'let toastTimer;')
+    + between('const FREQ_ORDER', 'function frequentQaAssignments(') + between('function applyDashboardRoleView(', 'async function renderHome(')
+    + between('const MODALITIES', '// A table with fixed column widths') + between('async function renderDashboard(', '// Click a list'), c);
+  await c.renderDashboard();
+  const rows = c.app.find((n) => n.tagName === 'tr' && n.className !== 'machine-row');
+  assert.deepEqual(rows.map((r) => r.children.slice(0, 3).map((td) => td.textContent)),
+    [['▶Synthetic Daily' + 'Daily (weekdays)', 'Overdue since D2026-11-03', 'No runs yet'],
+     ['▶Synthetic Source Exchange', 'As needed', 'Recorded D2026-10-13']], 'as needed once; the date once, under Last result');
+  assert.match(source, /if \(a\.state === "ready"\) return a\.last_done \? `As needed · last run \$\{shortDate\(a\.last_done\)\}` : "As needed";/, 'Setup QA and the machine page keep the last-run date');
+  for (const rule of [' #app[data-page="perform-qa"] td[data-label]:not(:first-child)::before { content:attr(data-label); color:var(--muted); font-size:14px; flex:none; }',
+    ' #app[data-page="perform-qa"] .fixed-table td.list-cell { justify-content:flex-start; }',
+    ' #app[data-page="perform-qa"] .fixed-table tbody tr:not(.machine-row) > td:nth-child(4) { display:none; }']) assert.ok(phoneRules.includes(rule), rule);
+  assert.match(phoneRules, /#app\[data-page="perform-qa"\] \.fixed-table td \{ display:flex;[^}]*padding:4px 0;/);
+  assert.match(between('async function renderDashboard(', '// Click a list'), /fixedTable\(\[\["QA list", "40%"\], \["Status", "24%"\], \["Last result", "24%"\], \["History", "12%"\]\], rows\)/, 'History is the 4th cell');
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter.');
 })().catch((err) => { console.error(err); process.exit(1); });

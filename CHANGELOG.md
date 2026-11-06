@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Perform QA: an as-needed list (TrueBeam SRS, HDR daily and source exchange) says "As needed" once, in Status, with no schedule line under its name and no date in the chip (its last run stays under Last result). On a phone each card is shorter: the name beside its ▶, "Status" on one line, the History ring left to the Dashboard and Machine Trends (admin 3,306 px at 390 instead of 4,657; therapist 2,636 instead of 3,634). Display only.
+
 - Data Administration: what each role may do is one table that every role sees, and an admin's people table is Username · Name · Role · Status with active accounts first (the five rights columns repeated the role); Import folders shows its example path once and a quiet Save only after a folder is changed. On a phone both become cards: nothing scrolls sideways and no word breaks mid-word (admin page 4,339 px at 390 instead of 5,457 with two sideways tables; therapist 2,323 instead of 4,211). Display only: the same saves.
 
 - Review QA and Past results on a phone: each run is a compact card with no column names (date and machine, then the QA list on its own line, then who, result and review), 88-120 px tall instead of 213-303; Review QA is about 5,900 px long instead of 13,900 and Past results about 20,300 instead of 46,100 at 390 px. Display only.

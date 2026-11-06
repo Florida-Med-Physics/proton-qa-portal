@@ -1356,9 +1356,12 @@ td, .measure-table td { font-size: 21px; }
  #app[data-page="perform-qa"] .fixed-table colgroup, #app[data-page="perform-qa"] .fixed-table thead { display:none; }
  #app[data-page="perform-qa"] .fixed-table, #app[data-page="perform-qa"] .fixed-table tbody { display:block; width:100%; }
  #app[data-page="perform-qa"] .fixed-table tr { display:block; margin:12px 0; padding:10px; border:1px solid var(--border); border-radius:12px; }
- #app[data-page="perform-qa"] .fixed-table td { display:flex; min-width:0; gap:10px; justify-content:space-between; align-items:center; width:100%; padding:8px 0; border:0; }
- #app[data-page="perform-qa"] td[data-label]:not(:first-child)::before { content:attr(data-label); color:var(--muted); font-size:14px; }
+ #app[data-page="perform-qa"] .fixed-table td { display:flex; min-width:0; gap:10px; justify-content:space-between; align-items:center; width:100%; padding:4px 0; border:0; }
+ #app[data-page="perform-qa"] td[data-label]:not(:first-child)::before { content:attr(data-label); color:var(--muted); font-size:14px; flex:none; }   /* "Status" on one line */
  #app[data-page="perform-qa"] .fixed-table .machine-row { border:0; padding:0; }
+ /* The list's name beside its ▶; its pass-rate ring stays on the Dashboard and Machine Trends. */
+ #app[data-page="perform-qa"] .fixed-table td.list-cell { justify-content:flex-start; }
+ #app[data-page="perform-qa"] .fixed-table tbody tr:not(.machine-row) > td:nth-child(4) { display:none; }
 }
 
 

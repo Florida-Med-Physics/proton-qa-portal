@@ -735,8 +735,9 @@ async function renderDashboard() {
         // A small green start button in front of the list name opens the list.
         const go = can("perform") ? el("a", { class: "start-dot", href: `#/perform/${q.id}`, title: `Start ${q.queue_name}`, "aria-label": `Start ${q.queue_name}` }, "▶") : null;
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
-          el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
-          el("td", {class:"qa-schedule-status"}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
+          // An as-needed list says so once: "As needed" in Status, no schedule line, its last run under Last result.
+          el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, q.frequency === "asneeded" ? null : el("div", { class: "muted small" }, q.schedule))),
+          el("td", {class:"qa-schedule-status"}, chip(q.state, q.state === "ready" ? "As needed" : scheduleStatus({ ...q, active: 1 }))),
           el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}?from=perform` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
           el('td',{class:'center'},historyRing(q.history_counts,`#/trends?machine_id=${machine.id}&list=${q.id}`)));
       })];
