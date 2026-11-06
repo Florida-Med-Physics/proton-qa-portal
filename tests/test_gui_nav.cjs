@@ -45,10 +45,11 @@ assert.match(review, /\[p\.r\.expected!=null\?`Baseline \$\{fmt\(p\.r\.expected\
 assert.match(review, /const original=r\.value_num==null\|\|r\.value_num&&!run\.therapist_approved_by\?'':r\.value_num\?'pass':'fail';/);
 const runPage = between('async function renderRun(', 'function bandValue(');
 assert.match(runPage, /page\(`\$\{run\.machine_name\} · \$\{run\.queue_name\}`, shortDate\(run\.qa_date\)/);
-// The way back is where the run was opened from: Perform QA after Submit (or a last result there), otherwise Review QA,
-// the tab that holds runs, for every role (an MPA who opened it from Review QA goes back there).
-assert.match(runPage, /const back = queryParams\(\)\.get\('from'\) === 'perform' \? \['#\/perform-qa', 'Perform QA'\] : \['#\/review', 'Review QA'\];/);
-assert.match(runPage, /el\("a",\{class:"button",href:back\[0\]\},`Back to \$\{back\[1\]\}`\)/);
+// The way back is where the run was opened from: Perform QA after Submit (or a last result there), Machine Trends from
+// a chart (tests/test_gui_nav_3.cjs), otherwise Review QA, the tab that holds runs, for every role (an MPA who opened it
+// from Review QA goes back there).
+assert.match(runPage, /const back = from === 'perform' \? \['#\/perform-qa', 'Perform QA'\] : from === 'trends' \? \['#\/trends', 'Machine Trends'\] : \['#\/review', 'Review QA'\];/);
+assert.match(runPage, /el\("a",\{class:"button",href:back\[0\],onclick:backClick\},`Back to \$\{back\[1\]\}`\)/);
 assert.match(runPage, /`\$\{therapistMode&&run\.therapist_approved_by&&run\.review_ready!==false\?'Done — back':'Back'\} to \$\{back\[1\]\}`/);
 assert.doesNotMatch(runPage, /can\('review'\)\|\|can\('therapist_approve'\) \?/, 'not by role');
 assert.match(source, /location\.hash = `#\/runs\/\$\{result\.id\}\?from=perform`;/, 'Submit opens the run with the way back to Perform QA');

@@ -10,6 +10,6 @@ const saved=ctx.judgedByList(item,[original])[0];
 assert.equal(saved.expected,158.5);assert.equal(saved.status,'pass');assert.equal(saved.current_expected,160);
 assert.equal(ctx.judgedByList(item,[original],true)[0].status,'fail');
 assert.equal(original.expected,158.5);assert.equal(original.status,'pass');
-assert.equal(ctx.trendRunHref(original),'#/runs/17?test_id=42');
+assert.equal(ctx.trendRunHref(original),'#/runs/17?test_id=42&from=trends');
 for(const value of [77.7,158.5,260.7,101.325])assert.equal(ctx.fmt(value),String(value));
 console.log('Historical baseline/verdict preserved; explicit comparisons separate; exact source links and precision verified.');

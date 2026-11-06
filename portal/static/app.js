@@ -479,7 +479,7 @@ async function renderHome() {
       body.append(el('div',{class:'home-machine-block'},
         el('div',{class:'home-machine-row'},el('a',{href:`#/machines/${m.id}`,class:'home-machine-name'},m.name),
           el('div',{class:'home-machine-actions'},last?el('span',{class:'home-last-result',title:`Last QA: ${last.qa_date}`},chip(last.overall)):null,
-            el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)))),
+            m.queues.length?el('a',{class:'icon-link',href:`#/trends?machine_id=${m.id}`,title:`${m.name} trends`,'aria-label':`${m.name} trends`},trendIcon(20)):null)),
         scheduleRows.length?el('div',{class:'home-machine-schedules'},scheduleRows):el('p',{class:'muted small'},'No QA assigned')));
     }
     if(!machines.length)body.append(el('p',{class:'muted small'},'No active machines.'));
@@ -710,7 +710,8 @@ function historyRing(counts={}, href, label="") {
   const p=total?pass/total*100:0,w=total?(pass+warn)/total*100:0;
   const percent=total&&pass===total?100:Math.min(99,Number(p.toPrecision(2)));
   const description=`${label?label+" · ":""}History, all dates: ${pass} pass, ${warn} warning, ${fail} fail. ${counts.recorded||0} unanswered or unjudged results excluded.`;
-  return el('a',{href,class:'history-rate',title:description,'aria-label':description},
+  // No result at all yet: the "—" is not a link (Machine Trends would have nothing to show).
+  return el(total||counts.recorded?'a':'span',{href:total||counts.recorded?href:null,class:'history-rate',title:description,'aria-label':description},
     el('span',{class:'trend-pass-donut',style:total?`background:conic-gradient(var(--pass) 0% ${p}%,var(--warn) ${p}% ${w}%,var(--fail) ${w}% 100%)`:'background:var(--border)'},el('span',{class:'trend-pass-value'},total?`${percent}%`:'—')));
 }
 
@@ -3516,9 +3517,12 @@ async function renderReviewMeasurements(run) {
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  // The way back: Perform QA when the run was opened from there (Submit, a last result), otherwise Review QA (its tab).
-  const back = queryParams().get('from') === 'perform' ? ['#/perform-qa', 'Perform QA'] : ['#/review', 'Review QA'];
-  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0]},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+  // The way back: Perform QA when the run was opened from there (Submit, a last result); Machine Trends when opened from
+  // a chart, a value or an insight (Back, to the place it was left there); otherwise Review QA (its tab).
+  const from = queryParams().get('from');
+  const back = from === 'perform' ? ['#/perform-qa', 'Perform QA'] : from === 'trends' ? ['#/trends', 'Machine Trends'] : ['#/review', 'Review QA'];
+  const backClick = from === 'trends' ? (e) => { if (history.length > 1) { e.preventDefault(); history.back(); } } : null;
+  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0],onclick:backClick},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
     window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
@@ -3586,7 +3590,7 @@ async function renderRun(id) {
   const therapistMode=can('therapist_approve')&&!can('review');
   if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
 
-  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&!run.trashed_at&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):null),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},`${therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back':'Back'} to ${back[1]}`)));
+  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&!run.trashed_at&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):null),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0],onclick:backClick},`${therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back':'Back'} to ${back[1]}`)));
 
 }
 
@@ -3982,8 +3986,9 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
 const FORECAST_DAYS = 28;                                   // the straight-line trend is projected this far past the last result
 
 let activePointTooltip=null;
+// A run opened from Machine Trends (a chart dot, a value, an insight) says so (from=trends): its way back is Machine Trends.
 function trendRunHref(point) {
-  return `#/runs/${point.run_id}${point.source_test_id?'?test_id='+point.source_test_id:''}`;
+  return `#/runs/${point.run_id}?${point.source_test_id?`test_id=${point.source_test_id}&`:''}from=trends`;
 }
 function pointTooltip(dot,point,label,unit,event,fixed2=false) {
   let tip=document.getElementById('qa-point-tooltip');
@@ -4322,13 +4327,17 @@ function renderTrendDetail(group, range, assignments=[]) {
           p.source_test_number?el('span',{class:'small'},`Test ${p.source_test_number}`):null,
           el('span',{},`${fmt2(p.value)} ${unit}`.trim()),chip(p.status)):'');
       });
-      return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}`},row.qa_date)),
+      return el('tr',{},el('td',{},el('a',{href:`#/runs/${row.run_id}?from=trends`},row.qa_date)),
         el('td',{},assignments.find(a=>String(a.id)===String(row.cells.find(Boolean)?.assignment_id))?.queue_name||'Recorded QA'),cells);
     });
     const title=`${byRun.size>100?'Latest 100 runs':'Values'}${axis?` · ${yAxisLabel(members.map(m=>m.name)).replace(/\s+[XY]$/,'')} ${axis}`:''}`;
-    app.append(el('details',{class:'card',open:rows.length<=20},
+    // A long values table starts closed; opened, it opens again when this page is drawn again (Back from a run).
+    const key=`values|${members.map(m=>m.test_id).join(',')}`;
+    const card=el('details',{class:'card',open:rows.length<=20||openTrendGroups.has(key)},
       el('summary',{},title),
-      table(['QA date','Source QA list',...members.map(m=>(axis?energyOf(m):m.axis)||'Value')],valueRows)));
+      table(['QA date','Source QA list',...members.map(m=>(axis?energyOf(m):m.axis)||'Value')],valueRows));
+    card.addEventListener('toggle',()=>{if(card.open)openTrendGroups.add(key);else openTrendGroups.delete(key);});
+    app.append(card);
   }
 }
 

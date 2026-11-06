@@ -234,5 +234,28 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.match(between('async function renderTrendOverview(', 'function renderTrendDetail('), /app\.querySelector\('\.trend-file-tools'\)\?\.remove\(\);/);
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card.');
+// 7. Links into and out of Machine Trends. A run opened from it (a chart dot, a value, an insight) says from=trends, and
+// its "Back to Machine Trends" goes Back, to the place it was left (a long values table opened there opens again); a ring
+// with no result yet and the trends icon of a machine with no list are not links to a page that cannot show anything.
+{
+  const c = dom();
+  vm.runInContext(between('function trendRunHref(', 'function pointTooltip(') + between('function historyRing(', 'async function renderDashboard('), c);
+  assert.equal(c.trendRunHref({ run_id: 17, source_test_id: 42 }), '#/runs/17?test_id=42&from=trends');
+  assert.equal(c.trendRunHref({ run_id: 17 }), '#/runs/17?from=trends');
+  assert.match(between('function renderTrendDetail(', 'function stat('), /el\('a',\{href:`#\/runs\/\$\{row\.run_id\}\?from=trends`\},row\.qa_date\)/, "a value's date");
+  const run = between('async function renderRun(', 'function bandValue(');
+  assert.match(run, /from === 'trends' \? \['#\/trends', 'Machine Trends'\]/);
+  assert.match(run, /const backClick = from === 'trends' \? \(e\) => \{ if \(history\.length > 1\) \{ e\.preventDefault\(\); history\.back\(\); \} \} : null;/);
+  assert.equal((run.match(/href:back\[0\],onclick:backClick\}/g) || []).length, 2, 'both Back buttons');
+  const detail = between('function renderTrendDetail(', 'function stat(');
+  assert.match(detail, /open:rows\.length<=20\|\|openTrendGroups\.has\(key\)/);
+  assert.match(detail, /card\.addEventListener\('toggle',\(\)=>\{if\(card\.open\)openTrendGroups\.add\(key\);else openTrendGroups\.delete\(key\);\}\);/);
+  const ring = (counts) => { const r = c.historyRing(counts, '#/trends?machine_id=9&list=14', 'HDR'); return [r.tagName, r.getAttribute('href'), r.textContent]; };
+  assert.deepEqual(ring({}), ['span', null, '—'], 'no result yet: no link');
+  assert.deepEqual(ring({ recorded: 2 }), ['a', '#/trends?machine_id=9&list=14', '—'], 'unjudged values still have a trend');
+  assert.deepEqual(ring({ pass: 3 }), ['a', '#/trends?machine_id=9&list=14', '100%']);
+  assert.match(between('async function renderHome(', '// Dark mode on/off'), /m\.queues\.length\?el\('a',\{class:'icon-link',href:`#\/trends\?machine_id=\$\{m\.id\}`/, 'the trends icon only for a machine with a list');
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links.');
 })().catch((err) => { console.error(err); process.exit(1); });
