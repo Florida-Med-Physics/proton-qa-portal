@@ -136,7 +136,7 @@ let browser;
   await page(`[...document.querySelectorAll('.submit-bar button')].find((b) => b.textContent === 'Submit for review').click()`);
   await until(`/^#\\/runs\\/\\d+/.test(location.hash) && document.querySelector('.review-measure-table')`, 'the saved run');
   await sleep(800);
-  const runId = await page(`Number(location.hash.split('/')[2])`);
+  const runId = await page(`parseInt(location.hash.split('/')[2], 10)`);   // #/runs/<id>?from=perform
   const run = await page(`localApi('GET', '/api/runs/${runId}')`);
   const saved = Object.fromEntries(run.results.map((r) => [r.name, r]));
   assert.equal(saved['Source air kerma strength — TCS Sk'].value_num, 12.05);

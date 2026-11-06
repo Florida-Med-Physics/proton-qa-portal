@@ -171,6 +171,7 @@ function toast(message, bad) {
 // Writes (POST, PUT, ...) always finish, with their own toast or note. A read that is one step of a save calls
 // request() instead, so the save does not stop half-way when a page is drawn meanwhile.
 let routeGen = 0;
+let topOnDraw = null;   // the route() whose page opens at its top, as page() draws it (the hashchange listener sets it)
 function api(method, path, body) {
   const gen = routeGen, reply = request(method, path, body);
   if (method !== "GET") return reply;
@@ -266,6 +267,7 @@ function page(title, subtitle, actions) {
   app.replaceChildren(el("div", { class: "page-head" },
     el("div", {}, el("h1", {}, title), subtitle ? el("div", { class: "muted" }, subtitle) : null),
     el("div", { class: "row" }, actions || [])));
+  if (topOnDraw === routeGen) { topOnDraw = null; scrollTo(0, 0); }   // with the new page, not before it has loaded
 }
 
 function table(headers, rows, emptyText) {
@@ -629,7 +631,7 @@ const ROUTES = [
   [/^#\/machines\/(\d+)$/, renderMachine],
   [/^#\/assignments\/(\d+)\/limits$/, renderLimits],
   [/^#\/perform\/(\d+)$/, renderPerform],
-  [/^#\/queues$/, renderSetup],   // the one list of lists is Setup QA
+  [/^#\/queues$/, () => location.replace("#/setup")],   // old links: the one list of lists is Setup QA
   [/^#\/queues\/(new|\d+)$/, renderQueueEditor],
   [/^#\/tests$/, renderTests],
   [/^#\/review$/, renderReview],
@@ -734,7 +736,7 @@ async function renderDashboard() {
         return el("tr", { class: q.state === "overdue" ? "row-overdue" : "" },
           el("td", { class: "list-cell indent" }, go, el("span", { class: "list-name" }, q.queue_name, el("div", { class: "muted small" }, q.schedule))),
           el("td", {class:"qa-schedule-status"}, chip(q.state, scheduleStatus({ ...q, active: 1 }))),
-          el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
+          el("td", {}, last ? [chip(last.overall), " ", el("a", { class: "small", href: `#/runs/${last.id}?from=perform` }, shortDate(last.qa_date))] : el("span", { class: "muted small" }, "No runs yet")),
           el('td',{class:'center'},historyRing(q.history_counts,`#/trends?machine_id=${machine.id}&list=${q.id}`)));
       })];
     });
@@ -2138,7 +2140,7 @@ async function renderPerform(assignmentId) {
       const result = await api("POST", `/api/assignments/${assignmentId}/runs`, { qa_date: qaDate.value, comment: runComment.value, results, source_ref: sourceRef, clear_draft: true });
       if (result.draft_cleared !== true) await api("POST", `/api/assignments/${assignmentId}/draft/clear`, {}).catch(() => {});
       toast(`Submitted. Overall: ${capitalize(result.overall)}`);
-      location.hash = `#/runs/${result.id}`;
+      location.hash = `#/runs/${result.id}?from=perform`;   // the way back is Perform QA
     } catch (err) {
       autosaveStopped = false;
       error.textContent = err.message;
@@ -2171,10 +2173,12 @@ async function renderPerform(assignmentId) {
   const saveDraft = el("button", { type: "button", onclick: async () => {
     clearTimeout(autosaveTimer);
     saveDraft.disabled = true;
+    const gen = routeGen;
     await persistDraft();
     saveDraft.disabled = false;
-    // Saved: back to Perform QA, where the list is opened again to finish it. Not saved: stay; the note and toast say so.
-    if (/^Saved/.test(draftNote.textContent)) { toast("Saved for later"); location.hash = "#/perform-qa"; }
+    // Saved: back to Perform QA, where the list is opened again to finish it (not if another page was opened meanwhile).
+    // Not saved: stay; the note and toast say so.
+    if (/^Saved/.test(draftNote.textContent)) { toast("Saved for later"); if (gen === routeGen) location.hash = "#/perform-qa"; }
   } }, "Mark in Progress");
   const footer = el("div", { class: "submit-bar" }, el("label", { class: "inline" }, "QA date ", qaDate), progress, overallChip,
     el("div", { class: "spacer" }), draftNote, el("a", { class: "button", href: "#/perform-qa" }, "Cancel"), saveDraft, submit);
@@ -2951,8 +2955,9 @@ async function renderQueueEditor(id) {
       }
       modifiedMachineValues.clear();defaultLimitsDirty=false;importBlocksDirty=false;dirty=false;unsaved.hidden=true;
       toast('QA list and machine values saved');
-      // Saving keeps your place in the list (a new list opens at its top).
-      if(result){location.hash=`#/queues/${result.id}`;if(!isNew){const y=scrollY;await route();requestAnimationFrame(()=>scrollTo(0,y));}}else draw();
+      // Saving keeps your place in the list (a new list opens at its top). A new address is drawn by the hashchange
+      // listener; the same address is drawn here, so the save (and a dialog waiting for it) finishes.
+      if(!result)draw();else if(location.hash!==`#/queues/${result.id}`)location.hash=`#/queues/${result.id}`;else{const y=scrollY;await route();requestAnimationFrame(()=>scrollTo(0,y));}
     };
     saveTemplateChanges=save;
     app.append(el("div", { class: "row" }, newCheck, el("div", {}, picker)));
@@ -3487,9 +3492,9 @@ async function renderReviewMeasurements(run) {
 
 async function renderRun(id) {
   const run = await api("GET", `/api/runs/${id}`);
-  // The way back fits the role: Review QA for those who review or sign, Perform QA for those who only perform.
-  const back = can('review')||can('therapist_approve') ? ['#/review','Back to Review QA'] : ['#/perform-qa','Back to Perform QA'];
-  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0]},back[1]),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
+  // The way back: Perform QA when the run was opened from there (Submit, a last result), otherwise Review QA (its tab).
+  const back = queryParams().get('from') === 'perform' ? ['#/perform-qa', 'Perform QA'] : ['#/review', 'Review QA'];
+  page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0]},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
     window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
@@ -3524,19 +3529,21 @@ async function renderRun(id) {
       const error = el("p", { class: "error" });
       const decide = (decision) => async () => {
         error.textContent = "";
-        buttons.forEach((b) => { b.disabled = true; });
+        buttons.forEach((b) => { b.disabled = true; });   // until the next page is drawn: a decision is sent once
+        const gen = routeGen;
         try {
           await api("POST", `/api/runs/${id}/review`, { decision, comment: comment.value });
-          if (decision !== "approved") { toast("Rejected"); route(); return; }
-          toast("Approved");
-          // Approve opens the next run waiting for this physicist (none left: Review QA).
-          const next = nextToApprove(await api("GET", "/api/runs?review_status=pending&limit=400").catch(() => []), id);
-          location.hash = next ? `#/runs/${next.id}` : "#/review";
         } catch (err) {
           error.textContent = err.message;
-        } finally {
           buttons.forEach((b) => { b.disabled = false; });
+          return;
         }
+        toast(decision === "approved" ? "Approved" : "Rejected");
+        if (gen !== routeGen) return;   // saved; a page opened meanwhile stays as it is
+        if (decision !== "approved") return route();   // Reject stays on the run
+        // Approve opens the next run waiting for this physicist (none left: Review QA).
+        const next = nextToApprove(await api("GET", "/api/runs?review_status=pending&limit=400").catch(() => []), run);
+        location.hash = next ? `#/runs/${next.id}` : "#/review";
       };
       const buttons = [el("button", { class: "primary", onclick: decide("approved") }, "Approve"), el("button", { class: "danger", onclick: decide("rejected") }, "Reject")];
       const actions=el('div',{class:'review-action-bar'},el('strong',{},'Your review'),error,el('span',{class:'spacer'}),buttons);
@@ -3555,15 +3562,18 @@ async function renderRun(id) {
   const therapistMode=can('therapist_approve')&&!can('review');
   if(!run.trashed_at&&activeRole()==='physicist'&&run.review_status==='approved') app.append(el('div',{class:'card row'},el('strong',{},'Physics Review: Approved'),el('span',{class:'spacer'}),el('button',{type:'button',onclick:async()=>{try{await api('POST',`/api/runs/${run.id}/physics-unapprove`,{});toast('Awaiting Physics Review');route();}catch(err){toast(err.message,true);}}},'Unapprove')));
 
-  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):`${reviewStatusText(run)}.`),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back to Review QA':back[1])));
+  app.append(el('div',{class:'submit-bar review-close-bar'},el('span',{class:'review-close-message',role:'status'},therapistMode&&!run.trashed_at&&run.therapist_approval_required&&run.review_status==='pending'?(run.therapist_approved_by&&run.review_ready!==false?'Your review is saved. Awaiting Physics Review.':run.results.some(r=>therapistReviewCheck(r)&&r.status==='fail')?'Saved as Fail. Awaiting Therapy Review.':'Awaiting Therapy Review.'):null),el('span',{class:'spacer'}),el('a',{class:'button primary',href:back[0]},`${therapistMode&&run.therapist_approved_by&&run.review_ready!==false?'Done — back':'Back'} to ${back[1]}`)));
 
 }
 
 // A physicist may approve a run that needs no therapist sign-off, or one a therapist has signed (an Admin acting as one).
 const mayApprove = (r) => !r.therapist_approval_required || (r.therapist_approved_by && activeRole() === 'physicist');
-// The next run waiting for this person's approval, in Review QA's order: never this run, their own, or one not ready.
-function nextToApprove(runs, id) {
-  return runs.find((r) => r.id !== Number(id) && r.review_status === 'pending' && r.review_ready !== false && r.performed_by !== state.user.id && mayApprove(r));
+// The next run waiting for this person's approval: the one after this run in Review QA's order (newest first), else the
+// first from the top. Never this run, their own, or one not ready.
+function nextToApprove(runs, run) {
+  const ok = (r) => r.id !== run.id && r.review_status === 'pending' && r.review_ready !== false && r.performed_by !== state.user.id && mayApprove(r);
+  const after = (r) => r.qa_date < run.qa_date || (r.qa_date === run.qa_date && r.id < run.id);
+  return runs.find((r) => ok(r) && after(r)) || runs.find(ok);
 }
 
 function bandValue(point, key, sign) {
@@ -3787,22 +3797,18 @@ function trendPassCounts(points) {
 
 function trendPassRing(points, label = 'Selected period') {
   const c = trendPassCounts(points), scale = c.total ? 100 / c.total : 0;
-  // Nothing judged (no Warning or Action on any result): a grey ring with "—", never "0% passed".
-  if (!c.pass && !c.warn && !c.fail) {
-    const unjudged = `${label}: no limits, not judged. ${c.total} results.`;
-    return el('span', { class: 'trend-pass-rate', title: unjudged, role: 'img', 'aria-label': unjudged },
-      el('span', { class: 'trend-pass-donut', style: 'background: var(--border)' }, el('span', { class: 'trend-pass-value' }, '—')));
-  }
+  if (!c.pass && !c.warn && !c.fail) return null;   // nothing judged (no Warning or Action on any result): no ring
   const passEnd = c.pass * scale, warningEnd = passEnd + c.warn * scale, actionEnd = warningEnd + c.fail * scale;
   const description = `${label}: ${c.percent}% passed. ${c.pass} pass, ${c.warn} warning, ${c.fail} action${c.other ? `, ${c.other} unclassified` : ''}; ${c.total} measurements in selected period. Uses the baseline and verdict saved with each result; includes extreme values.`;
   return el('span', { class: 'trend-pass-rate', title: description, role: 'img', 'aria-label': description },
     el('span', { class: 'trend-pass-donut', style: `background: conic-gradient(var(--pass) 0% ${passEnd}%, var(--warn) ${passEnd}% ${warningEnd}%, var(--fail) ${warningEnd}% ${actionEnd}%, var(--border) ${actionEnd}% 100%)` },
-      el('span', { class: 'trend-pass-value' }, c.total ? `${c.percent}%` : '—')),
+      el('span', { class: 'trend-pass-value' }, `${c.percent}%`)),
     el('span', { class: 'trend-pass-label' }, 'passed'));
 }
 
 function trendPassBreakdown(series) {
-  return el('div', { class: 'trend-pass-breakdown', 'aria-label': 'Pass rate by energy' }, series.map(item => el('div', { class: 'trend-energy-rate' }, el('strong', {}, item.label), trendPassRing(item.points, item.label))));
+  const rings = series.map(item => [item.label, trendPassRing(item.points, item.label)]).filter(([, ring]) => ring);
+  return rings.length ? el('div', { class: 'trend-pass-breakdown', 'aria-label': 'Pass rate by energy' }, rings.map(([label, ring]) => el('div', { class: 'trend-energy-rate' }, el('strong', {}, label), ring))) : null;
 }
 
 function trendStatistics(series, unit, delta = false, colorIndex = null) {
@@ -3899,14 +3905,14 @@ function seriesChart(series, unit, { small = false, delta = null, yLabel = null,
           return { ...item, label, colorIndex: energies.get(label) };
         }).sort((a, b) => a.colorIndex - b.colorIndex);              // the same energy order (and colours) in X and in Y
         if (!members.length) return null;
-        const bands = !delta || trendSharedLimits(members);
+        const bands = !delta || trendSharedLimits(members), breakdown = trendPassBreakdown(members);
         if (delta && bands) banded.push(...members);
         return el('section', { class: 'subplot skewness-axis-panel' }, el('div', { class: 'subplot-title' }, `${yLabel} ${axis}`, trendPassRing(members.flatMap(item => item.points), `${yLabel} ${axis}`)),
           drawSeries(members, unit, { compact: true, delta, yLabel: `${yLabel} ${axis}`, prediction, bands, fixed2: trends }),
           bands ? null : bandNote(),
           trendExclusionNote(members, delta),
           trends ? trendSummaryTable(members, unit, delta, `${yLabel} ${axis}`) : trendStatistics(members, unit, delta),
-          el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), trendPassBreakdown(members)));
+          breakdown && el('details', { class: 'small' }, el('summary', {}, 'Pass rate by energy'), breakdown));
       }).filter(Boolean);
       show(controls, el('div', { class: 'energy-plot-grid plots-2 skewness-axis-grid' }, ...panels),
         el('div', { class: 'chart-key' }, delta && hasRef ? keyItem('ref', 'Reference (0)') : null,
@@ -4533,8 +4539,8 @@ async function renderTrends() {
   }
   const go = (next) => { location.hash = `#/trends?${new URLSearchParams(Object.entries(next).filter(([, v]) => v))}`; };
   page("Machine Trends", null, [
-    select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => go({ machine_id: e.target.value, range }) }),
-    lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => go({ machine_id: machineId, list: e.target.value, range }) }) : null,
+    select('machine_id', machines.slice().sort(machineOrder).map(m => [m.id, m.name]), machineId, { 'aria-label': 'Machine', onchange: e => { newPage(); go({ machine_id: e.target.value, range }); } }),
+    lists.length ? select("list", lists.map((a) => [a.id, a.queue_name]), listId, { "aria-label": "QA list", onchange: (e) => { newPage(); go({ machine_id: machineId, list: e.target.value, range }); } }) : null,
     select("range", [["30", "Last 30 days"], ["90", "Last 3 months"], ["365", "Last year"], ["all", "All history"]], range, { "aria-label": "Period", onchange: (e) => go({ machine_id: machineId, list: listId, test_id: testIds.join(","), range: e.target.value }) }),
     testIds.length ? el("a", { class: "button", href: `#/trends?${new URLSearchParams(Object.entries({ machine_id: machineId, list: listId, range }).filter(([, v]) => v))}` }, "← All tests") : null]);
   app.querySelector(".page-head").classList.add("sticky-head", "trends-head");
@@ -4799,16 +4805,27 @@ async function renderAccount() {
 
 // ---------------------------------------------------------------------------
 
-// A new page opens at its top; a new query on the same page (Machine Trends or Past results filters) keeps the place,
-// once the page is drawn again (drawing it empties it first). One test's trend (test_id) is a page of its own.
+// A new page opens at its top, as page() draws it. Back and Forward return to the place a page was left. A new query on
+// the same page (a Machine Trends period, Past results filters or Show more) keeps the place. Each place is put back once
+// the page is drawn again (drawing it empties it first). One test's trend (test_id) is a page of its own, and so is
+// another machine or QA list on Machine Trends (newPage()).
+history.scrollRestoration = "manual";   // GatorQA puts the place back itself, once the page has loaded
 const pageKey = (hash) => { const [path, query] = hash.split("?"); return `${path}|${new URLSearchParams(query || "").get("test_id") || ""}`; };
-let routedPage = pageKey(location.hash);
+const places = new Map();   // where each page in this tab's history was left
+let routedPage = pageKey(location.hash), entry;
+const newPage = () => { routedPage = ""; };
+const markEntry = () => { entry = Math.random(); history.replaceState({ ...history.state, gatorqaEntry: entry }, ""); };
+markEntry();
 window.addEventListener("hashchange", async () => {
-  const key = pageKey(location.hash), same = key === routedPage, y = scrollY, gen = routeGen + 1;
+  places.set(entry, scrollY);
+  const key = pageKey(location.hash), gen = routeGen + 1, visited = history.state?.gatorqaEntry;
+  let y = 0;
+  if (visited !== undefined) { entry = visited; y = places.get(visited) || 0; }   // Back or Forward
+  else { if (key === routedPage) y = scrollY; markEntry(); }
   routedPage = key;
-  if (!same) scrollTo(0, 0);
+  if (!y) topOnDraw = gen;
   await route();
-  if (same && y && gen === routeGen) requestAnimationFrame(() => scrollTo(0, y));   // once its rows are sized; not if another page was opened meanwhile
+  if (y && gen === routeGen) requestAnimationFrame(() => scrollTo(0, y));   // once its rows are sized; not if another page was opened meanwhile
 });
 api("GET", "/api/me").then((data) => {
   state.user = data.user;

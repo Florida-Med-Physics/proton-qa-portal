@@ -154,7 +154,7 @@ function pages(B, { reply = (path, x) => x } = {}) {
   const pending = [], sent = [];   // sent: each request's body, in order
   const memory = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
   const ctx = { console, document, Node, HTMLElement: Element, HTMLInputElement: function () {}, Date: FixedDate, URLSearchParams, TextEncoder, TextDecoder, Intl, structuredClone, queueMicrotask,
-    location: { hash: '#/', reload() {} }, URL: { createObjectURL: () => 'blob:synthetic', revokeObjectURL() {} }, crypto: globalThis.crypto, atob, btoa,
+    location: { hash: '#/', reload() {} }, history: { state: null, replaceState() {} }, URL: { createObjectURL: () => 'blob:synthetic', revokeObjectURL() {} }, crypto: globalThis.crypto, atob, btoa,
     setTimeout: (fn, ms, ...a) => setTimeout(fn, Math.min(ms || 0, 5), ...a), clearTimeout, setInterval: () => 0, clearInterval() {},
     requestAnimationFrame: (fn) => setTimeout(fn, 0), sessionStorage: memory(), localStorage: memory(), indexedDB: fakeIndexedDb(),
     matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }), ResizeObserver: class { observe() {} disconnect() {} },

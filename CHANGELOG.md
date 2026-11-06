@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Navigation fixes after review: browser Back returns to where you were on a page (Review QA, Past results…); a new page moves to its top only once it has loaded; Approve opens the next run below the one approved (not the newest) and is sent once; Approve and Mark in Progress no longer pull you back if you opened another page meanwhile; a run opened from Perform QA (after Submit) goes back there, from anywhere else back to Review QA, for every role; the run's bottom bar no longer repeats its review status; another machine or list on Machine Trends opens at its top; the list editor's Save template dialog closes when the editor link had a query; old #/queues links become #/setup; Machine Trends shows no ring for a measurement with no limits; Past results filters full width on phones; Review QA headings as wide as their tables. Both builds.
+
 - Setup QA list editor opened read-only (a therapist or MPA following a link): the Import blocks card no longer shows the word "null".
 
 - README and the quick user guide describe the new Review QA order, Approve opening the next run, Trash on the run page and Mark in Progress returning to Perform QA.
