@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Review QA and Past results on a phone: each run is a compact card with no column names (date and machine, then the QA list on its own line, then who, result and review), 88-120 px tall instead of 213-303; Review QA is about 5,900 px long instead of 13,900 and Past results about 20,300 instead of 46,100 at 390 px. Display only.
+
 - Tests: the regression checks tests/test_report.cjs and tests/test_autosave.cjs run again (they loaded only part of app.js and had missed helpers added in October: reviewStatusText and QADerived); the report check expects the review label "Awaiting Physics Review".
 
 - Machine Trends: in the statistics table under a chart, a long series name may also wrap after an underscore and before a bracket ("Field1_Exp_" / "IsoDepth", "Factor" / "(Proton)"), so a narrow phone table fits without breaking a word; short symbols such as k_Q stay whole and the names read the same. Display only.
