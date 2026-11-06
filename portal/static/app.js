@@ -2615,7 +2615,7 @@ async function renderQueueEditor(id) {
     const edit=block=>importMappingEditor(block,importItems,value=>{const index=importBlocks.findIndex(b=>b.id===value.id);if(index<0)importBlocks.push(value);else importBlocks[index]=value;importBlocksDirty=true;markDirty();drawImportBlocks();},q.schedules?.[0]?.id,inferred);
     importBlocksBox.replaceChildren(...present([el('h2',{},'Import blocks'),el('p',{class:'muted small'},'Map workbook cells, CSV/TXT columns, or PDF/TXT labels to tests. Values are reviewed before filling answers; machine limits remain unchanged.'),...importBlocks.map(block=>el('div',{class:'row import-block-summary'},el('strong',{},block.name),el('span',{class:'muted small'},IMPORT_READERS.find(r=>r[0]===block.reader)?.[1]),editable?el('button',{type:'button',onclick:()=>edit(block)},'Edit mapping'):null,editable?el('button',{type:'button',onclick:()=>{importBlocks=importBlocks.filter(b=>b.id!==block.id);importBlocksDirty=true;markDirty();drawImportBlocks();}},'Remove'):null)),editable?el('button',{type:'button',onclick:()=>edit(null)},'Add import block'):null]));   // present(): a read-only view never shows "null"
   };
-  drawImportBlocks();app.append(importBlocksBox);
+  if(editable){drawImportBlocks();app.append(importBlocksBox);}   // read-only (a therapist or MPA by link): nothing to map, no card
   const machineSelections = {};
   await Promise.all((q.schedules||[]).map(async schedule=>{
     const template=await api('GET',`/api/assignments/${schedule.id}/template`);

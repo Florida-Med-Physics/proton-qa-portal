@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- List editor opened read-only (a therapist or MPA following a link): no "Import blocks" card, which offered them nothing to do; the tests start about 170 px higher on a phone. Display only.
+
 - QA form: the Protocol box starts closed at every width (one click opens it), so the first test starts 50-90 px higher; on floridaphysics.com it opened on every computer screen. Display only.
 
 - Values for this machine (Setup QA ⋮): Back and Save limits go back to the page it was opened from (Setup QA, at the place you left, the machine page or the list editor) instead of the old machine page, and its column is headed "Baseline" as everywhere else (it said "Expected"). Navigation and wording only: the same save.
