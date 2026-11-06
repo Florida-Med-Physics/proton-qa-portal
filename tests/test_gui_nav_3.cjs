@@ -303,5 +303,13 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.doesNotMatch(limits, /#\/machines\//, 'never the old machine page');
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from.');
+// 10. QA form: the Protocol box starts closed at every width (on floridaphysics.com the 1200px test means 767px, so it
+// opened on every computer, 105-148 px of transcription notes above the first test); one click opens it.
+{
+  const form = between('async function renderPerform(', 'const inputs = [];');
+  assert.match(form, /app\.append\(el\("details", \{ class: "card instructions" \}, el\("summary", \{\}, el\("strong", \{\}, "Protocol"\)\)/);
+  assert.doesNotMatch(form, /instructions", open:/);
+}
+
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol box starts closed.');
 })().catch((err) => { console.error(err); process.exit(1); });

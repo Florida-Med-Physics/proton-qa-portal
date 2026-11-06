@@ -1753,7 +1753,8 @@ async function renderPerform(assignmentId) {
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   if (t.queue.description) {
-    app.append(el("details", { class: "card instructions", open: !QAHdrDaily.supported(t)&&!matchMedia("(max-width: 1200px)").matches }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description)));
+    // Closed at every width: the protocol is one click away and the first test starts higher on the screen.
+    app.append(el("details", { class: "card instructions" }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description)));
   }
   const inputs = [];
   const sections = [];
