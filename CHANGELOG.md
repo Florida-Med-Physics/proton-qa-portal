@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- Every record the browser build keeps now has its own id, as on the server: the PBS daily list's checks re-added at start-up (after the shared list was renamed, or on an older list) and a machine's own values kept when an old per-machine copy is folded back were added without one, and a host that stores records by id (floridaphysics.com) kept only one of them. Start-up and Restore give any such record already saved the next free id and log it once ("upgrade ids"); nothing else in a record changes (`tests/test_row_ids.cjs`).
+
 - Tests: the regression checks tests/test_report.cjs and tests/test_autosave.cjs run again (they loaded only part of app.js and had missed helpers added in October: reviewStatusText and QADerived); the report check expects the review label "Awaiting Physics Review".
 
 - Machine Trends: in the statistics table under a chart, a long series name may also wrap after an underscore and before a bracket ("Field1_Exp_" / "IsoDepth", "Factor" / "(Proton)"), so a narrow phone table fits without breaking a word; short symbols such as k_Q stay whole and the names read the same. Display only.
