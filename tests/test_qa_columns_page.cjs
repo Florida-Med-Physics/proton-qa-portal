@@ -43,13 +43,13 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.ok((await dialog.textContent()).includes(instruction), 'the instruction, word for word'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     await step.locator('.qa-label strong').click();
     assert.ok((await dialog.textContent()).includes(instruction), 'the label opens it too'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    const group = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();   // X / Y / Z with the same directions and no calculated row
+    const group = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();   // X / Y / Z (and their 3D) with their directions in the title
     await group.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.match(await dialog.textContent(), /Record the correction vector/); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    assert.equal(await group.locator('tbody .qa-calculation-info').count(), 0, 'its row does not repeat the group\'s directions');
+    assert.equal(await group.locator('.qa-shared-field').evaluateAll((fields) => fields.slice(0, 3).filter((f) => f.querySelector('.qa-calculation-info')).length), 0, 'its axes do not repeat the group\'s directions');
     // An X / Y / Z group is one row: its axes side by side, each with its own answer and verdict, the 3D worked out.
     assert.equal(await group.locator('tr[data-qa-entry]').count(), 1);
-    assert.deepEqual(await group.locator('.qa-shared-field .qa-shared-name').allTextContents(), ['X', 'Y', 'Z'], 'the unit is in the block\'s name');
+    assert.deepEqual(await group.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z', '3D'], 'the unit is in the block\'s name');
     assert.equal(await group.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
     // Each field reads "X: [ ]": its letter beside its box, on one line.
     const [letter, boxX] = [await group.locator('.qa-shared-field .qa-shared-name').first().boundingBox(), await group.locator('.qa-shared-field input[type=number]').first().boundingBox()];

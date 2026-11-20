@@ -150,7 +150,7 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     const kv = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();
     assert.equal(await kv.locator('.measure-title .measure-n').textContent(), '2.04');
     assert.equal(await kv.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
-    assert.deepEqual(await kv.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z']);
+    assert.deepEqual(await kv.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z', '3D'], 'set out as 2.03 is, its 3D worked out from its own axes');
     await kv.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_KV, 'six steps: the last two record the vector, then apply the correction');
     assert.equal(await dialog.locator('.directions').count(), 0);
@@ -158,7 +158,9 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     // The same baselines and limits as 2.03, each axis judged against its own.
     assert.equal(await kv.locator('.measure-title .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
     for (const [axis, value] of [['X', '-5.05'], ['Y', '-1.17'], ['Z', '4.25']]) await p.getByLabel(`Mechanical-to-kV/kV Correction Vector ${axis} [cm]`, { exact: true }).fill(value);
-    assert.deepEqual((await kv.locator('.qa-shared-field').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()), ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)']);
+    assert.deepEqual((await kv.locator('.qa-shared-field').allTextContents()).slice(0, 3).map((text) => text.replace(/\s+/g, ' ').trim()), ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)']);
+    assert.equal(await p.getByLabel('Mechanical-to-kV/kV Correction Vector [cm]', { exact: true }).inputValue(), '6.70', 'the same calculation as 2.03\'s 3D');
+    assert.deepEqual(await kv.locator('.qa-shared-field .qa-limits').allTextContents(), ['Baseline 0.0'], 'its 3D says its own baseline, as 2.03\'s does');
     // The check after the block has no step above it now: its ⓘ is its own instruction, as before.
     const verify = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${VERIFY}: pass`, exact: true }) });
     assert.equal(await verify.locator('td.qa-n').textContent(), '2.05');

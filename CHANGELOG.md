@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- **[Physics review]** PBS daily list in the starting data, block 2.04 Mechanical-to-kV/kV Correction Vector: a calculated 3D beside its X, Y, Z, set up as block 2.03's is (the same formula over its own axes; baseline 0; recorded, not judged), as asked by Brook on 2026-11-20. New installs and new demo data only.
+
 - **[Physics review]** PBS daily list in the starting data, block 2.04 Mechanical-to-kV/kV Correction Vector (Brook, 2026-11-20): the same baselines and limits as 2.03 (X = −5 cm, Y = −1 cm, Z = +4.5 cm; Warning ±0.15 cm; Action ±0.2 cm), and its steps end with "Record the correction vector from the isocenter before moving the couch." and then "Apply the recorded correction vector and move the couch." (that step was below the block, with the check after it; the first was the block's own direction). New installs and new demo data only.
 
 - **[Physics review]** PBS daily list in the starting data, Mechanical and Imaging (Brook, 2026-11-20): block 2.03's fifth step is "DO NOT APPLY Correction", in place of its direction "Record the correction vector only. Do not move the couch."; the four steps before the gantry-90 kV/kV block (select the Daily QA field, move the gantry to 90°, insert panel A, acquire kV/kV) are that block's directions and the step after it (apply the correction vector) is the direction of the check below it; the block is **Mechanical-to-kV/kV Correction Vector [cm]** (2.04; X, Y, Z; was "[kV/kV - Gantry 90°] Correction vector"). It has no baselines or limits yet, so its values are recorded, not judged. New installs and new demo data only.

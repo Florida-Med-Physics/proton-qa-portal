@@ -42,8 +42,8 @@ Share with `--host 0.0.0.0`.
   (the seven setup steps of Setup and Safety; thirteen in Mechanical and Imaging for the block below them), block 2.02
   is "Mechanical-to-kV/kV Isocenter [cm]" (X, Y, Z, 3D), 2.03 "Mechanical-to-CBCT Correction Vector [cm]" (baselines
   X −5, Y −1, Z +4.5 cm, Warning ±0.15, Action ±0.2, from Brook; fifth step "DO NOT APPLY Correction") and 2.04
-  "Mechanical-to-kV/kV Correction Vector [cm]" (X, Y, Z; the same baselines and limits as 2.03, on Brook's word; its
-  steps end with recording the vector and then applying the correction), and nothing
+  "Mechanical-to-kV/kV Correction Vector [cm]" (X, Y, Z and a 3D like 2.03's; the same baselines and limits as 2.03,
+  on Brook's word; its steps end with recording the vector and then applying the correction), and nothing
   outside the Sphinx measurements reads in mm (Brook: "if there are mm anywhere in that queue, it shouldnt be there";
   the Sphinx values stay in mm until Brook says otherwise: export, baselines, limits and history are in mm). An
   existing install renames and switches them in Setup QA. GTR5's exports carry nine spots; only six are on the list (open question).
