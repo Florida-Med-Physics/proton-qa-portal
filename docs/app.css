@@ -1915,6 +1915,7 @@ td, .measure-table td { font-size: 21px; }
 @media (max-width: 1200px) {
   .measure-title { --qa-block-n:auto; }
   .measure-title .measure-n { padding:0; margin-right:0; font-size:20px; color:var(--muted); }
+  .measure-title .measure-n + strong { flex:1 1 0; min-width:0; }   /* the number and the name share a line; a long name wraps beside its number */
   .measure-title .measure-n ~ .qa-limits { margin-left:0; }
   .measure-table td.qa-n-span:empty { display:none; }   /* a card has no empty number line */
 }
