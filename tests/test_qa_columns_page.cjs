@@ -35,9 +35,9 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.equal(await p.locator('.measure-title .qa-sub').count(), 0);
     await p.getByRole('button', { name: 'Protocol', exact: true }).click();
     assert.match(await dialog.textContent(), /Protocol/); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    const instruction = 'Go to MyQA, open your machine QA, connect Sphinx, and measure the background.';
-    const step = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${instruction}: yes`, exact: true }) });
-    assert.equal(await step.locator('.qa-label strong').textContent(), 'MyQA: connect Sphinx, measure background');
+    const instruction = 'Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.';
+    const step = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${instruction}: pass`, exact: true }) });
+    assert.equal(await step.locator('.qa-label strong').textContent(), 'Verify BB alignment with another kV/kV');
     assert.equal(await step.locator('.qa-label strong').getAttribute('title'), instruction);
     await step.getByRole('button', { name: 'Test details', exact: true }).click();
     assert.ok((await dialog.textContent()).includes(instruction), 'the instruction, word for word'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
@@ -68,6 +68,33 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.equal(new Set(tops).size, 1, 'all on one line');
     assert.equal(await offset.locator('table').evaluate((table) => table.querySelector('tr.quick-trend td').colSpan + 1 === table.querySelectorAll('colgroup col').length), true, 'its quick trend spans the columns beside the number');
     assert.equal(await p.getByLabel('How Sphinx imports work', { exact: true }).count(), 1);
+    // The Sphinx import is a row of the Sphinx Measurements section: under the section's title, above its tables, and
+    // named for what it does (Brook, 2026-11-20). The steps up to delivering the beam are the section's directions.
+    const sphinx = p.locator('.card.section', { has: p.locator(':scope > summary strong', { hasText: /^Sphinx Measurements$/ }) });
+    assert.equal(await p.locator('.qa-import').count(), 1);
+    assert.equal(await sphinx.locator(':scope > .qa-import').count(), 1, 'inside its section');
+    assert.equal(await sphinx.locator(':scope > .qa-import strong').first().textContent(), 'Import Sphinx Measurements');
+    assert.equal(await p.getByText('Import measurements', { exact: true }).count(), 0);
+    assert.equal(await sphinx.evaluate((box) => box.firstElementChild.nextElementSibling === box.querySelector(':scope > .qa-import')), true, 'right under the section\'s title');
+    const [importRow, firstTable] = [await sphinx.locator(':scope > .qa-import').boundingBox(), await sphinx.locator('table').first().boundingBox()];
+    assert.ok(importRow.y + importRow.height <= firstTable.y + 1, 'above the section\'s tables');
+    await sphinx.locator(':scope > summary .qa-section-info button').click();
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), ['Retract panels A and B.', 'Go to MyQA, open your machine QA, connect Sphinx, and measure the background.', 'Deliver the beam.']);
+    await p.keyboard.press('Escape');
+    assert.equal(await sphinx.evaluate((d) => d.open), true, 'the section stays open');
+    // What Sphinx measures is filled from its file, never typed: the homogeneity and the coincidence offsets too.
+    for (const name of ['Field Homogeneity [%]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]', 'Energy [100.00 MeV]: Distal Depth [mm]']) {
+      const field = p.getByLabel(name, { exact: true });
+      assert.equal(await field.getAttribute('readonly'), '', name);
+      assert.equal(await field.getAttribute('placeholder'), 'from file', name);
+    }
+    for (const name of ['Daily output: Charge [nC]', '[MU] Delivered MU (Record in IC2)', 'Chamber Temperature, °C']) assert.equal(await p.getByLabel(name, { exact: true }).getAttribute('readonly'), null, `${name}: typed`);
+    // One row, one number, for what reads as one line: the charge with its dose, each factor with its instrument, X with Y.
+    for (const [first, second] of [['Daily output: Charge [nC]', 'Daily output: Dose [cGy]'], ['Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]'],
+      ['Chamber', 'Chamber Cal. Factor(Proton), Gy/C'], ['Electrometer', 'Electrometer Calibration Factor']]) {
+      const same = await p.evaluate(([a, b]) => { const row = (name) => { const f = [...document.querySelectorAll('[aria-label]')].find((x) => x.getAttribute('aria-label') === name && x.closest('tr[data-qa-entry]')); return f && f.closest('tr[data-qa-entry]'); }; return !!row(a) && row(a) === row(b); }, [first, second]);
+      assert.equal(same, true, `${first} and ${second} share a row`);
+    }
 
     // 3. The Columns box: small, under its button, and the page stays in use behind it. Show History, move Result left
     // of Measured, hide Unit. What was typed stays.

@@ -1942,3 +1942,7 @@ td, .measure-table td { font-size: 21px; }
   .qa-axis-row .qa-shared-name > span::after { content:":"; }
   .qa-axis-row .qa-shared-more { grid-column:2; grid-row:2; }
 }
+
+
+/* The Sphinx import is a row of the Sphinx Measurements section, under its title: no card of its own. */
+.card.section > .qa-import { margin:0; padding:6px 16px 12px; border:0; border-radius:0; box-shadow:none; background:none; }

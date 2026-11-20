@@ -2136,12 +2136,6 @@
      "description": "Template 2.80. [Section: Mechanical and Imaging]"
     },
     {
-     "name": "Retract panels A and B.",
-     "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.90. [Section: Mechanical and Imaging]"
-    },
-    {
      "category": "AI_PBS_Daily_Imaging",
      "name": "[OBs] Required Correction Vector - X [cm]",
      "type": "numeric",
@@ -2185,17 +2179,22 @@
      "description": "Template 2.95. [Section: Mechanical and Imaging]"
     },
     {
+     "name": "Retract panels A and B.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 3.00a. [Section: Sphinx Measurements] [direction: section]"
+    },
+    {
      "category": "A tip for the next procedure",
      "name": "Go to MyQA, open your machine QA, connect Sphinx, and measure the background.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 2.99. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 3.00b. [Section: Sphinx Measurements] [direction: section]"
     },
     {
      "name": "Deliver the beam.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 3.00. [Section: Sphinx Measurements]"
+     "type": "text",
+     "description": "Template 3.00. [Section: Sphinx Measurements] [direction: section]"
     },
     {
      "category": "Beam_Parameters",
@@ -2225,7 +2224,7 @@
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.04. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20100000000%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20200000000%7D%5D%2C%20%22sample%22%3A%20true%7D]"
+     "description": "Template 3.04. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20100000000%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20200000000%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Device Selection",
@@ -2240,7 +2239,7 @@
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.06. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Electrometer%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.0%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.1%7D%5D%2C%20%22sample%22%3A%20true%7D]"
+     "description": "Template 3.06. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Electrometer%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.0%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.1%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Device Selection",
@@ -2267,7 +2266,7 @@
      "unit": "cGy",
      "expected": 150,
      "tol_mode": "absolute",
-     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Daily%20output%3A%20Charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Daily_PBS_Dosimetry%22%7D%2C%20%7B%22name%22%3A%20%22Overall%20Calibration%20Factor%20%5BGy%2FC%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20%28Output%29%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22A%2A0.000000001%2AB%2AC%2A100%22%7D]"
+     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Daily%20output%3A%20Charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Daily_PBS_Dosimetry%22%7D%2C%20%7B%22name%22%3A%20%22Overall%20Calibration%20Factor%20%5BGy%2FC%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20%28Output%29%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22A%2A0.000000001%2AB%2AC%2A100%22%7D] [row: with above]"
     },
     {
      "category": "Data",
@@ -2898,7 +2897,7 @@
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.67. [Section: Sphinx Measurements]",
+     "description": "Template 3.67. [Section: Sphinx Measurements] [row: with above]",
      "warn": 0.5,
      "fail": 1.0
     },

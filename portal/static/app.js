@@ -1864,6 +1864,12 @@ function measureParts(name) {
   return { metric: hit[1], metricLabel, rowLabel, sortKey: (spot ? Number(spot[1]) : 0) * 10000 + (energy ? Number(energy[1]) : 0) };
 }
 
+// A value the Sphinx export reports once, not per energy or spot (field homogeneity, an isocenter coincidence offset):
+// the import fills it by the same rules (canonicalKey in the backends), so it is never a calculation of the form's own.
+function sphinxResult(item) {
+  const n = String(item.name || "").toLowerCase().replace(/\s+/g, " ");
+  return item.type === "numeric" && !/\[(?:calc|derived): /.test(item.description || "") && MEASURE_RULES.some(([re]) => re.test(n));
+}
 function blockNumbers(items) {
   const out = new Map();
   out.joined = new Set();                                                 // tests on the row of the test above (sharedRows)
@@ -2112,6 +2118,7 @@ async function renderPerform(assignmentId) {
     }
   };
   const named = t.items.some((i) => sectionNameOf(i));
+  const sphinxList = t.items.some((i) => i.type === "numeric" && measureParts(i.name));   // its measurements come from a Sphinx export
   const numbers = blockNumbers(t.items);
   const byCategory = new Map(), directionsOf = new Map(), waiting = new Map();   // a section's tests, its directions (sectionDirections), and those waiting for the test below them
   for (const item of t.items) {
@@ -2142,7 +2149,9 @@ async function renderPerform(assignmentId) {
       if (item.type === "boolean" || item.type === "status") ({ value: input, control } = passFailInput(item.name, item.type === "status", item.unit === "Yes/No"));
       else if (item.type === "numeric") {
         // Sphinx measurements are read from the export file, never typed in.
-        const fromFile = !!measureParts(item.name) || /^Measured by Sphinx/.test(item.description || "");
+        // A list filled from a Sphinx export takes its one-off Sphinx results from the file too (field homogeneity, the
+        // isocenter coincidence offsets): the import already reads them, so they are not typed (Brook, 2026-11-20).
+        const fromFile = !!measureParts(item.name) || (sphinxList && sphinxResult(item)) || /^Measured by Sphinx/.test(item.description || "");
         control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
           readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
       }
@@ -2492,18 +2501,21 @@ async function renderPerform(assignmentId) {
     el('p',{},'Use a Sphinx report export (.xls or Sphinx-format .csv). This reader expects the report’s Setup headings and measurement rows; it does not accept arbitrary CSV column layouts.'),
     el('p',{},'For each row, it identifies the measurement name, energy/spot, warning/action limits, reference, and measured Result. Only the Result fills the answer. Matching uses the measurement and nominal energy, so small energy-label differences and uniquely matched spot renumbering do not create new tests.'),
     el('p',{},'The selected machine’s saved baseline and limits determine pass/fail. Imported reference values and the file’s own verdict do not replace them. Only matching template tests are filled; the remaining answers stay for you to complete.')]:null),sphinxSection?'How Sphinx imports work':'About importing');
-  const fileCard = el("div", { class: "card step qa-import" }, el('div',{class:'row'},el("strong", {}, "Import measurements"),importHelp,sphinxFile),
+  const fileCard = el("div", { class: "card step qa-import" }, el('div',{class:'row'},el("strong", {}, sphinxSection ? "Import Sphinx Measurements" : "Import measurements"),importHelp,sphinxFile),
     autoLine, sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
       can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
   }
-  // Sphinx reports belong beside the measurement section they fill.
+  // Sphinx reports belong in the measurement section they fill.
   const customBlocks=(t.queue.import_blocks||[]).filter(b=>!(b.reader==='sphinx'&&sphinxSection)&&!(b.reader==='hdr'&&QAHdrDaily.supported(t)));
   if(!sphinxSection&&(!customBlocks.length||QAHdrDaily.supported(t)||t.items.some(i=>(i.description||'').includes('[rule: wl-max-delta]'))))app.append(fileCard);
   app.append(...customBlocks.map(block=>mappedImportCard(block,t,inputs,qaDate,refresh)));
   app.append(finishedMessage);
-  app.append(...sections.flatMap((x) => [x.heading,x===sphinxSection?fileCard:null,x.box]).filter(Boolean));   // a null would append as the text "null"
+  app.append(...sections.flatMap((x) => [x.heading,x.box]).filter(Boolean));   // a null would append as the text "null"
+  // The Sphinx import is part of the Sphinx Measurements section: under its title (and its directions), above its
+  // tables (Brook, 2026-11-20: the section first, then "Import Sphinx Measurements").
+  if (sphinxSection) { const title = sphinxSection.box.firstElementChild; if (title && title.after) title.after(fileCard); else sphinxSection.box.append(fileCard); }
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
