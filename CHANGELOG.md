@@ -9,6 +9,10 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- **[Physics review]** PBS daily list in the starting data, Mechanical and Imaging (Brook, 2026-11-20): block 2.03's fifth step is "DO NOT APPLY Correction", in place of its direction "Record the correction vector only. Do not move the couch."; the four steps before the gantry-90 kV/kV block (select the Daily QA field, move the gantry to 90°, insert panel A, acquire kV/kV) are that block's directions and the step after it (apply the correction vector) is the direction of the check below it; the block is **Mechanical-to-kV/kV Correction Vector [cm]** (2.04; X, Y, Z; was "[kV/kV - Gantry 90°] Correction vector"). It has no baselines or limits yet, so its values are recorded, not judged. New installs and new demo data only.
+
+- QA form (display only): on an X / Y / Z row each field reads "X: [ ]", its letter beside its box; the unit is in the block's name. The whole of a titled block is marked while the pointer is on any part of it.
+
 - **[Physics review]** PBS daily list in the starting data, block 2.03 Mechanical-to-CBCT Correction Vector: baselines X = −5 cm, Y = −1 cm, Z = +4.5 cm, Warning ±0.15 cm, Action ±0.2 cm, as given by Brook on 2026-11-20 (the axes were recorded without limits before). The block's 3D is unchanged (baseline 0, recorded, not judged). New installs and new demo data only.
 
 - QA form (display only): a titled block (X / Y / Z, per energy) reads as one test. Its number is beside its name, where the # column's numbers are; the name line has no band and no line under it; its limits are under the name. Axes with baselines of their own are named on that line ("Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm"). A test's ⓘ is one list: the directions above it, then what the test itself says as the last step, with no separate Directions box.

@@ -1931,3 +1931,14 @@ td, .measure-table td { font-size: 21px; }
 .section > .measure-block:has(> .measure-title):hover > .measure-title,
 .section > .measure-block:has(> .measure-title):hover .measure-table tbody tr > td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
 .section > .measure-block:has(> .measure-title):hover .measure-table:not(.axis-table) tbody tr[data-qa-entry]:hover > td { background: var(--surface-2); }
+
+/* On an X / Y / Z row each field reads "X: [ ]", its letter beside its box and not over it (Brook, 2026-11-20); what
+   follows a field (its verdict and deviation, a baseline of its own, its note) sits under the box. A phone's card
+   already reads this way. */
+@media (min-width: 1201px) {
+  .qa-axis-row .qa-shared { align-items:start; }
+  .qa-axis-row .qa-shared-field { grid-row:auto; grid-template-rows:auto; grid-template-columns:auto minmax(0, 1fr); column-gap:8px; align-items:center; }
+  .qa-axis-row .qa-shared-name { grid-column:1; grid-row:1; align-self:center; align-items:center; }
+  .qa-axis-row .qa-shared-name > span::after { content:":"; }
+  .qa-axis-row .qa-shared-more { grid-column:2; grid-row:2; }
+}

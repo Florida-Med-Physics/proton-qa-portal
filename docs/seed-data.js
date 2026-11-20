@@ -1982,13 +1982,19 @@ window.PORTAL_SEED = {
      "description": "Template 2.07. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
+     "name": "DO NOT APPLY Correction",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 2.07b. [Section: Mechanical and Imaging] [direction: next]"
+    },
+    {
      "category": "AI_PBS_Daily_Imaging",
      "name": "Mechanical-to-CBCT Correction Vector X [cm]",
      "type": "numeric",
      "unit": "cm",
      "expected": -5,
      "tol_mode": "absolute",
-     "description": "Template 2.08a. [Section: Mechanical and Imaging] Record the correction vector only. Do not move the couch.",
+     "description": "Template 2.08a. [Section: Mechanical and Imaging]",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - X [cm]"
@@ -2000,7 +2006,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": -1,
      "tol_mode": "absolute",
-     "description": "Template 2.08b. [Section: Mechanical and Imaging] Record the correction vector only. Do not move the couch.",
+     "description": "Template 2.08b. [Section: Mechanical and Imaging]",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - Y [cm]"
@@ -2012,7 +2018,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 4.5,
      "tol_mode": "absolute",
-     "description": "Template 2.08c. [Section: Mechanical and Imaging] Record the correction vector only. Do not move the couch.",
+     "description": "Template 2.08c. [Section: Mechanical and Imaging]",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - Z [cm]"
@@ -2024,59 +2030,62 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.08d. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-CBCT%20Correction%20Vector%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-CBCT%20Correction%20Vector%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-CBCT%20Correction%20Vector%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D] Record the correction vector only. Do not move the couch.",
+     "description": "Template 2.08d. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-CBCT%20Correction%20Vector%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-CBCT%20Correction%20Vector%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-CBCT%20Correction%20Vector%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]",
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required 3D Correction Vector Offset [cm]"
     },
     {
      "name": "In MOSAIQ, select the Daily QA field; the planned gantry angle should be 90°.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.10. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.10. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "name": "On the virtual hand pendant, choose Treatment → Gantry and move to 90°, or use Go to.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.20. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.20. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "name": "Insert panel A for kV/kV imaging.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.30. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.30. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "name": "Acquire kV/kV images and use Auto 3 to align, or manually align to the isocenter.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.50. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.50. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
-     "name": "[kV/kV - Gantry 90°] Correction vector X [cm]",
+     "name": "Mechanical-to-kV/kV Correction Vector X [cm]",
      "category": "AI_PBS_Daily_Imaging",
      "type": "numeric",
      "unit": "cm",
-     "description": "Template 2.60x. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch."
+     "description": "Template 2.60x. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch.",
+     "_previous_name": "[kV/kV - Gantry 90°] Correction vector X [cm]"
     },
     {
-     "name": "[kV/kV - Gantry 90°] Correction vector Y [cm]",
+     "name": "Mechanical-to-kV/kV Correction Vector Y [cm]",
      "category": "AI_PBS_Daily_Imaging",
      "type": "numeric",
      "unit": "cm",
-     "description": "Template 2.60y. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch."
+     "description": "Template 2.60y. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch.",
+     "_previous_name": "[kV/kV - Gantry 90°] Correction vector Y [cm]"
     },
     {
-     "name": "[kV/kV - Gantry 90°] Correction vector Z [cm]",
+     "name": "Mechanical-to-kV/kV Correction Vector Z [cm]",
      "category": "AI_PBS_Daily_Imaging",
      "type": "numeric",
      "unit": "cm",
-     "description": "Template 2.60z. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch."
+     "description": "Template 2.60z. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch.",
+     "_previous_name": "[kV/kV - Gantry 90°] Correction vector Z [cm]"
     },
     {
      "name": "Apply the recorded correction vector and move the couch.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.70. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.70. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "name": "Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.",

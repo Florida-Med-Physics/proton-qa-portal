@@ -2246,7 +2246,9 @@ async function renderPerform(assignmentId) {
         // On an X / Y / Z row a field is named for its axis; its ⓘ shows only a calculation or directions of its own.
         const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(axisRow ? { ...p.it, steps: null } : p.it, t.items, numbers) : null);
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
-        const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" ? p.unit : "", details(p), p.control,
+        // (An axis field reads "X: [ ]"; its unit is in the block's name when the tests' names carry it, "… [cm]".)
+        const unitInName = axisRow && /\[[^\]]+\]\s*$/.test(groupName);
+        const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" && !unitInName ? p.unit : "", details(p), p.control,
           has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
         parts.forEach((p, i) => { p.entry.field = cell.firstChild.children[i]; });
         if (axisRow) cell.firstChild.style.setProperty("--qa-fields", parts.length);   // every axis on the one line (app.css)

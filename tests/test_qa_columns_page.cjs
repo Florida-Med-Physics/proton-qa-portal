@@ -35,21 +35,26 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.equal(await p.locator('.measure-title .qa-sub').count(), 0);
     await p.getByRole('button', { name: 'Protocol', exact: true }).click();
     assert.match(await dialog.textContent(), /Protocol/); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    const instruction = 'In MOSAIQ, select the Daily QA field; the planned gantry angle should be 90°.';
-    const step = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${instruction}: pass`, exact: true }) });
-    assert.equal(await step.locator('.qa-label strong').textContent(), 'Select the Daily QA field in MOSAIQ (gantry 90°)');
+    const instruction = 'Go to MyQA, open your machine QA, connect Sphinx, and measure the background.';
+    const step = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${instruction}: yes`, exact: true }) });
+    assert.equal(await step.locator('.qa-label strong').textContent(), 'MyQA: connect Sphinx, measure background');
     assert.equal(await step.locator('.qa-label strong').getAttribute('title'), instruction);
     await step.getByRole('button', { name: 'Test details', exact: true }).click();
     assert.ok((await dialog.textContent()).includes(instruction), 'the instruction, word for word'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     await step.locator('.qa-label strong').click();
     assert.ok((await dialog.textContent()).includes(instruction), 'the label opens it too'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    const group = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Gantry 90°' }) }).first();   // X / Y / Z with the same directions and no calculated row
+    const group = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();   // X / Y / Z with the same directions and no calculated row
     await group.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.match(await dialog.textContent(), /Record the correction vector/); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await group.locator('tbody .qa-calculation-info').count(), 0, 'its row does not repeat the group\'s directions');
     // An X / Y / Z group is one row: its axes side by side, each with its own answer and verdict, the 3D worked out.
     assert.equal(await group.locator('tr[data-qa-entry]').count(), 1);
-    assert.deepEqual(await group.locator('.qa-shared-field .qa-shared-name').allTextContents(), ['X (cm)', 'Y (cm)', 'Z (cm)']);
+    assert.deepEqual(await group.locator('.qa-shared-field .qa-shared-name').allTextContents(), ['X', 'Y', 'Z'], 'the unit is in the block\'s name');
+    assert.equal(await group.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
+    // Each field reads "X: [ ]": its letter beside its box, on one line.
+    const [letter, boxX] = [await group.locator('.qa-shared-field .qa-shared-name').first().boundingBox(), await group.locator('.qa-shared-field input[type=number]').first().boundingBox()];
+    assert.ok(letter.x + letter.width <= boxX.x && letter.y + letter.height / 2 > boxX.y && letter.y + letter.height / 2 < boxX.y + boxX.height, 'the letter is beside its box');
+    assert.equal(await group.locator('.qa-shared-field .qa-shared-name > span').first().evaluate((s) => getComputedStyle(s, '::after').content), '":"');
     const offset = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
     assert.equal(await offset.locator('tr[data-qa-entry]').count(), 1);
     assert.match(await offset.locator('.measure-title').textContent(), /Baseline 0 cm · Warning ±0\.15 cm · Action ±0\.2 cm$/, 'what the axes share is in the title');
@@ -57,7 +62,7 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.ok(groupLimits.y >= groupName.y + groupName.height - 2 && Math.abs(groupLimits.x - groupName.x) <= 2, 'under the group\'s name, at the left');
     for (const [axis, value] of [['X', '0.05'], ['Y', '0.17'], ['Z', '-0.25']]) await p.getByLabel(`Mechanical-to-kV/kV Isocenter ${axis} [cm]`, { exact: true }).fill(value);
     assert.deepEqual((await offset.locator('.qa-shared-field').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()),
-      ['X (cm)PASS(Δ +0.05 cm)', 'Y (cm)WARNING(Δ +0.17 cm)', 'Z (cm)ACTION(Δ −0.25 cm)', '3D (cm)ⓘRecorded(Δ +0.31 cm)']);
+      ['XPASS(Δ +0.05 cm)', 'YWARNING(Δ +0.17 cm)', 'ZACTION(Δ −0.25 cm)', '3DⓘRecorded(Δ +0.31 cm)']);
     assert.equal(await p.getByLabel('Mechanical-to-kV/kV Isocenter [cm]', { exact: true }).inputValue(), '0.306');
     const tops = await offset.locator('.qa-shared-field').evaluateAll((fields) => fields.map((f) => Math.round(f.getBoundingClientRect().top)));
     assert.equal(new Set(tops).size, 1, 'all on one line');
