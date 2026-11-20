@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA form (display only): an X / Y / Z group, with its 3D, is one row. The axes sit side by side, each with its own answer, verdict and note; the group's title carries the baseline and limits they share; the row's Trend shows every axis, and History (when shown) a line per axis. A group's quick trend no longer squeezes the table (its cell spanned one column too many). Phone cards and a saved run are as before.
+
 - QA form and saved run (display only): the columns read # · Test · Baseline · Measured · Unit · Result · History · Note · Trend, and a **Columns** box lets each person show, hide and reorder them (kept in the browser, per person and per page; #, Test, Measured and Result always show). The QA form starts without History. Each section names its columns once, X / Y / Z and per-energy groups sit under a title band with their limits, and instructions moved off the page behind a click: the protocol (a **Protocol** button), a group's directions and the import notes (ⓘ), and the PBS daily steps, which show a short label with the instruction word for word in the ⓘ, on hover and on a click. Phone cards are unchanged. **[Physics review]**: the short step labels (`QA_STEP_LABELS` in `app.js`) are draft wording.
 
 - Sphinx import takes `review: false` (both builds): the run is judged by the list's limits like any new import but is recorded without a review step (Historical import), so the scheduled folder import can fill in trending without anyone approving every daily file. Manual imports are unchanged. **[Physics review]**: auto-imported runs no longer pass through therapy or physics review.

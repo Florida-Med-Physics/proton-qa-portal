@@ -1571,8 +1571,11 @@ function layoutQaTable(table, view = table.dataset.qaView || 'perform') {
   table.dataset.qaView = view;
   const { all, shown } = qaColumns(view, !!table.querySelector('td.qa-shared-cell'));
   const rows = [...table.children].filter((part) => part.tagName === 'THEAD' || part.tagName === 'TBODY').flatMap((part) => [...part.children]);   // the table's own rows
+  // A group's number cell spans its rows, quick trends included, so those take one column fewer (a column too many
+  // would add an empty one to the table and squeeze the test's own).
+  const numbered = table.querySelector('td.qa-n-span') ? 1 : 0;
   for (const row of rows) {
-    if (row.classList.contains('quick-trend')) { row.children[0].colSpan = shown.length; continue; }
+    if (row.classList.contains('quick-trend')) { row.children[0].colSpan = shown.length - numbered; continue; }
     const shared = [...row.children].find((x) => x.classList.contains('qa-shared-cell'));
     for (const c of all) {
       const cell = shared && QA_SHARED_COLUMNS.includes(c.key) ? (c.key === 'test' ? shared : null)
@@ -2065,7 +2068,10 @@ async function renderPerform(assignmentId) {
       el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear()))); };
     // Every measured (numeric) test is a row in a table: Measurement, Reference, Tolerance, Action, Status, Comment,
     // History (under its QA dates) and Trends. Repeated measurements (per energy or spot) share a titled table.
-    const measureTable = (members, { firstHeader, title, directions, firstCell, label, groupDirections = null }) => {
+    const measureTable = (members, { firstHeader, title, directions, firstCell, label, groupDirections = null, groupName = "" }) => {
+      // An X / Y / Z group (and its 3D) is one row: the axes side by side in one cell, like tests marked "Same row as
+      // the test above". Its title carries the name, the directions and what the axes share (baseline, limits).
+      const axisRow = firstHeader === "Axis";
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-3).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
@@ -2080,39 +2086,56 @@ async function renderPerform(assignmentId) {
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => (it.type === "numeric" ? qaLimitsLine(it.limits, unit) : null);
       const numberCell = (it) => (firstHeader !== "Test"
-        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: members.length * 2 }, numbers.get(it.test_id) || "") : null)
+        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: (axisRow ? 1 : members.length) * 2 }, numbers.get(it.test_id) || "") : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
       // Tests marked "Same row as the test above" share one row (sharedCell), each laid out as in a row of its own: its
       // result and deviation (when it has a baseline or limits), baseline and limits under its input, then its comment
       // (the + opens every one); History and Trend follow the first judged one, named (each keeps its own on Machine Trends).
+      // What an X / Y / Z group's title says for all its axes: the baseline they share and the limits of the first judged one.
+      const judged = members.filter((it) => it.type === "numeric");
+      const titleBaseline = axisRow && judged.length && judged.every((it) => (it.limits || {}).expected != null && it.limits.expected === judged[0].limits.expected) ? `Baseline ${refCell(judged[0], judged[0].unit && judged[0].unit !== "unitless" ? judged[0].unit : "")}` : null;
+      const titleMember = firstHeader !== "Test" ? members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null)) : null;
+      const titleLimits = titleMember ? limitsLine(titleMember, titleMember.unit && titleMember.unit !== "unitless" ? titleMember.unit : "")?.textContent || null : null;
       const sharedCells = (parts) => {
         const has = (p, ...keys) => p.it.type === "numeric" && keys.some((k) => (p.it.limits || {})[k] != null);
         const main = parts.find((p) => has(p, "warn", "fail")) || parts.find((p) => p.it.type === "numeric") || parts[0];
-        const limits = (p) => { const line = limitsLine(p.it, p.unit); return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line; };   // the unit is in the name
+        const limits = (p) => {
+          const line = limitsLine(p.it, p.unit);
+          if (axisRow) {   // only what the title does not already say
+            const own = [has(p, "expected") && !titleBaseline ? `Baseline ${refCell(p.it, "")}` : null, line && line.textContent !== titleLimits ? line.textContent : null].filter(Boolean);
+            return own.length ? el("span", { class: "qa-limits" }, own.join(" · ")) : null;
+          }
+          return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line;   // the unit is in the name
+        };
+        // On an X / Y / Z row a field is named for its axis; its ⓘ shows only a calculation or directions of its own.
+        const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(p.it, t.items, numbers) : null);
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
-        const cell = sharedCell(parts.map((p) => [p.it, shortName(p.it), p.it.type === "numeric" ? p.unit : "", testDetailsButton(p.it, t.items, numbers), p.control,
+        const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" ? p.unit : "", details(p), p.control,
           has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
         parts.forEach((p, i) => { p.entry.field = cell.firstChild.children[i]; });
+        if (axisRow) cell.firstChild.style.setProperty("--qa-fields", parts.length);   // every axis on the one line (app.css)
         return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
-      const trRows = (firstHeader === "Test" ? sharedRows(members, numbers) : members.map((it) => [it])).map((group) => {
+      const trRows = (firstHeader === "Test" ? sharedRows(members, numbers) : axisRow ? [members] : members.map((it) => [it])).map((group) => {
         const parts = group.map((it) => { drawn.add(it.test_id); return { it, unit: it.unit && it.unit !== "unitless" ? it.unit : "", ...buildEntry(it) }; });
         const [{ it, unit, control, comment, noteToggle, note, statusCell }] = parts;
         const shared = parts.length > 1 ? sharedCells(parts) : null, main = shared ? shared.main : parts[0];
         noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         // In a group the directions are beside its title; a row repeats them only when its own differ. A calculation keeps its ⓘ.
-        const details = firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(it, t.items, numbers) : null;
+        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(it, t.items, numbers) : null;
+        // The quick trend: this test's; on an X / Y / Z row, every axis (and the 3D), one under another.
+        const trended = axisRow ? parts.filter((p) => p.it.type === "numeric") : [main];
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
-          const pts = (history[main.it.test_id] || []).slice(-60);
-          if (!pts.length) return toast("No results yet for this test.", true);
+          const series = trended.map((p) => ({ label: axisRow ? p.it.axisLabel : p.it.name, points: (history[p.it.test_id] || []).slice(-60) })).filter((x) => x.points.length);
+          if (!series.length) return toast("No results yet for this test.", true);
           if (chart.hidden) chart.firstChild.replaceChildren(
-            el("div", { class: "row" }, el("strong", {}, label(main.it)), el("span", { class: "spacer" }),
+            el("div", { class: "row" }, el("strong", {}, axisRow ? groupName : label(main.it)), el("span", { class: "spacer" }),
               el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&list=${t.assignment.id}&test_id=${main.it.test_id}&range=365` }, "Full trend")),
-            seriesChart([{ label: main.it.name, points: pts }], main.unit, { small: true, yLabel: yAxisLabel([main.it.name]) }));
+            seriesChart(series, main.unit, { small: true, yLabel: yAxisLabel(trended.map((p) => p.it.name)) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
-        const row = el("tr", {'data-qa-entry':it.test_id},
+        const row = el("tr", {'data-qa-entry':it.test_id, class: axisRow ? "qa-axis-row" : null},
           numberCell(it),
           shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
@@ -2122,7 +2145,9 @@ async function renderPerform(assignmentId) {
           shared ? null : el("td", { class: "qa-measured" }, control),
           shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
-          el("td", { class: "history-cell" }, dates.length ? [shared?.history, histChips(main.it, main.unit)] : el("span", { class: "muted small" }, "—")),
+          el("td", { class: "history-cell" }, !dates.length ? el("span", { class: "muted small" }, "—")
+            : axisRow ? trended.map((p) => el("div", { class: "qa-axis-history" }, el("div", { class: "qa-shared-name" }, p.it.axisLabel), histChips(p.it, p.unit)))   // each axis its own
+            : [shared?.history, histChips(main.it, main.unit)]),
           el("td", {class:"qa-trends"}, main.it.type === "numeric" ? trend : null));   // a trend only for a measured value
         for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
         const extras = el('td', {class:'qa-phone-extras', colspan:9});
@@ -2142,14 +2167,14 @@ async function renderPerform(assignmentId) {
         return [row, chart];
       });
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
-          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // collapsed under a table with the same columns (qaHeadings)
+          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(axisRow ? "Test" : firstHeader)),   // collapsed under a table with the same columns (qaHeadings)
             dates.length ? qaDatesRow(dates.map(dateSlot)) : null),
           el("tbody", {}, trRows.flat()));
-      // Axis and energy tables carry the shared limits in their title rather than on every row.
+      // Axis and energy tables carry the shared limits in their title rather than on every row; an X / Y / Z row's
+      // title also carries the baseline its axes share.
       if (title && firstHeader !== "Test") {
-        const withLimits = members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null));
-        const line = withLimits && limitsLine(withLimits, withLimits.unit && withLimits.unit !== "unitless" ? withLimits.unit : "");
-        if (line) title.append(line);
+        const shared = [titleBaseline, titleLimits].filter(Boolean);
+        if (shared.length) title.append(el("span", { class: "qa-limits" }, shared.join(" · ")));
       }
       const block = el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
       layoutQaTable(tableEl, "perform");   // the person's columns; names the block's columns (data-cols) for qaHeadings
@@ -2189,7 +2214,7 @@ async function renderPerform(assignmentId) {
           firstHeader: "Axis",
           title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : ""),
             performDirections(m.axes[0], `${m.base}${m.unitTag ? ` ${m.unitTag}` : ""}`)),
-          directions: null, groupDirections: directionsText(m.axes[0]),
+          directions: null, groupDirections: directionsText(m.axes[0]), groupName: `${m.base}${m.unitTag ? ` ${m.unitTag}` : ""}`,
           label: (it) => `${m.base} ${it.axisLabel}`,
           firstCell: (it) => el("strong", {}, it.axisLabel),
         }));

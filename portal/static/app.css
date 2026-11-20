@@ -1878,3 +1878,11 @@ td, .measure-table td { font-size: 21px; }
 .qa-import > .row { flex-wrap:wrap; gap:8px 14px; align-items:center; }
 .qa-import > .row input[type=file] { flex:1 1 260px; width:auto; min-width:0; }
 .qa-import .qa-calculation-info { margin-top:0; }
+
+/* X / Y / Z (and their 3D) on one row: each axis a field, side by side from the left; the group's title says what they
+   share (baseline, limits). With History on, each axis has its own line of dates' values. */
+.qa-axis-row .qa-shared { grid-template-columns:repeat(var(--qa-fields, 4), minmax(0, 12em)); }   /* all on one line, narrower when the window is */
+.measure-table.axis-table th:nth-child(2) { text-align:left; padding-right:6px; }   /* its heading reads Test, like the tables around it */
+.qa-axis-row .qa-shared-name { color:var(--text); font-weight:600; }
+.qa-axis-row .qa-shared-unit { color:var(--muted); font-weight:400; }
+.qa-axis-history + .qa-axis-history { margin-top:6px; }

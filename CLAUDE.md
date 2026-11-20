@@ -68,7 +68,8 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   and reorder (kept in the browser per person and page; #, Test, Measured and Result always show). Process and
   procedure instructions are in info bubbles, not on the page: Protocol button, ⓘ beside a test or group title, the
   import ⓘ; PBS daily steps show a short label (`QA_STEP_LABELS`, draft wording) with the instruction in the ⓘ. One
-  names row per section; a group's title is a band with its limits. Finish Gantry 1 (GTR1) before expanding to other
+  names row per section; a group's title is a band with its limits. An X / Y / Z group (and its 3D) is ONE row, the
+  axes side by side (Brook, 2026-11-19: "put all in one row"; per-energy groups stay one row per energy). Finish Gantry 1 (GTR1) before expanding to other
   machines. floridaphysics.com sizes these columns by `col[data-col]` in its `site-overrides.css`: keep the keys.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
