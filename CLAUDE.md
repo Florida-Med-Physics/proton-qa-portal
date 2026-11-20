@@ -39,7 +39,7 @@ Share with `--host 0.0.0.0`.
   references and Warning/Action limits; Sphinx `.xls` auto-fill); monthly list = `Monthly QA template – Proton
   gantry (TG-224)` from the boss's GTR5 monthly worksheet (floridaphysics repo). The TG-224 daily template is kept
   but not scheduled. In the seed (Brook, 2026-11-20) fourteen instruction-only steps of the daily list are directions
-  (the seven setup steps of Setup and Safety; thirteen in Mechanical and Imaging for the block below them), block 2.02
+  (the seven setup steps of Setup and Safety; seventeen in Mechanical and Imaging for the block below them), block 2.02
   is "Mechanical-to-kV/kV Isocenter [cm]" (X, Y, Z, 3D), 2.03 "Mechanical-to-CBCT Correction Vector [cm]" (baselines
   X −5, Y −1, Z +4.5 cm, Warning ±0.15, Action ±0.2, from Brook; fifth step "DO NOT APPLY Correction") and 2.04
   "Mechanical-to-kV/kV Correction Vector [cm]" (X, Y, Z and a 3D like 2.03's; the same baselines and limits as 2.03,

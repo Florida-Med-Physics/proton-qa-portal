@@ -24,8 +24,10 @@ const BEFORE_CBCT = ['At TCS, move the couch to X = −5 cm, Y = −1 cm, Z = +4
 const BEFORE_KV = ['In MOSAIQ, select the Daily QA field; the planned gantry angle should be 90°.', 'On the virtual hand pendant, choose Treatment → Gantry and move to 90°, or use Go to.',
   'Insert panel A for kV/kV imaging.', 'Acquire kV/kV images and use Auto 3 to align, or manually align to the isocenter.',
   'Record the correction vector from the isocenter before moving the couch.', 'Apply the recorded correction vector and move the couch.'];
+// The three before the BB alignment check.
+const BEFORE_VERIFY = ['Apply the correction vector.', 'Reacquire kV/kV.', 'Align to the central BB for Sphinx output measurements.'];
 const VERIFY = 'Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.';
-const BELOW = [...BEFORE_LASERS, ...BEFORE_OFFSET, ...BEFORE_CBCT, ...BEFORE_KV];
+const BELOW = [...BEFORE_LASERS, ...BEFORE_OFFSET, ...BEFORE_CBCT, ...BEFORE_KV, ...BEFORE_VERIFY];
 const LASERS = 'Visually check that the room lasers align with the BB; offset must be less than 0.2 cm.';
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -70,7 +72,7 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     const numbered = await rows.evaluateAll((all) => all.map((r) => r.querySelector('.inline-test-name > strong')?.textContent).filter(Boolean).slice(0, 8));
     assert.deepEqual(numbered, ['1.01:', '1.02:', '1.03:', '1.04:', '1.05:', '1.06:', '1.07:', '2.01:']);
     const below = await tests(BELOW);
-    assert.equal(below.length, 14);
+    assert.equal(below.length, 17);
     for (const t of below) { assert.equal(t.type, 'text'); assert.match(t.description, /\[Section: Mechanical and Imaging\].*\[direction: next\]/); }
     for (const name of BELOW) {
       const row = await rowOf(name);
@@ -161,12 +163,11 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     assert.deepEqual((await kv.locator('.qa-shared-field').allTextContents()).slice(0, 3).map((text) => text.replace(/\s+/g, ' ').trim()), ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)']);
     assert.equal(await p.getByLabel('Mechanical-to-kV/kV Correction Vector [cm]', { exact: true }).inputValue(), '6.70', 'the same calculation as 2.03\'s 3D');
     assert.deepEqual(await kv.locator('.qa-shared-field .qa-limits').allTextContents(), ['Baseline 0.0'], 'its 3D says its own baseline, as 2.03\'s does');
-    // The check after the block has no step above it now: its ⓘ is its own instruction, as before.
+    // The check after the block: its three steps, then its own instruction, one list.
     const verify = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${VERIFY}: pass`, exact: true }) });
     assert.equal(await verify.locator('td.qa-n').textContent(), '2.05');
     await verify.getByRole('button', { name: 'Test details', exact: true }).click();
-    assert.equal(await dialog.locator('ol.qa-steps').count(), 0);
-    assert.equal(await dialog.locator('.qa-step-text').textContent(), VERIFY);
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_VERIFY, VERIFY]);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await p.getByLabel('Mechanical-to-CBCT Correction Vector [cm]', { exact: true }).inputValue(), '6.70');
     assert.equal(await offset.locator('tbody .qa-calculation-info').evaluateAll((all) => all.filter((b) => /Insert panels/.test(b.getAttribute('aria-label') || '')).length), 0);

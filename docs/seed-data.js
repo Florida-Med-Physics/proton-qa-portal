@@ -2115,6 +2115,24 @@ window.PORTAL_SEED = {
      "description": "Template 2.61. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
     },
     {
+     "name": "Apply the correction vector.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 2.71. [Section: Mechanical and Imaging] [direction: next]"
+    },
+    {
+     "name": "Reacquire kV/kV.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 2.72. [Section: Mechanical and Imaging] [direction: next]"
+    },
+    {
+     "name": "Align to the central BB for Sphinx output measurements.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 2.73. [Section: Mechanical and Imaging] [direction: next]"
+    },
+    {
      "name": "Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.",
      "category": "Mechanical and Safety",
      "type": "boolean",
