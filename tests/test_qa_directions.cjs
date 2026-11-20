@@ -25,7 +25,7 @@ function el(tag, props, ...kids) {
 }
 const opened = [];
 const context = { el, infoPopup: (content, label) => { opened.push({ content, label }); return el('button', { 'aria-label': label }, 'ⓘ'); },
-  QADerived: { read: () => null, encode: (d) => d }, derivedExplanation: () => null, qaStepLabel: () => null };
+  QADerived: { read: () => null, encode: (d) => d }, derivedExplanation: () => null, qaStepLabel: () => null, qaDisplayName: (item) => item.name };
 vm.createContext(context);
 for (const part of [between('const TYPE_LABELS', '\n'), between('// Directions are shown with the test', 'function infoDisclosure('), between('function testDetailsButton(', 'function qaColgroup('),
   between("// A group's directions (an X / Y / Z or per-energy table)", 'function helpText('), between('function helpText(', 'function fitTextarea('),
@@ -69,6 +69,9 @@ for (const c of imaging.filter((x) => /\[derived: /.test(x.description))) {
 assert.deepEqual(seed.pbs_imaging_defaults.map((r) => r.name), ['[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]', '[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]', '[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]',
   'Mechanical-to-kV/kV Isocenter X [cm]', 'Mechanical-to-kV/kV Isocenter Y [cm]', 'Mechanical-to-kV/kV Isocenter Z [cm]']);
 for (const r of seed.pbs_imaging_defaults) assert.deepEqual([r.unit, r.expected, r.warn, r.fail, r.tol_mode], ['cm', 0, 0.15, 0.2, 'absolute'], 'the limits themselves are as they were');
+// The CBCT block's baselines and limits, as Brook gave them (2026-11-20): X −5, Y −1, Z +4.5 cm; Warning ±0.15, Action ±0.2.
+assert.deepEqual(['X', 'Y', 'Z'].map((axis) => { const c = pbs.find((x) => x.name === `Mechanical-to-CBCT Correction Vector ${axis} [cm]`); return [c.expected, c.warn, c.fail, c.tol_mode, c.unit]; }),
+  [[-5, 0.15, 0.2, 'absolute', 'cm'], [-1, 0.15, 0.2, 'absolute', 'cm'], [4.5, 0.15, 0.2, 'absolute', 'cm']]);
 for (const d of samples) for (const [kind, TAG] of Object.entries(TAGS)) {
   const on = withDirectionMark(d, kind);
   assert.equal(directionKind({ type: 'text', description: on }), kind, d);
@@ -145,11 +148,21 @@ const steps = [list[3], list[6]];
 assert.ok(testDetailsButton({ ...list[2], steps }, list, numbers));
 assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
 assert.deepEqual(opened.at(-1).content.kids[1].kids.map((li) => li.text), ['Launch the software.', 'Retract the panel.']);
+// What the test itself says is the last step of the same list: one list, no Directions box beside it.
 assert.ok(testDetailsButton({ ...list[2], steps, description: `${list[2].description} Read the probe.` }, list, numbers));
-assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol', 'div'], 'its own directions follow the steps');
+assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
+assert.deepEqual(opened.at(-1).content.kids[1].kids.map((li) => li.text), ['Launch the software.', 'Retract the panel.', 'Read the probe.']);
+assert.equal(opened.at(-1).content.kids[1].kids[2].props.class, 'qa-step-own');
 assert.ok(performDirections({ ...list[2], steps }, 'Offset [cm]'));
 assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
 assert.equal(opened.at(-1).content.kids[0].text, 'Offset [cm]');
+assert.ok(performDirections({ ...list[2], steps, description: `${list[2].description} Record the vector only.` }, 'Offset [cm]'));
+assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
+assert.deepEqual(opened.at(-1).content.kids[1].kids.map((li) => li.text), ['Launch the software.', 'Retract the panel.', 'Record the vector only.']);
+// Without directions above it, a test's own Directions are shown as before.
+assert.ok(performDirections({ ...list[2], description: `${list[2].description} Record the vector only.` }, 'Offset [cm]'));
+assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'div']);
+assert.equal(opened.at(-1).content.kids[1].props.class, 'directions pre');
 
 // 5. The QA form: a direction for the test below waits for that test (item.steps); one for the section, or one with no
 // test below it in its section, goes to the section's ⓘ; none is a row or part of the history request. In a group the

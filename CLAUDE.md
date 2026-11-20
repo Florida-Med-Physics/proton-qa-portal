@@ -86,7 +86,11 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   citation; Brook or the reviewing physicist supplies it. The **Columns** box is a small popout under its button (never a
   window over the page), with ← → to move a column; a heading can be dragged left or right in the table. A group's
   Warning / Action (and baseline) sit under its black name at the left of the title band, never at the far right.
-  Energy labels sit at the left under the group's name (no wide blank under the name).
+  Energy labels sit at the left under the group's name (no wide blank under the name). A titled block reads as ONE
+  test ("all of this is 2.02 … it should look like a block not two rows broken up"): its number beside its name
+  (`.measure-n`), no band behind the name and no line between the name, its limits and its fields; axes with their own
+  baselines are named on the limits line. A test's ⓘ is one combined list (the directions above it, then its own
+  direction as the last step), never steps plus a separate Directions box.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in

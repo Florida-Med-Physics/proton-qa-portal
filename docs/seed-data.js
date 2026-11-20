@@ -1986,9 +1986,11 @@ window.PORTAL_SEED = {
      "name": "Mechanical-to-CBCT Correction Vector X [cm]",
      "type": "numeric",
      "unit": "cm",
-     "expected": null,
+     "expected": -5,
      "tol_mode": "absolute",
      "description": "Template 2.08a. [Section: Mechanical and Imaging] Record the correction vector only. Do not move the couch.",
+     "warn": 0.15,
+     "fail": 0.2,
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - X [cm]"
     },
     {
@@ -1996,9 +1998,11 @@ window.PORTAL_SEED = {
      "name": "Mechanical-to-CBCT Correction Vector Y [cm]",
      "type": "numeric",
      "unit": "cm",
-     "expected": null,
+     "expected": -1,
      "tol_mode": "absolute",
      "description": "Template 2.08b. [Section: Mechanical and Imaging] Record the correction vector only. Do not move the couch.",
+     "warn": 0.15,
+     "fail": 0.2,
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - Y [cm]"
     },
     {
@@ -2006,9 +2010,11 @@ window.PORTAL_SEED = {
      "name": "Mechanical-to-CBCT Correction Vector Z [cm]",
      "type": "numeric",
      "unit": "cm",
-     "expected": null,
+     "expected": 4.5,
      "tol_mode": "absolute",
      "description": "Template 2.08c. [Section: Mechanical and Imaging] Record the correction vector only. Do not move the couch.",
+     "warn": 0.15,
+     "fail": 0.2,
      "_previous_name": "[CBCT - Pelvis SFOV ND] Required Correction Vector - Z [cm]"
     },
     {
