@@ -113,7 +113,12 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // Above a group (X / Y / Z): its steps are behind the ⓘ in the group's title, in the list's order, not on a row.
     const offset = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
-    assert.equal(await offset.locator('td.qa-n').textContent(), '2.02');
+    // A block's number is beside its name in the title band; the row under it leaves the # column empty.
+    assert.equal(await offset.locator('.measure-title .measure-n').textContent(), '2.02');
+    assert.equal(await offset.locator('td.qa-n').textContent(), '');
+    const [blockN, blockName, lasersN] = [await offset.locator('.measure-title .measure-n').boundingBox(), await offset.locator('.measure-title strong').boundingBox(), await lasers.locator('td.qa-n').boundingBox()];
+    assert.ok(blockN.x + blockN.width <= blockName.x + 1 && Math.abs(blockN.y + blockN.height / 2 - (blockName.y + blockName.height / 2)) <= 4, 'the number, then the name, on one line');
+    assert.ok(Math.abs(blockN.x + blockN.width / 2 - (lasersN.x + lasersN.width / 2)) <= 12, 'where the # column\'s numbers are');
     assert.equal(await offset.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Isocenter [cm]');
     assert.deepEqual(await offset.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X (cm)', 'Y (cm)', 'Z (cm)', '3D (cm)']);
     await offset.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
@@ -122,7 +127,7 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // The next block follows at once: the four steps between the two blocks are its instructions, ahead of its own.
     const cbct = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-CBCT Correction Vector' }) }).first();
-    assert.equal(await cbct.locator('td.qa-n').textContent(), '2.03');
+    assert.equal(await cbct.locator('.measure-title .measure-n').textContent(), '2.03');
     assert.equal(await cbct.locator('.measure-title strong').textContent(), 'Mechanical-to-CBCT Correction Vector [cm]');
     await cbct.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_CBCT);

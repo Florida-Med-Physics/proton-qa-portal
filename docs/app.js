@@ -2207,8 +2207,10 @@ async function renderPerform(assignmentId) {
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => (it.type === "numeric" ? qaLimitsLine(it.limits, unit) : null);
+      // A titled block (X / Y / Z, per energy) is one numbered test: its number is beside its name in the title band
+      // (Brook, 2026-11-20), and the rows under the band leave the # column empty.
       const numberCell = (it) => (firstHeader !== "Test"
-        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: (axisRow ? 1 : members.length) * 2 }, numbers.get(it.test_id) || "") : null)
+        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: (axisRow ? 1 : members.length) * 2 }) : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
       // Tests marked "Same row as the test above" share one row (sharedCell), each laid out as in a row of its own: its
       // result and deviation (when it has a baseline or limits), baseline and limits under its input, then its comment
@@ -2295,6 +2297,7 @@ async function renderPerform(assignmentId) {
       // Axis and energy tables carry the shared limits in their title rather than on every row; an X / Y / Z row's
       // title also carries the baseline its axes share.
       if (title && firstHeader !== "Test") {
+        title.prepend(el("span", { class: "measure-n" }, numbers.get(members[0].test_id) || ""));
         const shared = [titleBaseline, titleLimits].filter(Boolean);
         if (shared.length) title.append(el("span", { class: "qa-limits" }, shared.join(" · ")));
       }
