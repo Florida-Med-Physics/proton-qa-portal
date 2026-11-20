@@ -72,9 +72,13 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   axes side by side (Brook, 2026-11-19: "put all in one row"; per-energy groups stay one row per energy). Finish Gantry 1 (GTR1) before expanding to other
   machines. floridaphysics.com sizes these columns by `col[data-col]` in its `site-overrides.css`: keep the keys.
 - **QA form, round 3 (Brook, 2026-11-20):** setup steps that are only instructions are **Directions**, not Yes / No
-  rows: a popout list behind the ⓘ beside the section's title ("instead of things to select yes or no on"). A list
-  item becomes one in Setup QA (Result Type "Direction": a Text item carrying `[direction: section]`, no number, nothing
-  recorded; `isDirection`, `sectionDirections`). The **Columns** box is a small popout under its button (never a
+  rows: a popout list behind the ⓘ beside the section's title ("instead of things to select yes or no on"), or
+  behind the ⓘ of the test or group below them ("2.01 should be the instructions for Room lasers, and 2.03 and 2.04
+  … for Mechanical-to-kV/kV Imaging Isocenter"). A list item becomes one in Setup QA (Result Type "Direction:
+  section" / "Direction: test below": a Text item carrying `[direction: section]` / `[direction: next]`, no number,
+  nothing recorded; `directionKind`, `sectionDirections`, `item.steps`). Still asked for, not built: blocks with
+  their tests in Setup QA, and a test's ⓘ citing its report (TG-224, TG-142, TG-198, MPPG 8.a/8.b): never guess a
+  citation; Brook or the reviewing physicist supplies it. The **Columns** box is a small popout under its button (never a
   window over the page), with ← → to move a column; a heading can be dragged left or right in the table. A group's
   Warning / Action (and baseline) sit under its black name at the left of the title band, never at the far right.
   Energy labels sit at the left under the group's name (no wide blank under the name).

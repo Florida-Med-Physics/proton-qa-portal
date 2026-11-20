@@ -137,7 +137,7 @@ const addThem = between('can("configure") ? el("button", { onclick: async () => 
 const newTest = between('const newCheck = el("button"', 'const error = el("p", { class: "error" });');
 vm.runInContext([
   between('// route() numbers each page it draws', '// A site that hosts these pages'),
-  between("// Setup QA's Result Type \"Direction\" adds or removes the tag", "// A section's directions (isDirection)"),   // what the test form saves through
+  between('function withDirectionMark(', 'function directionsList('),   // what the test form saves through (testFormData)
   between('const qaTableObservers = new Set();', 'function table('),
   between('async function logout()', 'function queryParams()'),
   between('function queryParams()', '// Proton gantries, then Photon'),

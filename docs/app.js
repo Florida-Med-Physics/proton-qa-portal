@@ -353,7 +353,7 @@ function qaLimitsLine(limits, unit) {
   return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
 }
 
-const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived", direction: "Direction" };
+const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived", direction: "Direction: section", direction_next: "Direction: test below" };
 
 // "(Δ +0.30 mm)" in plain text after the Result chip (the chip carries the colour): the difference from the reference,
 // sign always shown, unit after the number. Nothing when there is no reference or no value.
@@ -1394,14 +1394,20 @@ const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist
 // "[row: with above]" (Setup QA: "Same row as the test above"): the test is drawn on the row of the test above it, on the
 // QA form and a saved run, and has no number of its own (blockNumbers). The first test of a list or section ignores it.
 const ROW_MARK = /\[row: with above\]/;
-// "[direction: section]" (Setup QA: Result Type "Direction"): not a test but a step of its section's directions. The QA
-// form lists a section's directions, in the list's order, behind the ⓘ beside the section's title. Nothing is entered
-// or recorded for one, and it has no number (blockNumbers). It is kept as a Text item, which records nothing while it
-// has no answer, so saving and judging a run are as before. Only a Text item is ever a direction: a test of another
-// type that somehow carries the tag is still drawn and answered, since a run would hold a blank result for it.
-const DIRECTION_MARK = /\[direction: section\]/;
-const isDirection = (item) => !!item && item.type === "text" && DIRECTION_MARK.test(item.description || "");
-const typeLabel = (t) => (isDirection(t) ? TYPE_LABELS.direction : TYPE_LABELS[t.type]);
+// A direction (Setup QA: Result Type "Direction: …") is not a test but an instruction, shown behind an ⓘ on the QA form:
+//   "[direction: next]"     for the test below it: behind that test's ⓘ, or its group's (X / Y / Z, per energy). Several
+//                           directions in a row above one test are its steps, in the list's order;
+//   "[direction: section]"  for its section: listed behind the ⓘ beside the section's title. A direction for the test
+//                           below with no test below it in its section is listed there too.
+// Nothing is entered or recorded for one, and it has no number (blockNumbers). It is kept as a Text item, which records
+// nothing while it has no answer, so saving and judging a run are as before. Only a Text item is ever a direction: a
+// test of another type that somehow carries the tag is still drawn and answered, since a run would hold a blank result
+// for it.
+const DIRECTION_MARK = /\[direction: (section|next)\]/;
+const directionKind = (item) => (item && item.type === "text" ? (DIRECTION_MARK.exec(item.description || "") || [])[1] || null : null);
+const isDirection = (item) => !!directionKind(item);
+const directionType = (item) => ({ section: "direction", next: "direction_next" })[directionKind(item)] || null;   // as a Result Type
+const typeLabel = (t) => TYPE_LABELS[directionType(t) || t.type];
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function infoDisclosure(content,label='Test information',open=false) {
   return el('details',{class:'qa-info',open},el('summary',{title:label,'aria-label':label},el('span',{'aria-hidden':'true'},'i')),el('div',{class:'qa-info-content'},content));
@@ -1449,7 +1455,8 @@ const qaStepLabel = (item) => (item.type === "boolean" || item.type === "status"
 // A test's name as the QA form and a saved run show it. A step's short label carries its instruction on hover and opens
 // it on a click, like the ⓘ beside it (`details`, testDetailsButton), which a phone's card does not show.
 function qaTestName(item, shown, details) {
-  return qaStepLabel(item) ? el("strong", { class: "qa-step-name", title: item.name, onclick: () => details?.click() }, shown) : el("strong", {}, shown);
+  const more = qaStepLabel(item) ? item.name : item.steps && item.steps.length ? "Directions" : null;   // a test with directions above it opens them the same way
+  return more ? el("strong", { class: "qa-step-name", title: more, onclick: () => details?.click() }, shown) : el("strong", {}, shown);
 }
 function qaDisplayName(item) {
   if(item.category!=='HDR treatment-day QA')return qaStepLabel(item)||item.name;
@@ -1567,7 +1574,8 @@ function testDetailsButton(item,items,numbers) {
   const directions=calculation?null:helpText(item.description);
   // A step whose name is its instruction shows a short label (qaDisplayName); the instruction is here, in full.
   const step=!calculation&&!!qaStepLabel(item);
-  return calculation||directions||step?infoPopup(calculation||el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),directions),calculation?'Calculation details':'Test details'):null;
+  const steps=directionsList(item.steps);   // the directions above it in the list (Setup QA: "Direction: test below")
+  return calculation||directions||step||steps?infoPopup(calculation?el('div',{},steps,calculation):el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),steps,directions),calculation?'Calculation details':'Test details'):null;
 }
 function qaColgroup(table,shown,count=0) {
   let cols=[...table.children].find(x=>x.tagName==='COLGROUP');
@@ -1713,7 +1721,8 @@ function qaColumnsButton(view) {
 // A group's directions (an X / Y / Z or per-energy table): behind the ⓘ beside its title. `name`: the title.
 function performDirections(item,name){
   const text=QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description);
-  return text?infoPopup(el('div',{},el('strong',{},name),text),'Test details'):null;
+  const steps=directionsList(item.steps);   // the directions above the group in the list
+  return text||steps?infoPopup(el('div',{},el('strong',{},name),steps,text),'Test details'):null;
 }
 // Directions as plain words (no template number or markers), to tell whether two tests carry the same ones.
 const directionsText=(item)=>helpText(item.description)?.lastChild?.textContent||'';
@@ -1753,23 +1762,28 @@ function withRowMark(description, on) {
   const d = (description || "").replace(/ ?\[row: with above\]/g, ""), at = d.search(/\n\s*Source:/);
   return !on ? d : !d ? "[row: with above]" : at < 0 ? `${d} [row: with above]` : `${d.slice(0, at)} [row: with above]${d.slice(at)}`;
 }
-// Setup QA's Result Type "Direction" adds or removes the tag; the rest of the field stays as it was.
-function withDirectionMark(description, on) {
-  const d = (description || "").replace(/ ?\[direction: section\]/g, ""), at = d.search(/\n\s*Source:/);
-  return !on ? d : !d ? "[direction: section]" : at < 0 ? `${d} [direction: section]` : `${d.slice(0, at)} [direction: section]${d.slice(at)}`;
+// Setup QA's Result Type "Direction: …" sets the tag ("section" or "next") or, with nothing, removes it; the rest of
+// the field stays as it was.
+function withDirectionMark(description, kind) {
+  const d = (description || "").replace(/ ?\[direction: (?:section|next)\]/g, ""), at = d.search(/\n\s*Source:/);
+  const tag = kind ? `[direction: ${kind === "next" ? "next" : "section"}]` : "";
+  return !tag ? d : !d ? tag : at < 0 ? `${d} ${tag}` : `${d.slice(0, at)} ${tag}${d.slice(at)}`;
 }
-// The test form's Type "Direction" is saved as a Text item carrying the tag; any other type drops the tag.
+// The test form's Type "Direction: …" is saved as a Text item carrying the tag; any other type drops the tag.
 function testFormData(data) {
-  const direction = data.type === "direction";
-  return { ...data, type: direction ? "text" : data.type, description: withDirectionMark(data.description, direction) };
+  const kind = { direction: "section", direction_next: "next" }[data.type] || null;
+  return { ...data, type: kind ? "text" : data.type, description: withDirectionMark(data.description, kind) };
 }
-// A section's directions (isDirection), in the list's order, behind the ⓘ beside the section's title on the QA form. A
-// direction's own Directions text, when it has any, follows it in smaller print.
+// Directions as a numbered list, word for word, in the list's order. A direction's own Directions text, when it has
+// any, follows it in smaller print.
+function directionsList(steps) {
+  return steps && steps.length ? el("ol", { class: "qa-steps" }, steps.map((s) => el("li", {}, s.name, directionsText(s) ? el("div", { class: "qa-step-more" }, directionsText(s)) : null))) : null;
+}
+// A section's directions, behind the ⓘ beside the section's title on the QA form.
 function sectionDirections(steps, title) {
   if (!steps.length) return null;
-  const list = el("ol", { class: "qa-steps" }, steps.map((s) => el("li", {}, s.name, directionsText(s) ? el("div", { class: "qa-step-more" }, directionsText(s)) : null)));
   // In a section's title a click also folds the section: this button only opens its box.
-  return el("span", { class: "qa-section-info", onclick: (event) => event.preventDefault() }, infoPopup(list, `Directions: ${title}`));
+  return el("span", { class: "qa-section-info", onclick: (event) => event.preventDefault() }, infoPopup(directionsList(steps), `Directions: ${title}`));
 }
 function fitTextarea(box) { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; }
 
@@ -2072,13 +2086,16 @@ async function renderPerform(assignmentId) {
   };
   const named = t.items.some((i) => sectionNameOf(i));
   const numbers = blockNumbers(t.items);
-  const byCategory = new Map(), directionsOf = new Map();   // a section's tests, and its directions (sectionDirections)
+  const byCategory = new Map(), directionsOf = new Map(), waiting = new Map();   // a section's tests, its directions (sectionDirections), and those waiting for the test below them
   for (const item of t.items) {
     const key = named ? `${sectionNumber(item)}|${sectionNameOf(item) || ""}` : `${sectionNumber(item)}|${item.category || "General"}`;
     if (!byCategory.has(key)) byCategory.set(key, []);
-    if (isDirection(item)) { if (!directionsOf.has(key)) directionsOf.set(key, []); directionsOf.get(key).push(item); }
-    else byCategory.get(key).push(item);
+    const kind = directionKind(item);
+    if (kind === "next") { if (!waiting.has(key)) waiting.set(key, []); waiting.get(key).push(item); }
+    else if (kind) { if (!directionsOf.has(key)) directionsOf.set(key, []); directionsOf.get(key).push(item); }
+    else { item.steps = waiting.get(key)?.length ? waiting.get(key) : null; waiting.delete(key); byCategory.get(key).push(item); }   // its ⓘ lists them (testDetailsButton, performDirections)
   }
+  for (const [key, left] of waiting) directionsOf.set(key, [...(directionsOf.get(key) || []), ...left]);   // no test below them: the section's
   const sectionCategories = new Map();
   for (const key of byCategory.keys()) {
     const [n, category] = key.split("|");
@@ -2191,7 +2208,7 @@ async function renderPerform(assignmentId) {
           return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line;   // the unit is in the name
         };
         // On an X / Y / Z row a field is named for its axis; its ⓘ shows only a calculation or directions of its own.
-        const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(p.it, t.items, numbers) : null);
+        const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(axisRow ? { ...p.it, steps: null } : p.it, t.items, numbers) : null);
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
         const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" ? p.unit : "", details(p), p.control,
           has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
@@ -2206,7 +2223,7 @@ async function renderPerform(assignmentId) {
         noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         // In a group the directions are beside its title; a row repeats them only when its own differ. A calculation keeps its ⓘ.
-        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(it, t.items, numbers) : null;
+        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(firstHeader === "Test" ? it : { ...it, steps: null }, t.items, numbers) : null;
         // The quick trend: this test's; on an X / Y / Z row, every axis (and the 3D), one under another.
         const trended = axisRow ? parts.filter((p) => p.it.type === "numeric") : [main];
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
@@ -3152,11 +3169,11 @@ async function renderQueueEditor(id) {
       return [head, family ? dirRow : null, groupHead, family ? null : dirRow, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow && !family ? " after-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
-          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : isDirection(t) ? el("span", { class: "direction-tag", title: "A direction: listed behind the ⓘ beside its section's title on the QA form. Nothing is recorded." }, "ⓘ") : null, sameRow,
+          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : isDirection(t) ? el("span", { class: "direction-tag", title: directionKind(t) === "next" ? "A direction: shown behind the ⓘ of the test below it on the QA form. Nothing is recorded." : "A direction: listed behind the ⓘ beside its section's title on the QA form. Nothing is recorded." }, "ⓘ") : null, sameRow,
             el("textarea", { rows: 1, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => { editDefinition('name', e.target.value); e.target.style.height='auto';e.target.style.height=`${e.target.scrollHeight}px`; } }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item), addDirections)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], isDirection(t)?'direction':QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(isDirection(t)&&e.target.value!=='direction')editDefinition('description',withDirectionMark(t.description,false)); if(e.target.value==='direction'){t.type='text';t.description=withDirectionMark(QADerived.encode(t.description,null),true);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'text',description:t.description,derived:null});markDirty();draw();return;} if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'&&!isDirection(t)?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : typeLabel(t)),
+        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], directionType(t)||(QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type), { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; const kind={direction:'section',direction_next:'next'}[e.target.value]; if(isDirection(t)&&!kind)editDefinition('description',withDirectionMark(t.description,null)); if(kind){t.type='text';t.description=withDirectionMark(QADerived.encode(t.description,null),kind);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'text',description:t.description,derived:null});markDirty();draw();return;} if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'&&!isDirection(t)?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : typeLabel(t)),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
           : el("span", { class: "muted" }, isDirection(t) ? "Not recorded" : t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
@@ -3414,7 +3431,7 @@ function arithmeticDerivedEditor(rule,prior,onChange,formMode=false) {
 
 function testForm(test,prior=[]) {
   const t = test || { type: "numeric", tol_mode: "absolute", active: 1 };
-  const type = select("type", Object.entries(TYPE_LABELS), isDirection(t)?'direction':QADerived.read(t.description)?'derived':t.type);
+  const type = select("type", Object.entries(TYPE_LABELS), directionType(t)||(QADerived.read(t.description)?'derived':t.type));
   const limits = el("div", { class: "form-grid wide" },
     field("Unit", el("input", { name: "unit", value: t.unit || "", placeholder: "mm, %, cGy, °" })),
     field("Expected value", el("input", { name: "expected", type: "number", step: "any", value: t.expected ?? "" })),

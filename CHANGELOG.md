@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- **[Physics review]** QA lists: a direction can belong to the test below it (Setup QA, Result Type **Direction: test below**; the earlier kind reads **Direction: section**). The QA form shows it behind the ⓘ of that test, or of its group (X / Y / Z, per energy); several in a row above one test are its steps, in order. One with no test below it in its section is listed with the section's. Stored as a Text item carrying `[direction: next]`; no number, nothing recorded. No list is changed by this entry.
+
 - **[Physics review]** QA lists: a list item can be a **Direction** (Setup QA, Result Type). The QA form lists a section's directions, in order, behind an ⓘ beside the section's title instead of drawing a row for each; a direction has no number and nothing is entered or recorded for it. It is stored as a Text item carrying `[direction: section]`, so saving and judging a run are unchanged, and switching the Result Type back makes it a test again. No list is changed by this entry. QA form (display only): the **Columns** box is a small box under its button with ← → to move a column, and a column's heading can be dragged left or right in the table; a group's limits sit under its name at the left.
 
 - QA form (display only): an X / Y / Z group, with its 3D, is one row. The axes sit side by side, each with its own answer, verdict and note; the group's title carries the baseline and limits they share; the row's Trend shows every axis, and History (when shown) a line per axis. A group's quick trend no longer squeezes the table (its cell spanned one column too many). Phone cards and a saved run are as before.
