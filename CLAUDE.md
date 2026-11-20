@@ -62,6 +62,14 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   them, only as many as fit one line. A numeric result's deviation follows its verdict chip in plain brackets,
   "PASS (Δ +0.30 mm)" (Brook, 2026-11-04: no Deviation column); hidden on phones. Comments behind a
   pencil icon. Yes before No.
+- **QA form (Brook, 2026-11-19; overrides the notes above where they differ):** columns in the order `# · Test · Baseline ·
+  Measured · Unit · Result · History · Note · Trend` (`QA_COLUMNS` in `app.js`, one list for headings, rows, widths and
+  the Columns box). The QA form starts without History; a saved run keeps it. **Columns** lets each person show, hide
+  and reorder (kept in the browser per person and page; #, Test, Measured and Result always show). Process and
+  procedure instructions are in info bubbles, not on the page: Protocol button, ⓘ beside a test or group title, the
+  import ⓘ; PBS daily steps show a short label (`QA_STEP_LABELS`, draft wording) with the instruction in the ⓘ. One
+  names row per section; a group's title is a band with its limits. Finish Gantry 1 (GTR1) before expanding to other
+  machines. floridaphysics.com sizes these columns by `col[data-col]` in its `site-overrides.css`: keep the keys.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
