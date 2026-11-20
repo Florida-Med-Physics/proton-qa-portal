@@ -44,7 +44,20 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     const group = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Gantry 90°' }) }).first();   // X / Y / Z with the same directions and no calculated row
     await group.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.match(await dialog.textContent(), /Record the correction vector/); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    assert.equal(await group.locator('tbody .qa-calculation-info').count(), 0, 'its rows do not repeat the group\'s directions');
+    assert.equal(await group.locator('tbody .qa-calculation-info').count(), 0, 'its row does not repeat the group\'s directions');
+    // An X / Y / Z group is one row: its axes side by side, each with its own answer and verdict, the 3D worked out.
+    assert.equal(await group.locator('tr[data-qa-entry]').count(), 1);
+    assert.deepEqual(await group.locator('.qa-shared-field .qa-shared-name').allTextContents(), ['X (cm)', 'Y (cm)', 'Z (cm)']);
+    const offset = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'PPS 2 XRAY Offset' }) }).first();
+    assert.equal(await offset.locator('tr[data-qa-entry]').count(), 1);
+    assert.match(await offset.locator('.measure-title').textContent(), /Baseline 0 cm · Warning ±0\.15 cm · Action ±0\.2 cm$/, 'what the axes share is in the title');
+    for (const [axis, value] of [['X', '0.05'], ['Y', '0.17'], ['Z', '-0.25']]) await p.getByLabel(`[Ortho - kV/kV] PPS 2 XRAY Offset ${axis} [cm]`, { exact: true }).fill(value);
+    assert.deepEqual((await offset.locator('.qa-shared-field').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()),
+      ['X (cm)PASS(Δ +0.05 cm)', 'Y (cm)WARNING(Δ +0.17 cm)', 'Z (cm)ACTION(Δ −0.25 cm)', '3D (cm)ⓘRecorded(Δ +0.31 cm)']);
+    assert.equal(await p.getByLabel('[Ortho - kV/kV] PPS 2 XRAY Offset [cm]', { exact: true }).inputValue(), '0.306');
+    const tops = await offset.locator('.qa-shared-field').evaluateAll((fields) => fields.map((f) => Math.round(f.getBoundingClientRect().top)));
+    assert.equal(new Set(tops).size, 1, 'all on one line');
+    assert.equal(await offset.locator('table').evaluate((table) => table.querySelector('tr.quick-trend td').colSpan + 1 === table.querySelectorAll('colgroup col').length), true, 'its quick trend spans the columns beside the number');
     assert.equal(await p.getByLabel('How Sphinx imports work', { exact: true }).count(), 1);
 
     // 3. The Columns box: show History, move Result ahead of Measured, hide Unit. What was typed stays.
