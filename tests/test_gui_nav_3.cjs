@@ -367,12 +367,13 @@ const cells = (row) => row.children.map((td) => td.textContent);
   assert.doesNotMatch(limits, /#\/machines\//, 'never the old machine page');
 }
 
-// 10. QA form: the Protocol box starts closed at every width (on floridaphysics.com the 1200px test means 767px, so it
-// opened on every computer, 105-148 px of transcription notes above the first test); one click opens it.
+// 10. QA form: the protocol opens from a "Protocol" button in the tools row (a box of its own above the first test until
+// 2026-11-19): one click away at every width, and the first test starts higher on the screen.
 {
   const form = between('async function renderPerform(', 'const inputs = [];');
-  assert.match(form, /app\.append\(el\("details", \{ class: "card instructions" \}, el\("summary", \{\}, el\("strong", \{\}, "Protocol"\)\)/);
-  assert.doesNotMatch(form, /instructions", open:/);
+  assert.match(form, /const protocol = t\.queue\.description \? infoPopup\(el\("div", \{ class: "pre" \}, [^;]+, "Protocol", "Protocol"\) : null;/);
+  assert.doesNotMatch(form, /card instructions/, 'no Protocol box above the tests');
+  assert.match(between('  const unfinishedToggle=', '  const refresh = () => {'), /unfinishedCount,el\('span',\{class:'spacer'\}\),protocol,qaColumnsButton\('perform'\)\)\);/, 'in the tools row, before Columns');
 }
 
 // 11. List editor opened read-only (a therapist or MPA by link): no "Import blocks" card, which offers nothing to them.
@@ -419,5 +420,5 @@ const cells = (row) => row.children.map((td) => td.textContent);
   for (const p of ['README.md', 'docs/USER_GUIDE.txt']) assert.match(fs.readFileSync(p, 'utf8'), /Record past imports as history…(\*\*)? on Data Administration, under Import folders/, p);
 }
 
-console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol box starts closed; no Import blocks card on a read-only list; a search opens a list where it is performed; Record past imports moves to Data Administration.');
+console.log('GUI and navigation 3: Review QA and Past results as compact phone cards; Data Administration cards on a phone, one rights table, quiet folder Save; Perform QA says As needed once and its phone cards are shorter; the list editor column row no longer covers tests on a phone; View As keeps the page its role may open; Machine Trends lists daily first, keeps open tests after Back, All tests goes Back, one empty card; a run from Machine Trends goes back there and empty rings are not links; the machine page lists daily first with a start button before each list; Values for this machine goes back where it came from; the Protocol opens from a button; no Import blocks card on a read-only list; a search opens a list where it is performed; Record past imports moves to Data Administration.');
 })().catch((err) => { console.error(err); process.exit(1); });

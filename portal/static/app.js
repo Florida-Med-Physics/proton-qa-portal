@@ -1399,11 +1399,13 @@ function infoDisclosure(content,label='Test information',open=false) {
   return el('details',{class:'qa-info',open},el('summary',{title:label,'aria-label':label},el('span',{'aria-hidden':'true'},'i')),el('div',{class:'qa-info-content'},content));
 }
 
-function infoPopup(content,label='Calculation details') {
-  return el('button',{type:'button',class:'qa-calculation-info',title:label,'aria-label':label,onclick:()=>{
+// Details in a box that opens on a click, so the page itself stays short: directions, a calculation, the protocol.
+// `words`: a button that reads as those words rather than the round ⓘ.
+function infoPopup(content,label='Calculation details',words=null) {
+  return el('button',{type:'button',class:words?'qa-info-words':'qa-calculation-info',title:label,'aria-label':words?null:label,'aria-haspopup':'dialog',onclick:()=>{
     const dialog=el('dialog',{class:'calculation-dialog'},el('h2',{},label),content,el('button',{type:'button',onclick:()=>dialog.close()},'Close'));
     dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
-  }},'ⓘ');
+  }},words||'ⓘ');
 }
 // A saved run's note behind a pencil, as on the QA form: the note shows on hover, and in full in a box on a click.
 function noteButton(text) {
@@ -1411,8 +1413,38 @@ function noteButton(text) {
   button.className='icon-btn note-btn has-note';button.textContent='✎';button.title=text;button.setAttribute('aria-label',`Note: ${text}`);
   return button;
 }
+// Steps of the PBS daily list whose name is the whole instruction: the QA form and a saved run show this short label,
+// and the instruction itself, word for word, opens from the ⓘ beside it (testDetailsButton) and shows on hover. Display
+// only: the test keeps its name everywhere else (Setup QA, Machine Trends, the PDF report, files). A renamed test simply
+// shows its new name. Draft labels for physicist review.
+const QA_STEP_LABELS = {
+  "Please connect the power cord and the chamber cable to the electrometer (DOSE-X) in the control room, then turn on the electrometer.": "Connect and turn on the electrometer (DOSE-X)",
+  "Please log in to the 'MOSAIQ2' computer and launch the myQA software.": "Launch myQA on MOSAIQ2",
+  "Please setup the Sphinx (index: H3) and move the couch BARS to the patient's right side to prevent potential collision during CBCT.": "Set up Sphinx (H3); couch bars to patient's right",
+  "Please remove the range shifter to prevent collisions and beam delivery.": "Remove the range shifter",
+  "Please connect the chamber cable in the treatment room.": "Connect chamber cable in treatment room",
+  "Send the daily QA chart for this gantry from MOSAIQ to TCS and accept it at TCS.": "Send QA chart from MOSAIQ to TCS and accept it",
+  "Use the hand pendant → Set-up to align PPS, gantry and snout automatically at the isocenter, one at a time.": "Align PPS, gantry and snout at isocenter",
+  "Visually check that the room lasers align with the BB; offset must be less than 2 mm.": "Room lasers align with BB (offset < 2 mm)",
+  "Capture kV/kV images and align finely to the center of the BB image. Record the offset below, then move the couch to correct it.": "Capture kV/kV, align to BB center, record offset",
+  "Acquire the CBCT image using a half scan in the clockwise direction.": "Acquire CBCT (half scan, clockwise)",
+  "Use Auto to obtain the correction vector. Manually realign if the offset differs substantially from the reference.": "Get the correction vector with Auto",
+  "In MOSAIQ, select the Daily QA field; the planned gantry angle should be 90°.": "Select the Daily QA field in MOSAIQ (gantry 90°)",
+  "On the virtual hand pendant, choose Treatment → Gantry and move to 90°, or use Go to.": "Move the gantry to 90°",
+  "Acquire kV/kV images and use Auto 3 to align, or manually align to the isocenter.": "Acquire kV/kV and align to isocenter",
+  "Apply the recorded correction vector and move the couch.": "Apply the correction vector; move the couch",
+  "Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.": "Verify BB alignment with another kV/kV",
+  "Please review the isocenter position by selecting OB's DR image and apply a correction vector if necessary (if any axis exceeds 0.05 cm: x, y, or z).": "Review isocenter on OB's DR image (correct if > 0.05 cm)",
+  "Go to MyQA, open your machine QA, connect Sphinx, and measure the background.": "MyQA: connect Sphinx, measure background",
+};
+const qaStepLabel = (item) => (item.type === "boolean" || item.type === "status") && Object.hasOwn(QA_STEP_LABELS, item.name) ? QA_STEP_LABELS[item.name] : null;
+// A test's name as the QA form and a saved run show it. A step's short label carries its instruction on hover and opens
+// it on a click, like the ⓘ beside it (`details`, testDetailsButton), which a phone's card does not show.
+function qaTestName(item, shown, details) {
+  return qaStepLabel(item) ? el("strong", { class: "qa-step-name", title: item.name, onclick: () => details?.click() }, shown) : el("strong", {}, shown);
+}
 function qaDisplayName(item) {
-  if(item.category!=='HDR treatment-day QA')return item.name;
+  if(item.category!=='HDR treatment-day QA')return qaStepLabel(item)||item.name;
   return ({
     'Emergency and operating procedures, emergency equipment, and TCS self-test':'Safety setup & TCS self-test',
     'Video system operational':'Video system', 'Intercom operational':'Intercom',
@@ -1433,41 +1465,188 @@ function qaDisplayName(item) {
     'Radiation warning light test':'Radiation warning light', 'Position indicator light test':'Position indicator light'
   })[item.name]||item.name;
 }
+// ── The QA table's columns ──────────────────────────────────────────────────────────────────────────────────────────
+// The QA form and a saved run draw the same table, and its columns are defined once, here: the headings, the order of a
+// row's cells, the widths and the Columns box all read this list. # and Test stay first. A person may hide any column
+// but #, Test, Measured and Result, and put the others in any order. The choice is kept in this browser, per person and
+// per page: "perform" is the QA form, where History starts hidden; "review" is a saved run. Widths are in px (Test takes
+// the room that is left; History's grows with the dates shown).
+const QA_COLUMNS = [
+  { key: 'n', cls: 'qa-n', title: '#', width: 72, pinned: true },
+  { key: 'test', cls: 'qa-label', title: 'Test', width: 0, pinned: true },
+  { key: 'baseline', cls: 'qa-baseline', title: 'Baseline', width: 132 },
+  { key: 'measured', cls: 'qa-measured', title: 'Measured', width: 156, always: true },
+  { key: 'unit', cls: 'qa-unit', title: 'Unit', width: 76 },
+  { key: 'result', cls: 'qa-result', title: 'Result', width: 300, always: true },   // fits "WARNING (Δ −12.35 mm)" on one line at the form's 22 px
+  { key: 'history', cls: 'history-cell', title: 'History', width: 112 },
+  { key: 'comment', cls: 'qa-comment', title: 'Comment', label: 'Note', width: 72 },
+  { key: 'trends', cls: 'qa-trends', title: 'Trends', label: 'Trend', width: 80 },
+];
+const QA_COLUMNS_HIDDEN = { perform: ['history'], review: [] };   // the columns a page starts without
+const QA_COLUMNS_KEY = 'gatorqa-columns-v1';
+const QA_SHARED_COLUMNS = ['test', 'baseline', 'measured', 'unit', 'result'];   // what a shared row's one cell covers (sharedCell)
+const qaColumnMemory = {};   // this visit's choices, so one still applies where the browser keeps nothing (a private window)
+function qaColumnChoice(view) {
+  const who = `${state.user?.id ?? ''}`, here = `${who}|${view}`;
+  if (here in qaColumnMemory) return qaColumnMemory[here];
+  try { const mine = (JSON.parse(localStorage.getItem(QA_COLUMNS_KEY) || '{}') || {})[who]?.[view]; return mine && typeof mine === 'object' ? mine : null; }
+  catch { return null; }
+}
+function saveQaColumnChoice(view, choice) {   // null: back to the page's own columns
+  const who = `${state.user?.id ?? ''}`;
+  qaColumnMemory[`${who}|${view}`] = choice;
+  try {
+    const all = JSON.parse(localStorage.getItem(QA_COLUMNS_KEY) || '{}') || {};
+    all[who] = { ...(all[who] || {}) };
+    if (choice) all[who][view] = choice; else delete all[who][view];
+    localStorage.setItem(QA_COLUMNS_KEY, JSON.stringify(all));
+  } catch { /* kept for this visit only */ }
+}
+// A QA table's columns in the person's order: `all` (each with its label and `off` when hidden) and `shown`.
+// `sharedRows`: the table has a row whose tests share one cell; the columns that cell covers then stay side by side,
+// in the person's order, ahead of the others, so every row still sits under its headings.
+function qaColumns(view = 'perform', sharedRows = false) {
+  const choice = qaColumnChoice(view), movable = QA_COLUMNS.filter((c) => !c.pinned);
+  const picked = (Array.isArray(choice?.order) ? choice.order : []).map((key) => movable.find((c) => c.key === key)).filter(Boolean);
+  let order = [...new Set([...picked, ...movable])];
+  if (sharedRows) order = [...order.filter((c) => QA_SHARED_COLUMNS.includes(c.key)), ...order.filter((c) => !QA_SHARED_COLUMNS.includes(c.key))];
+  const hidden = new Set(Array.isArray(choice?.hidden) ? choice.hidden : QA_COLUMNS_HIDDEN[view] || []);
+  const all = [...QA_COLUMNS.filter((c) => c.pinned), ...order].map((c) => ({ ...c, label: c.label || c.title, off: hidden.has(c.key) && !c.pinned && !c.always }));
+  return { all, shown: all.filter((c) => !c.off) };
+}
 function qaHeaders(first='Test') {
-  return ['#',first,'Measured','Unit','Result','Baseline','History','Comment','Trends'].map(label=>
-    el('th',{scope:'col',title:label,'aria-label':label},label==='Comment'?'Note':label==='Trends'?'Trend':label));
+  return QA_COLUMNS.map(c=>{const title=c.key==='test'?first:c.title;
+    return el('th',{scope:'col',title,'aria-label':title,'data-col':c.key},c.key==='test'?first:c.label||c.title);});
+}
+// History's dates, in a row of their own under the column names.
+function qaDatesRow(slots) {
+  return el('tr',{class:'hist-dates'},QA_COLUMNS.map(c=>el('th',{'data-col':c.key,class:c.key==='history'?'history-cell':null},c.key==='history'?el('span',{class:'hist-row'},slots):null)));
 }
 function testDetailsButton(item,items,numbers) {
   const calculation=derivedExplanation(item,items,numbers);
   const directions=calculation?null:helpText(item.description);
-  return calculation||directions?infoPopup(calculation||el('div',{},el('strong',{},item.name),directions),calculation?'Calculation details':'Test details'):null;
+  // A step whose name is its instruction shows a short label (qaDisplayName); the instruction is here, in full.
+  const step=!calculation&&!!qaStepLabel(item);
+  return calculation||directions||step?infoPopup(calculation||el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),directions),calculation?'Calculation details':'Test details'):null;
+}
+function qaColgroup(table,shown,count=0) {
+  let cols=[...table.children].find(x=>x.tagName==='COLGROUP');
+  if(!cols){cols=el('colgroup');table.prepend(cols);}
+  const key=shown.map(c=>c.key).join(' ')+'|'+count;
+  if(cols.dataset.cols===key)return;
+  cols.dataset.cols=key;
+  cols.replaceChildren(...shown.map(c=>{const col=el('col',{'data-col':c.key});col.style.width=c.key==='test'?'auto':c.key==='history'?`${count?count*136+(count-1)*8+16:c.width}px`:`${c.width}px`;return col;}));
 }
 function fitQaTable(table) {
   requestAnimationFrame(()=>{
     if(!table?.isConnected)return;
     const wrap=table.parentElement;
     const adapt=()=>{
+      const {shown}=qaColumns(table.dataset.qaView||'perform',!!table.querySelector('td.qa-shared-cell'));
       const compact=matchMedia('(max-width: 1200px)').matches;
       const maxHistory=Math.max(0,...[...table.querySelectorAll('.hist-row')].map(row=>row.children.length));
-      // 888 px: the fixed columns below (#, Measured, Unit, Result, Baseline, Note, Trend); the test name keeps 320 px or more.
-      // Result (300 px) fits "WARNING (Δ −12.35 mm)" on one line at the form's 22 px reading size. The old Deviation and
-      // Result columns took 268 px, but their text already ran past them at that size.
-      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-888-320)/144))));
+      // The test name keeps 320 px or more beside the columns shown; History then shows as many dates (up to 3) as fit.
+      const fixed=shown.reduce((sum,c)=>sum+(c.key==='history'?0:c.width),0);
+      const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-fixed-320)/144))));
       table.querySelectorAll('.hist-row').forEach(row=>[...row.children].forEach((cell,i)=>cell.hidden=i>=count));
-      let cols=table.querySelector('colgroup');
-      if(!cols){cols=el('colgroup',{},Array.from({length:9},()=>el('col')));table.prepend(cols);}
-      const widths=['72px','auto','156px','76px','300px','132px',`${count?count*136+(count-1)*8+16:112}px`,'72px','80px'];
-      [...cols.children].forEach((col,i)=>col.style.width=widths[i]);
+      qaColgroup(table,shown,count);
     };
+    table.qaFit=adapt;
     const observer=new ResizeObserver(adapt);qaTableObservers.add(observer);observer.observe(wrap);adapt();
   });
 }
 function orderMeasurementRow(row) {
-  for(const name of ['qa-n','qa-label','qa-measured','qa-unit','qa-result','qa-baseline','history-cell','qa-comment','qa-trends']) {
-    const cell=[...row.children].find(c=>c.classList.contains(name));if(cell)row.append(cell);
+  for(const c of QA_COLUMNS) {
+    const cell=[...row.children].find(x=>x.classList.contains(c.cls));if(cell)row.append(cell);
   }
 }
-function performDirections(item){return QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description,{inline:true});}
+// Puts a QA table's cells in the person's column order and turns off the columns they hid. A hidden column's cells stay
+// in their rows (a hidden Note still holds its note) and app.css leaves them out on a computer; on a phone each row is a
+// card, laid out as before. Called when a table is built and, for every table on the page, when the Columns box
+// changes: nothing is drawn again, so what has been typed stays.
+function layoutQaTable(table, view = table.dataset.qaView || 'perform') {
+  table.dataset.qaView = view;
+  const { all, shown } = qaColumns(view, !!table.querySelector('td.qa-shared-cell'));
+  const rows = [...table.children].filter((part) => part.tagName === 'THEAD' || part.tagName === 'TBODY').flatMap((part) => [...part.children]);   // the table's own rows
+  for (const row of rows) {
+    if (row.classList.contains('quick-trend')) { row.children[0].colSpan = shown.length; continue; }
+    const shared = [...row.children].find((x) => x.classList.contains('qa-shared-cell'));
+    for (const c of all) {
+      const cell = shared && QA_SHARED_COLUMNS.includes(c.key) ? (c.key === 'test' ? shared : null)
+        : [...row.children].find((x) => x !== shared && (x.tagName === 'TH' ? x.dataset.col === c.key : x.classList.contains(c.cls)));
+      if (!cell) continue;
+      row.append(cell);
+      cell.classList.toggle('qa-col-off', c.off);
+    }
+    if (shared) shared.colSpan = shown.filter((c) => QA_SHARED_COLUMNS.includes(c.key)).length;
+    const extras = [...row.children].find((x) => x.classList.contains('qa-phone-extras'));
+    if (extras) row.append(extras);
+  }
+  const history = shown.some((c) => c.key === 'history'), dates = table.querySelectorAll('tr.hist-dates .hist-row > *').length;
+  table.classList.toggle('qa-no-history', !history);
+  // Tables with these in common line up under one another, so the second need not name its columns again (qaHeadings).
+  const block = table.closest('.measure-block');
+  if (block) block.dataset.cols = `${shown.map((c) => c.key).join(' ')}|${history ? dates : 0}|${table.querySelector('.seg.warn') ? 'wide' : ''}`;
+  if (table.qaFit) table.qaFit(); else qaColgroup(table, shown);
+}
+// In a section, a table under one with the same columns does not name them again: its names row is collapsed with the
+// class "repeat" (app.css), never removed, so screen readers still read each cell's column name from it. The first table
+// shown always names its columns.
+function qaHeadings(blocks) {
+  let above = null;   // the columns of the table shown above
+  for (const block of blocks) {
+    const names = block.querySelector('tr.qa-col-names');
+    if (!names || block.hidden) continue;
+    names.classList.toggle('repeat', above === block.dataset.cols);
+    above = block.dataset.cols;
+  }
+}
+// The Columns box: which columns show, and in what order. A change applies at once to every QA table on the page.
+function qaColumnsButton(view) {
+  return el('button', { type: 'button', class: 'qa-columns-button', 'aria-haspopup': 'dialog', title: 'Show, hide and reorder columns', onclick: () => qaColumnsDialog(view) }, 'Columns');
+}
+function qaColumnsDialog(view) {
+  const list = el('ul', { class: 'qa-columns-list' });
+  let dragged = null;
+  const apply = (order, hidden, focus) => {
+    saveQaColumnChoice(view, order ? { order, hidden } : null);
+    document.querySelectorAll('.measure-table').forEach((table) => layoutQaTable(table));
+    document.querySelectorAll('.card.section').forEach((box) => qaHeadings(box.querySelectorAll('.measure-block')));
+    draw();
+    if (focus) (list.querySelector(`li[data-col="${focus[0]}"] button[data-move="${focus[1]}"]:not(:disabled)`) || list.querySelector(`li[data-col="${focus[0]}"] button:not(:disabled)`))?.focus();
+  };
+  const draw = () => {
+    const movable = qaColumns(view).all.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
+    const place = (key, at) => { const next = keys.filter((k) => k !== key); next.splice(at, 0, key); return next; };
+    list.replaceChildren(...movable.map((c, i) => {
+      const show = el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null,
+        onchange: () => apply(keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]) });
+      const move = (by, label, sign) => el('button', { type: 'button', class: 'icon-btn', 'data-move': by, disabled: i + by < 0 || i + by >= movable.length || null,
+        title: label, 'aria-label': `${label}: ${c.label}`, onclick: () => apply(place(c.key, i + by), hidden, [c.key, by]) }, sign);
+      return el('li', { 'data-col': c.key, draggable: 'true',
+        ondragstart: (event) => { dragged = c.key; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label); },   // (Firefox starts a drag only with data set)
+        ondragover: (event) => { if (dragged && dragged !== c.key) event.preventDefault(); },
+        ondrop: (event) => { event.preventDefault(); if (dragged && dragged !== c.key) apply(place(dragged, i), hidden); dragged = null; } },
+        el('label', { class: 'check' }, show, c.label), c.always ? el('span', { class: 'muted small' }, 'Always shown') : null,
+        el('span', { class: 'spacer' }), move(-1, 'Move earlier', '↑'), move(1, 'Move later', '↓'));
+    }));
+  };
+  const dialog = el('dialog', { class: 'calculation-dialog qa-columns-dialog' }, el('h2', {}, 'Columns'),
+    el('p', { class: 'muted small' }, '# and Test stay first. Kept on this computer.'), list,
+    el('div', { class: 'row' }, el('button', { type: 'button', onclick: () => apply(null) }, 'Reset'), el('span', { class: 'spacer' }),
+      el('button', { type: 'button', class: 'primary', onclick: () => dialog.close() }, 'Done')));
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  draw();
+  dialog.showModal();
+}
+// A group's directions (an X / Y / Z or per-energy table): behind the ⓘ beside its title. `name`: the title.
+function performDirections(item,name){
+  const text=QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description);
+  return text?infoPopup(el('div',{},el('strong',{},name),text),'Test details'):null;
+}
+// Directions as plain words (no template number or markers), to tell whether two tests carry the same ones.
+const directionsText=(item)=>helpText(item.description)?.lastChild?.textContent||'';
 
 function helpText(description, { inline = false } = {}) {
   description=(description||'').replace(/(?:^|\n)\s*Source:[^\n]*/g,'');
@@ -1754,10 +1933,8 @@ async function renderPerform(assignmentId) {
   const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends?tests=${t.items.map((i) => i.test_id).join(",")}&last=60`).catch(() => ({})) : {};
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
-  if (t.queue.description) {
-    // Closed at every width: the protocol is one click away and the first test starts higher on the screen.
-    app.append(el("details", { class: "card instructions" }, el("summary", {}, el("strong", {}, "Protocol")), el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description)));
-  }
+  // The protocol opens from a button in the tools row: one click away, and the first test starts higher on the screen.
+  const protocol = t.queue.description ? infoPopup(el("div", { class: "pre" }, QAHdrDaily.supported(t)?"Complete on treatment days. Enter today’s readings and note any exceptions.":t.queue.description), "Protocol", "Protocol") : null;
   const inputs = [];
   const sections = [];
   const progress = el("span");
@@ -1778,7 +1955,7 @@ async function renderPerform(assignmentId) {
     if(focus)focus.focus({preventScroll:true});else{entry.row.tabIndex=-1;entry.row.focus({preventScroll:true});}
   }},'Next unanswered');
   const unfinishedToggle=el('input',{type:'checkbox','aria-label':'Show unfinished only',onchange:event=>{unfinishedOnly=event.target.checked;refresh();if(unfinishedOnly)for(const section of sections)if(!section.box.hidden)section.box.open=true;}});
-  app.append(el('div',{class:'card qa-completion-tools'},nextUnanswered,el('label',{class:'check'},unfinishedToggle,'Show unfinished only'),unfinishedCount));
+  app.append(el('div',{class:'card qa-completion-tools'},nextUnanswered,el('label',{class:'check'},unfinishedToggle,'Show unfinished only'),unfinishedCount,el('span',{class:'spacer'}),protocol,qaColumnsButton('perform')));
   const refresh = () => {
     const statuses = inputs.map((i) => i.status());
     const worst = statuses.filter(Boolean).reduce((w, s) => (STATUS_RANK[s] > STATUS_RANK[w] ? s : w), "pass");
@@ -1794,17 +1971,15 @@ async function renderPerform(assignmentId) {
     for(const entry of inputs){if(!entry.row)continue;entry.row.hidden=unfinishedOnly&&(entry.rowEntries||[entry]).every(e=>!e.required||!!e.status());if(entry.row.hidden)entry.chart.hidden=true;}
     for (const s of sections){
       s.refresh();const hide=unfinishedOnly&&!s.entries.some(e=>e.required&&!e.status());s.box.hidden=hide;if(s.heading)s.heading.hidden=hide;
-      let above=null;   // the columns of the table shown above, in this section
-      for(const block of s.box.querySelectorAll('.measure-block')){
+      const blocks=s.box.querySelectorAll('.measure-block');
+      for(const block of blocks){
         const rows=[...block.querySelectorAll('tr[data-qa-entry]')],visible=rows.filter(row=>!row.hidden);
         block.hidden=unfinishedOnly&&!visible.length;
         const number=block.querySelector('.qa-n-span');
         if(number&&visible.length){visible[0].prepend(number);number.rowSpan=visible.length*2;}
-        // Under a table with the same columns, a table shows its dates but not the column names again ("repeat" collapses
-        // the row on screen and keeps it for screen readers, which read each cell's column names from it).
-        const names=block.querySelector('tr.qa-col-names');
-        if(names&&!block.hidden){names.classList.toggle('repeat',!!block.querySelector('tr.hist-dates')&&above===block.dataset.cols);above=block.dataset.cols;}
       }
+      // Under a table with the same columns, a table does not name them again (History's dates still show).
+      qaHeadings(blocks);
     }
   };
   const named = t.items.some((i) => sectionNameOf(i));
@@ -1887,7 +2062,7 @@ async function renderPerform(assignmentId) {
       el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear()))); };
     // Every measured (numeric) test is a row in a table: Measurement, Reference, Tolerance, Action, Status, Comment,
     // History (under its QA dates) and Trends. Repeated measurements (per energy or spot) share a titled table.
-    const measureTable = (members, { firstHeader, title, directions, firstCell, label }) => {
+    const measureTable = (members, { firstHeader, title, directions, firstCell, label, groupDirections = null }) => {
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-3).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
@@ -1923,6 +2098,8 @@ async function renderPerform(assignmentId) {
         const shared = parts.length > 1 ? sharedCells(parts) : null, main = shared ? shared.main : parts[0];
         noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+        // In a group the directions are beside its title; a row repeats them only when its own differ. A calculation keeps its ⓘ.
+        const details = firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(it, t.items, numbers) : null;
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
           const pts = (history[main.it.test_id] || []).slice(-60);
           if (!pts.length) return toast("No results yet for this test.", true);
@@ -1934,7 +2111,7 @@ async function renderPerform(assignmentId) {
         } }, trendIcon(16));
         const row = el("tr", {'data-qa-entry':it.test_id},
           numberCell(it),
-          shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it)),testDetailsButton(it,t.items,numbers)), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
+          shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
           // null, not "": an empty cell must stay :empty so the card layout drops its label too.
           shared ? null : el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
@@ -1961,22 +2138,20 @@ async function renderPerform(assignmentId) {
         phoneDrawer(extras, secondary.filter(cell=>cell.firstChild).map(cell=>cell.firstChild), 'Comment, history & trends');
         return [row, chart];
       });
-      const widths = ["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"];
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" ? " axis-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
-          el("colgroup", {}, widths.map((w) => { const col = el("col"); col.style.width = w; return col; })),
-          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // collapsed under a table with the same columns (refresh)
-            dates.length ? el("tr", { class: "hist-dates" }, ...Array.from({ length: 6 }, () => el("th", {})),
-              el("th", { class: "history-cell" }, el("span", { class: "hist-row" }, dates.map(dateSlot))), el("th", {}), el("th", {})) : null),
+          el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(firstHeader)),   // collapsed under a table with the same columns (qaHeadings)
+            dates.length ? qaDatesRow(dates.map(dateSlot)) : null),
           el("tbody", {}, trRows.flat()));
-      fitQaTable(tableEl);
       // Axis and energy tables carry the shared limits in their title rather than on every row.
       if (title && firstHeader !== "Test") {
         const withLimits = members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null));
         const line = withLimits && limitsLine(withLimits, withLimits.unit && withLimits.unit !== "unitless" ? withLimits.unit : "");
         if (line) title.append(line);
       }
-      // Same first heading and as many History dates: the same columns, at the same widths.
-      return el("div", { class: "measure-block", "data-cols": `${firstHeader}|${dates.length}` }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+      const block = el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+      layoutQaTable(tableEl, "perform");   // the person's columns; names the block's columns (data-cols) for qaHeadings
+      fitQaTable(tableEl);
+      return block;
     };
     const shortName = (it) => it.name.startsWith(category + " – ") ? it.name.slice(category.length + 3) : qaDisplayName(it);
     // Single measurements that follow one another share one table; the row carries the number, name and directions.
@@ -1999,7 +2174,7 @@ async function renderPerform(assignmentId) {
       let plain = [];
       const emitPlain = () => {
         if (plain.length) rows.push(measureTable(plain, { firstHeader: "Test", title: null, directions: null, label: shortName,
-          firstCell: (it) => el("strong", {}, shortName(it)) }));
+          firstCell: (it, details) => qaTestName(it, shortName(it), details) }));
         plain = [];
       };
       for (const m of foldAxes(pending)) {
@@ -2010,8 +2185,8 @@ async function renderPerform(assignmentId) {
         rows.push(measureTable(members, {
           firstHeader: "Axis",
           title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : ""),
-            performDirections(m.calc || m.axes[0])),
-          directions: null,
+            performDirections(m.axes[0], `${m.base}${m.unitTag ? ` ${m.unitTag}` : ""}`)),
+          directions: null, groupDirections: directionsText(m.axes[0]),
           label: (it) => `${m.base} ${it.axisLabel}`,
           firstCell: (it) => el("strong", {}, it.axisLabel),
         }));
@@ -2027,8 +2202,8 @@ async function renderPerform(assignmentId) {
       const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
       rows.push(measureTable(family.map((f) => f.item), {
         firstHeader: "Energy",
-        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), performDirections(item)),
-        directions: null,
+        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), performDirections(item, mp0.metricLabel)),
+        directions: null, groupDirections: directionsText(item),
         firstCell: (it) => el("strong", {}, measureParts(it.name).rowLabel),
         label: (it) => { const mp = measureParts(it.name); return `${mp.rowLabel} · ${mp.metricLabel}`; },
       }));
@@ -2143,13 +2318,15 @@ async function renderPerform(assignmentId) {
   const autoLine = t.assignment.import_folder && browserFolders() ? el("div") : null;
   if (window.QAExcel?.supported(t)) app.append(monthlyWorkbookTools(t, inputs, qaDate));
   const sphinxSection=sections.find(section=>/sphinx measurements/i.test(section.section))||null;
-  const importHelp=sphinxSection?infoDisclosure(el('div',{},
+  // One row: what the import does, and how a Sphinx report is read, open from its ⓘ.
+  const importHelp=infoPopup(el('div',{},
+    el('p',{},QAHdrDaily.supported(t)?'Import the HDR Daily QA PDF and review its values.':'Choose a report to fill matching measurements. Any remaining tests can be completed below.'),
+    sphinxSection?[
     el('p',{},'Use a Sphinx report export (.xls or Sphinx-format .csv). This reader expects the report’s Setup headings and measurement rows; it does not accept arbitrary CSV column layouts.'),
     el('p',{},'For each row, it identifies the measurement name, energy/spot, warning/action limits, reference, and measured Result. Only the Result fills the answer. Matching uses the measurement and nominal energy, so small energy-label differences and uniquely matched spot renumbering do not create new tests.'),
-    el('p',{},'The selected machine’s saved baseline and limits determine pass/fail. Imported reference values and the file’s own verdict do not replace them. Only matching template tests are filled; the remaining answers stay for you to complete.')),'How Sphinx imports work'):null;
-  const fileCard = el("div", { class: "card step" }, el('div',{class:'row'},el("strong", {}, "Import measurements"),importHelp),
-    el("span", { class: "muted small" }, QAHdrDaily.supported(t)?" Import the HDR Daily QA PDF and review its values.":" Choose a report to fill matching measurements. Any remaining tests can be completed below."),
-    autoLine, el("div", {}, sphinxFile), sphinxInfo);
+    el('p',{},'The selected machine’s saved baseline and limits determine pass/fail. Imported reference values and the file’s own verdict do not replace them. Only matching template tests are filled; the remaining answers stay for you to complete.')]:null),sphinxSection?'How Sphinx imports work':'About importing');
+  const fileCard = el("div", { class: "card step qa-import" }, el('div',{class:'row'},el("strong", {}, "Import measurements"),importHelp,sphinxFile),
+    autoLine, sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
       can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
@@ -3506,9 +3683,10 @@ async function renderReviewMeasurements(run) {
         chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
         chart.hidden=false;
       }},trendIcon(16));
+      const details=shared?null:testDetailsButton(r,run.results,numbers);
       const row=el('tr',{'data-test-id':lead.test_id},
         el('td',{class:'qa-n'},numberFor(lead)),
-        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},el('strong',{},qaDisplayName(r))),testDetailsButton(r,run.results,numbers)),r.type==='numeric'?qaLimitsLine(limits,unit):null),
+        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},qaTestName(r,qaDisplayName(r),details)),details),r.type==='numeric'?qaLimitsLine(limits,unit):null),
         shared?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
         shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
         shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
@@ -3520,6 +3698,7 @@ async function renderReviewMeasurements(run) {
       tbody.append(row,chart);
     }
     app.append(el('section',{class:'card section review-section'},el('div',{class:'review-section-title'},categoryLabel(category)),el('div',{class:'measure-wrap'},el('table',{class:'measure-table review-measure-table'+(category==='HDR treatment-day QA'?' hdr-qa-table':'')},el('thead',{},el('tr',{},qaHeaders())),tbody))));
+    layoutQaTable(tbody.closest('table'),'review');   // the person's columns for a saved run
     fitQaTable(tbody.closest('table'));
   }
 }
@@ -3533,7 +3712,7 @@ async function renderRun(id) {
   const back = from === 'perform' ? ['#/perform-qa', 'Perform QA'] : from === 'trends' ? [`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}`, 'Machine Trends'] : ['#/review', 'Review QA'];
   const backClick = from === 'trends' ? (e) => { if (history.state?.gatorqaFrom?.startsWith('#/trends')) { e.preventDefault(); history.back(); } } : null;
   page(`${run.machine_name} · ${run.queue_name}`, shortDate(run.qa_date), [el("a",{class:"button",href:back[0],onclick:backClick},`Back to ${back[1]}`),el("button", { onclick: () => downloadQaReport(id).catch((err) => toast(err.message, true)) }, "Download PDF report"),
-    window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaTrashButton(run)]);
+    window.QAExcel?.supported(run)?el('button',{onclick:async()=>{try{const values={};for(const r of run.results){const key=QAExcel.keyOf(r),m=QAExcel.data().mapping.find(x=>x.key===key);if(!key||m?.formula)continue;values[key]=r.type==='boolean'?(r.value_num==null?null:r.value_num?'PASS':'FAIL'):r.type==='numeric'?r.value_num:r.value_text;}downloadWorkbookBlob(await QAExcel.exportFile(values,run.qa_date,run.performer_name||run.performer),run.qa_date);}catch(err){toast(err.message,true);}}},'Download Excel'):null,qaColumnsButton('review'),qaTrashButton(run)]);
   const who = `${personName(run.performer_name, run.performer)}, ${run.performed_at.slice(11, 16)}`;
   const facts = el("dl", { class: "result-card card" },
     el("dt", {}, "Result"), el("dd", {}, chip(run.overall)),

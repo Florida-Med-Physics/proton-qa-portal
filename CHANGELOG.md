@@ -9,6 +9,8 @@ Entries marked **[Physics review]** change QA tests, tolerances, templates, or h
 
 ## [Unreleased]
 
+- QA form and saved run (display only): the columns read # · Test · Baseline · Measured · Unit · Result · History · Note · Trend, and a **Columns** box lets each person show, hide and reorder them (kept in the browser, per person and per page; #, Test, Measured and Result always show). The QA form starts without History. Each section names its columns once, X / Y / Z and per-energy groups sit under a title band with their limits, and instructions moved off the page behind a click: the protocol (a **Protocol** button), a group's directions and the import notes (ⓘ), and the PBS daily steps, which show a short label with the instruction word for word in the ⓘ, on hover and on a click. Phone cards are unchanged. **[Physics review]**: the short step labels (`QA_STEP_LABELS` in `app.js`) are draft wording.
+
 - Tests: tests/test_gui_nav_3.cjs reads app.js the same way on a Windows checkout (Windows line endings), as the other checks already do.
 
 - View As on People (#/users, GatorQA's own builds): choosing Physicist opens the Dashboard, as before round 3, instead of keeping the page and showing only "You do not have permission to do that."; People needs the Manage users right, more than its Data Administration tab. Navigation only.

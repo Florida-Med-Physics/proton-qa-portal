@@ -7,40 +7,41 @@ const source = fs.readFileSync('portal/static/app.js', 'utf8');
 assert.equal(fs.readFileSync('docs/app.js', 'utf8'), source, 'docs/app.js is out of step: run python build_pages.py');
 const between = (from, to) => { const a = source.indexOf(from), b = source.indexOf(to, a + 1); assert.ok(a >= 0 && b > a, `${from} … ${to}`); return source.slice(a, b); };
 
-// 1. QA form: a table under one with the same columns (same first heading, as many History dates) shows its dates but
-// not the column names again; the first table of a section keeps them, and so does the first one shown when
-// "Show unfinished only" hides the tables above it.
+// 1. QA form: in a section, a table under one with the same columns does not name them again (History's dates still show
+// when History is on); the first table of a section names them, and so does the first one shown when "Show unfinished
+// only" hides the tables above it. A table's columns are named on its block (data-cols) by layoutQaTable.
 const measureTable = between('    const measureTable = (members,', '    const shortName = (it) =>');
 assert.match(measureTable, /el\("thead", \{\}, el\("tr", \{ class: "qa-col-names" \}, qaHeaders\(firstHeader\)\),/, 'every table builds its names row');
-assert.match(measureTable, /dates\.length \? el\("tr", \{ class: "hist-dates" \}/, 'and its date row, as before');
-assert.match(measureTable, /el\("div", \{ class: "measure-block", "data-cols": `\$\{firstHeader\}\|\$\{dates\.length\}` \}/, 'the block names its columns');
-const thinning = between('      let above=null;', '  const named = t.items.some(').replace(/\s*\}\s*\};\s*$/, '');
+assert.match(measureTable, /dates\.length \? qaDatesRow\(dates\.map\(dateSlot\)\) : null/, 'and its date row, as before');
+assert.match(measureTable, /layoutQaTable\(tableEl, "perform"\);/, 'and is laid out in the person\'s columns');
+assert.match(between('function layoutQaTable(', 'function qaHeadings('), /block\.dataset\.cols = `\$\{shown\.map\(\(c\) => c\.key\)\.join\(' '\)\}\|\$\{history \? dates : 0\}\|\$\{table\.querySelector\('\.seg\.warn'\) \? 'wide' : ''\}`;/, 'the block names its columns');
+assert.match(between('  const refresh = () => {', '  const named = t.items.some('), /block\.hidden=unfinishedOnly&&!visible\.length;[\s\S]*qaHeadings\(blocks\);/, 'after hiding finished tables, the names rows are thinned');
 const form = {};
 vm.createContext(form);
-vm.runInContext(`this.thin = (s, unfinishedOnly) => {\n${thinning}\n};`, form);
+vm.runInContext(between('function qaHeadings(', '// The Columns box') + '\nthis.qaHeadings = qaHeadings;', form);
 // The repeated names row is collapsed with the class "repeat", never removed with hidden: screen readers still read each
 // cell's column names (Measured, Unit, Result…) from it.
 const classList = () => { const on = new Set(); return { toggle: (c, force) => { if (force) on.add(c); else on.delete(c); return !!force; }, contains: (c) => on.has(c) }; };
-const block = (cols, { rows = 2, answered = 0, dates = true } = {}) => {
-  const names = { hidden: false, classList: classList() }, entries = Array.from({ length: rows }, (_, i) => ({ hidden: i < answered }));
-  return { hidden: false, dataset: { cols }, names, querySelectorAll: (sel) => (sel === 'tr[data-qa-entry]' ? entries : []),
-    querySelector: (sel) => (sel === 'tr.qa-col-names' ? names : sel === 'tr.hist-dates' ? (dates ? {} : null) : null) };
+const block = (cols, { hidden = false } = {}) => {
+  const names = { hidden: false, classList: classList() };
+  return { hidden, dataset: { cols }, names, querySelector: (sel) => (sel === 'tr.qa-col-names' ? names : null) };
 };
-const shown = (blocks) => blocks.map((b) => (b.hidden ? 'hidden' : b.names.hidden ? 'names removed' : b.names.classList.contains('repeat') ? 'dates' : 'names'));
-const thin = (blocks, unfinishedOnly = false) => { form.thin({ box: { querySelectorAll: () => blocks } }, unfinishedOnly); return shown(blocks); };
-assert.deepEqual(thin([block('Test|3'), block('Energy|3'), block('Energy|3'), block('Energy|3'), block('Test|3')]),
-  ['names', 'names', 'dates', 'dates', 'names'], 'per-energy tables under the first: dates only');
-assert.deepEqual(thin([block('Axis|3'), block('Axis|3'), block('Energy|3')]), ['names', 'dates', 'names'], 'other first heading: names again');
-assert.deepEqual(thin([block('Energy|3'), block('Energy|2')]), ['names', 'names'], 'other number of dates (other History width): names again');
-assert.deepEqual(thin([block('Energy|0', { dates: false }), block('Energy|0', { dates: false })]), ['names', 'names'], 'a table with no date row keeps its names');
-const unfinished = [block('Test|3'), block('Energy|3', { answered: 2 }), block('Energy|3'), block('Energy|3')];
-assert.deepEqual(thin(unfinished, true), ['names', 'hidden', 'names', 'dates'], 'unfinished only: the first table shown gets the names');
-unfinished.forEach((b) => { b.querySelectorAll('tr[data-qa-entry]').forEach((r) => { r.hidden = false; }); });
-assert.deepEqual(thin(unfinished, false), ['names', 'names', 'dates', 'dates'], 'and back');
+const shown = (blocks) => blocks.map((b) => (b.hidden ? 'hidden' : b.names.hidden ? 'names removed' : b.names.classList.contains('repeat') ? 'collapsed' : 'names'));
+const thin = (blocks) => { form.qaHeadings(blocks); return shown(blocks); };
+const PLAIN = 'n test baseline measured unit result comment trends|0|', DATED = 'n test baseline measured unit result history comment trends|3|';
+assert.deepEqual(thin([block(PLAIN), block(PLAIN), block(PLAIN), block(PLAIN)]), ['names', 'collapsed', 'collapsed', 'collapsed'], 'one names row for a section of like tables');
+assert.deepEqual(thin([block(DATED), block(DATED), block(DATED.replace('|3|', '|2|'))]), ['names', 'collapsed', 'names'], 'other number of dates (other History width): names again');
+assert.deepEqual(thin([block(PLAIN), block(PLAIN + 'wide'), block(PLAIN)]), ['names', 'names', 'names'], 'a wider Measured (Pass / Warning / Fail buttons): names again');
+assert.deepEqual(thin([block(PLAIN), block('n test measured result|0|'), block('n test measured result|0|')]), ['names', 'names', 'collapsed'], 'other columns (a table with a shared row keeps its own order): names again');
+const unfinished = [block(PLAIN, { hidden: true }), block(PLAIN), block(PLAIN)];
+assert.deepEqual(thin(unfinished), ['hidden', 'names', 'collapsed'], 'unfinished only: the first table shown gets the names');
+unfinished[0].hidden = false;
+assert.deepEqual(thin(unfinished), ['names', 'collapsed', 'collapsed'], 'and back');
 const css = fs.readFileSync('portal/static/app.css', 'utf8');
 assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
 assert.ok(css.includes('.measure-table tr.qa-col-names.repeat > th { height:0 !important; padding-top:0 !important; padding-bottom:0 !important; border:0 !important; line-height:0 !important; font-size:0 !important; overflow:hidden; }'),
   'the repeated names row takes no room on screen');
+assert.ok(css.includes('#app .measure-table tr.qa-col-names.repeat > th { font-size:0 !important; }'), 'not even its text, which the form sizes with !important');
 
 // 2. Limits read "Warning ±" / "Action ±" (never WARNING / ACTION / FAIL; the verdict chips keep PASS / WARNING / ACTION).
 const words = { el: (tag, props, ...kids) => ({ tag, props: props || {}, textContent: kids.flat(Infinity).join('') }) };

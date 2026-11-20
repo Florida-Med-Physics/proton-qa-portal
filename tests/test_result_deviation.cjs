@@ -20,7 +20,7 @@ const context = { el, QADerived: { value: (input) => input.value, setInput() {} 
 vm.createContext(context);
 for (const part of [between('const present =', 'for (const method of'), between('const STATUS_LABEL', 'const REVIEW_LABEL'),
   between('function capitalize(', 'function decimalsOf('), between('function fmt(', 'function today('), between('const signed =', '\n'),
-  between('function deviationText(', '// Shell, login, routing'), between('function qaHeaders(', 'function testDetailsButton(')])
+  between('function deviationText(', '// Shell, login, routing'), between('const QA_COLUMNS = [', 'const QA_COLUMNS_HIDDEN'), between('function qaHeaders(', 'function testDetailsButton(')])
   vm.runInContext(part, context);
 const text = (node) => (node ? node.text : null);
 
@@ -63,34 +63,38 @@ assert.deepEqual(typeInto({ type: 'numeric', name: 'No reference', unit: 'mm', l
 assert.deepEqual(typeInto({ type: 'numeric', name: 'Unitless', unit: 'unitless', limits: ref })('100.3'), [['chip pass', 'PASS'], ['result-dev', '(Δ +0.30)']]);
 assert.deepEqual(typeInto({ type: 'boolean', name: 'Interlock', unit: '', limits: {} })('pass'), []);
 
-// No Deviation column on either page; the columns, widths and spans agree on nine columns.
-assert.deepEqual(Array.from(context.qaHeaders(), (th) => th.text), ['#', 'Test', 'Measured', 'Unit', 'Result', 'Baseline', 'History', 'Note', 'Trend']);
+// No Deviation column on either page; the columns, widths and spans agree on nine columns, all read from QA_COLUMNS
+// (Baseline, Measured, Result in that order since 2026-11-19; a person may reorder and hide them: tests/test_qa_columns.cjs).
+const columns = Array.from(vm.runInContext('QA_COLUMNS', context));   // a plain array of this realm, so it compares with the ones built here
+assert.deepEqual(Array.from(context.qaHeaders(), (th) => th.text), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note', 'Trend']);
+assert.deepEqual(Array.from(context.qaHeaders('Energy'), (th) => [th.props['data-col'], th.props.title]).slice(0, 3), [['n', '#'], ['test', 'Energy'], ['baseline', 'Baseline']]);
 const perform = between('async function renderPerform(', 'function importSphinxDialog(');
 const review = between('async function renderReviewMeasurements(', 'async function renderRun(');
 for (const [name, code] of [['QA form', perform], ['saved run', review]]) {
   assert.doesNotMatch(code, /qa-dev|deltaBadge|'Deviation'/, name);
   assert.deepEqual([...code.matchAll(/colspan\s*:\s*(\d+)/g)].map((m) => m[1]).filter((n, i, all) => all.indexOf(n) === i), ['9'], name);
 }
-assert.match(perform, /Array\.from\(\{ length: 6 \}, \(\) => el\("th", \{\}\)\),\s*el\("th", \{ class: "history-cell" \}/);   // 6 + History + Note + Trend
+assert.match(perform, /dates\.length \? qaDatesRow\(dates\.map\(dateSlot\)\) : null/);
+const datesRow = context.qaDatesRow(['a', 'b']);   // one heading cell per column; History's holds the dates
+assert.deepEqual(datesRow.kids.map((th) => th.props['data-col']), columns.map((c) => c.key));
+assert.deepEqual(datesRow.kids.filter((th) => th.props.class === 'history-cell').map((th) => th.text), ['ab']);
 assert.match(review, /el\('div',\{class:'status-cell'\},chip\(r\.status\),r\.type==='numeric'&&!missing\?deviationText\(r\.value_num,limits,unit\):null\)/);
-const order = /for\(const name of \[([^\]]+)\]\)/.exec(between('function orderMeasurementRow(', 'function performDirections('))[1];
-assert.equal(order, "'qa-n','qa-label','qa-measured','qa-unit','qa-result','qa-baseline','history-cell','qa-comment','qa-trends'");
+assert.deepEqual(columns.map((c) => c.cls), ['qa-n', 'qa-label', 'qa-baseline', 'qa-measured', 'qa-unit', 'qa-result', 'history-cell', 'qa-comment', 'qa-trends']);
+assert.match(between('function orderMeasurementRow(', '// Puts a QA table\'s cells'), /for\(const c of QA_COLUMNS\) \{\s*const cell=\[\.\.\.row\.children\]\.find\(x=>x\.classList\.contains\(c\.cls\)\);if\(cell\)row\.append\(cell\);/);
 const fit = between('function fitQaTable(', 'function orderMeasurementRow(');
-const widths = /const widths=\[(.*?)\];/.exec(fit)[1].split(',');
-assert.equal(widths.length, 9);
-assert.match(fit, /Array\.from\(\{length:9\}/);
-const fixed = widths.filter((w) => /^'\d+px'$/.test(w)).reduce((sum, w) => sum + parseInt(w.slice(1), 10), 0);
-assert.equal(fixed, Number(/wrap\.clientWidth-(\d+)-320/.exec(fit)[1]), 'the history count must use the fixed column total');
+assert.equal(columns.length, 9);
+const fixed = columns.filter((c) => c.key !== 'history').reduce((sum, c) => sum + c.width, 0);
+assert.match(fit, /const fixed=shown\.reduce\(\(sum,c\)=>sum\+\(c\.key==='history'\?0:c\.width\),0\);/, 'the history count uses the total of the columns shown');
+assert.match(fit, /Math\.floor\(\(wrap\.clientWidth-fixed-320\)\/144\)/);
 // Result is sized for the QA form's one reading size (22 px on desktop, forced on every element of the form): measured in
 // Chrome, the WARNING chip is 128 px and "(Δ −12.35 mm)" 146 px, with a 6 px gap and 8 px cell padding each side.
 assert.match(css, /#app\[data-page\^="perform\/"\], #app\[data-page\^="runs\/"\] \{ --qa-form-font-size:22px; \}/);
-const result = parseInt(widths[4].slice(1), 10);
-assert.equal(widths[4], "'300px'");
+const result = columns.find((c) => c.key === 'result').width;
+assert.equal(result, 300);
 assert.ok(result >= 128 + 6 + 146 + 2 * 8, '"WARNING (Δ −12.35 mm)" must fit on one line');
 // Every other column keeps its width; Result takes 32 px more than the old Deviation (140) + Result (128) pair.
 assert.equal(fixed, 72 + 156 + 76 + 132 + 72 + 80 + result);
 assert.equal(result - (140 + 128), 32);
-assert.match(perform, /const widths = \["100px", "auto", "190px", "100px", "300px", "150px", "424px", "130px", "100px"\];/);
 assert.doesNotMatch(css, /qa-dev|\.delta\b/);
 assert.match(css, /\.result-dev \{[^}]*color: var\(--muted\)/);
 // No size of its own (the form's reading size wins anyway); the pieces never break inside; phones leave it out, as they

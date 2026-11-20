@@ -71,7 +71,7 @@ Checked against the full archive on 2026-10-21 (942 G1 and 201 G5 sessions, 74,9
 
 A **template** is the master QA list (for example "Daily QA template", built from the TG-224 daily template export with `import-checklist`). It is never scheduled directly. **Duplicate** it for a machine: every check is copied, so that machine's list owns its checks and their limits, and tuning one machine never changes another or the template. Sphinx measurements are added to a machine's list automatically the first time one of its exports is loaded.
 
-The entry form follows the template's sections: **0.0 Setup** instructions, **1.0 Safety**, **2.0 Mechanical and imaging**, **3.0 Sphinx dosimetry**, with each check's number and directions shown beside it.
+The entry form follows the template's sections: **0.0 Setup** instructions, **1.0 Safety**, **2.0 Mechanical and imaging**, **3.0 Sphinx dosimetry**, with each check's number; its directions open from the ⓘ beside it.
 
 ## How it fits together
 
@@ -222,3 +222,5 @@ In Setup QA's list editor, tick **Same row as the test above** on a test (Physic
 Device-selection calibration uses the Derived “Device calibration lookup” method. PBS and Eyeline chamber/electrometer selections supply the calibration factors and downstream calculations. The bundled SAMPLE devices and factors are placeholders, editable in Setup QA. Blank or unknown selections leave dependent values unanswered; the backend recalculates lookups during submission.
 
 Perform and Review submission bars scroll after the form rather than staying fixed over tests. Execution table headings do not wrap or offer column sorting; rows retain protocol order. HDR uses concise display labels with full directions available through the first-line information button. Stored test identities, measurements and limits are unchanged.
+
+The QA form and a saved run share one table: # · Test · Baseline · Measured · Unit · Result · History · Note · Trend. **Columns** (the QA form's tools row; a saved run's page buttons) shows, hides and reorders them. #, Test, Measured and Result always show, and the choice is kept in that browser, per person and per page. The QA form starts without History. Each section names its columns once; X / Y / Z and per-energy groups sit under a title band with their limits. Instructions are one click away rather than on the page: **Protocol**, a group's ⓘ, the import ⓘ, and the PBS daily steps, which show a short label (draft wording for physicist review, `QA_STEP_LABELS` in `app.js`) with the instruction word for word in the ⓘ. On a phone the cards are unchanged, and a step's label opens its instruction.
