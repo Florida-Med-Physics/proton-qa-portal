@@ -114,7 +114,7 @@ const keys = (cols) => J(cols.map((c) => c.key));
   assert.equal(labels[lasers], 'Room lasers align with BB (offset < 0.2 cm)');
   const pbs = seed.templates.find((t) => t.name === 'PBS DailyQA Template - Sphinx').checks;
   const outsideSphinx = pbs.filter((c) => !/\[Section: Sphinx Measurements\]/.test(c.description || ''));
-  assert.equal(outsideSphinx.length, 52);
+  assert.equal(outsideSphinx.length, 57);
   for (const c of outsideSphinx) { assert.doesNotMatch(c.name, /\bmm\b/, c.name); assert.notEqual(c.unit, 'mm', c.name); assert.doesNotMatch((c.description || '').replace(/\[derived: [^\]]+\]/, ''), /\bmm\b/, c.name); }
   assert.equal(context.qaDisplayName({ type: 'boolean', category: 'HDR treatment-day QA', name: 'Video system operational' }), 'Video system', 'HDR names as before');
   // The instruction itself stays one click away: the details box of a labelled step carries the full name.

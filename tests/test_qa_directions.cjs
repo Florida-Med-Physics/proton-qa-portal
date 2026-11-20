@@ -40,11 +40,11 @@ const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
 const samples = [...new Set(seed.templates.flatMap((t) => t.checks.map((c) => c.description || '')).filter((d) => !d.includes('[direction:'))), '', 'Plain directions', 'Line one\nline two', 'Source: only a source line'];
 assert.ok(samples.length > 20);
 // The seed's own directions: in the PBS daily list only. The seven setup steps are their section's (after its fields);
-// thirteen instructions of the next section are for the test below them (the room lasers check; the kV/kV isocenter
-// block; the CBCT correction vector block; the gantry-90 kV/kV correction vector block; the check after it). Each is a
-// Text item with its tag and no unit.
+// seventeen instructions of the next section are for the test below them (the room lasers check; the kV/kV isocenter
+// block; the CBCT correction vector block; the gantry-90 kV/kV correction vector block; the BB alignment check). Each is
+// a Text item with its tag and no unit.
 const seeded = seed.templates.flatMap((t) => t.checks.filter((c) => (c.description || '').includes('[direction:')).map((c) => ({ ...c, list: t.name })));
-assert.deepEqual(seeded.map((c) => directionKind(c)), [...Array(7).fill('section'), ...Array(13).fill('next')]);
+assert.deepEqual(seeded.map((c) => directionKind(c)), [...Array(7).fill('section'), ...Array(17).fill('next')]);
 for (const c of seeded) {
   assert.equal(c.list, 'PBS DailyQA Template - Sphinx');
   assert.equal(c.unit, undefined);
@@ -55,12 +55,27 @@ const setup = pbs.filter((c) => /\[Section: Setup and Safety\]/.test(c.descripti
 assert.deepEqual(setup.map((c) => directionKind(c)), [null, null, null, null, null, null, null, 'section', 'section', 'section', 'section', 'section', 'section', 'section']);
 const seedNumbers = blockNumbers(pbs);
 assert.deepEqual(setup.filter((c) => !isDirection(c)).map((c) => seedNumbers.get(c.test_id)), ['1.01', '1.02', '1.03', '1.04', '1.05', '1.06', '1.07']);
-const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 27);
-assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', null, null, null, 'next', null, null]);
-assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02', '', '', '', '', '', '2.03', '2.03', '2.03', '2.03', '', '', '', '', '2.04', '2.04', '2.04', '', '2.05', '2.06'],
+const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 32);
+assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', 'next', 'next', null, null, null, null, 'next', 'next', 'next', null, null]);
+assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02', '', '', '', '', '', '2.03', '2.03', '2.03', '2.03', '', '', '', '', '', '', '2.04', '2.04', '2.04', '2.04', '', '', '', '2.05', '2.06'],
   'the lasers check, the kV/kV isocenter block, the CBCT correction vector block, the kV/kV correction vector block, then the check after it');
 assert.equal(imaging[12].name, 'DO NOT APPLY Correction');
-assert.deepEqual(imaging.slice(21, 24).map((c) => c.name), ['X', 'Y', 'Z'].map((axis) => `Mechanical-to-kV/kV Correction Vector ${axis} [cm]`));
+// The kV/kV correction vector block ends its steps with recording the vector and then applying the correction (the
+// CBCT block ends with not applying it), and takes the CBCT block's baselines and limits ("Same as 2.03").
+assert.deepEqual(imaging.slice(21, 23).map((c) => c.name), ['Record the correction vector from the isocenter before moving the couch.', 'Apply the recorded correction vector and move the couch.']);
+assert.deepEqual(imaging.slice(23, 26).map((c) => c.name), ['X', 'Y', 'Z'].map((axis) => `Mechanical-to-kV/kV Correction Vector ${axis} [cm]`));
+assert.deepEqual(imaging.slice(23, 26).map((c) => [c.expected, c.warn, c.fail, c.tol_mode, c.unit]), imaging.slice(13, 16).map((c) => [c.expected, c.warn, c.fail, c.tol_mode, c.unit]));
+assert.ok(imaging.slice(23, 26).every((c) => !/Record the correction vector/.test(c.description)), 'its own direction is a step now');
+// Its 3D is set up as the CBCT block's is: the same formula over its own axes, baseline 0, no limits.
+const [cbct3d, kv3d] = [imaging[16], imaging[26]];
+assert.deepEqual([cbct3d.name, kv3d.name], ['Mechanical-to-CBCT Correction Vector [cm]', 'Mechanical-to-kV/kV Correction Vector [cm]']);
+const ruleOf = (c) => JSON.parse(decodeURIComponent(/\[derived: ([^\]]+)\]/.exec(c.description)[1]));
+assert.equal(ruleOf(kv3d).formula, ruleOf(cbct3d).formula);
+assert.deepEqual([kv3d.type, kv3d.unit, kv3d.expected, kv3d.warn, kv3d.fail, kv3d.tol_mode, kv3d.category], [cbct3d.type, cbct3d.unit, cbct3d.expected, cbct3d.warn, cbct3d.fail, cbct3d.tol_mode, cbct3d.category]);
+assert.match(kv3d.description, /\[calc: 3d-offset\]/);
+// The BB alignment check (2.05) has three steps above it, in Brook's order (2026-11-20).
+assert.deepEqual(imaging.slice(27, 30).map((c) => c.name), ['Apply the correction vector.', 'Reacquire kV/kV.', 'Align to the central BB for Sphinx output measurements.']);
+assert.equal(imaging[30].name, 'Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.');
 assert.ok(pbs.every((c) => !/Record the correction vector only/.test(c.description || '')), 'the CBCT block\'s old direction is gone: step 5 says it');
 assert.deepEqual(imaging.filter((c) => !isDirection(c)).slice(1, 9).map((c) => c.name), ['Mechanical-to-kV/kV Isocenter X [cm]', 'Mechanical-to-kV/kV Isocenter Y [cm]', 'Mechanical-to-kV/kV Isocenter Z [cm]', 'Mechanical-to-kV/kV Isocenter [cm]',
   'Mechanical-to-CBCT Correction Vector X [cm]', 'Mechanical-to-CBCT Correction Vector Y [cm]', 'Mechanical-to-CBCT Correction Vector Z [cm]', 'Mechanical-to-CBCT Correction Vector [cm]']);
