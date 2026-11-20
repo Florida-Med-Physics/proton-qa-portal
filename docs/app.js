@@ -1439,7 +1439,8 @@ const QA_STEP_LABELS = {
   "Please connect the chamber cable in the treatment room.": "Connect chamber cable in treatment room",
   "Send the daily QA chart for this gantry from MOSAIQ to TCS and accept it at TCS.": "Send QA chart from MOSAIQ to TCS and accept it",
   "Use the hand pendant → Set-up to align PPS, gantry and snout automatically at the isocenter, one at a time.": "Align PPS, gantry and snout at isocenter",
-  "Visually check that the room lasers align with the BB; offset must be less than 2 mm.": "Room lasers align with BB (offset < 2 mm)",
+  "Visually check that the room lasers align with the BB; offset must be less than 0.2 cm.": "Room lasers align with BB (offset < 0.2 cm)",
+  "Visually check that the room lasers align with the BB; offset must be less than 2 mm.": "Room lasers align with BB (offset < 2 mm)",   // the wording before 2026-11-20, for a list that still carries it
   "Capture kV/kV images and align finely to the center of the BB image. Record the offset below, then move the couch to correct it.": "Capture kV/kV, align to BB center, record offset",
   "Acquire the CBCT image using a half scan in the clockwise direction.": "Acquire CBCT (half scan, clockwise)",
   "Use Auto to obtain the correction vector. Manually realign if the offset differs substantially from the reference.": "Get the correction vector with Auto",
@@ -1784,6 +1785,27 @@ function sectionDirections(steps, title) {
   if (!steps.length) return null;
   // In a section's title a click also folds the section: this button only opens its box.
   return el("span", { class: "qa-section-info", onclick: (event) => event.preventDefault() }, infoPopup(directionsList(steps), `Directions: ${title}`));
+}
+// A calculation (QADerived) names its inputs by name and category, so a test renamed or moved to another category in
+// Setup QA would leave the calculation without its input (and a run could not be saved). The rules that used such a test
+// are re-pointed in the same save: [[test, rule], …] for each test of `list` whose rule changed. `before`: test id ->
+// { name, category } as they were when the editor opened.
+function derivedAfterRenames(list, before) {
+  const was = (t) => before.get(t.id);
+  const moved = list.filter((t) => was(t) && (was(t).name !== t.name || was(t).category !== (t.category || "")));
+  const out = [];
+  if (moved.length) for (const test of list) {
+    let rule = null;
+    try { rule = QADerived.read(test.description); } catch { /* an unreadable rule is left as it is */ }
+    if (!rule || !Array.isArray(rule.inputs)) continue;
+    let changed = false;
+    for (const input of rule.inputs) {
+      const hit = moved.find((t) => was(t).name === input.name && was(t).category === (input.category || ""));
+      if (hit) { input.name = hit.name; input.category = hit.category || ""; changed = true; }
+    }
+    if (changed) out.push([test, rule]);
+  }
+  return out;
 }
 function fitTextarea(box) { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; }
 
@@ -2901,6 +2923,7 @@ async function renderQueueEditor(id) {
   const testUpdates = new Map();
   const addingDirections = new Set();     // tests given an empty directions box with "+ Directions"
   const byId = Object.fromEntries(tests.map((t) => [t.id, t]));
+  const namedAtLoad = new Map(tests.map((t) => [t.id, { name: t.name, category: t.category || "" }]));   // for derivedAfterRenames
   let items = q.items.map((i) => ({ test_id: i.test_id, expected: i.expected, warn: i.warn, fail: i.fail, tol_mode: i.tol_mode }));
   // "Values for": the list's default baseline / Warning / Action (every machine), or one machine's own values,
   // which override the default on that machine only (blank = use the default, shown in grey).
@@ -3184,6 +3207,10 @@ async function renderQueueEditor(id) {
         el("td", {}, editable ? el("div", { class: "row nowrap row-actions" },
           el("button", { type: "button", class: "small edit-test", title: "Edit all of this test's settings", "aria-label": `Edit test: ${t.name}`, onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t,items.slice(0,index).map(x=>byId[x.test_id])), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
             await api("PUT", `/api/tests/${t.id}`, { ...testFormData(data), owner_queue_id: t.owner_queue_id });
+            // Renamed here, it stays the input of the calculations that used it (derivedAfterRenames).
+            const renamed = { ...t, name: String(data.name || "").trim(), category: String(data.category || "").trim() };
+            for (const [test, rule] of derivedAfterRenames(items.map((i) => (i.test_id === t.id ? renamed : byId[i.test_id])).filter(Boolean), namedAtLoad))
+              if (test.id !== t.id) await api("PUT", `/api/tests/${test.id}`, { ...test, type: "derived", derived: rule, description: QADerived.encode(test.description, rule) });
             toast("Test saved");
             route();
           }) }, "✎ Edit"),
@@ -3285,6 +3312,11 @@ async function renderQueueEditor(id) {
       error.textContent = "";
       let result;
       if(!valuesFor||defaultLimitsDirty||importBlocksDirty){
+        // A renamed test stays the input of the calculations that used it (derivedAfterRenames).
+        for (const [test, rule] of derivedAfterRenames(items.map((i) => byId[i.test_id]).filter(Boolean), namedAtLoad)) {
+          test.description = QADerived.encode(test.description, rule);
+          testUpdates.set(test.id, { ...(testUpdates.get(test.id) || {}), type: 'derived', derived: rule });
+        }
         const payload = { ...formData(info), items, import_blocks:importBlocks, test_updates: [...testUpdates].map(([test_id, fields]) => ({ test_id, ...fields })) };
         result=isNew?await api('POST','/api/queues',payload):await api('PUT',`/api/queues/${id}`,payload);
       }
