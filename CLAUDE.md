@@ -39,8 +39,10 @@ Share with `--host 0.0.0.0`.
   references and Warning/Action limits; Sphinx `.xls` auto-fill); monthly list = `Monthly QA template – Proton
   gantry (TG-224)` from the boss's GTR5 monthly worksheet (floridaphysics repo). The TG-224 daily template is kept
   but not scheduled. In the seed (Brook, 2026-11-20) fourteen instruction-only steps of the daily list are directions
-  (the seven setup steps of Setup and Safety; seven in Mechanical and Imaging for the block below them), block 2.02 is
-  "Mechanical-to-kV/kV Isocenter [cm]" (X, Y, Z, 3D) and 2.03 "Mechanical-to-CBCT Correction Vector [cm]", and nothing
+  (the seven setup steps of Setup and Safety; thirteen in Mechanical and Imaging for the block below them), block 2.02
+  is "Mechanical-to-kV/kV Isocenter [cm]" (X, Y, Z, 3D), 2.03 "Mechanical-to-CBCT Correction Vector [cm]" (baselines
+  X −5, Y −1, Z +4.5 cm, Warning ±0.15, Action ±0.2, from Brook; fifth step "DO NOT APPLY Correction") and 2.04
+  "Mechanical-to-kV/kV Correction Vector [cm]" (X, Y, Z; no limits given yet: never copy 2.03's without being told), and nothing
   outside the Sphinx measurements reads in mm (Brook: "if there are mm anywhere in that queue, it shouldnt be there";
   the Sphinx values stay in mm until Brook says otherwise: export, baselines, limits and history are in mm). An
   existing install renames and switches them in Setup QA. GTR5's exports carry nine spots; only six are on the list (open question).
@@ -86,7 +88,13 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   citation; Brook or the reviewing physicist supplies it. The **Columns** box is a small popout under its button (never a
   window over the page), with ← → to move a column; a heading can be dragged left or right in the table. A group's
   Warning / Action (and baseline) sit under its black name at the left of the title band, never at the far right.
-  Energy labels sit at the left under the group's name (no wide blank under the name).
+  Energy labels sit at the left under the group's name (no wide blank under the name). A titled block reads as ONE
+  test ("all of this is 2.02 … it should look like a block not two rows broken up"): its number beside its name
+  (`.measure-n`), no band behind the name and no line between the name, its limits and its fields; axes with their own
+  baselines are named on the limits line. A test's ⓘ is one combined list (the directions above it, then its own
+  direction as the last step), never steps plus a separate Directions box. On an X / Y / Z row each field reads
+  "X: [ ]" (letter beside its box; "I want X: [] Y: [], and Z:[] on each of these rows"), and the whole block is
+  marked on hover, its name line too.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in

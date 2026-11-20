@@ -1578,8 +1578,9 @@ function testDetailsButton(item,items,numbers) {
   const directions=calculation?null:helpText(item.description);
   // A step whose name is its instruction shows a short label (qaDisplayName); the instruction is here, in full.
   const step=!calculation&&!!qaStepLabel(item);
-  const steps=directionsList(item.steps);   // the directions above it in the list (Setup QA: "Direction: test below")
-  return calculation||directions||step||steps?infoPopup(calculation?el('div',{},steps,calculation):el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),steps,directions),calculation?'Calculation details':'Test details'):null;
+  // The directions above it in the list (Setup QA: "Direction: test below") and what the test itself says are one list.
+  const steps=directionsList(item.steps,calculation?[]:[step?item.name:null,directionsText(item)]);
+  return calculation||directions||step||steps?infoPopup(calculation?el('div',{},steps,calculation):steps?el('div',{},el('strong',{},qaDisplayName(item)),steps):el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),directions),calculation?'Calculation details':'Test details'):null;
 }
 function qaColgroup(table,shown,count=0) {
   let cols=[...table.children].find(x=>x.tagName==='COLGROUP');
@@ -1725,8 +1726,8 @@ function qaColumnsButton(view) {
 // A group's directions (an X / Y / Z or per-energy table): behind the ⓘ beside its title. `name`: the title.
 function performDirections(item,name){
   const text=QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description);
-  const steps=directionsList(item.steps);   // the directions above the group in the list
-  return text||steps?infoPopup(el('div',{},el('strong',{},name),steps,text),'Test details'):null;
+  const steps=directionsList(item.steps,text?[directionsText(item)]:[]);   // the directions above the group in the list, then its own: one list
+  return text||steps?infoPopup(el('div',{},el('strong',{},name),steps||text),'Test details'):null;
 }
 // Directions as plain words (no template number or markers), to tell whether two tests carry the same ones.
 const directionsText=(item)=>helpText(item.description)?.lastChild?.textContent||'';
@@ -1779,9 +1780,13 @@ function testFormData(data) {
   return { ...data, type: kind ? "text" : data.type, description: withDirectionMark(data.description, kind) };
 }
 // Directions as a numbered list, word for word, in the list's order. A direction's own Directions text, when it has
-// any, follows it in smaller print.
-function directionsList(steps) {
-  return steps && steps.length ? el("ol", { class: "qa-steps" }, steps.map((s) => el("li", {}, s.name, directionsText(s) ? el("div", { class: "qa-step-more" }, directionsText(s)) : null))) : null;
+// any, follows it in smaller print. `own`: what the test itself says (its instruction, its Directions text), as the
+// last steps of the same list, so a test's ⓘ is one list and not steps beside a separate Directions box (Brook,
+// 2026-11-20).
+function directionsList(steps, own = []) {
+  const last = own.filter(Boolean);
+  return steps && steps.length ? el("ol", { class: "qa-steps" }, steps.map((s) => el("li", {}, s.name, directionsText(s) ? el("div", { class: "qa-step-more" }, directionsText(s)) : null)),
+    last.map((text) => el("li", { class: "qa-step-own" }, text))) : null;
 }
 // A section's directions, behind the ⓘ beside the section's title on the QA form.
 function sectionDirections(steps, title) {
@@ -2210,15 +2215,24 @@ async function renderPerform(assignmentId) {
       };
       const refCell = (it, unit) => (it.limits.expected !== null && it.limits.expected !== undefined ? `${fmt(it.limits.expected, dp)} ${unit}`.trim() : el("span", { class: "muted" }, "—"));
       const limitsLine = (it, unit) => (it.type === "numeric" ? qaLimitsLine(it.limits, unit) : null);
+      // A titled block (X / Y / Z, per energy) is one numbered test: its number is beside its name in the title band
+      // (Brook, 2026-11-20), and the rows under the band leave the # column empty.
       const numberCell = (it) => (firstHeader !== "Test"
-        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: (axisRow ? 1 : members.length) * 2 }, numbers.get(it.test_id) || "") : null)
+        ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: (axisRow ? 1 : members.length) * 2 }) : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
       // Tests marked "Same row as the test above" share one row (sharedCell), each laid out as in a row of its own: its
       // result and deviation (when it has a baseline or limits), baseline and limits under its input, then its comment
       // (the + opens every one); History and Trend follow the first judged one, named (each keeps its own on Machine Trends).
-      // What an X / Y / Z group's title says for all its axes: the baseline they share and the limits of the first judged one.
+      // What an X / Y / Z group's title says for all its axes: the baseline they share, or each axis's own when they
+      // differ ("Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm"), and the limits of the first judged one.
       const judged = members.filter((it) => it.type === "numeric");
-      const titleBaseline = axisRow && judged.length && judged.every((it) => (it.limits || {}).expected != null && it.limits.expected === judged[0].limits.expected) ? `Baseline ${refCell(judged[0], judged[0].unit && judged[0].unit !== "unitless" ? judged[0].unit : "")}` : null;
+      const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
+      const sameBaseline = axisRow && judged.length > 0 && judged.every((it) => (it.limits || {}).expected != null && it.limits.expected === judged[0].limits.expected);
+      const axes = axisRow && !sameBaseline ? judged.filter((it) => "XYZ".includes(it.axisLabel)) : [];
+      const eachBaseline = axes.length > 1 && axes.every((it) => (it.limits || {}).expected != null);
+      const baselineInTitle = (it) => sameBaseline || (eachBaseline && axes.some((a) => a.test_id === it.test_id));
+      const signedBaseline = (it) => `${it.limits.expected > 0 ? "+" : it.limits.expected < 0 ? "−" : ""}${fmt(Math.abs(it.limits.expected), dp)}${unitOf(it) ? ` ${unitOf(it)}` : ""}`;
+      const titleBaseline = sameBaseline ? `Baseline ${refCell(judged[0], unitOf(judged[0]))}` : eachBaseline ? `Baseline ${axes.map((it) => `${it.axisLabel} = ${signedBaseline(it)}`).join(", ")}` : null;
       const titleMember = firstHeader !== "Test" ? members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null)) : null;
       const titleLimits = titleMember ? limitsLine(titleMember, titleMember.unit && titleMember.unit !== "unitless" ? titleMember.unit : "")?.textContent || null : null;
       const sharedCells = (parts) => {
@@ -2227,7 +2241,7 @@ async function renderPerform(assignmentId) {
         const limits = (p) => {
           const line = limitsLine(p.it, p.unit);
           if (axisRow) {   // only what the title does not already say
-            const own = [has(p, "expected") && !titleBaseline ? `Baseline ${refCell(p.it, "")}` : null, line && line.textContent !== titleLimits ? line.textContent : null].filter(Boolean);
+            const own = [has(p, "expected") && !baselineInTitle(p.it) ? `Baseline ${refCell(p.it, "")}` : null, line && line.textContent !== titleLimits ? line.textContent : null].filter(Boolean);
             return own.length ? el("span", { class: "qa-limits" }, own.join(" · ")) : null;
           }
           return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line;   // the unit is in the name
@@ -2235,7 +2249,9 @@ async function renderPerform(assignmentId) {
         // On an X / Y / Z row a field is named for its axis; its ⓘ shows only a calculation or directions of its own.
         const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(axisRow ? { ...p.it, steps: null } : p.it, t.items, numbers) : null);
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
-        const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" ? p.unit : "", details(p), p.control,
+        // (An axis field reads "X: [ ]"; its unit is in the block's name when the tests' names carry it, "… [cm]".)
+        const unitInName = axisRow && /\[[^\]]+\]\s*$/.test(groupName);
+        const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" && !unitInName ? p.unit : "", details(p), p.control,
           has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
         parts.forEach((p, i) => { p.entry.field = cell.firstChild.children[i]; });
         if (axisRow) cell.firstChild.style.setProperty("--qa-fields", parts.length);   // every axis on the one line (app.css)
@@ -2298,6 +2314,7 @@ async function renderPerform(assignmentId) {
       // Axis and energy tables carry the shared limits in their title rather than on every row; an X / Y / Z row's
       // title also carries the baseline its axes share.
       if (title && firstHeader !== "Test") {
+        title.prepend(el("span", { class: "measure-n" }, numbers.get(members[0].test_id) || ""));
         const shared = [titleBaseline, titleLimits].filter(Boolean);
         if (shared.length) title.append(el("span", { class: "qa-limits" }, shared.join(" · ")));
       }

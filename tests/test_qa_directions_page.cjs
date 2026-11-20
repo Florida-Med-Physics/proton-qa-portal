@@ -19,8 +19,13 @@ const STEPS = [
 const BEFORE_LASERS = ['Use the hand pendant → Set-up to align PPS, gantry and snout automatically at the isocenter, one at a time.'];
 const BEFORE_OFFSET = ['Insert panels A and B.', 'Capture kV/kV images and align finely to the center of the BB image. Record the offset below, then move the couch to correct it.'];
 const BEFORE_CBCT = ['At TCS, move the couch to X = −5 cm, Y = −1 cm, Z = +4.5 cm.', 'Retract panel A before CBCT.', 'Acquire the CBCT image using a half scan in the clockwise direction.',
-  'Use Auto to obtain the correction vector. Manually realign if the offset differs substantially from the reference.'];
-const BELOW = [...BEFORE_LASERS, ...BEFORE_OFFSET, ...BEFORE_CBCT];
+  'Use Auto to obtain the correction vector. Manually realign if the offset differs substantially from the reference.', 'DO NOT APPLY Correction'];
+// The four before the gantry-90 kV/kV block, and the one after it (for the check below it).
+const BEFORE_KV = ['In MOSAIQ, select the Daily QA field; the planned gantry angle should be 90°.', 'On the virtual hand pendant, choose Treatment → Gantry and move to 90°, or use Go to.',
+  'Insert panel A for kV/kV imaging.', 'Acquire kV/kV images and use Auto 3 to align, or manually align to the isocenter.'];
+const BEFORE_VERIFY = ['Apply the recorded correction vector and move the couch.'];
+const VERIFY = 'Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.';
+const BELOW = [...BEFORE_LASERS, ...BEFORE_OFFSET, ...BEFORE_CBCT, ...BEFORE_KV, ...BEFORE_VERIFY];
 const LASERS = 'Visually check that the room lasers align with the BB; offset must be less than 0.2 cm.';
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -65,7 +70,7 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     const numbered = await rows.evaluateAll((all) => all.map((r) => r.querySelector('.inline-test-name > strong')?.textContent).filter(Boolean).slice(0, 8));
     assert.deepEqual(numbered, ['1.01:', '1.02:', '1.03:', '1.04:', '1.05:', '1.06:', '1.07:', '2.01:']);
     const below = await tests(BELOW);
-    assert.equal(below.length, 7);
+    assert.equal(below.length, 13);
     for (const t of below) { assert.equal(t.type, 'text'); assert.match(t.description, /\[Section: Mechanical and Imaging\].*\[direction: next\]/); }
     for (const name of BELOW) {
       const row = await rowOf(name);
@@ -106,33 +111,58 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     const lasers = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${LASERS}: yes`, exact: true }) });
     assert.equal(await lasers.locator('td.qa-n').textContent(), '2.01');
     for (const name of BELOW) assert.equal(await p.getByRole('button', { name: `${name}: pass`, exact: true }).count() + await p.getByRole('button', { name: `${name}: yes`, exact: true }).count(), 0, 'nothing to answer');
+    // One list: the steps above the test, then the test's own instruction as the last step.
     await lasers.getByRole('button', { name: 'Test details', exact: true }).click();
-    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_LASERS);
-    assert.equal(await dialog.locator('.qa-step-text').textContent(), LASERS, 'the test\'s own instruction is there too');
-    assert.equal(await dialog.evaluate((d) => !!(d.querySelector('ol.qa-steps').compareDocumentPosition(d.querySelector('.qa-step-text')) & Node.DOCUMENT_POSITION_PRECEDING)), true, 'the test\'s name, then the steps');
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_LASERS, LASERS]);
+    assert.equal(await dialog.locator('strong').first().textContent(), 'Room lasers align with BB (offset < 0.2 cm)');
+    assert.equal(await dialog.locator('.qa-step-text, .directions').count(), 0, 'no instruction or Directions box beside the list');
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // Above a group (X / Y / Z): its steps are behind the ⓘ in the group's title, in the list's order, not on a row.
     const offset = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
-    assert.equal(await offset.locator('td.qa-n').textContent(), '2.02');
+    // A block's number is beside its name in the title band; the row under it leaves the # column empty.
+    assert.equal(await offset.locator('.measure-title .measure-n').textContent(), '2.02');
+    assert.equal(await offset.locator('td.qa-n').textContent(), '');
+    const [blockN, blockName, lasersN] = [await offset.locator('.measure-title .measure-n').boundingBox(), await offset.locator('.measure-title strong').boundingBox(), await lasers.locator('td.qa-n').boundingBox()];
+    assert.ok(blockN.x + blockN.width <= blockName.x + 1 && Math.abs(blockN.y + blockN.height / 2 - (blockName.y + blockName.height / 2)) <= 4, 'the number, then the name, on one line');
+    assert.ok(Math.abs(blockN.x + blockN.width / 2 - (lasersN.x + lasersN.width / 2)) <= 12, 'where the # column\'s numbers are');
     assert.equal(await offset.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Isocenter [cm]');
-    assert.deepEqual(await offset.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X (cm)', 'Y (cm)', 'Z (cm)', '3D (cm)']);
+    assert.deepEqual(await offset.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z', '3D']);
     await offset.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_OFFSET);
     assert.match(await dialog.locator('strong').first().textContent(), /^Mechanical-to-kV\/kV Isocenter \[cm\]$/);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // The next block follows at once: the four steps between the two blocks are its instructions, ahead of its own.
     const cbct = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-CBCT Correction Vector' }) }).first();
-    assert.equal(await cbct.locator('td.qa-n').textContent(), '2.03');
+    assert.equal(await cbct.locator('.measure-title .measure-n').textContent(), '2.03');
     assert.equal(await cbct.locator('.measure-title strong').textContent(), 'Mechanical-to-CBCT Correction Vector [cm]');
     await cbct.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
-    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_CBCT);
-    assert.match(await dialog.textContent(), /Record the correction vector only\. Do not move the couch\./, 'the block\'s own directions follow its steps');
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_CBCT, 'five steps, the last "DO NOT APPLY Correction"');
+    assert.equal(await dialog.locator('.directions').count(), 0, 'no Directions box beside the list');
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    // Its axes have baselines of their own: the title line names each, with the limits they share; the 3D keeps its own.
+    assert.equal(await cbct.locator('.measure-title .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
+    assert.deepEqual(await cbct.locator('.qa-shared-field .qa-limits').allTextContents(), ['Baseline 0.0'], 'only the 3D says its own');
     // Its 3D is still worked out from its axes, under their new names.
-    for (const [axis, value] of [['X', '0.3'], ['Y', '0.4'], ['Z', '0']]) await p.getByLabel(`Mechanical-to-CBCT Correction Vector ${axis} [cm]`, { exact: true }).fill(value);
-    assert.equal(await p.getByLabel('Mechanical-to-CBCT Correction Vector [cm]', { exact: true }).inputValue(), '0.500');
+    for (const [axis, value] of [['X', '-5.05'], ['Y', '-1.17'], ['Z', '4.25']]) await p.getByLabel(`Mechanical-to-CBCT Correction Vector ${axis} [cm]`, { exact: true }).fill(value);
+    assert.deepEqual((await cbct.locator('.qa-shared-field').allTextContents()).slice(0, 3).map((text) => text.replace(/\s+/g, ' ').trim()),
+      ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)'], 'each axis is judged against its own baseline');
+    // The gantry-90 kV/kV block follows at once (2.04), set out like 2.03: its four steps, then its own direction, one list.
+    const kv = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();
+    assert.equal(await kv.locator('.measure-title .measure-n').textContent(), '2.04');
+    assert.equal(await kv.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
+    assert.deepEqual(await kv.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z']);
+    await kv.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_KV, 'Record the correction vector from the isocenter before moving the couch.']);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    // The step after that block belongs to the check below it.
+    const verify = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${VERIFY}: pass`, exact: true }) });
+    assert.equal(await verify.locator('td.qa-n').textContent(), '2.05');
+    await verify.getByRole('button', { name: 'Test details', exact: true }).click();
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_VERIFY, VERIFY]);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    assert.equal(await p.getByLabel('Mechanical-to-CBCT Correction Vector [cm]', { exact: true }).inputValue(), '6.70');
     assert.equal(await offset.locator('tbody .qa-calculation-info').evaluateAll((all) => all.filter((b) => /Insert panels/.test(b.getAttribute('aria-label') || '')).length), 0);
-    for (const axis of ['X', 'Y', 'Z']) assert.equal(await offset.locator('.qa-shared-field', { hasText: `${axis} (cm)` }).getByRole('button', { name: /^Test details/ }).count(), 0, 'an axis does not repeat the group\'s steps');
+    assert.equal(await offset.locator('.qa-shared-field').evaluateAll((fields) => fields.slice(0, 3).filter((f) => f.querySelector('.qa-calculation-info')).length), 0, 'an axis does not repeat the group\'s steps');
     assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, 'nothing scrolls sideways');
 
     // 3. A run records nothing for a direction, and a blank direction never lowers the run's verdict.
@@ -153,7 +183,7 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // A card shows no ⓘ: the name of a test with directions above it opens them.
     await p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${LASERS}: yes`, exact: true }) }).locator('.qa-label strong').click();
-    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_LASERS);
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_LASERS, LASERS]);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await p.setViewportSize({ width: 1600, height: 900 });

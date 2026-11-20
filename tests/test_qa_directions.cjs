@@ -25,7 +25,7 @@ function el(tag, props, ...kids) {
 }
 const opened = [];
 const context = { el, infoPopup: (content, label) => { opened.push({ content, label }); return el('button', { 'aria-label': label }, 'ⓘ'); },
-  QADerived: { read: () => null, encode: (d) => d }, derivedExplanation: () => null, qaStepLabel: () => null };
+  QADerived: { read: () => null, encode: (d) => d }, derivedExplanation: () => null, qaStepLabel: () => null, qaDisplayName: (item) => item.name };
 vm.createContext(context);
 for (const part of [between('const TYPE_LABELS', '\n'), between('// Directions are shown with the test', 'function infoDisclosure('), between('function testDetailsButton(', 'function qaColgroup('),
   between("// A group's directions (an X / Y / Z or per-energy table)", 'function helpText('), between('function helpText(', 'function fitTextarea('),
@@ -40,10 +40,11 @@ const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
 const samples = [...new Set(seed.templates.flatMap((t) => t.checks.map((c) => c.description || '')).filter((d) => !d.includes('[direction:'))), '', 'Plain directions', 'Line one\nline two', 'Source: only a source line'];
 assert.ok(samples.length > 20);
 // The seed's own directions: in the PBS daily list only. The seven setup steps are their section's (after its fields);
-// seven instructions of the next section are for the test below them (the room lasers check; the kV/kV isocenter block;
-// the CBCT correction vector block). Each is a Text item with its tag and no unit.
+// thirteen instructions of the next section are for the test below them (the room lasers check; the kV/kV isocenter
+// block; the CBCT correction vector block; the gantry-90 kV/kV correction vector block; the check after it). Each is a
+// Text item with its tag and no unit.
 const seeded = seed.templates.flatMap((t) => t.checks.filter((c) => (c.description || '').includes('[direction:')).map((c) => ({ ...c, list: t.name })));
-assert.deepEqual(seeded.map((c) => directionKind(c)), ['section', 'section', 'section', 'section', 'section', 'section', 'section', 'next', 'next', 'next', 'next', 'next', 'next', 'next']);
+assert.deepEqual(seeded.map((c) => directionKind(c)), [...Array(7).fill('section'), ...Array(13).fill('next')]);
 for (const c of seeded) {
   assert.equal(c.list, 'PBS DailyQA Template - Sphinx');
   assert.equal(c.unit, undefined);
@@ -54,10 +55,13 @@ const setup = pbs.filter((c) => /\[Section: Setup and Safety\]/.test(c.descripti
 assert.deepEqual(setup.map((c) => directionKind(c)), [null, null, null, null, null, null, null, 'section', 'section', 'section', 'section', 'section', 'section', 'section']);
 const seedNumbers = blockNumbers(pbs);
 assert.deepEqual(setup.filter((c) => !isDirection(c)).map((c) => seedNumbers.get(c.test_id)), ['1.01', '1.02', '1.03', '1.04', '1.05', '1.06', '1.07']);
-const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 17);
-assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', null, null, null, null, null]);
-assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02', '', '', '', '', '2.03', '2.03', '2.03', '2.03', '2.04'],
-  'the lasers check, the kV/kV isocenter block, then the CBCT correction vector block');
+const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 27);
+assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', null, null, null, 'next', null, null]);
+assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02', '', '', '', '', '', '2.03', '2.03', '2.03', '2.03', '', '', '', '', '2.04', '2.04', '2.04', '', '2.05', '2.06'],
+  'the lasers check, the kV/kV isocenter block, the CBCT correction vector block, the kV/kV correction vector block, then the check after it');
+assert.equal(imaging[12].name, 'DO NOT APPLY Correction');
+assert.deepEqual(imaging.slice(21, 24).map((c) => c.name), ['X', 'Y', 'Z'].map((axis) => `Mechanical-to-kV/kV Correction Vector ${axis} [cm]`));
+assert.ok(pbs.every((c) => !/Record the correction vector only/.test(c.description || '')), 'the CBCT block\'s old direction is gone: step 5 says it');
 assert.deepEqual(imaging.filter((c) => !isDirection(c)).slice(1, 9).map((c) => c.name), ['Mechanical-to-kV/kV Isocenter X [cm]', 'Mechanical-to-kV/kV Isocenter Y [cm]', 'Mechanical-to-kV/kV Isocenter Z [cm]', 'Mechanical-to-kV/kV Isocenter [cm]',
   'Mechanical-to-CBCT Correction Vector X [cm]', 'Mechanical-to-CBCT Correction Vector Y [cm]', 'Mechanical-to-CBCT Correction Vector Z [cm]', 'Mechanical-to-CBCT Correction Vector [cm]']);
 // Each block's 3D names its axes as they are now, and the default limits table knows the kV/kV axes by both names.
@@ -69,6 +73,9 @@ for (const c of imaging.filter((x) => /\[derived: /.test(x.description))) {
 assert.deepEqual(seed.pbs_imaging_defaults.map((r) => r.name), ['[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]', '[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]', '[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]',
   'Mechanical-to-kV/kV Isocenter X [cm]', 'Mechanical-to-kV/kV Isocenter Y [cm]', 'Mechanical-to-kV/kV Isocenter Z [cm]']);
 for (const r of seed.pbs_imaging_defaults) assert.deepEqual([r.unit, r.expected, r.warn, r.fail, r.tol_mode], ['cm', 0, 0.15, 0.2, 'absolute'], 'the limits themselves are as they were');
+// The CBCT block's baselines and limits, as Brook gave them (2026-11-20): X −5, Y −1, Z +4.5 cm; Warning ±0.15, Action ±0.2.
+assert.deepEqual(['X', 'Y', 'Z'].map((axis) => { const c = pbs.find((x) => x.name === `Mechanical-to-CBCT Correction Vector ${axis} [cm]`); return [c.expected, c.warn, c.fail, c.tol_mode, c.unit]; }),
+  [[-5, 0.15, 0.2, 'absolute', 'cm'], [-1, 0.15, 0.2, 'absolute', 'cm'], [4.5, 0.15, 0.2, 'absolute', 'cm']]);
 for (const d of samples) for (const [kind, TAG] of Object.entries(TAGS)) {
   const on = withDirectionMark(d, kind);
   assert.equal(directionKind({ type: 'text', description: on }), kind, d);
@@ -145,11 +152,21 @@ const steps = [list[3], list[6]];
 assert.ok(testDetailsButton({ ...list[2], steps }, list, numbers));
 assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
 assert.deepEqual(opened.at(-1).content.kids[1].kids.map((li) => li.text), ['Launch the software.', 'Retract the panel.']);
+// What the test itself says is the last step of the same list: one list, no Directions box beside it.
 assert.ok(testDetailsButton({ ...list[2], steps, description: `${list[2].description} Read the probe.` }, list, numbers));
-assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol', 'div'], 'its own directions follow the steps');
+assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
+assert.deepEqual(opened.at(-1).content.kids[1].kids.map((li) => li.text), ['Launch the software.', 'Retract the panel.', 'Read the probe.']);
+assert.equal(opened.at(-1).content.kids[1].kids[2].props.class, 'qa-step-own');
 assert.ok(performDirections({ ...list[2], steps }, 'Offset [cm]'));
 assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
 assert.equal(opened.at(-1).content.kids[0].text, 'Offset [cm]');
+assert.ok(performDirections({ ...list[2], steps, description: `${list[2].description} Record the vector only.` }, 'Offset [cm]'));
+assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'ol']);
+assert.deepEqual(opened.at(-1).content.kids[1].kids.map((li) => li.text), ['Launch the software.', 'Retract the panel.', 'Record the vector only.']);
+// Without directions above it, a test's own Directions are shown as before.
+assert.ok(performDirections({ ...list[2], description: `${list[2].description} Record the vector only.` }, 'Offset [cm]'));
+assert.deepEqual(opened.at(-1).content.kids.map((k) => k.tag), ['strong', 'div']);
+assert.equal(opened.at(-1).content.kids[1].props.class, 'directions pre');
 
 // 5. The QA form: a direction for the test below waits for that test (item.steps); one for the section, or one with no
 // test below it in its section, goes to the section's ⓘ; none is a row or part of the history request. In a group the
