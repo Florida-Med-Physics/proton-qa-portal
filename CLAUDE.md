@@ -71,6 +71,13 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   names row per section; a group's title is a band with its limits. An X / Y / Z group (and its 3D) is ONE row, the
   axes side by side (Brook, 2026-11-19: "put all in one row"; per-energy groups stay one row per energy). Finish Gantry 1 (GTR1) before expanding to other
   machines. floridaphysics.com sizes these columns by `col[data-col]` in its `site-overrides.css`: keep the keys.
+- **QA form, round 3 (Brook, 2026-11-20):** setup steps that are only instructions are **Directions**, not Yes / No
+  rows: a popout list behind the ⓘ beside the section's title ("instead of things to select yes or no on"). A list
+  item becomes one in Setup QA (Result Type "Direction": a Text item carrying `[direction: section]`, no number, nothing
+  recorded; `isDirection`, `sectionDirections`). The **Columns** box is a small popout under its button (never a
+  window over the page), with ← → to move a column; a heading can be dragged left or right in the table. A group's
+  Warning / Action (and baseline) sit under its black name at the left of the title band, never at the far right.
+  Energy labels sit at the left under the group's name (no wide blank under the name).
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
