@@ -40,10 +40,10 @@ const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
 const samples = [...new Set(seed.templates.flatMap((t) => t.checks.map((c) => c.description || '')).filter((d) => !d.includes('[direction:'))), '', 'Plain directions', 'Line one\nline two', 'Source: only a source line'];
 assert.ok(samples.length > 20);
 // The seed's own directions: in the PBS daily list only. The seven setup steps are their section's (after its fields);
-// three instructions of the next section are for the test below them (the room lasers check; the X / Y / Z offset group).
-// Each is a Text item with its tag and no unit.
+// seven instructions of the next section are for the test below them (the room lasers check; the kV/kV isocenter block;
+// the CBCT correction vector block). Each is a Text item with its tag and no unit.
 const seeded = seed.templates.flatMap((t) => t.checks.filter((c) => (c.description || '').includes('[direction:')).map((c) => ({ ...c, list: t.name })));
-assert.deepEqual(seeded.map((c) => directionKind(c)), ['section', 'section', 'section', 'section', 'section', 'section', 'section', 'next', 'next', 'next']);
+assert.deepEqual(seeded.map((c) => directionKind(c)), ['section', 'section', 'section', 'section', 'section', 'section', 'section', 'next', 'next', 'next', 'next', 'next', 'next', 'next']);
 for (const c of seeded) {
   assert.equal(c.list, 'PBS DailyQA Template - Sphinx');
   assert.equal(c.unit, undefined);
@@ -54,9 +54,21 @@ const setup = pbs.filter((c) => /\[Section: Setup and Safety\]/.test(c.descripti
 assert.deepEqual(setup.map((c) => directionKind(c)), [null, null, null, null, null, null, null, 'section', 'section', 'section', 'section', 'section', 'section', 'section']);
 const seedNumbers = blockNumbers(pbs);
 assert.deepEqual(setup.filter((c) => !isDirection(c)).map((c) => seedNumbers.get(c.test_id)), ['1.01', '1.02', '1.03', '1.04', '1.05', '1.06', '1.07']);
-const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 8);
-assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null]);
-assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02'], 'the lasers check, then the X / Y / Z offset and its 3D');
+const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 17);
+assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null, 'next', 'next', 'next', 'next', null, null, null, null, null]);
+assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02', '', '', '', '', '2.03', '2.03', '2.03', '2.03', '2.04'],
+  'the lasers check, the kV/kV isocenter block, then the CBCT correction vector block');
+assert.deepEqual(imaging.filter((c) => !isDirection(c)).slice(1, 9).map((c) => c.name), ['Mechanical-to-kV/kV Isocenter X [cm]', 'Mechanical-to-kV/kV Isocenter Y [cm]', 'Mechanical-to-kV/kV Isocenter Z [cm]', 'Mechanical-to-kV/kV Isocenter [cm]',
+  'Mechanical-to-CBCT Correction Vector X [cm]', 'Mechanical-to-CBCT Correction Vector Y [cm]', 'Mechanical-to-CBCT Correction Vector Z [cm]', 'Mechanical-to-CBCT Correction Vector [cm]']);
+// Each block's 3D names its axes as they are now, and the default limits table knows the kV/kV axes by both names.
+for (const c of imaging.filter((x) => /\[derived: /.test(x.description))) {
+  const inputs = JSON.parse(decodeURIComponent(/\[derived: ([^\]]+)\]/.exec(c.description)[1])).inputs;
+  assert.deepEqual(inputs.map((i) => i.name), ['X', 'Y', 'Z'].map((axis) => c.name.replace(' [cm]', ` ${axis} [cm]`)));
+  for (const i of inputs) assert.equal(pbs.filter((x) => x.name === i.name && (x.category || '') === i.category && x.type === 'numeric').length, 1, i.name);
+}
+assert.deepEqual(seed.pbs_imaging_defaults.map((r) => r.name), ['[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]', '[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]', '[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]',
+  'Mechanical-to-kV/kV Isocenter X [cm]', 'Mechanical-to-kV/kV Isocenter Y [cm]', 'Mechanical-to-kV/kV Isocenter Z [cm]']);
+for (const r of seed.pbs_imaging_defaults) assert.deepEqual([r.unit, r.expected, r.warn, r.fail, r.tol_mode], ['cm', 0, 0.15, 0.2, 'absolute'], 'the limits themselves are as they were');
 for (const d of samples) for (const [kind, TAG] of Object.entries(TAGS)) {
   const on = withDirectionMark(d, kind);
   assert.equal(directionKind({ type: 'text', description: on }), kind, d);

@@ -94,8 +94,11 @@ const keys = (cols) => J(cols.map((c) => c.key));
   const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
   const steps = seed.templates.find((t) => t.name === 'PBS DailyQA Template - Sphinx').checks.filter((c) => c.type === 'boolean' || c.type === 'status' || /\[direction: (?:section|next)\]/.test(c.description || '')).map((c) => c.name);
   assert.ok(Object.keys(labels).length >= 15);
+  // A step reworded in the seed keeps its label under the earlier wording too, for a list that still carries it.
+  const earlier = ['Visually check that the room lasers align with the BB; offset must be less than 2 mm.'];
+  for (const name of earlier) { assert.ok(Object.hasOwn(labels, name)); assert.ok(!steps.includes(name), `no longer the seed's wording: ${name}`); }
   for (const [name, label] of Object.entries(labels)) {
-    assert.ok(steps.includes(name), `not a step of the PBS daily list: ${name}`);
+    assert.ok(steps.includes(name) || earlier.includes(name), `not a step of the PBS daily list: ${name}`);
     assert.ok(label.length <= 60 && label.length < name.length, `${label}: shorter than its instruction, 60 characters at most`);
     assert.doesNotMatch(label, /null|undefined|\[object/);
   }
@@ -105,6 +108,14 @@ const keys = (cols) => J(cols.map((c) => c.key));
   assert.equal(context.qaStepLabel({ ...step, type: 'numeric' }), null, 'never a measured value');
   assert.equal(context.qaStepLabel({ ...step, name: `${step.name} (edited)` }), null, 'a renamed step shows its own name');
   assert.equal(context.qaDisplayName({ ...step, name: 'toString' }), 'toString', 'only the list\'s own names');
+  // No millimetres in what the PBS daily form shows of its checks: the lasers check reads in cm.
+  const lasers = 'Visually check that the room lasers align with the BB; offset must be less than 0.2 cm.';
+  assert.ok(steps.includes(lasers));
+  assert.equal(labels[lasers], 'Room lasers align with BB (offset < 0.2 cm)');
+  const pbs = seed.templates.find((t) => t.name === 'PBS DailyQA Template - Sphinx').checks;
+  const outsideSphinx = pbs.filter((c) => !/\[Section: Sphinx Measurements\]/.test(c.description || ''));
+  assert.equal(outsideSphinx.length, 51);
+  for (const c of outsideSphinx) { assert.doesNotMatch(c.name, /\bmm\b/, c.name); assert.notEqual(c.unit, 'mm', c.name); assert.doesNotMatch((c.description || '').replace(/\[derived: [^\]]+\]/, ''), /\bmm\b/, c.name); }
   assert.equal(context.qaDisplayName({ type: 'boolean', category: 'HDR treatment-day QA', name: 'Video system operational' }), 'Video system', 'HDR names as before');
   // The instruction itself stays one click away: the details box of a labelled step carries the full name.
   assert.match(between('function testDetailsButton(', 'function qaColgroup('), /const step=!calculation&&!!qaStepLabel\(item\);/);
