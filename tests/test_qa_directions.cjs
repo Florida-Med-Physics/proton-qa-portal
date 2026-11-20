@@ -39,6 +39,24 @@ const TAGS = { section: '[direction: section]', next: '[direction: next]' };
 const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
 const samples = [...new Set(seed.templates.flatMap((t) => t.checks.map((c) => c.description || '')).filter((d) => !d.includes('[direction:'))), '', 'Plain directions', 'Line one\nline two', 'Source: only a source line'];
 assert.ok(samples.length > 20);
+// The seed's own directions: in the PBS daily list only. The seven setup steps are their section's (after its fields);
+// three instructions of the next section are for the test below them (the room lasers check; the X / Y / Z offset group).
+// Each is a Text item with its tag and no unit.
+const seeded = seed.templates.flatMap((t) => t.checks.filter((c) => (c.description || '').includes('[direction:')).map((c) => ({ ...c, list: t.name })));
+assert.deepEqual(seeded.map((c) => directionKind(c)), ['section', 'section', 'section', 'section', 'section', 'section', 'section', 'next', 'next', 'next']);
+for (const c of seeded) {
+  assert.equal(c.list, 'PBS DailyQA Template - Sphinx');
+  assert.equal(c.unit, undefined);
+  assert.match(c.description, /^Template \d\.\d+[a-z]?\. \[Section: (Setup and Safety|Mechanical and Imaging)\] \[direction: (section|next)\]$/);
+}
+const pbs = seed.templates.find((t) => t.name === 'PBS DailyQA Template - Sphinx').checks.map((c, i) => ({ ...c, test_id: i + 1 }));
+const setup = pbs.filter((c) => /\[Section: Setup and Safety\]/.test(c.description || ''));
+assert.deepEqual(setup.map((c) => directionKind(c)), [null, null, null, null, null, null, null, 'section', 'section', 'section', 'section', 'section', 'section', 'section']);
+const seedNumbers = blockNumbers(pbs);
+assert.deepEqual(setup.filter((c) => !isDirection(c)).map((c) => seedNumbers.get(c.test_id)), ['1.01', '1.02', '1.03', '1.04', '1.05', '1.06', '1.07']);
+const imaging = pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).slice(0, 8);
+assert.deepEqual(imaging.map((c) => directionKind(c)), ['next', null, 'next', 'next', null, null, null, null]);
+assert.deepEqual(imaging.map((c) => seedNumbers.get(c.test_id) || ''), ['', '2.01', '', '', '2.02', '2.02', '2.02', '2.02'], 'the lasers check, then the X / Y / Z offset and its 3D');
 for (const d of samples) for (const [kind, TAG] of Object.entries(TAGS)) {
   const on = withDirectionMark(d, kind);
   assert.equal(directionKind({ type: 'text', description: on }), kind, d);

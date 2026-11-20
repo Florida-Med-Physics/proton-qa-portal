@@ -38,7 +38,9 @@ Share with `--host 0.0.0.0`.
 - GTR1, GTR2, GTR5 — Proton gantry. Daily list = `PBS DailyQA Template - Sphinx` (six spots with the myQA TG-224
   references and Warning/Action limits; Sphinx `.xls` auto-fill); monthly list = `Monthly QA template – Proton
   gantry (TG-224)` from the boss's GTR5 monthly worksheet (floridaphysics repo). The TG-224 daily template is kept
-  but not scheduled. GTR5's exports carry nine spots; only six are on the list (open question).
+  but not scheduled. Ten instruction-only steps of the daily list are directions in the seed (Brook, 2026-11-20: the
+  seven setup steps of Setup and Safety; three in Mechanical and Imaging for the test below them); an existing
+  install switches them in Setup QA. GTR5's exports carry nine spots; only six are on the list (open question).
 - Eyeline GTR4 — Proton eyeline. One `Eyeline Daily QA` list (PDD / Output (partial) / Imaging / Safety).
 - TrueBeam — Linac (daily per Penn list + `SRS QA – TrueBeam` as needed). Linac 1 (Elekta Synergy), Ethos.
 - Big Bore CT (7064) — CT simulator. MRI Sim — MRI simulator (placeholder).
