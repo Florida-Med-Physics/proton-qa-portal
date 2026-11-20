@@ -1925,3 +1925,9 @@ td, .measure-table td { font-size: 21px; }
 .section > .measure-block > .measure-title { background:none; border-bottom:0; padding-bottom:0; }
 .section > .measure-block > .measure-title strong { font-size:22px; }   /* as a test's name */
 .section > .measure-block > .measure-title .qa-limits { margin-bottom:2px; }
+
+/* A titled block is one test, so all of it is marked while the pointer is on any part of it: its name line as well as
+   its rows (Brook, 2026-11-20). In a block of several rows (per energy) the row under the pointer is a shade stronger. */
+.section > .measure-block:has(> .measure-title):hover > .measure-title,
+.section > .measure-block:has(> .measure-title):hover .measure-table tbody tr > td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.section > .measure-block:has(> .measure-title):hover .measure-table:not(.axis-table) tbody tr[data-qa-entry]:hover > td { background: var(--surface-2); }
