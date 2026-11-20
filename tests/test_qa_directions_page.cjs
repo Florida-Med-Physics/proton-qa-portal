@@ -20,12 +20,12 @@ const BEFORE_LASERS = ['Use the hand pendant → Set-up to align PPS, gantry and
 const BEFORE_OFFSET = ['Insert panels A and B.', 'Capture kV/kV images and align finely to the center of the BB image. Record the offset below, then move the couch to correct it.'];
 const BEFORE_CBCT = ['At TCS, move the couch to X = −5 cm, Y = −1 cm, Z = +4.5 cm.', 'Retract panel A before CBCT.', 'Acquire the CBCT image using a half scan in the clockwise direction.',
   'Use Auto to obtain the correction vector. Manually realign if the offset differs substantially from the reference.', 'DO NOT APPLY Correction'];
-// The four before the gantry-90 kV/kV block, and the one after it (for the check below it).
+// The six before the gantry-90 kV/kV block: it ends with recording the vector and then applying the correction.
 const BEFORE_KV = ['In MOSAIQ, select the Daily QA field; the planned gantry angle should be 90°.', 'On the virtual hand pendant, choose Treatment → Gantry and move to 90°, or use Go to.',
-  'Insert panel A for kV/kV imaging.', 'Acquire kV/kV images and use Auto 3 to align, or manually align to the isocenter.'];
-const BEFORE_VERIFY = ['Apply the recorded correction vector and move the couch.'];
+  'Insert panel A for kV/kV imaging.', 'Acquire kV/kV images and use Auto 3 to align, or manually align to the isocenter.',
+  'Record the correction vector from the isocenter before moving the couch.', 'Apply the recorded correction vector and move the couch.'];
 const VERIFY = 'Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.';
-const BELOW = [...BEFORE_LASERS, ...BEFORE_OFFSET, ...BEFORE_CBCT, ...BEFORE_KV, ...BEFORE_VERIFY];
+const BELOW = [...BEFORE_LASERS, ...BEFORE_OFFSET, ...BEFORE_CBCT, ...BEFORE_KV];
 const LASERS = 'Visually check that the room lasers align with the BB; offset must be less than 0.2 cm.';
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -70,7 +70,7 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     const numbered = await rows.evaluateAll((all) => all.map((r) => r.querySelector('.inline-test-name > strong')?.textContent).filter(Boolean).slice(0, 8));
     assert.deepEqual(numbered, ['1.01:', '1.02:', '1.03:', '1.04:', '1.05:', '1.06:', '1.07:', '2.01:']);
     const below = await tests(BELOW);
-    assert.equal(below.length, 13);
+    assert.equal(below.length, 14);
     for (const t of below) { assert.equal(t.type, 'text'); assert.match(t.description, /\[Section: Mechanical and Imaging\].*\[direction: next\]/); }
     for (const name of BELOW) {
       const row = await rowOf(name);
@@ -152,13 +152,19 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     assert.equal(await kv.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
     assert.deepEqual(await kv.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z']);
     await kv.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
-    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_KV, 'Record the correction vector from the isocenter before moving the couch.']);
+    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_KV, 'six steps: the last two record the vector, then apply the correction');
+    assert.equal(await dialog.locator('.directions').count(), 0);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    // The step after that block belongs to the check below it.
+    // The same baselines and limits as 2.03, each axis judged against its own.
+    assert.equal(await kv.locator('.measure-title .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
+    for (const [axis, value] of [['X', '-5.05'], ['Y', '-1.17'], ['Z', '4.25']]) await p.getByLabel(`Mechanical-to-kV/kV Correction Vector ${axis} [cm]`, { exact: true }).fill(value);
+    assert.deepEqual((await kv.locator('.qa-shared-field').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()), ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)']);
+    // The check after the block has no step above it now: its ⓘ is its own instruction, as before.
     const verify = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${VERIFY}: pass`, exact: true }) });
     assert.equal(await verify.locator('td.qa-n').textContent(), '2.05');
     await verify.getByRole('button', { name: 'Test details', exact: true }).click();
-    assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), [...BEFORE_VERIFY, VERIFY]);
+    assert.equal(await dialog.locator('ol.qa-steps').count(), 0);
+    assert.equal(await dialog.locator('.qa-step-text').textContent(), VERIFY);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     assert.equal(await p.getByLabel('Mechanical-to-CBCT Correction Vector [cm]', { exact: true }).inputValue(), '6.70');
     assert.equal(await offset.locator('tbody .qa-calculation-info').evaluateAll((all) => all.filter((b) => /Insert panels/.test(b.getAttribute('aria-label') || '')).length), 0);

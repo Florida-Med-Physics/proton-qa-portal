@@ -2058,11 +2058,27 @@ window.PORTAL_SEED = {
      "description": "Template 2.50. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
+     "name": "Record the correction vector from the isocenter before moving the couch.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 2.50b. [Section: Mechanical and Imaging] [direction: next]"
+    },
+    {
+     "name": "Apply the recorded correction vector and move the couch.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 2.70. [Section: Mechanical and Imaging] [direction: next]"
+    },
+    {
      "name": "Mechanical-to-kV/kV Correction Vector X [cm]",
      "category": "AI_PBS_Daily_Imaging",
      "type": "numeric",
      "unit": "cm",
-     "description": "Template 2.60x. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch.",
+     "expected": -5,
+     "tol_mode": "absolute",
+     "description": "Template 2.60x. [Section: Mechanical and Imaging]",
+     "warn": 0.15,
+     "fail": 0.2,
      "_previous_name": "[kV/kV - Gantry 90°] Correction vector X [cm]"
     },
     {
@@ -2070,7 +2086,11 @@ window.PORTAL_SEED = {
      "category": "AI_PBS_Daily_Imaging",
      "type": "numeric",
      "unit": "cm",
-     "description": "Template 2.60y. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch.",
+     "expected": -1,
+     "tol_mode": "absolute",
+     "description": "Template 2.60y. [Section: Mechanical and Imaging]",
+     "warn": 0.15,
+     "fail": 0.2,
      "_previous_name": "[kV/kV - Gantry 90°] Correction vector Y [cm]"
     },
     {
@@ -2078,14 +2098,12 @@ window.PORTAL_SEED = {
      "category": "AI_PBS_Daily_Imaging",
      "type": "numeric",
      "unit": "cm",
-     "description": "Template 2.60z. [Section: Mechanical and Imaging] Record the correction vector from the isocenter before moving the couch.",
+     "expected": 4.5,
+     "tol_mode": "absolute",
+     "description": "Template 2.60z. [Section: Mechanical and Imaging]",
+     "warn": 0.15,
+     "fail": 0.2,
      "_previous_name": "[kV/kV - Gantry 90°] Correction vector Z [cm]"
-    },
-    {
-     "name": "Apply the recorded correction vector and move the couch.",
-     "category": "Mechanical and Safety",
-     "type": "text",
-     "description": "Template 2.70. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "name": "Acquire another kV/kV image to verify BB alignment at the isocenter. Manually realign if needed.",
