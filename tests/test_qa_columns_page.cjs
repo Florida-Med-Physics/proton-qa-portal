@@ -17,7 +17,9 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     const headings = () => p.locator('.measure-table').first().locator('thead tr').first().locator('th').evaluateAll((cells) => cells.filter((c) => c.getClientRects().length).map((c) => c.textContent));
     const firstRow = () => p.locator('.measure-table tbody tr[data-qa-entry]').first().evaluate((row) => [...row.children].filter((c) => c.getClientRects().length).map((c) => c.className.split(' ').find((n) => /^(qa-|history-cell)/.test(n))));
     const dialog = p.locator('dialog[open]');
-    const columns = async (act) => { await p.getByRole('button', { name: 'Columns', exact: true }).click(); await dialog.waitFor(); await act(); await dialog.getByRole('button', { name: 'Done', exact: true }).click(); await p.waitForTimeout(150); };
+    // The Columns box: a small box under its button, open while `act` runs.
+    const box = p.locator('.qa-columns-pop');
+    const columns = async (act) => { await p.getByRole('button', { name: 'Columns', exact: true }).click(); await box.waitFor(); await act(); await box.getByRole('button', { name: 'Done', exact: true }).click(); await box.waitFor({ state: 'detached' }); await p.waitForTimeout(150); };
 
     // 1. The QA form starts with Baseline, Measured, then Result, and without History; one names row per section.
     await open(`#/perform/${list}`);
@@ -33,9 +35,9 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.equal(await p.locator('.measure-title .qa-sub').count(), 0);
     await p.getByRole('button', { name: 'Protocol', exact: true }).click();
     assert.match(await dialog.textContent(), /Protocol/); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    const instruction = 'Please remove the range shifter to prevent collisions and beam delivery.';
-    const step = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${instruction}: yes`, exact: true }) });
-    assert.equal(await step.locator('.qa-label strong').textContent(), 'Remove the range shifter');
+    const instruction = 'Acquire the CBCT image using a half scan in the clockwise direction.';
+    const step = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: `${instruction}: pass`, exact: true }) });
+    assert.equal(await step.locator('.qa-label strong').textContent(), 'Acquire CBCT (half scan, clockwise)');
     assert.equal(await step.locator('.qa-label strong').getAttribute('title'), instruction);
     await step.getByRole('button', { name: 'Test details', exact: true }).click();
     assert.ok((await dialog.textContent()).includes(instruction), 'the instruction, word for word'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
@@ -51,6 +53,8 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     const offset = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'PPS 2 XRAY Offset' }) }).first();
     assert.equal(await offset.locator('tr[data-qa-entry]').count(), 1);
     assert.match(await offset.locator('.measure-title').textContent(), /Baseline 0 cm · Warning ±0\.15 cm · Action ±0\.2 cm$/, 'what the axes share is in the title');
+    const [groupName, groupLimits] = [await offset.locator('.measure-title strong').boundingBox(), await offset.locator('.measure-title .qa-limits').boundingBox()];
+    assert.ok(groupLimits.y >= groupName.y + groupName.height - 2 && Math.abs(groupLimits.x - groupName.x) <= 2, 'under the group\'s name, at the left');
     for (const [axis, value] of [['X', '0.05'], ['Y', '0.17'], ['Z', '-0.25']]) await p.getByLabel(`[Ortho - kV/kV] PPS 2 XRAY Offset ${axis} [cm]`, { exact: true }).fill(value);
     assert.deepEqual((await offset.locator('.qa-shared-field').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()),
       ['X (cm)PASS(Δ +0.05 cm)', 'Y (cm)WARNING(Δ +0.17 cm)', 'Z (cm)ACTION(Δ −0.25 cm)', '3D (cm)ⓘRecorded(Δ +0.31 cm)']);
@@ -60,19 +64,34 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.equal(await offset.locator('table').evaluate((table) => table.querySelector('tr.quick-trend td').colSpan + 1 === table.querySelectorAll('colgroup col').length), true, 'its quick trend spans the columns beside the number');
     assert.equal(await p.getByLabel('How Sphinx imports work', { exact: true }).count(), 1);
 
-    // 3. The Columns box: show History, move Result ahead of Measured, hide Unit. What was typed stays.
+    // 3. The Columns box: small, under its button, and the page stays in use behind it. Show History, move Result left
+    // of Measured, hide Unit. What was typed stays.
     const temperature = p.getByLabel('Chamber Temperature, °C', { exact: true });
     await temperature.fill('22.4');
     await columns(async () => {
-      await dialog.getByRole('checkbox', { name: 'History', exact: true }).check();
-      await dialog.getByRole('button', { name: 'Move earlier: Result', exact: true }).click();
-      await dialog.getByRole('button', { name: 'Move earlier: Result', exact: true }).click();
-      await dialog.getByRole('checkbox', { name: 'Unit', exact: true }).uncheck();
-      assert.equal(await dialog.getByRole('checkbox', { name: 'Measured', exact: true }).isDisabled(), true, 'Measured always shows');
-      assert.equal(await dialog.getByRole('checkbox', { name: 'Result', exact: true }).isDisabled(), true, 'Result always shows');
+      const [pop, button] = [await box.boundingBox(), await p.getByRole('button', { name: 'Columns', exact: true }).boundingBox()];
+      assert.ok(pop.width <= 300 && pop.height <= 400, `a small box: ${pop.width} x ${pop.height}`);
+      assert.ok(pop.y >= button.y + button.height && Math.abs(pop.x + pop.width - (button.x + button.width)) <= 2, 'under its button');
+      assert.equal(await p.locator('dialog[open]').count(), 0, 'not a window over the page');
+      assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).getAttribute('aria-expanded'), 'true');
+      assert.deepEqual(await box.locator('li label').allTextContents(), ['Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note', 'Trend'], 'top to bottom is left to right');
+      await box.getByRole('checkbox', { name: 'History', exact: true }).check();
+      await box.getByRole('button', { name: 'Move left: Result', exact: true }).click();
+      assert.equal(await p.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Move left: Result', 'the arrow just used keeps the keyboard');
+      await box.getByRole('button', { name: 'Move left: Result', exact: true }).click();
+      await box.getByRole('checkbox', { name: 'Unit', exact: true }).uncheck();
+      assert.equal(await box.getByRole('checkbox', { name: 'Measured', exact: true }).isDisabled(), true, 'Measured always shows');
+      assert.equal(await box.getByRole('checkbox', { name: 'Result', exact: true }).isDisabled(), true, 'Result always shows');
+      assert.equal(await box.getByRole('button', { name: 'Move left: Baseline', exact: true }).isDisabled(), true, 'nothing left of the first');
     });
     const chosen = ['#', 'Test', 'Baseline', 'Result', 'Measured', 'History', 'Note', 'Trend'];
     assert.deepEqual(await headings(), chosen);
+    assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).getAttribute('aria-expanded'), 'false');
+    // Escape and a click elsewhere close it too.
+    await p.getByRole('button', { name: 'Columns', exact: true }).click(); await box.waitFor();
+    await p.keyboard.press('Escape'); await box.waitFor({ state: 'detached' });
+    await p.getByRole('button', { name: 'Columns', exact: true }).click(); await box.waitFor();
+    await p.locator('.page-head h1').click(); await box.waitFor({ state: 'detached' });
     assert.deepEqual(await firstRow(), ['qa-n', 'qa-label', 'qa-baseline', 'qa-result', 'qa-measured', 'history-cell', 'qa-comment', 'qa-trends']);
     assert.equal(await temperature.inputValue(), '22.4', 'nothing typed is lost');
     assert.equal(await p.locator('.measure-table').first().locator('colgroup col').count(), chosen.length, 'as many widths as columns');
@@ -85,16 +104,49 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     await open(`#/runs/${run}`);
     assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note', 'Trend']);
     assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).count(), 1);
-    await columns(async () => { await dialog.getByRole('checkbox', { name: 'Trend', exact: true }).uncheck(); });
+    await columns(async () => { await box.getByRole('checkbox', { name: 'Trend', exact: true }).uncheck(); });
     assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note']);
     // Reset: the page's own columns again.
     await open(`#/perform/${list}`);
     assert.deepEqual(await headings(), chosen, 'the QA form kept its own');
-    await columns(async () => { await dialog.getByRole('button', { name: 'Reset', exact: true }).click(); });
+    await columns(async () => { await box.getByRole('button', { name: 'Reset', exact: true }).click(); });
+    const usual = ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'Note', 'Trend'];
+    assert.deepEqual(await headings(), usual);
+
+    // A heading dragged left or right moves its column on every table of the page, and the choice is kept. Dropped on
+    // the left half of a heading it lands before it, on the right half after it; # and Test stay first.
+    const heading = (key) => p.locator('.measure-table').first().locator(`tr.qa-col-names th[data-col="${key}"]`);
+    const drag = async (key, onto, side) => { const target = await heading(onto).boundingBox(); await heading(key).dragTo(heading(onto), { targetPosition: { x: side === 'left' ? 4 : target.width - 4, y: target.height / 2 } }); await p.waitForTimeout(150); };
+    assert.equal(await heading('result').getAttribute('draggable'), 'true');
+    assert.equal(await heading('test').getAttribute('draggable'), null, 'Test stays where it is');
+    assert.equal(await heading('n').getAttribute('draggable'), null);
+    await temperature.fill('22.4');
+    await drag('result', 'baseline', 'left');
+    assert.deepEqual(await headings(), ['#', 'Test', 'Result', 'Baseline', 'Measured', 'Unit', 'Note', 'Trend']);
+    assert.deepEqual(await firstRow(), ['qa-n', 'qa-label', 'qa-result', 'qa-baseline', 'qa-measured', 'qa-unit', 'qa-comment', 'qa-trends'], 'the rows follow their headings');
+    await drag('result', 'unit', 'right');
     assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'Note', 'Trend']);
+    await drag('trends', 'test', 'right');
+    assert.deepEqual(await headings(), ['#', 'Test', 'Trend', 'Baseline', 'Measured', 'Unit', 'Result', 'Note'], 'dropped on Test: first after it');
+    assert.equal(await temperature.inputValue(), '22.4', 'nothing typed is lost');
+    assert.equal(await p.locator('.qa-drop-before, .qa-drop-after, .qa-col-dragging').count(), 0, 'no marks left behind');
+    assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+    // Every table moved, a hidden column kept its place (History, between Result and Note), and the box shows the order.
+    const orders = await p.locator('.measure-table').evaluateAll((tables) => [...new Set(tables.filter((t) => !t.querySelector('td.qa-shared-cell')).map((t) => [...t.querySelectorAll('tr.qa-col-names th')].map((th) => th.dataset.col).join(' ')))]);
+    assert.deepEqual(orders, ['n test trends baseline measured unit result history comment'], 'one order on every table');
+    await columns(async () => {
+      assert.deepEqual(await box.locator('li label').allTextContents(), ['Trend', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note']);
+      // A heading dragged while the box is open (one the box does not cover): the box follows.
+      await drag('measured', 'baseline', 'left');
+      assert.deepEqual(await box.locator('li label').allTextContents(), ['Trend', 'Measured', 'Baseline', 'Unit', 'Result', 'History', 'Note']);
+    });
+    await p.reload(); await p.waitForSelector('.measure-table'); await p.waitForTimeout(200);
+    assert.deepEqual(await headings(), ['#', 'Test', 'Trend', 'Measured', 'Baseline', 'Unit', 'Result', 'Note'], 'kept for next time');
+    await columns(async () => { await box.getByRole('button', { name: 'Reset', exact: true }).click(); });
+    assert.deepEqual(await headings(), usual);
 
     // 4. A phone's cards are as before: no Columns button, each row its test, answer and verdict.
-    await columns(async () => { await dialog.getByRole('checkbox', { name: 'Baseline', exact: true }).uncheck(); });
+    await columns(async () => { await box.getByRole('checkbox', { name: 'Baseline', exact: true }).uncheck(); });
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(200);
     assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).isVisible(), false);
     // (A row with nothing to judge leaves its empty Result out, as before; the temperature typed above has a verdict.)
@@ -109,6 +161,6 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.ok((await dialog.textContent()).includes(instruction), 'on a phone the label opens the instruction'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
     assert.deepEqual(errors, []);
-    console.log('QA columns on the page: new default order without History; one names row per section; instructions behind ⓘ and Protocol; the Columns box shows, hides, reorders, keeps what was typed and is remembered per page; Reset; phone cards unchanged.');
+    console.log('QA columns on the page: new default order without History; one names row per section; instructions behind ⓘ and Protocol; the Columns box is a small box under its button that shows, hides, moves left and right, keeps what was typed and is remembered per page; a heading dragged left or right moves its column on every table; Reset; phone cards unchanged.');
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exit(1); });

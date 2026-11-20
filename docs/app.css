@@ -1844,13 +1844,24 @@ td, .measure-table td { font-size: 21px; }
 /* A names row collapsed under a table with the same columns (qaHeadings) takes no room at all: the QA form's one
    reading size is set with !important on every element, so the size is taken away here by a stronger rule. */
 #app .measure-table tr.qa-col-names.repeat > th { font-size:0 !important; }
-.qa-columns-dialog { min-width:min(420px, 92vw); }
-.qa-columns-list { list-style:none; margin:8px 0 16px; padding:0; }
-.qa-columns-list li { display:flex; align-items:center; gap:10px; padding:6px 2px; border-bottom:1px solid var(--border); cursor:grab; }
-.qa-columns-list li:last-child { border-bottom:0; }
-.qa-columns-list .check { margin:0; font-size:18px; }
-.qa-columns-list .icon-btn { min-width:40px; min-height:40px; }
+/* The Columns box: small, under its button (qaColumnsButton). */
+.qa-columns-wrap { position:relative; display:inline-flex; }
+.qa-columns-pop { position:absolute; top:calc(100% + 6px); right:0; z-index:40; width:272px; max-width:calc(100vw - 24px); padding:8px 12px 10px;
+  color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 30px rgba(20, 30, 50, 0.22); }
+.qa-columns-pop.from-left { right:auto; left:0; }
+.qa-columns-list { list-style:none; margin:0; padding:0; }
+.qa-columns-list li { display:flex; align-items:center; gap:6px; padding:1px 0; }
+.qa-columns-list .check { margin:0; font-size:16px; }
+.qa-columns-pop .qa-columns-list .icon-btn { min-width:32px; min-height:32px; padding:0; }
 .qa-columns-list .icon-btn:disabled { opacity:0.3; }
+.qa-columns-pop p { margin:6px 0 8px; }
+.qa-columns-pop .row { align-items:center; }
+.qa-columns-pop .row button { min-height:34px; }
+/* A column's heading is dragged left or right to move the column (qaHeadingDrag); a bar shows where it will land. */
+.measure-table tr.qa-col-names > th[draggable="true"] { cursor:grab; }
+.measure-table tr.qa-col-names > th.qa-col-dragging { opacity:0.45; }
+.measure-table tr.qa-col-names > th.qa-drop-before { box-shadow:inset 3px 0 0 var(--accent); }
+.measure-table tr.qa-col-names > th.qa-drop-after { box-shadow:inset -3px 0 0 var(--accent); }
 .qa-completion-tools .spacer { flex:1; }
 
 /* A step's instruction, word for word, in its details box; its short label opens it too (the ⓘ is not on a phone's card). */
@@ -1858,7 +1869,7 @@ td, .measure-table td { font-size: 21px; }
 .qa-step-name { cursor:help; }
 @media (max-width: 1200px) {
   .qa-step-name { text-decoration:underline dotted; text-underline-offset:4px; }
-  .qa-columns-button { display:none; }   /* a phone's cards have no columns to choose */
+  .qa-columns-button, .qa-columns-pop { display:none; }   /* a phone's cards have no columns to choose */
 }
 
 /* One table per section. The tables of a section join into one: the first names the columns (qaHeadings), and a
@@ -1872,7 +1883,7 @@ td, .measure-table td { font-size: 21px; }
 .measure-title strong { display:inline; }
 .section > .measure-block > .measure-title strong { font-size:19px; }
 .measure-title .qa-calculation-info { margin-top:0; }
-.measure-title .qa-limits { margin:0 0 0 auto; }
+.measure-title .qa-limits { flex-basis:100%; margin:0; }   /* under the group's name, at the left (Brook, 2026-11-20) */
 
 /* Import measurements: its name, its ⓘ and the file box on one row. */
 .qa-import > .row { flex-wrap:wrap; gap:8px 14px; align-items:center; }
@@ -1886,3 +1897,12 @@ td, .measure-table td { font-size: 21px; }
 .qa-axis-row .qa-shared-name { color:var(--text); font-weight:600; }
 .qa-axis-row .qa-shared-unit { color:var(--muted); font-weight:400; }
 .qa-axis-history + .qa-axis-history { margin-top:6px; }
+
+/* A section's directions: the ⓘ beside the section's title opens them as a numbered list (sectionDirections). */
+.section > summary .qa-section-info { display:inline-flex; margin-right:auto; }
+.qa-section-info .qa-calculation-info { margin-top:0; }
+.qa-steps { margin:8px 0 16px; padding-left:1.7em; }
+.qa-steps li { margin:0 0 10px; font-size:18px; line-height:1.45; }
+.qa-step-more { margin-top:2px; font-size:15px; color:var(--muted); white-space:pre-wrap; }
+/* Setup QA: a direction has no number; an ⓘ stands in its place. */
+.direction-tag { flex:0 0 auto; color:var(--accent); font-weight:600; }

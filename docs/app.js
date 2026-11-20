@@ -356,7 +356,7 @@ function qaLimitsLine(limits, unit) {
   return parts.length ? el("span", { class: "qa-limits" }, parts.join(" · ")) : null;
 }
 
-const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived" };
+const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass / warning / fail", text: "Text", choice: "Multiple choice", derived: "Derived", direction: "Direction: section", direction_next: "Direction: test below" };
 
 // "(Δ +0.30 mm)" in plain text after the Result chip (the chip carries the colour): the difference from the reference,
 // sign always shown, unit after the number. Nothing when there is no reference or no value.
@@ -1397,6 +1397,20 @@ const DEFAULT_MARK = /\[default: ([^\]]+)\]\s*/;         // "[default: Therapist
 // "[row: with above]" (Setup QA: "Same row as the test above"): the test is drawn on the row of the test above it, on the
 // QA form and a saved run, and has no number of its own (blockNumbers). The first test of a list or section ignores it.
 const ROW_MARK = /\[row: with above\]/;
+// A direction (Setup QA: Result Type "Direction: …") is not a test but an instruction, shown behind an ⓘ on the QA form:
+//   "[direction: next]"     for the test below it: behind that test's ⓘ, or its group's (X / Y / Z, per energy). Several
+//                           directions in a row above one test are its steps, in the list's order;
+//   "[direction: section]"  for its section: listed behind the ⓘ beside the section's title. A direction for the test
+//                           below with no test below it in its section is listed there too.
+// Nothing is entered or recorded for one, and it has no number (blockNumbers). It is kept as a Text item, which records
+// nothing while it has no answer, so saving and judging a run are as before. Only a Text item is ever a direction: a
+// test of another type that somehow carries the tag is still drawn and answered, since a run would hold a blank result
+// for it.
+const DIRECTION_MARK = /\[direction: (section|next)\]/;
+const directionKind = (item) => (item && item.type === "text" ? (DIRECTION_MARK.exec(item.description || "") || [])[1] || null : null);
+const isDirection = (item) => !!directionKind(item);
+const directionType = (item) => ({ section: "direction", next: "direction_next" })[directionKind(item)] || null;   // as a Result Type
+const typeLabel = (t) => TYPE_LABELS[directionType(t) || t.type];
 const sectionNameOf = (item) => { const m = SECTION_NAME.exec(item.description || ""); return m ? m[1] : null; };
 function infoDisclosure(content,label='Test information',open=false) {
   return el('details',{class:'qa-info',open},el('summary',{title:label,'aria-label':label},el('span',{'aria-hidden':'true'},'i')),el('div',{class:'qa-info-content'},content));
@@ -1444,7 +1458,8 @@ const qaStepLabel = (item) => (item.type === "boolean" || item.type === "status"
 // A test's name as the QA form and a saved run show it. A step's short label carries its instruction on hover and opens
 // it on a click, like the ⓘ beside it (`details`, testDetailsButton), which a phone's card does not show.
 function qaTestName(item, shown, details) {
-  return qaStepLabel(item) ? el("strong", { class: "qa-step-name", title: item.name, onclick: () => details?.click() }, shown) : el("strong", {}, shown);
+  const more = qaStepLabel(item) ? item.name : item.steps && item.steps.length ? "Directions" : null;   // a test with directions above it opens them the same way
+  return more ? el("strong", { class: "qa-step-name", title: more, onclick: () => details?.click() }, shown) : el("strong", {}, shown);
 }
 function qaDisplayName(item) {
   if(item.category!=='HDR treatment-day QA')return qaStepLabel(item)||item.name;
@@ -1519,7 +1534,39 @@ function qaColumns(view = 'perform', sharedRows = false) {
 }
 function qaHeaders(first='Test') {
   return QA_COLUMNS.map(c=>{const title=c.key==='test'?first:c.title;
-    return el('th',{scope:'col',title,'aria-label':title,'data-col':c.key},c.key==='test'?first:c.label||c.title);});
+    return el('th',{scope:'col',title,'aria-label':title,'data-col':c.key,...qaHeadingDrag(c)},c.key==='test'?first:c.label||c.title);});
+}
+// A column's heading can be dragged left or right onto another heading: its column moves there on every table of the
+// page and stays there (the choice the Columns box keeps). # and Test stay first; dropped on Test, a column becomes the
+// first after it. The Columns box moves a column with its ← and → for anyone who cannot drag.
+function qaHeadingDrag(c) {
+  if (c.key === 'n') return {};
+  const viewOf = (th) => th.closest('table')?.dataset.qaView || 'perform';
+  const clear = () => document.querySelectorAll('.qa-col-dragging, .qa-drop-before, .qa-drop-after').forEach((x) => x.classList.remove('qa-col-dragging', 'qa-drop-before', 'qa-drop-after'));
+  const target = {
+    ondragover: (event) => {
+      const key = qaHeadingDrag.key;
+      if (!key || key === c.key) return;
+      event.preventDefault();
+      const th = event.currentTarget, box = th.getBoundingClientRect(), after = !!c.pinned || event.clientX > box.left + box.width / 2;
+      th.classList.toggle('qa-drop-after', after);
+      th.classList.toggle('qa-drop-before', !after);
+    },
+    ondragleave: (event) => event.currentTarget.classList.remove('qa-drop-before', 'qa-drop-after'),
+    ondrop: (event) => {
+      const key = qaHeadingDrag.key;
+      if (!key || key === c.key) return;
+      event.preventDefault();
+      const th = event.currentTarget, view = viewOf(th), after = th.classList.contains('qa-drop-after');
+      qaHeadingDrag.key = null;
+      clear();
+      const first = qaColumns(view).all.find((x) => !x.pinned && x.key !== key);
+      if (!c.pinned) moveQaColumn(view, key, c.key, after); else if (first) moveQaColumn(view, key, first.key, false);
+    },
+  };
+  return c.pinned ? target : { draggable: 'true', ...target,
+    ondragstart: (event) => { qaHeadingDrag.key = c.key; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label || c.title); event.currentTarget.classList.add('qa-col-dragging'); },   // (Firefox starts a drag only with data set)
+    ondragend: () => { qaHeadingDrag.key = null; clear(); } };
 }
 // History's dates, in a row of their own under the column names.
 function qaDatesRow(slots) {
@@ -1530,7 +1577,8 @@ function testDetailsButton(item,items,numbers) {
   const directions=calculation?null:helpText(item.description);
   // A step whose name is its instruction shows a short label (qaDisplayName); the instruction is here, in full.
   const step=!calculation&&!!qaStepLabel(item);
-  return calculation||directions||step?infoPopup(calculation||el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),directions),calculation?'Calculation details':'Test details'):null;
+  const steps=directionsList(item.steps);   // the directions above it in the list (Setup QA: "Direction: test below")
+  return calculation||directions||step||steps?infoPopup(calculation?el('div',{},steps,calculation):el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),steps,directions),calculation?'Calculation details':'Test details'):null;
 }
 function qaColgroup(table,shown,count=0) {
   let cols=[...table.children].find(x=>x.tagName==='COLGROUP');
@@ -1607,49 +1655,77 @@ function qaHeadings(blocks) {
     above = block.dataset.cols;
   }
 }
-// The Columns box: which columns show, and in what order. A change applies at once to every QA table on the page.
-function qaColumnsButton(view) {
-  return el('button', { type: 'button', class: 'qa-columns-button', 'aria-haspopup': 'dialog', title: 'Show, hide and reorder columns', onclick: () => qaColumnsDialog(view) }, 'Columns');
+// The columns as a person arranges them. A change applies at once to every QA table on the page; nothing is drawn again,
+// so what has been typed stays. `order` null: back to the page's own columns.
+function applyQaColumns(view, order, hidden = []) {
+  saveQaColumnChoice(view, order ? { order, hidden } : null);
+  document.querySelectorAll('.measure-table').forEach((table) => layoutQaTable(table));
+  document.querySelectorAll('.card.section').forEach((box) => qaHeadings(box.querySelectorAll('.measure-block')));
+  if (applyQaColumns.redraw) applyQaColumns.redraw();   // the open Columns box shows the new order
 }
-function qaColumnsDialog(view) {
-  const list = el('ul', { class: 'qa-columns-list' });
-  let dragged = null;
-  const apply = (order, hidden, focus) => {
-    saveQaColumnChoice(view, order ? { order, hidden } : null);
-    document.querySelectorAll('.measure-table').forEach((table) => layoutQaTable(table));
-    document.querySelectorAll('.card.section').forEach((box) => qaHeadings(box.querySelectorAll('.measure-block')));
+// Moves a column to just before or after another in the person's order (hidden columns keep their places).
+function moveQaColumn(view, key, target, after) {
+  const movable = qaColumns(view).all.filter((c) => !c.pinned), order = movable.map((c) => c.key).filter((k) => k !== key), at = order.indexOf(target);
+  if (at < 0 || order.length === movable.length) return;
+  order.splice(at + (after ? 1 : 0), 0, key);
+  applyQaColumns(view, order, movable.filter((c) => c.off).map((c) => c.key));
+}
+// The Columns box: a small box under its button, with a tick for each column and ← → to move one left or right. A
+// heading can also be dragged in the table itself (qaHeadingDrag), and the box follows. Done, Escape or a click elsewhere closes it.
+function qaColumnsButton(view) {
+  let box = null;
+  const button = el('button', { type: 'button', class: 'qa-columns-button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', title: 'Show, hide and move columns',
+    onclick: () => (box ? close(false) : open()) }, 'Columns');
+  const wrap = el('span', { class: 'qa-columns-wrap' }, button);
+  const outside = (event) => { if (!wrap.contains(event.target) && !event.target.closest?.('tr.qa-col-names')) close(false); };   // (a heading may be dragged with the box open)
+  const escape = (event) => { if (event.key === 'Escape') { event.stopPropagation(); close(true); } };
+  const close = (focus) => {
+    if (!box) return;
+    box.remove();
+    box = null;
+    applyQaColumns.redraw = null;
+    document.removeEventListener('pointerdown', outside, true);
+    document.removeEventListener('keydown', escape, true);
+    button.setAttribute('aria-expanded', 'false');
+    if (focus) button.focus();
+  };
+  const open = () => {
+    const list = el('ul', { class: 'qa-columns-list' });
+    let focus = null;   // what was last used, found again after the list is redrawn
+    const draw = () => {
+      const movable = qaColumns(view).all.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
+      list.replaceChildren(...movable.map((c, i) => {
+        const show = el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null,
+          onchange: () => { focus = `li[data-col="${c.key}"] input`; applyQaColumns(view, keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]); } });
+        const move = (by, label, sign) => el('button', { type: 'button', class: 'icon-btn', 'data-move': by, disabled: i + by < 0 || i + by >= movable.length || null,
+          title: label, 'aria-label': `${label}: ${c.label}`,
+          onclick: () => { const next = keys.filter((k) => k !== c.key); next.splice(i + by, 0, c.key); focus = `li[data-col="${c.key}"] button[data-move="${by}"]:not(:disabled), li[data-col="${c.key}"] button:not(:disabled)`; applyQaColumns(view, next, hidden); } }, sign);
+        return el('li', { 'data-col': c.key }, el('label', { class: 'check', title: c.always ? 'Always shown' : null }, show, c.label), el('span', { class: 'spacer' }),
+          move(-1, 'Move left', '←'), move(1, 'Move right', '→'));
+      }));
+      if (focus) list.querySelector(focus)?.focus();
+      focus = null;
+    };
+    box = el('div', { class: 'qa-columns-pop', role: 'dialog', 'aria-label': 'Columns' }, list,
+      el('p', { class: 'muted small' }, 'Or drag a heading.'),
+      el('div', { class: 'row' }, el('button', { type: 'button', class: 'small', onclick: () => applyQaColumns(view, null) }, 'Reset'), el('span', { class: 'spacer' }),
+        el('button', { type: 'button', class: 'small primary', onclick: () => close(true) }, 'Done')));
+    wrap.append(box);
+    applyQaColumns.redraw = draw;
     draw();
-    if (focus) (list.querySelector(`li[data-col="${focus[0]}"] button[data-move="${focus[1]}"]:not(:disabled)`) || list.querySelector(`li[data-col="${focus[0]}"] button:not(:disabled)`))?.focus();
+    if (box.getBoundingClientRect().left < 8) box.classList.add('from-left');   // a button near the left edge: open to the right of it
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape, true);
+    button.setAttribute('aria-expanded', 'true');
+    list.querySelector('input:not(:disabled)')?.focus();
   };
-  const draw = () => {
-    const movable = qaColumns(view).all.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
-    const place = (key, at) => { const next = keys.filter((k) => k !== key); next.splice(at, 0, key); return next; };
-    list.replaceChildren(...movable.map((c, i) => {
-      const show = el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null,
-        onchange: () => apply(keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]) });
-      const move = (by, label, sign) => el('button', { type: 'button', class: 'icon-btn', 'data-move': by, disabled: i + by < 0 || i + by >= movable.length || null,
-        title: label, 'aria-label': `${label}: ${c.label}`, onclick: () => apply(place(c.key, i + by), hidden, [c.key, by]) }, sign);
-      return el('li', { 'data-col': c.key, draggable: 'true',
-        ondragstart: (event) => { dragged = c.key; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label); },   // (Firefox starts a drag only with data set)
-        ondragover: (event) => { if (dragged && dragged !== c.key) event.preventDefault(); },
-        ondrop: (event) => { event.preventDefault(); if (dragged && dragged !== c.key) apply(place(dragged, i), hidden); dragged = null; } },
-        el('label', { class: 'check' }, show, c.label), c.always ? el('span', { class: 'muted small' }, 'Always shown') : null,
-        el('span', { class: 'spacer' }), move(-1, 'Move earlier', '↑'), move(1, 'Move later', '↓'));
-    }));
-  };
-  const dialog = el('dialog', { class: 'calculation-dialog qa-columns-dialog' }, el('h2', {}, 'Columns'),
-    el('p', { class: 'muted small' }, '# and Test stay first. Kept on this computer.'), list,
-    el('div', { class: 'row' }, el('button', { type: 'button', onclick: () => apply(null) }, 'Reset'), el('span', { class: 'spacer' }),
-      el('button', { type: 'button', class: 'primary', onclick: () => dialog.close() }, 'Done')));
-  dialog.addEventListener('close', () => dialog.remove());
-  document.body.append(dialog);
-  draw();
-  dialog.showModal();
+  return wrap;
 }
 // A group's directions (an X / Y / Z or per-energy table): behind the ⓘ beside its title. `name`: the title.
 function performDirections(item,name){
   const text=QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description);
-  return text?infoPopup(el('div',{},el('strong',{},name),text),'Test details'):null;
+  const steps=directionsList(item.steps);   // the directions above the group in the list
+  return text||steps?infoPopup(el('div',{},el('strong',{},name),steps,text),'Test details'):null;
 }
 // Directions as plain words (no template number or markers), to tell whether two tests carry the same ones.
 const directionsText=(item)=>helpText(item.description)?.lastChild?.textContent||'';
@@ -1657,7 +1733,7 @@ const directionsText=(item)=>helpText(item.description)?.lastChild?.textContent|
 function helpText(description, { inline = false } = {}) {
   description=(description||'').replace(/(?:^|\n)\s*Source:[^\n]*/g,'');
   if (!description || description.startsWith("Measured by Sphinx")) return null;
-  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row): [^\]]+\]\s*/g, "").trim();
+  const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row|direction): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
   if (inline) {                                        // a quiet one-liner under the test name; the whole text on hover
     const one = text.replace(/\s+/g, " ");
@@ -1667,7 +1743,7 @@ function helpText(description, { inline = false } = {}) {
 }
 
 // Directions as people read and edit them, apart from the markers GatorQA keeps in the same field: the template
-// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device|row: …] and Source lines.
+// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device|row|direction: …] and Source lines.
 // Editing the text in the list editor keeps every marker exactly as it was.
 function directionsParts(description) {
   let d = description || "";
@@ -1675,7 +1751,7 @@ function directionsParts(description) {
   const prefix = num ? num[0].trim() : "";
   if (num) d = d.slice(num[0].length);
   const tags = [], sources = [];
-  for (const re of [new RegExp(SECTION_NAME.source, "g"), new RegExp(MARKER.source, "g"), new RegExp(DEFAULT_MARK.source, "g"), /\[(?:choices|excel|rule|derived|device|row): [^\]]+\]/g])
+  for (const re of [new RegExp(SECTION_NAME.source, "g"), new RegExp(MARKER.source, "g"), new RegExp(DEFAULT_MARK.source, "g"), /\[(?:choices|excel|rule|derived|device|row|direction): [^\]]+\]/g])
     d = d.replace(re, (m) => { tags.push(m.trim()); return " "; });
   d = d.replace(/(?:^|\n)\s*Source:[^\n]*/g, (m) => { sources.push(m.trim()); return ""; });
   return { prefix, tags, sources, text: d.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim() };
@@ -1688,6 +1764,29 @@ function joinDirections(parts, text) {
 function withRowMark(description, on) {
   const d = (description || "").replace(/ ?\[row: with above\]/g, ""), at = d.search(/\n\s*Source:/);
   return !on ? d : !d ? "[row: with above]" : at < 0 ? `${d} [row: with above]` : `${d.slice(0, at)} [row: with above]${d.slice(at)}`;
+}
+// Setup QA's Result Type "Direction: …" sets the tag ("section" or "next") or, with nothing, removes it; the rest of
+// the field stays as it was.
+function withDirectionMark(description, kind) {
+  const d = (description || "").replace(/ ?\[direction: (?:section|next)\]/g, ""), at = d.search(/\n\s*Source:/);
+  const tag = kind ? `[direction: ${kind === "next" ? "next" : "section"}]` : "";
+  return !tag ? d : !d ? tag : at < 0 ? `${d} ${tag}` : `${d.slice(0, at)} ${tag}${d.slice(at)}`;
+}
+// The test form's Type "Direction: …" is saved as a Text item carrying the tag; any other type drops the tag.
+function testFormData(data) {
+  const kind = { direction: "section", direction_next: "next" }[data.type] || null;
+  return { ...data, type: kind ? "text" : data.type, description: withDirectionMark(data.description, kind) };
+}
+// Directions as a numbered list, word for word, in the list's order. A direction's own Directions text, when it has
+// any, follows it in smaller print.
+function directionsList(steps) {
+  return steps && steps.length ? el("ol", { class: "qa-steps" }, steps.map((s) => el("li", {}, s.name, directionsText(s) ? el("div", { class: "qa-step-more" }, directionsText(s)) : null))) : null;
+}
+// A section's directions, behind the ⓘ beside the section's title on the QA form.
+function sectionDirections(steps, title) {
+  if (!steps.length) return null;
+  // In a section's title a click also folds the section: this button only opens its box.
+  return el("span", { class: "qa-section-info", onclick: (event) => event.preventDefault() }, infoPopup(directionsList(steps), `Directions: ${title}`));
 }
 function fitTextarea(box) { box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`; }
 
@@ -1749,7 +1848,7 @@ function blockNumbers(items) {
   const next = (item) => { const n = sectionNumber(item); counter[n] = (counter[n] || 0) + 1; return `${n}.${String(counter[n]).padStart(2, "0")}`; };
   const box = (item) => sectionNameOf(item) || item.category || "";      // the section card a test is drawn in
   const bySection = new Map();
-  for (const it of items) { const n = sectionNumber(it); if (!bySection.has(n)) bySection.set(n, []); bySection.get(n).push(it); }
+  for (const it of items) { if (isDirection(it)) continue; const n = sectionNumber(it); if (!bySection.has(n)) bySection.set(n, []); bySection.get(n).push(it); }
   for (const list of bySection.values()) {
     const families = new Map();
     for (const it of list) {
@@ -1936,7 +2035,7 @@ async function renderPerform(assignmentId) {
     return;
   }
   // The form shows at most the newest 60 points of each of its own tests (History: newest 3 dates; quick trend: 60).
-  const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends?tests=${t.items.map((i) => i.test_id).join(",")}&last=60`).catch(() => ({})) : {};
+  const history = t.items.some((i) => i.type === "numeric") ? await api("GET", `/api/machines/${t.machine.id}/trends?tests=${t.items.filter((i) => !isDirection(i)).map((i) => i.test_id).join(",")}&last=60`).catch(() => ({})) : {};
   page(`${t.machine.name} · ${t.queue.name}`, t.assignment.schedule);
   app.querySelector(".page-head").classList.add("sticky-head");        // the machine and list stay in view while scrolling
   // The protocol opens from a button in the tools row: one click away, and the first test starts higher on the screen.
@@ -1990,12 +2089,16 @@ async function renderPerform(assignmentId) {
   };
   const named = t.items.some((i) => sectionNameOf(i));
   const numbers = blockNumbers(t.items);
-  const byCategory = new Map();
+  const byCategory = new Map(), directionsOf = new Map(), waiting = new Map();   // a section's tests, its directions (sectionDirections), and those waiting for the test below them
   for (const item of t.items) {
     const key = named ? `${sectionNumber(item)}|${sectionNameOf(item) || ""}` : `${sectionNumber(item)}|${item.category || "General"}`;
     if (!byCategory.has(key)) byCategory.set(key, []);
-    byCategory.get(key).push(item);
+    const kind = directionKind(item);
+    if (kind === "next") { if (!waiting.has(key)) waiting.set(key, []); waiting.get(key).push(item); }
+    else if (kind) { if (!directionsOf.has(key)) directionsOf.set(key, []); directionsOf.get(key).push(item); }
+    else { item.steps = waiting.get(key)?.length ? waiting.get(key) : null; waiting.delete(key); byCategory.get(key).push(item); }   // its ⓘ lists them (testDetailsButton, performDirections)
   }
+  for (const [key, left] of waiting) directionsOf.set(key, [...(directionsOf.get(key) || []), ...left]);   // no test below them: the section's
   const sectionCategories = new Map();
   for (const key of byCategory.keys()) {
     const [n, category] = key.split("|");
@@ -2108,7 +2211,7 @@ async function renderPerform(assignmentId) {
           return has(p, "expected") ? el("span", { class: "qa-limits" }, [`Baseline ${refCell(p.it, "")}`, line?.textContent].filter(Boolean).join(" · ")) : line;   // the unit is in the name
         };
         // On an X / Y / Z row a field is named for its axis; its ⓘ shows only a calculation or directions of its own.
-        const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(p.it, t.items, numbers) : null);
+        const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(axisRow ? { ...p.it, steps: null } : p.it, t.items, numbers) : null);
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
         const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" ? p.unit : "", details(p), p.control,
           has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
@@ -2123,7 +2226,7 @@ async function renderPerform(assignmentId) {
         noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         // In a group the directions are beside its title; a row repeats them only when its own differ. A calculation keeps its ⓘ.
-        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(it, t.items, numbers) : null;
+        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(firstHeader === "Test" ? it : { ...it, steps: null }, t.items, numbers) : null;
         // The quick trend: this test's; on an X / Y / Z row, every axis (and the 3D), one under another.
         const trended = axisRow ? parts.filter((p) => p.it.type === "numeric") : [main];
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
@@ -2238,7 +2341,7 @@ async function renderPerform(assignmentId) {
     }
     flush();
     const summary = el("span", { class: "section-summary" });
-    const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, categoryLabel(category)), summary), rows);
+    const box = el("details", { class: "card section", open: true }, el("summary", {}, el("strong", {}, categoryLabel(category)), sectionDirections(directionsOf.get(key) || [], categoryLabel(category)), summary), rows);
     sections.push({
       box, heading, entries, section,
       refresh() {
@@ -2247,7 +2350,7 @@ async function renderPerform(assignmentId) {
         const left = req.filter((e) => !e.status()).length;
         const bad = s.filter((x) => x === "fail").length;
         const warn = s.filter((x) => x === "warn").length;
-        summary.replaceChildren(...present([left ? `${left} to do` : "All done",
+        summary.replaceChildren(...present([left ? `${left} to do` : entries.length ? "All done" : null,
           bad ? [" · ", chip("fail", `${bad} action`)] : null, warn ? [" · ", chip("warn", `${warn} warning`)] : null]));
       },
       settled() {
@@ -3037,7 +3140,7 @@ async function renderQueueEditor(id) {
       const lastInFamily = family && family[family.length - 1].item === item;
       const groupHead = firstInFamily ? el("tr", { class: "group" }, el("td", { colspan: 6 }, el("strong", {}, `${numbers.get(item.test_id)}: ${axis.base}`))) : null;
       const familyDirections = family
-        ? (firstInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
+        ? (firstInFamily ? [...new Set(family.map((x) => (byId[x.item.test_id].description || "").replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row|direction): [^\]]+\]\s*/g, "").trim()).filter(Boolean))].map((text) => helpText(text)) : "")
         : null;
       // Directions sit above their test. In the editor they are edited in place, like the name and category;
       // the markers kept in the same field are not shown and are kept as they were. Sphinx-measured tests keep
@@ -3069,13 +3172,13 @@ async function renderQueueEditor(id) {
       return [head, family ? dirRow : null, groupHead, family ? null : dirRow, el("tr", { class: `compact${family ? " grouped-axis-row" : ""}${dirRow && !family ? " after-directions" : ""}`, ...dragProps(index), draggable: editable && !valuesFor ? "true" : null },
         el("td", { class: "item-cell" }, el("div", { class: "name-with-edit" },
           editable ? el("span", { class: "drag-handle", title: "Drag to reorder" }, "⠿") : null,
-          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : null, sameRow,
+          editable && !valuesFor ? el("div", { class: "inline-test-name" }, number ? el("strong", {}, `${number}:`) : isDirection(t) ? el("span", { class: "direction-tag", title: directionKind(t) === "next" ? "A direction: shown behind the ⓘ of the test below it on the QA form. Nothing is recorded." : "A direction: listed behind the ⓘ beside its section's title on the QA form. Nothing is recorded." }, "ⓘ") : null, sameRow,
             el("textarea", { rows: 1, value: t.name, "aria-label": `Test name: ${t.id}`, oninput: e => { editDefinition('name', e.target.value); e.target.style.height='auto';e.target.style.height=`${e.target.scrollHeight}px`; } }))
             : el("strong", {}, family ? "" : number ? `${number}: ` : "", family ? axis.axis : shortName), valuesFor && !baseIds.has(item.test_id) ? el("span", { class: "muted small" }, `${machineName(valuesFor)} only`) : null, machineToleranceHelp(t,item), addDirections)),
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
-        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type, { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : TYPE_LABELS[t.type]),
+        el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], directionType(t)||(QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type), { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; const kind={direction:'section',direction_next:'next'}[e.target.value]; if(isDirection(t)&&!kind)editDefinition('description',withDirectionMark(t.description,null)); if(kind){t.type='text';t.description=withDirectionMark(QADerived.encode(t.description,null),kind);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'text',description:t.description,derived:null});markDirty();draw();return;} if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'&&!isDirection(t)?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : typeLabel(t)),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
-          : el("span", { class: "muted" }, t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
+          : el("span", { class: "muted" }, isDirection(t) ? "Not recorded" : t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
@@ -3083,7 +3186,7 @@ async function renderQueueEditor(id) {
             { disabled: !editable, onchange: (e) => { target.tol_mode = e.target.value; draw(); } }),el('button',{type:'button',class:'small machine-tolerances-button',title:'Machine-Specific Tolerances','aria-label':`Machine-Specific Tolerances: ${t.name}`,onclick:()=>showMachineTolerances(t,item)},'Machines'))) : el("span", { class: "muted" }, "—")),
         el("td", {}, editable ? el("div", { class: "row nowrap row-actions" },
           el("button", { type: "button", class: "small edit-test", title: "Edit all of this test's settings", "aria-label": `Edit test: ${t.name}`, onclick: () => modal(`Edit ${t.name}`, el("div", {}, testForm(t,items.slice(0,index).map(x=>byId[x.test_id])), m.modified_at ? el("p", { class: "small muted" }, `Last Modified: ${m.modified_at.slice(0, 16).replace("T", " ")}${m.modified_by ? " · " + m.modified_by : ""}`) : null), async (data) => {
-            await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+            await api("PUT", `/api/tests/${t.id}`, { ...testFormData(data), owner_queue_id: t.owner_queue_id });
             toast("Test saved");
             route();
           }) }, "✎ Edit"),
@@ -3167,7 +3270,7 @@ async function renderQueueEditor(id) {
     el("p", { class: "muted small" }, "Default limits apply to all machines. Select a machine above to set its own limits; blank fields use the defaults."));
   if (editable) {
     const newCheck = el("button", { disabled: isNew, title: isNew ? "Save the list first" : "", onclick: () => { if (valuesFor && dirty) { toast("Save your limits before adding a test.", true); return; } modal("New test for this list", testForm(null,items.map(x=>byId[x.test_id])), async (data) => {
-      const r = await api("POST", "/api/tests", { ...data, owner_queue_id: Number(id) });
+      const r = await api("POST", "/api/tests", { ...testFormData(data), owner_queue_id: Number(id) });
       if (valuesFor) {
         const refreshed = await request("GET", "/api/tests");   // a step of this save (see api)
         const created = refreshed.find((t) => t.id === r.id); tests.push(created); byId[r.id] = created;
@@ -3331,7 +3434,7 @@ function arithmeticDerivedEditor(rule,prior,onChange,formMode=false) {
 
 function testForm(test,prior=[]) {
   const t = test || { type: "numeric", tol_mode: "absolute", active: 1 };
-  const type = select("type", Object.entries(TYPE_LABELS), QADerived.read(t.description)?'derived':t.type);
+  const type = select("type", Object.entries(TYPE_LABELS), directionType(t)||(QADerived.read(t.description)?'derived':t.type));
   const limits = el("div", { class: "form-grid wide" },
     field("Unit", el("input", { name: "unit", value: t.unit || "", placeholder: "mm, %, cGy, °" })),
     field("Expected value", el("input", { name: "expected", type: "number", step: "any", value: t.expected ?? "" })),
@@ -3364,12 +3467,12 @@ async function renderTests() {
   const holder = el("div", { class: "stack" });
   const shortName = (t) => t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
   const edit = (t) => editable ? () => modal(`Edit ${t.name}`, testForm(t), async (data) => {
-    await api("PUT", `/api/tests/${t.id}`, { ...data, owner_queue_id: t.owner_queue_id });
+    await api("PUT", `/api/tests/${t.id}`, { ...testFormData(data), owner_queue_id: t.owner_queue_id });
     toast("Test saved");
     route();
   }) : null;
   const limitCells = (t) => [
-    el("td", { class: "muted" }, t.type === "numeric" ? "Measured" : TYPE_LABELS[t.type]),
+    el("td", { class: "muted" }, t.type === "numeric" ? "Measured" : typeLabel(t)),
     el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.expected)} ${t.unit}`.trim() : ""),
     el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.warn)}${t.tol_mode === "percent" ? " %" : ""}` : ""),
     el("td", { class: "num" }, t.type === "numeric" ? `${fmt(t.fail)}${t.tol_mode === "percent" ? " %" : ""}` : ""),
@@ -3401,7 +3504,7 @@ async function renderTests() {
       return;
     }
     // Flat: one table sorted by the chosen column, with the QA list shown on every row.
-    const keys = { name: (t) => shortName(t), category: (t) => t.category || "General", type: (t) => TYPE_LABELS[t.type] };
+    const keys = { name: (t) => shortName(t), category: (t) => t.category || "General", type: (t) => typeLabel(t) };
     const key = keys[sortPick.value];
     const sorted = shown.slice().sort((a, b) => key(a).localeCompare(key(b)) || (a.owner_name || "").localeCompare(b.owner_name || "") || shortName(a).localeCompare(shortName(b)));
     holder.replaceChildren(table(["Test", "QA list", "Category", "Type", "#Expected", "#Warning ±", "#Action ±", ""], sorted.map((t) =>

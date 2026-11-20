@@ -1842,55 +1842,50 @@
     {
      "category": "Safety",
      "name": "Please connect the power cord and the chamber cable to the electrometer (DOSE-X) in the control room, then turn on the electrometer.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 1.08. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.08. [Section: Setup and Safety] [direction: section]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please log in to the 'MOSAIQ2' computer and launch the myQA software.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 1.09. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.09. [Section: Setup and Safety] [direction: section]"
     },
     {
      "name": "Place the H-index 3 bar at step 3.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 1.09b. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.09b. [Section: Setup and Safety] [direction: section]"
     },
     {
      "category": "Safety",
      "name": "Please setup the Sphinx (index: H3) and move the couch BARS to the patient's right side to prevent potential collision during CBCT.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 1.10. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.10. [Section: Setup and Safety] [direction: section]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please remove the range shifter to prevent collisions and beam delivery.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 1.11. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.11. [Section: Setup and Safety] [direction: section]"
     },
     {
      "category": "A tip for the next procedure",
      "name": "Please connect the chamber cable in the treatment room.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 1.12. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.12. [Section: Setup and Safety] [direction: section]"
     },
     {
      "name": "Send the daily QA chart for this gantry from MOSAIQ to TCS and accept it at TCS.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 1.13. [Section: Setup and Safety]"
+     "type": "text",
+     "description": "Template 1.13. [Section: Setup and Safety] [direction: section]"
     },
     {
      "name": "Use the hand pendant → Set-up to align PPS, gantry and snout automatically at the isocenter, one at a time.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.00. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.00. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "category": "Mechanical and Safety",
@@ -1903,14 +1898,14 @@
     {
      "name": "Insert panels A and B.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.02a. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.02a. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "name": "Capture kV/kV images and align finely to the center of the BB image. Record the offset below, then move the couch to correct it.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.02b. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 2.02b. [Section: Mechanical and Imaging] [direction: next]"
     },
     {
      "category": "Mechanical and Safety",

@@ -38,7 +38,9 @@ Share with `--host 0.0.0.0`.
 - GTR1, GTR2, GTR5 — Proton gantry. Daily list = `PBS DailyQA Template - Sphinx` (six spots with the myQA TG-224
   references and Warning/Action limits; Sphinx `.xls` auto-fill); monthly list = `Monthly QA template – Proton
   gantry (TG-224)` from the boss's GTR5 monthly worksheet (floridaphysics repo). The TG-224 daily template is kept
-  but not scheduled. GTR5's exports carry nine spots; only six are on the list (open question).
+  but not scheduled. Ten instruction-only steps of the daily list are directions in the seed (Brook, 2026-11-20: the
+  seven setup steps of Setup and Safety; three in Mechanical and Imaging for the test below them); an existing
+  install switches them in Setup QA. GTR5's exports carry nine spots; only six are on the list (open question).
 - Eyeline GTR4 — Proton eyeline. One `Eyeline Daily QA` list (PDD / Output (partial) / Imaging / Safety).
 - TrueBeam — Linac (daily per Penn list + `SRS QA – TrueBeam` as needed). Linac 1 (Elekta Synergy), Ethos.
 - Big Bore CT (7064) — CT simulator. MRI Sim — MRI simulator (placeholder).
@@ -71,6 +73,17 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   names row per section; a group's title is a band with its limits. An X / Y / Z group (and its 3D) is ONE row, the
   axes side by side (Brook, 2026-11-19: "put all in one row"; per-energy groups stay one row per energy). Finish Gantry 1 (GTR1) before expanding to other
   machines. floridaphysics.com sizes these columns by `col[data-col]` in its `site-overrides.css`: keep the keys.
+- **QA form, round 3 (Brook, 2026-11-20):** setup steps that are only instructions are **Directions**, not Yes / No
+  rows: a popout list behind the ⓘ beside the section's title ("instead of things to select yes or no on"), or
+  behind the ⓘ of the test or group below them ("2.01 should be the instructions for Room lasers, and 2.03 and 2.04
+  … for Mechanical-to-kV/kV Imaging Isocenter"). A list item becomes one in Setup QA (Result Type "Direction:
+  section" / "Direction: test below": a Text item carrying `[direction: section]` / `[direction: next]`, no number,
+  nothing recorded; `directionKind`, `sectionDirections`, `item.steps`). Still asked for, not built: blocks with
+  their tests in Setup QA, and a test's ⓘ citing its report (TG-224, TG-142, TG-198, MPPG 8.a/8.b): never guess a
+  citation; Brook or the reviewing physicist supplies it. The **Columns** box is a small popout under its button (never a
+  window over the page), with ← → to move a column; a heading can be dragged left or right in the table. A group's
+  Warning / Action (and baseline) sit under its black name at the left of the title band, never at the far right.
+  Energy labels sit at the left under the group's name (no wide blank under the name).
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in

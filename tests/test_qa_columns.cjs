@@ -82,8 +82,9 @@ const keys = (cols) => J(cols.map((c) => c.key));
 }
 
 // 6. PBS daily steps: a short label on the QA form and a saved run, for Pass / Fail and Yes / No steps only, and only
-// while the test still carries the instruction as its name. Every labelled instruction is a step of the seed list, so
-// a reworded step cannot keep an old label unnoticed.
+// while the test still carries the instruction as its name. Every labelled instruction is a step of the seed list (a
+// test, or a direction: a list that still has the step as a test shows its label), so a reworded step cannot keep an old
+// label unnoticed.
 {
   const context = {};
   vm.createContext(context);
@@ -91,7 +92,7 @@ const keys = (cols) => J(cols.map((c) => c.key));
     + '\nthis.QA_STEP_LABELS = QA_STEP_LABELS; this.qaStepLabel = qaStepLabel; this.qaDisplayName = qaDisplayName;', context);
   const labels = J(context.QA_STEP_LABELS);
   const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
-  const steps = seed.templates.find((t) => t.name === 'PBS DailyQA Template - Sphinx').checks.filter((c) => c.type === 'boolean' || c.type === 'status').map((c) => c.name);
+  const steps = seed.templates.find((t) => t.name === 'PBS DailyQA Template - Sphinx').checks.filter((c) => c.type === 'boolean' || c.type === 'status' || /\[direction: (?:section|next)\]/.test(c.description || '')).map((c) => c.name);
   assert.ok(Object.keys(labels).length >= 15);
   for (const [name, label] of Object.entries(labels)) {
     assert.ok(steps.includes(name), `not a step of the PBS daily list: ${name}`);
