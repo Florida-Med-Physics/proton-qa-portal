@@ -209,7 +209,7 @@ assert.match(perform, /testDetailsButton\(firstHeader === "Test" \? it : \{ \.\.
 assert.match(perform, /required: item\.type !== "text"/, 'a Text item is never required');
 const editor = between('async function renderQueueEditor(', 'function testForm(');
 assert.match(editor, /const kind=\{direction:'section',direction_next:'next'\}\[e\.target\.value\]; if\(isDirection\(t\)&&!kind\)editDefinition\('description',withDirectionMark\(t\.description,null\)\); if\(kind\)\{t\.type='text';t\.description=withDirectionMark\(QADerived\.encode\(t\.description,null\),kind\);testUpdates\.set\(t\.id,\{\.\.\.\(testUpdates\.get\(t\.id\)\|\|\{\}\),type:'text',description:t\.description,derived:null\}\);/);
-assert.equal((source.match(/\.\.\.testFormData\(data\)/g) || []).length, 3, 'every test form saves through testFormData');
+assert.equal((source.match(/\.\.\.testFormData\(data\)/g) || []).length, 4, 'every test form saves through testFormData (a section\'s ＋ Test too)');
 
 // 6. Both builds record nothing for a Text item without an answer, so a direction never reaches a run's results.
 assert.match(fs.readFileSync('docs/local-backend.js', 'utf8'), /String\(value\)\.trim\(\) === ""\) \{ if \(item\.type !== "text"\) rows\.push\(/);

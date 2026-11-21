@@ -17,9 +17,10 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     const headings = () => p.locator('.measure-table').first().locator('thead tr').first().locator('th').evaluateAll((cells) => cells.filter((c) => c.getClientRects().length).map((c) => c.textContent));
     const firstRow = () => p.locator('.measure-table tbody tr[data-qa-entry]').first().evaluate((row) => [...row.children].filter((c) => c.getClientRects().length).map((c) => c.className.split(' ').find((n) => /^(qa-|history-cell)/.test(n))));
     const dialog = p.locator('dialog[open]');
-    // The Columns box: a small box under its button, open while `act` runs.
+    // The Column Chooser: a small window, opened from its button, open while `act` runs.
     const box = p.locator('.qa-columns-pop');
-    const columns = async (act) => { await p.getByRole('button', { name: 'Columns', exact: true }).click(); await box.waitFor(); await act(); await box.getByRole('button', { name: 'Done', exact: true }).click(); await box.waitFor({ state: 'detached' }); await p.waitForTimeout(150); };
+    const chooser = p.getByRole('button', { name: 'Column Chooser', exact: true });
+    const columns = async (act) => { await chooser.click(); await box.waitFor(); await act(); await box.getByRole('button', { name: 'Close', exact: true }).click(); await box.waitFor({ state: 'detached' }); await p.waitForTimeout(150); };
 
     // 1. The QA form starts with Baseline, Measured, then Result, and without History; one names row per section.
     await open(`#/perform/${list}`);
@@ -96,16 +97,17 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
       assert.equal(same, true, `${first} and ${second} share a row`);
     }
 
-    // 3. The Columns box: small, under its button, and the page stays in use behind it. Show History, move Result left
+    // 3. The Column Chooser: small, opening under its button, and the page stays in use behind it. Show History, move Result left
     // of Measured, hide Unit. What was typed stays.
     const temperature = p.getByLabel('Chamber Temperature, °C', { exact: true });
     await temperature.fill('22.4');
     await columns(async () => {
-      const [pop, button] = [await box.boundingBox(), await p.getByRole('button', { name: 'Columns', exact: true }).boundingBox()];
-      assert.ok(pop.width <= 300 && pop.height <= 400, `a small box: ${pop.width} x ${pop.height}`);
+      const [pop, button] = [await box.boundingBox(), await chooser.boundingBox()];
+      assert.ok(pop.width <= 300 && pop.height <= 500, `a small window: ${pop.width} x ${pop.height}`);
       assert.ok(pop.y >= button.y + button.height && Math.abs(pop.x + pop.width - (button.x + button.width)) <= 2, 'under its button');
       assert.equal(await p.locator('dialog[open]').count(), 0, 'not a window over the page');
-      assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).getAttribute('aria-expanded'), 'true');
+      assert.equal(await chooser.getAttribute('aria-expanded'), 'true');
+      assert.equal(await box.locator('.qa-columns-title strong').textContent(), 'Column Chooser');
       assert.deepEqual(await box.locator('li label').allTextContents(), ['Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note', 'Trend'], 'top to bottom is left to right');
       await box.getByRole('checkbox', { name: 'History', exact: true }).check();
       await box.getByRole('button', { name: 'Move left: Result', exact: true }).click();
@@ -118,12 +120,14 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     });
     const chosen = ['#', 'Test', 'Baseline', 'Result', 'Measured', 'History', 'Note', 'Trend'];
     assert.deepEqual(await headings(), chosen);
-    assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).getAttribute('aria-expanded'), 'false');
-    // Escape and a click elsewhere close it too.
-    await p.getByRole('button', { name: 'Columns', exact: true }).click(); await box.waitFor();
+    assert.equal(await chooser.getAttribute('aria-expanded'), 'false');
+    // Escape closes it too, and so does its button; a click elsewhere does not: it stays open while the form is used.
+    await chooser.click(); await box.waitFor();
     await p.keyboard.press('Escape'); await box.waitFor({ state: 'detached' });
-    await p.getByRole('button', { name: 'Columns', exact: true }).click(); await box.waitFor();
-    await p.locator('.page-head h1').click(); await box.waitFor({ state: 'detached' });
+    await chooser.click(); await box.waitFor();
+    await p.locator('.page-head h1').click(); await p.waitForTimeout(150);
+    assert.equal(await box.count(), 1, 'still open after a click elsewhere');
+    await chooser.click(); await box.waitFor({ state: 'detached' });
     assert.deepEqual(await firstRow(), ['qa-n', 'qa-label', 'qa-baseline', 'qa-result', 'qa-measured', 'history-cell', 'qa-comment', 'qa-trends']);
     assert.equal(await temperature.inputValue(), '22.4', 'nothing typed is lost');
     assert.equal(await p.locator('.measure-table').first().locator('colgroup col').count(), chosen.length, 'as many widths as columns');
@@ -135,7 +139,7 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     const run = await p.evaluate(async (id) => (await api('POST', `/api/assignments/${id}/runs`, { results: [] })).id, list);
     await open(`#/runs/${run}`);
     assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note', 'Trend']);
-    assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).count(), 1);
+    assert.equal(await chooser.count(), 1);
     await columns(async () => { await box.getByRole('checkbox', { name: 'Trend', exact: true }).uncheck(); });
     assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note']);
     // Reset: the page's own columns again.
@@ -168,7 +172,9 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.deepEqual(orders, ['n test trends baseline measured unit result history comment'], 'one order on every table');
     await columns(async () => {
       assert.deepEqual(await box.locator('li label').allTextContents(), ['Trend', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note']);
-      // A heading dragged while the box is open (one the box does not cover): the box follows.
+      // A heading dragged while the window is open (moved to the left, off the headings): its list follows.
+      const bar0 = await box.locator('.qa-columns-title').boundingBox();
+      await p.mouse.move(bar0.x + 40, bar0.y + 10); await p.mouse.down(); await p.mouse.move(160, 420, { steps: 6 }); await p.mouse.up();
       await drag('measured', 'baseline', 'left');
       assert.deepEqual(await box.locator('li label').allTextContents(), ['Trend', 'Measured', 'Baseline', 'Unit', 'Result', 'History', 'Note']);
     });
@@ -177,10 +183,53 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     await columns(async () => { await box.getByRole('button', { name: 'Reset', exact: true }).click(); });
     assert.deepEqual(await headings(), usual);
 
-    // 4. A phone's cards are as before: no Columns button, each row its test, answer and verdict.
+    // The Column Chooser is a small window over the page (Brook, 2026-11-20: like the one in Mosaiq and Aria): a
+    // right-click on a heading opens it there, it stays open while the form is used, and it is moved by its title. A
+    // name dragged up or down its list moves the column; a name dragged onto a heading puts the column there, shown; a
+    // heading dragged into the window hides its column (never Measured or Result).
+    await heading('unit').click({ button: 'right' }); await box.waitFor();
+    const [opened, unitHeading] = [await box.boundingBox(), await heading('unit').boundingBox()];
+    // (At the pointer, the middle of the heading, or as near as keeps the whole window on screen.)
+    const pointer = { x: unitHeading.x + unitHeading.width / 2, y: unitHeading.y + unitHeading.height / 2 };
+    assert.ok(Math.abs(opened.x - Math.min(pointer.x, 1600 - opened.width - 8)) <= 2 && Math.abs(opened.y - Math.min(pointer.y, 900 - opened.height - 8)) <= 2, `opened at the pointer: ${JSON.stringify([opened, pointer])}`);
+    await temperature.fill('22.5');
+    assert.equal(await box.count(), 1, 'it stays open while the form is used');
+    const titleBar = await box.locator('.qa-columns-title').boundingBox();
+    await p.mouse.move(titleBar.x + 40, titleBar.y + 10); await p.mouse.down(); await p.mouse.move(titleBar.x - 20, titleBar.y - 30, { steps: 4 }); await p.mouse.up();   // (up and left: it opened as low as fits)
+    const moved = await box.boundingBox();
+    assert.ok(Math.abs(moved.x - (opened.x - 60)) <= 2 && Math.abs(moved.y - (opened.y - 40)) <= 2, `moved by its title: ${JSON.stringify([opened, moved])}`);
+    // Out of the way of the headings (at the left, over the test names), with the first table's headings in view.
+    await p.evaluate(() => scrollTo(0, 0));
+    const bar = await box.locator('.qa-columns-title').boundingBox();
+    await p.mouse.move(bar.x + 40, bar.y + 10); await p.mouse.down(); await p.mouse.move(160, 420, { steps: 6 }); await p.mouse.up();
+    assert.ok((await box.boundingBox()).x < 200, 'moved to the left');
+    const listed = () => box.locator('li').evaluateAll((items) => items.map((li) => li.dataset.col));
+    await box.locator('li[data-col="unit"]').dragTo(box.locator('li[data-col="baseline"]'), { targetPosition: { x: 60, y: 3 } }); await p.waitForTimeout(150);
+    assert.deepEqual(await listed(), ['unit', 'baseline', 'measured', 'result', 'history', 'comment', 'trends'], 'a name dragged up the list');
+    assert.deepEqual(await headings(), ['#', 'Test', 'Unit', 'Baseline', 'Measured', 'Result', 'Note', 'Trend']);
+    const resultHeading = await heading('result').boundingBox();
+    await box.locator('li[data-col="history"]').dragTo(heading('result'), { targetPosition: { x: 4, y: resultHeading.height / 2 } }); await p.waitForTimeout(150);
+    assert.deepEqual(await headings(), ['#', 'Test', 'Unit', 'Baseline', 'Measured', 'History', 'Result', 'Note', 'Trend'], 'a name dropped on a heading: its column is shown there');
+    assert.equal(await box.getByRole('checkbox', { name: 'History', exact: true }).isChecked(), true);
+    await heading('unit').dragTo(box.locator('p')); await p.waitForTimeout(150);
+    assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'History', 'Result', 'Note', 'Trend'], 'a heading dropped in the window: its column is hidden');
+    assert.equal(await box.getByRole('checkbox', { name: 'Unit', exact: true }).isChecked(), false);
+    await heading('measured').dragTo(box.locator('p')); await p.waitForTimeout(150);
+    assert.deepEqual(await headings(), ['#', 'Test', 'Baseline', 'Measured', 'History', 'Result', 'Note', 'Trend'], 'Measured always shows');
+    assert.equal(await temperature.inputValue(), '22.5', 'nothing typed is lost');
+    assert.equal(await p.locator('.qa-drop-before, .qa-drop-after, .qa-col-dragging, .qa-drop-hide').count(), 0, 'no marks left behind');
+    await box.getByRole('button', { name: 'Reset', exact: true }).click();
+    assert.deepEqual(await headings(), usual);
+    // Leaving the page takes the window with it.
+    await p.evaluate(() => { location.hash = '#/queues'; }); await p.waitForTimeout(600);
+    assert.equal(await box.count(), 0, 'gone with its page');
+    await open(`#/perform/${list}`);
+    assert.equal(await chooser.getAttribute('aria-expanded'), 'false');
+
+    // 4. A phone's cards are as before: no Column Chooser, each row its test, answer and verdict.
     await columns(async () => { await box.getByRole('checkbox', { name: 'Baseline', exact: true }).uncheck(); });
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(200);
-    assert.equal(await p.getByRole('button', { name: 'Columns', exact: true }).isVisible(), false);
+    assert.equal(await chooser.isVisible(), false);
     // (A row with nothing to judge leaves its empty Result out, as before; the temperature typed above has a verdict.)
     const card = (row) => row.evaluate((tr) => [...tr.children].filter((c) => getComputedStyle(c).display !== 'none').map((c) => (c.classList.contains('qa-label') ? 'Test' : c.classList.contains('qa-measured') ? 'Measured' : c.classList.contains('qa-result') ? 'Result' : 'Extra')));
     await temperature.fill('22.4');
@@ -193,6 +242,6 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.ok((await dialog.textContent()).includes(instruction), 'on a phone the label opens the instruction'); await dialog.getByRole('button', { name: 'Close', exact: true }).click();
 
     assert.deepEqual(errors, []);
-    console.log('QA columns on the page: new default order without History; one names row per section; instructions behind ⓘ and Protocol; the Columns box is a small box under its button that shows, hides, moves left and right, keeps what was typed and is remembered per page; a heading dragged left or right moves its column on every table; Reset; phone cards unchanged.');
+    console.log('QA columns on the page: new default order without History; one names row per section; instructions behind ⓘ and Protocol; the Column Chooser is a small window (its button or a right-click on a heading) that shows, hides, moves left and right, takes dragged names and headings, keeps what was typed and is remembered per page; a heading dragged left or right moves its column on every table; Reset; phone cards unchanged.');
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exit(1); });

@@ -38,8 +38,10 @@ Share with `--host 0.0.0.0`.
 - GTR1, GTR2, GTR5 — Proton gantry. Daily list = `PBS DailyQA Template - Sphinx` (six spots with the myQA TG-224
   references and Warning/Action limits; Sphinx `.xls` auto-fill); monthly list = `Monthly QA template – Proton
   gantry (TG-224)` from the boss's GTR5 monthly worksheet (floridaphysics repo). The TG-224 daily template is kept
-  but not scheduled. In the seed (Brook, 2026-11-20) fourteen instruction-only steps of the daily list are directions
-  (the seven setup steps of Setup and Safety; seventeen in Mechanical and Imaging for the block below them), block 2.02
+  but not scheduled. In the seed (Brook, 2026-11-20) the instruction-only steps of the daily list are directions
+  (the seven setup steps of Setup and Safety; seventeen in Mechanical and Imaging for the block below them; "Retract panels A
+  and B.", "Go to MyQA…" and "Deliver the beam." for the Sphinx Measurements section), four pairs share a row (chamber and
+  electrometer with their factors, Charge [nC] with Dose [cGy], the coincidence X offset with Y), block 2.02
   is "Mechanical-to-kV/kV Isocenter [cm]" (X, Y, Z, 3D), 2.03 "Mechanical-to-CBCT Correction Vector [cm]" (baselines
   X −5, Y −1, Z +4.5 cm, Warning ±0.15, Action ±0.2, from Brook; fifth step "DO NOT APPLY Correction") and 2.04
   "Mechanical-to-kV/kV Correction Vector [cm]" (X, Y, Z and a 3D like 2.03's; the same baselines and limits as 2.03,
@@ -84,10 +86,9 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   behind the ⓘ of the test or group below them ("2.01 should be the instructions for Room lasers, and 2.03 and 2.04
   … for Mechanical-to-kV/kV Imaging Isocenter"). A list item becomes one in Setup QA (Result Type "Direction:
   section" / "Direction: test below": a Text item carrying `[direction: section]` / `[direction: next]`, no number,
-  nothing recorded; `directionKind`, `sectionDirections`, `item.steps`). Still asked for, not built: blocks with
-  their tests in Setup QA, and a test's ⓘ citing its report (TG-224, TG-142, TG-198, MPPG 8.a/8.b): never guess a
-  citation; Brook or the reviewing physicist supplies it. The **Columns** box is a small popout under its button (never a
-  window over the page), with ← → to move a column; a heading can be dragged left or right in the table. A group's
+  nothing recorded; `directionKind`, `sectionDirections`, `item.steps`). A test's ⓘ cites its report (TG-224, TG-142,
+  TG-198, MPPG 8.a/8.b) from its Reference (below): never guess a citation; Brook or the reviewing physicist supplies
+  it. (The Columns popout of this round became the Column Chooser, below.) A heading can be dragged left or right in the table. A group's
   Warning / Action (and baseline) sit under its black name at the left of the title band, never at the far right.
   Energy labels sit at the left under the group's name (no wide blank under the name). A titled block reads as ONE
   test ("all of this is 2.02 … it should look like a block not two rows broken up"): its number beside its name
@@ -96,6 +97,19 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   direction as the last step), never steps plus a separate Directions box. On an X / Y / Z row each field reads
   "X: [ ]" (letter beside its box; "I want X: [] Y: [], and Z:[] on each of these rows"), and the whole block is
   marked on hover, its name line too.
+- **QA form, round 4 (Brook, 2026-11-20 evening):** tests on one row ("Same row as the test above") are a row of the
+  table, "lined up as if they were aligned in an Excel table": the last test is the row's value (Baseline, Measured,
+  Unit, Result in their columns), the ones before it are answered beside their names in the Test column, name and box
+  on the same line ("Chamber should be on the same line as the Chamber drop down"); shared words are said once in bold
+  (`inlineRow`, `joinedNames`). "Whenever theres nC and cGy, keep it on the same row." An X / Y pair is a titled block
+  like 2.02: "3.20 Isocenter Coincidence [X-ray vs. Proton Beam] and then … X: [] and a Y: [] on the row below". The
+  Sphinx import is the first row of the Sphinx Measurements section and reads "Import Sphinx Measurements"; what Sphinx
+  measures (homogeneity and the coincidence offsets too) is filled from the file. The **Column Chooser** is "like there
+  is in Mosaiq and in Aria": a small window over the page (its button, or a right-click on a heading), names dragged to
+  reorder or onto a heading, a heading dragged in to hide (`openQaColumnChooser`). A test's **Reference** is a
+  `Reference:` line of its field, edited in Setup QA's test form and shown last behind the ⓘ (`referenceOf`,
+  `withReference`); the seed's are the department's own TG-224 notes, unverified against the report. Setup QA: ＋ Test
+  and ＋ Block on each section's title. Brook does not like cm and mm mixed in one list: open, see "Waiting on Brook".
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
@@ -127,7 +141,11 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
 ## Waiting on Brook
 
 DQA3 sample export and MPC results format (TrueBeam importers), the Dose Pro procedure, the TG-66
-daily table (CT Sim tolerances), and the MRI daily items.
+daily table (CT Sim tolerances), and the MRI daily items. PBS daily list: whether the Sphinx values (export,
+baselines, limits, history in mm) should be shown in cm like the imaging checks, or the imaging checks in mm (never
+converted silently); the sign of the 2.03 / 2.04 baselines (Brook gave X −5, Y −1, Z +4.5 cm; the department's TG-224
+daily list expects +5, +1, −4.5 cm); the 2.03 / 2.04 limits (±0.15 / ±0.2 cm) against that list's "couch translational
+motion < 1 mm"; references for the checks that have none; and checking the seeded references against TG-224 itself.
 
 ## Portal updates agreed with Brook (2026-10-22)
 
