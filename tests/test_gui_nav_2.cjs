@@ -18,7 +18,7 @@ assert.match(between('function layoutQaTable(', 'function qaHeadings('), /block\
 assert.match(between('  const refresh = () => {', '  const named = t.items.some('), /block\.hidden=unfinishedOnly&&!visible\.length;[\s\S]*qaHeadings\(blocks\);/, 'after hiding finished tables, the names rows are thinned');
 const form = {};
 vm.createContext(form);
-vm.runInContext(between('function qaHeadings(', '// The Columns box') + '\nthis.qaHeadings = qaHeadings;', form);
+vm.runInContext(between('function qaHeadings(', '// The columns as a person arranges them') + '\nthis.qaHeadings = qaHeadings;', form);
 // The repeated names row is collapsed with the class "repeat", never removed with hidden: screen readers still read each
 // cell's column names (Measured, Unit, Result…) from it.
 const classList = () => { const on = new Set(); return { toggle: (c, force) => { if (force) on.add(c); else on.delete(c); return !!force; }, contains: (c) => on.has(c) }; };

@@ -34,7 +34,9 @@ const J = (x) => JSON.parse(JSON.stringify(x));   // answers from node:vm, compa
 // 1. The tag round trip in Setup QA (the box), for the kinds of directions the seed lists carry.
 const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
 const hdr = seed.templates.find((t) => t.name === 'Daily QA – HDR Flexitron').checks;
-assert.ok(!JSON.stringify(seed).includes('[row:'), 'the seed lists carry no row tag');
+// (Of the seed lists only the PBS daily list carries the tag: four pairs of its Sphinx section. The HDR list, used here, has none.)
+assert.ok(!JSON.stringify(hdr).includes('[row:'), 'the seeded HDR list carries no row tag');
+assert.deepEqual(seed.templates.filter((t) => JSON.stringify(t).includes('[row:')).map((t) => t.name), ['PBS DailyQA Template - Sphinx']);
 const samples = [...new Set(hdr.map((c) => c.description)), '', 'Plain directions', 'Line one\nline two', 'Source: only a source line', '  spaced  '];
 for (const d of samples) {
   const on = withRowMark(d, true);

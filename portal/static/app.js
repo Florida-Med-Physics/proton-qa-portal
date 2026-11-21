@@ -1535,11 +1535,13 @@ function qaColumns(view = 'perform', sharedRows = false) {
 }
 function qaHeaders(first='Test') {
   return QA_COLUMNS.map(c=>{const title=c.key==='test'?first:c.title;
-    return el('th',{scope:'col',title,'aria-label':title,'data-col':c.key,...qaHeadingDrag(c)},c.key==='test'?first:c.label||c.title);});
+    return el('th',{scope:'col',title,'aria-label':title,'data-col':c.key,...qaHeadingDrag(c),
+      oncontextmenu:(event)=>{event.preventDefault();openQaColumnChooser(event.currentTarget.closest('table')?.dataset.qaView||'perform',{x:event.clientX,y:event.clientY});}},c.key==='test'?first:c.label||c.title);});
 }
 // A column's heading can be dragged left or right onto another heading: its column moves there on every table of the
-// page and stays there (the choice the Columns box keeps). # and Test stay first; dropped on Test, a column becomes the
-// first after it. The Columns box moves a column with its ← and → for anyone who cannot drag.
+// page and stays there (the choice the Column Chooser keeps). # and Test stay first; dropped on Test, a column becomes
+// the first after it. A name dragged from the Column Chooser lands the same way, and is shown. The Column Chooser moves
+// a column with its ← and → for anyone who cannot drag; a right-click on a heading opens it there.
 function qaHeadingDrag(c) {
   if (c.key === 'n') return {};
   const viewOf = (th) => th.closest('table')?.dataset.qaView || 'perform';
@@ -1562,12 +1564,12 @@ function qaHeadingDrag(c) {
       qaHeadingDrag.key = null;
       clear();
       const first = qaColumns(view).all.find((x) => !x.pinned && x.key !== key);
-      if (!c.pinned) moveQaColumn(view, key, c.key, after); else if (first) moveQaColumn(view, key, first.key, false);
+      if (!c.pinned) moveQaColumn(view, key, c.key, after, true); else if (first) moveQaColumn(view, key, first.key, false, true);
     },
   };
   return c.pinned ? target : { draggable: 'true', ...target,
-    ondragstart: (event) => { qaHeadingDrag.key = c.key; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label || c.title); event.currentTarget.classList.add('qa-col-dragging'); },   // (Firefox starts a drag only with data set)
-    ondragend: () => { qaHeadingDrag.key = null; clear(); } };
+    ondragstart: (event) => { qaHeadingDrag.key = c.key; qaHeadingDrag.from = 'heading'; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label || c.title); event.currentTarget.classList.add('qa-col-dragging'); },   // (Firefox starts a drag only with data set)
+    ondragend: () => { qaHeadingDrag.key = null; qaHeadingDrag.from = null; clear(); } };
 }
 // History's dates, in a row of their own under the column names.
 function qaDatesRow(slots) {
@@ -1580,7 +1582,9 @@ function testDetailsButton(item,items,numbers) {
   const step=!calculation&&!!qaStepLabel(item);
   // The directions above it in the list (Setup QA: "Direction: test below") and what the test itself says are one list.
   const steps=directionsList(item.steps,calculation?[]:[step?item.name:null,directionsText(item)]);
-  return calculation||directions||step||steps?infoPopup(calculation?el('div',{},steps,calculation):steps?el('div',{},el('strong',{},qaDisplayName(item)),steps):el('div',{},el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),directions),calculation?'Calculation details':'Test details'):null;
+  const reference=referenceLine([item.description]);   // the report the check comes from, last
+  const body=calculation?[steps,calculation]:steps?[el('strong',{},qaDisplayName(item)),steps]:[el(step?'p':'strong',{class:step?'qa-step-text':null},item.name),directions];
+  return calculation||directions||step||steps||reference?infoPopup(el('div',{},body,reference),calculation?'Calculation details':'Test details'):null;
 }
 function qaColgroup(table,shown,count=0) {
   let cols=[...table.children].find(x=>x.tagName==='COLGROUP');
@@ -1665,75 +1669,131 @@ function applyQaColumns(view, order, hidden = []) {
   document.querySelectorAll('.card.section').forEach((box) => qaHeadings(box.querySelectorAll('.measure-block')));
   if (applyQaColumns.redraw) applyQaColumns.redraw();   // the open Columns box shows the new order
 }
-// Moves a column to just before or after another in the person's order (hidden columns keep their places).
-function moveQaColumn(view, key, target, after) {
+// Moves a column to just before or after another in the person's order (hidden columns keep their places). `show`: the
+// moved column is shown too (a name dropped on a heading).
+function moveQaColumn(view, key, target, after, show = false) {
   const movable = qaColumns(view).all.filter((c) => !c.pinned), order = movable.map((c) => c.key).filter((k) => k !== key), at = order.indexOf(target);
   if (at < 0 || order.length === movable.length) return;
   order.splice(at + (after ? 1 : 0), 0, key);
-  applyQaColumns(view, order, movable.filter((c) => c.off).map((c) => c.key));
+  applyQaColumns(view, order, movable.filter((c) => c.off && !(show && c.key === key)).map((c) => c.key));
 }
-// The Columns box: a small box under its button, with a tick for each column and ← → to move one left or right. A
-// heading can also be dragged in the table itself (qaHeadingDrag), and the box follows. Done, Escape or a click elsewhere closes it.
+// The Column Chooser (Brook, 2026-11-20: "a column chooser like there is in Mosaiq and in Aria"): a small window over
+// the page that stays open while the form is used. It opens from its button or from a right-click on a table's
+// headings, and lists every column in the order shown, each with a tick (shown or not). Columns are dragged: a name
+// up or down the list to move it, a name onto a heading to put it there (shown), a heading into the window to hide
+// it. ← → move one for anyone who cannot drag. The window is moved by its title; ✕ or Escape closes it. It is part of
+// the page, so it goes when the page is left.
+const qaColumnChooser = { box: null, button: null, stop: null };
+function closeQaColumnChooser(focus = false) {
+  const { box, button, stop } = qaColumnChooser;
+  if (stop) stop();
+  if (box) box.remove();
+  Object.assign(qaColumnChooser, { box: null, button: null, stop: null });
+  applyQaColumns.redraw = null;
+  document.querySelectorAll('.qa-columns-button[aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  if (focus && button?.isConnected) button.focus();
+}
+// `at`: { x, y } of the pointer for a right-click; without it the window opens under `button`.
+function openQaColumnChooser(view, at = null, button = null) {
+  if (matchMedia('(max-width: 1200px)').matches) return;   // a phone's cards have no columns to choose
+  closeQaColumnChooser();
+  const list = el('ul', { class: 'qa-columns-list' });
+  const clear = () => document.querySelectorAll('.qa-col-dragging, .qa-drop-before, .qa-drop-after, .qa-drop-hide').forEach((x) => x.classList.remove('qa-col-dragging', 'qa-drop-before', 'qa-drop-after', 'qa-drop-hide'));
+  let focus = null;   // what was last used, found again after the list is redrawn
+  const draw = () => {
+    const movable = qaColumns(view).all.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
+    list.replaceChildren(...movable.map((c, i) => {
+      const show = el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null,
+        onchange: () => { focus = `li[data-col="${c.key}"] input`; applyQaColumns(view, keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]); } });
+      const move = (by, label, sign) => el('button', { type: 'button', class: 'icon-btn', 'data-move': by, disabled: i + by < 0 || i + by >= movable.length || null,
+        title: label, 'aria-label': `${label}: ${c.label}`,
+        onclick: () => { const next = keys.filter((k) => k !== c.key); next.splice(i + by, 0, c.key); focus = `li[data-col="${c.key}"] button[data-move="${by}"]:not(:disabled), li[data-col="${c.key}"] button:not(:disabled)`; applyQaColumns(view, next, hidden); } }, sign);
+      return el('li', { 'data-col': c.key, draggable: 'true',
+        ondragstart: (event) => { qaHeadingDrag.key = c.key; qaHeadingDrag.from = 'chooser'; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label); event.currentTarget.classList.add('qa-col-dragging'); },
+        ondragend: () => { qaHeadingDrag.key = null; qaHeadingDrag.from = null; clear(); },
+        ondragover: (event) => {   // a name over another name: before or after it
+          if (qaHeadingDrag.from !== 'chooser' || !qaHeadingDrag.key || qaHeadingDrag.key === c.key) return;
+          event.preventDefault();
+          const li = event.currentTarget, r = li.getBoundingClientRect(), after = event.clientY > r.top + r.height / 2;
+          li.classList.toggle('qa-drop-after', after); li.classList.toggle('qa-drop-before', !after);
+        },
+        ondragleave: (event) => event.currentTarget.classList.remove('qa-drop-before', 'qa-drop-after'),
+        ondrop: (event) => {
+          const key = qaHeadingDrag.key;
+          if (qaHeadingDrag.from !== 'chooser' || !key || key === c.key) return;
+          event.preventDefault(); event.stopPropagation();
+          const after = event.currentTarget.classList.contains('qa-drop-after');
+          qaHeadingDrag.key = null; qaHeadingDrag.from = null; clear();
+          focus = `li[data-col="${key}"] input`;
+          moveQaColumn(view, key, c.key, after);
+        } },
+        el('span', { class: 'drag-handle', title: 'Drag to move', 'aria-hidden': 'true' }, '⠿'),
+        el('label', { class: 'check', title: c.always ? 'Always shown' : null }, show, c.label), el('span', { class: 'spacer' }),
+        move(-1, 'Move left', '←'), move(1, 'Move right', '→'));
+    }));
+    if (focus) list.querySelector(focus)?.focus();
+    focus = null;
+  };
+  const title = el('div', { class: 'qa-columns-title' }, el('strong', {}, 'Column Chooser'), el('span', { class: 'spacer' }),
+    el('button', { type: 'button', class: 'icon-btn', title: 'Close', 'aria-label': 'Close', onclick: () => closeQaColumnChooser(true) }, '✕'));
+  const box = el('div', { class: 'qa-columns-pop', role: 'dialog', 'aria-label': 'Column Chooser',
+    // A heading dragged into the window: its column is hidden (Measured and Result always show).
+    ondragover: (event) => { if (qaHeadingDrag.from !== 'heading' || !qaHeadingDrag.key) return; event.preventDefault(); box.classList.add('qa-drop-hide'); },
+    ondragleave: (event) => { if (!box.contains(event.relatedTarget)) box.classList.remove('qa-drop-hide'); },
+    ondrop: (event) => {
+      const key = qaHeadingDrag.key;
+      if (qaHeadingDrag.from !== 'heading' || !key) return;
+      event.preventDefault();
+      qaHeadingDrag.key = null; qaHeadingDrag.from = null; clear();
+      const movable = qaColumns(view).all.filter((c) => !c.pinned), column = movable.find((c) => c.key === key);
+      if (!column || column.always) return toast(column ? `${column.label} is always shown.` : 'That column stays where it is.', true);
+      applyQaColumns(view, movable.map((c) => c.key), [...new Set([...movable.filter((c) => c.off).map((c) => c.key), key])]);
+    } },
+    title, list,
+    el('p', { class: 'muted small' }, 'Drag a name to move it, or onto a heading. Drag a heading here to hide it.'),
+    el('div', { class: 'row' }, el('button', { type: 'button', class: 'small', onclick: () => applyQaColumns(view, null) }, 'Reset')));
+  (document.getElementById('app') || document.body).append(box);
+  // Where it opens: at the pointer, or under its button; always whole inside the window.
+  const place = (x, y) => { const w = box.offsetWidth, h = box.offsetHeight; box.style.left = `${Math.max(8, Math.min(x, innerWidth - w - 8))}px`; box.style.top = `${Math.max(8, Math.min(y, innerHeight - h - 8))}px`; };
+  draw();
+  const anchor = button?.getBoundingClientRect();
+  if (at) place(at.x, at.y); else if (anchor) place(anchor.right - box.offsetWidth, anchor.bottom + 6); else place(innerWidth - box.offsetWidth - 24, 96);
+  // Moved by its title.
+  title.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('button')) return;
+    const r = box.getBoundingClientRect(), dx = event.clientX - r.left, dy = event.clientY - r.top;
+    const move = (e) => place(e.clientX - dx, e.clientY - dy);
+    const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+    event.preventDefault();
+  });
+  const escape = (event) => {
+    if (!box.isConnected) return closeQaColumnChooser();   // the page was left
+    if (event.key === 'Escape') { event.stopPropagation(); closeQaColumnChooser(true); }
+  };
+  document.addEventListener('keydown', escape, true);
+  Object.assign(qaColumnChooser, { box, button, stop: () => document.removeEventListener('keydown', escape, true) });
+  applyQaColumns.redraw = () => { if (box.isConnected) draw(); };
+  if (button) button.setAttribute('aria-expanded', 'true');
+  list.querySelector('input:not(:disabled)')?.focus();
+}
 function qaColumnsButton(view) {
-  let box = null;
-  const button = el('button', { type: 'button', class: 'qa-columns-button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', title: 'Show, hide and move columns',
-    onclick: () => (box ? close(false) : open()) }, 'Columns');
-  const wrap = el('span', { class: 'qa-columns-wrap' }, button);
-  const outside = (event) => { if (!wrap.contains(event.target) && !event.target.closest?.('tr.qa-col-names')) close(false); };   // (a heading may be dragged with the box open)
-  const escape = (event) => { if (event.key === 'Escape') { event.stopPropagation(); close(true); } };
-  const close = (focus) => {
-    if (!box) return;
-    box.remove();
-    box = null;
-    applyQaColumns.redraw = null;
-    document.removeEventListener('pointerdown', outside, true);
-    document.removeEventListener('keydown', escape, true);
-    button.setAttribute('aria-expanded', 'false');
-    if (focus) button.focus();
-  };
-  const open = () => {
-    const list = el('ul', { class: 'qa-columns-list' });
-    let focus = null;   // what was last used, found again after the list is redrawn
-    const draw = () => {
-      const movable = qaColumns(view).all.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
-      list.replaceChildren(...movable.map((c, i) => {
-        const show = el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null,
-          onchange: () => { focus = `li[data-col="${c.key}"] input`; applyQaColumns(view, keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]); } });
-        const move = (by, label, sign) => el('button', { type: 'button', class: 'icon-btn', 'data-move': by, disabled: i + by < 0 || i + by >= movable.length || null,
-          title: label, 'aria-label': `${label}: ${c.label}`,
-          onclick: () => { const next = keys.filter((k) => k !== c.key); next.splice(i + by, 0, c.key); focus = `li[data-col="${c.key}"] button[data-move="${by}"]:not(:disabled), li[data-col="${c.key}"] button:not(:disabled)`; applyQaColumns(view, next, hidden); } }, sign);
-        return el('li', { 'data-col': c.key }, el('label', { class: 'check', title: c.always ? 'Always shown' : null }, show, c.label), el('span', { class: 'spacer' }),
-          move(-1, 'Move left', '←'), move(1, 'Move right', '→'));
-      }));
-      if (focus) list.querySelector(focus)?.focus();
-      focus = null;
-    };
-    box = el('div', { class: 'qa-columns-pop', role: 'dialog', 'aria-label': 'Columns' }, list,
-      el('p', { class: 'muted small' }, 'Or drag a heading.'),
-      el('div', { class: 'row' }, el('button', { type: 'button', class: 'small', onclick: () => applyQaColumns(view, null) }, 'Reset'), el('span', { class: 'spacer' }),
-        el('button', { type: 'button', class: 'small primary', onclick: () => close(true) }, 'Done')));
-    wrap.append(box);
-    applyQaColumns.redraw = draw;
-    draw();
-    if (box.getBoundingClientRect().left < 8) box.classList.add('from-left');   // a button near the left edge: open to the right of it
-    document.addEventListener('pointerdown', outside, true);
-    document.addEventListener('keydown', escape, true);
-    button.setAttribute('aria-expanded', 'true');
-    list.querySelector('input:not(:disabled)')?.focus();
-  };
-  return wrap;
+  const button = el('button', { type: 'button', class: 'qa-columns-button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', title: 'Show, hide and move columns (or right-click a heading)',
+    onclick: () => (qaColumnChooser.box?.isConnected && qaColumnChooser.button === button ? closeQaColumnChooser(false) : openQaColumnChooser(view, null, button)) }, 'Column Chooser');
+  return el('span', { class: 'qa-columns-wrap' }, button);
 }
 // A group's directions (an X / Y / Z or per-energy table): behind the ⓘ beside its title. `name`: the title.
-function performDirections(item,name){
+function performDirections(item,name,members=[item]){
   const text=QADerived.read(item.description)||/\[calc:/.test(item.description||'')?null:helpText(item.description);
   const steps=directionsList(item.steps,text?[directionsText(item)]:[]);   // the directions above the group in the list, then its own: one list
-  return text||steps?infoPopup(el('div',{},el('strong',{},name),steps||text),'Test details'):null;
+  const reference=referenceLine(members.map(m=>m.description));   // the report its tests come from
+  return text||steps||reference?infoPopup(el('div',{},el('strong',{},name),steps||text,reference),'Test details'):null;
 }
 // Directions as plain words (no template number or markers), to tell whether two tests carry the same ones.
 const directionsText=(item)=>helpText(item.description)?.lastChild?.textContent||'';
 
 function helpText(description, { inline = false } = {}) {
-  description=(description||'').replace(/(?:^|\n)\s*Source:[^\n]*/g,'');
+  description=(description||'').replace(/(?:^|\n)\s*(?:Source|Reference):[^\n]*/g,'');
   if (!description || description.startsWith("Measured by Sphinx")) return null;
   const text = description.replace(TEMPLATE_NUMBER, "").replace(SECTION_NAME, "").replace(MARKER, "").replace(DEFAULT_MARK, "").replace(/\[(?:choices|excel|rule|derived|device|row|direction): [^\]]+\]\s*/g, "").trim();
   if (!text) return null;
@@ -1745,7 +1805,8 @@ function helpText(description, { inline = false } = {}) {
 }
 
 // Directions as people read and edit them, apart from the markers GatorQA keeps in the same field: the template
-// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device|row|direction: …] and Source lines.
+// number ("Template 1.04."), [Section: …], [auto|calc|default|choices|excel|rule|derived|device|row|direction: …], and Source
+// and Reference lines.
 // Editing the text in the list editor keeps every marker exactly as it was.
 function directionsParts(description) {
   let d = description || "";
@@ -1755,7 +1816,7 @@ function directionsParts(description) {
   const tags = [], sources = [];
   for (const re of [new RegExp(SECTION_NAME.source, "g"), new RegExp(MARKER.source, "g"), new RegExp(DEFAULT_MARK.source, "g"), /\[(?:choices|excel|rule|derived|device|row|direction): [^\]]+\]/g])
     d = d.replace(re, (m) => { tags.push(m.trim()); return " "; });
-  d = d.replace(/(?:^|\n)\s*Source:[^\n]*/g, (m) => { sources.push(m.trim()); return ""; });
+  d = d.replace(/(?:^|\n)\s*(?:Source|Reference):[^\n]*/g, (m) => { sources.push(m.trim()); return ""; });
   return { prefix, tags, sources, text: d.replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").trim() };
 }
 function joinDirections(parts, text) {
@@ -1764,20 +1825,42 @@ function joinDirections(parts, text) {
 }
 // The list editor's "Same row as the test above" box adds or removes the tag; the rest of the field stays as it was.
 function withRowMark(description, on) {
-  const d = (description || "").replace(/ ?\[row: with above\]/g, ""), at = d.search(/\n\s*Source:/);
+  const d = (description || "").replace(/ ?\[row: with above\]/g, ""), at = d.search(/\n\s*(?:Source|Reference):/);
   return !on ? d : !d ? "[row: with above]" : at < 0 ? `${d} [row: with above]` : `${d.slice(0, at)} [row: with above]${d.slice(at)}`;
 }
 // Setup QA's Result Type "Direction: …" sets the tag ("section" or "next") or, with nothing, removes it; the rest of
 // the field stays as it was.
 function withDirectionMark(description, kind) {
-  const d = (description || "").replace(/ ?\[direction: (?:section|next)\]/g, ""), at = d.search(/\n\s*Source:/);
+  const d = (description || "").replace(/ ?\[direction: (?:section|next)\]/g, ""), at = d.search(/\n\s*(?:Source|Reference):/);
   const tag = kind ? `[direction: ${kind === "next" ? "next" : "section"}]` : "";
   return !tag ? d : !d ? tag : at < 0 ? `${d} ${tag}` : `${d.slice(0, at)} ${tag}${d.slice(at)}`;
 }
-// The test form's Type "Direction: …" is saved as a Text item carrying the tag; any other type drops the tag.
+// The report a check comes from ("Reference: TG-224, Dosimetry: output < 3 %"): a line of the test's directions field,
+// kept last like a Source line. The QA form shows it behind the test's ⓘ; Setup QA edits it in the test's Reference box.
+// (A marker written after it, such as a calculation's, is not part of its words.)
+const FIELD_MARKERS = /\s*\[(?:Section|auto|calc|default|choices|excel|rule|derived|device|row|direction): [^\]]*\]/g;
+function referenceOf(description) {
+  const line = /(?:^|\n)[ \t]*Reference:([^\n]*)/.exec(description || "");
+  return line ? line[1].replace(FIELD_MARKERS, "").trim() : "";
+}
+function withReference(description, reference) {
+  const kept = [];   // markers that were written on the old Reference line stay in the field
+  const d = (description || "").replace(/(?:^|\n)[ \t]*Reference:([^\n]*)/g, (line, rest) => { kept.push(...(rest.match(FIELD_MARKERS) || []).map((m) => m.trim())); return ""; });
+  const body = [d, ...kept].filter(Boolean).join(" "), text = String(reference || "").replace(/\s+/g, " ").trim();
+  return text ? `${body}${body ? "\n" : ""}Reference: ${text}` : body;
+}
+// The line behind an ⓘ: the references of the tests it stands for, each said once.
+function referenceLine(descriptions) {
+  const all = [...new Set(descriptions.map(referenceOf).filter(Boolean))];
+  return all.length ? el("p", { class: "qa-reference" }, el("span", { class: "directions-label" }, "Reference"), all.join("; ")) : null;
+}
+// The test form's Type "Direction: …" is saved as a Text item carrying the tag; any other type drops the tag. Its
+// Reference box is saved as the field's Reference line (a line typed into Instructions stays when the box is empty).
 function testFormData(data) {
   const kind = { direction: "section", direction_next: "next" }[data.type] || null;
-  return { ...data, type: kind ? "text" : data.type, description: withDirectionMark(data.description, kind) };
+  const { reference, ...rest } = data;
+  const description = withDirectionMark(data.description, kind);
+  return { ...rest, type: kind ? "text" : data.type, description: reference === undefined ? description : withReference(description, reference || referenceOf(description)) };
 }
 // Directions as a numbered list, word for word, in the list's order. A direction's own Directions text, when it has
 // any, follows it in smaller print. `own`: what the test itself says (its instruction, its Directions text), as the
@@ -1867,6 +1950,12 @@ function measureParts(name) {
   return { metric: hit[1], metricLabel, rowLabel, sortKey: (spot ? Number(spot[1]) : 0) * 10000 + (energy ? Number(energy[1]) : 0) };
 }
 
+// A value the Sphinx export reports once, not per energy or spot (field homogeneity, an isocenter coincidence offset):
+// the import fills it by the same rules (canonicalKey in the backends), so it is never a calculation of the form's own.
+function sphinxResult(item) {
+  const n = String(item.name || "").toLowerCase().replace(/\s+/g, " ");
+  return item.type === "numeric" && !/\[(?:calc|derived): /.test(item.description || "") && MEASURE_RULES.some(([re]) => re.test(n));
+}
 function blockNumbers(items) {
   const out = new Map();
   out.joined = new Set();                                                 // tests on the row of the test above (sharedRows)
@@ -1920,15 +2009,41 @@ function sharedRows(list, numbers) {
   list.forEach((it, i) => (i && numbers.joined?.has(it.test_id) && numbers.get(it.test_id) === numbers.get(list[i - 1].test_id) ? rows.at(-1).push(it) : rows.push([it])));
   return rows;
 }
+// What tests on one row are called together: { title, labels, axes }. `title` is the words their names start with
+// ("Daily output: Charge [nC]" and "Daily output: Dose [cGy]" are "Daily output"; "Chamber" and "Chamber Cal. Factor"
+// are "Chamber"), `labels` what is left of each name ("Charge [nC]", "Dose [cGy]"; "" and "Cal. Factor"). When the
+// names differ only by an axis letter ("…: X offset [mm]", "…: Y offset [mm]"), `axes` is those letters: such tests
+// are drawn as an X / Y block under the title. null when the names share no first word.
+function joinedNames(names) {
+  const words = names.map((n) => String(n || "").trim().split(/\s+/).filter(Boolean));
+  if (words.length < 2 || words.some((w) => !w.length)) return null;
+  let head = 0;
+  while (words.every((w) => head < w.length && w[head] === words[0][head])) head++;
+  const trim = (s) => s.replace(/^[\s:–—-]+|[\s:,–—-]+$/g, "");
+  const title = trim(words[0].slice(0, head).join(" "));
+  if (!title) return null;
+  const rest = words.map((w) => w.slice(head));
+  const room = Math.min(...rest.map((w) => w.length)) - 1;   // every test keeps a word of its own
+  let tail = 0;
+  while (tail < room && rest.every((w) => w[w.length - 1 - tail] === rest[0][rest[0].length - 1 - tail])) tail++;
+  const letters = rest.map((w) => trim(w.slice(0, w.length - tail).join(" ")));
+  return { title, labels: rest.map((w) => trim(w.join(" "))), axes: letters.every((l) => /^[XYZ]$/.test(l)) ? letters : null };
+}
+// A field's unit follows its name unless the name already says it ("Charge [nC]", "Cal. Factor(Proton), Gy/C").
+function unitNamed(name, unit) {
+  if (!unit) return false;
+  const u = String(unit).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp("(?:\\[|\\(|,\\s*)" + u + "\\s*(?:\\]|\\)|$)").test(name || "");
+}
 // A shared row is one cell over the Test, Measured, Unit, Result and Baseline columns, its tests side by side as in a
 // row of their own: each one's name and unit ("TCS Sk (mGy·m²·h⁻¹)") with its details button (named for it), its input
 // or value, its result, baseline and limits, and its notes. `fields` are [test, name, unit, details, answer, result, limits, ...notes].
 function sharedCell(fields) {
   return el("td", { class: "qa-measured qa-shared-cell", colspan: 5 }, el("div", { class: "qa-shared" },
     fields.map(([test, name, unit, details, answer, result, limits, ...notes]) => {
-      if (details) for (const key of ["title", "aria-label"]) details.setAttribute(key, `${details.getAttribute(key)}: ${name}`);
-      return el("div", { class: "qa-shared-field", "data-test-id": test.test_id },
-        el("div", { class: "qa-shared-name" }, el("span", {}, name, unit ? [" ", el("span", { class: "qa-shared-unit" }, `(${unit})`)] : null), details), answer,
+      if (details) for (const key of ["title", "aria-label"]) details.setAttribute(key, `${details.getAttribute(key)}: ${name || test.name}`);
+      return el("div", { class: "qa-shared-field", "data-test-id": test.test_id },   // (a field its block's title names has no name of its own)
+        el("div", { class: "qa-shared-name" }, name || unit ? el("span", {}, name, unit ? [" ", el("span", { class: "qa-shared-unit" }, `(${unit})`)] : null) : null, details), answer,
         el("div", { class: "qa-shared-more" }, result, limits ? el("div", { class: "qa-shared-info" }, limits) : null, notes));
     })));
 }
@@ -2083,7 +2198,8 @@ async function renderPerform(assignmentId) {
     for(let parent=entry.row.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
     app.querySelectorAll('.qa-next-unanswered').forEach(row=>row.classList.remove('qa-next-unanswered'));
     entry.row.classList.add('qa-next-unanswered');entry.row.scrollIntoView({block:'center',behavior:'smooth'});
-    const focus=(entry.field||entry.row).querySelector('.qa-measured button:not(:disabled):not(.qa-calculation-info), .qa-measured select:not(:disabled), .qa-measured input:not([readonly]):not([type=hidden]):not(.note-input)');   // a shared row's field also holds its details and note
+    const within=entry.field?.classList.contains('qa-inline-field')?'':'.qa-measured ';   // a test answered beside its name (inlineRow) is not in the Measured column
+    const focus=(entry.field||entry.row).querySelector(`${within}button:not(:disabled):not(.qa-calculation-info), ${within}select:not(:disabled), ${within}input:not([readonly]):not([type=hidden]):not(.note-input)`);   // a shared row's field also holds its details and note
     if(focus)focus.focus({preventScroll:true});else{entry.row.tabIndex=-1;entry.row.focus({preventScroll:true});}
   }},'Next unanswered');
   const unfinishedToggle=el('input',{type:'checkbox','aria-label':'Show unfinished only',onchange:event=>{unfinishedOnly=event.target.checked;refresh();if(unfinishedOnly)for(const section of sections)if(!section.box.hidden)section.box.open=true;}});
@@ -2115,6 +2231,7 @@ async function renderPerform(assignmentId) {
     }
   };
   const named = t.items.some((i) => sectionNameOf(i));
+  const sphinxList = t.items.some((i) => i.type === "numeric" && measureParts(i.name));   // its measurements come from a Sphinx export
   const numbers = blockNumbers(t.items);
   const byCategory = new Map(), directionsOf = new Map(), waiting = new Map();   // a section's tests, its directions (sectionDirections), and those waiting for the test below them
   for (const item of t.items) {
@@ -2145,7 +2262,9 @@ async function renderPerform(assignmentId) {
       if (item.type === "boolean" || item.type === "status") ({ value: input, control } = passFailInput(item.name, item.type === "status", item.unit === "Yes/No"));
       else if (item.type === "numeric") {
         // Sphinx measurements are read from the export file, never typed in.
-        const fromFile = !!measureParts(item.name) || /^Measured by Sphinx/.test(item.description || "");
+        // A list filled from a Sphinx export takes its one-off Sphinx results from the file too (field homogeneity, the
+        // isocenter coincidence offsets): the import already reads them, so they are not typed (Brook, 2026-11-20).
+        const fromFile = !!measureParts(item.name) || (sphinxList && sphinxResult(item)) || /^Measured by Sphinx/.test(item.description || "");
         control = input = el("input", { type: "number", step: "any", class: `result-input${fromFile ? " from-file" : ""}`, "aria-label": item.name,
           readonly: fromFile ? "" : null, placeholder: fromFile ? "from file" : null, title: fromFile ? "Filled from the Sphinx export file" : null });
       }
@@ -2198,10 +2317,13 @@ async function renderPerform(assignmentId) {
       el("div", {}, dt.toLocaleDateString(undefined, { day: "numeric", month: "short" })), el("div", { class: "yr" }, String(dt.getFullYear()))); };
     // Every measured (numeric) test is a row in a table: Measurement, Reference, Tolerance, Action, Status, Comment,
     // History (under its QA dates) and Trends. Repeated measurements (per energy or spot) share a titled table.
-    const measureTable = (members, { firstHeader, title, directions, firstCell, label, groupDirections = null, groupName = "" }) => {
+    const measureTable = (members, { firstHeader, title, directions, firstCell, label, groupDirections = null, groupName = "", joined = false }) => {
       // An X / Y / Z group (and its 3D) is one row: the axes side by side in one cell, like tests marked "Same row as
       // the test above". Its title carries the name, the directions and what the axes share (baseline, limits).
       const axisRow = firstHeader === "Axis";
+      // `joined`: tests on one row under the name they share (joinedNames), drawn the same way; each keeps its own
+      // history and trend, and the title says a baseline or limits only when every judged field has the same.
+      const axisTrend = axisRow && !joined;
       const tests = members.flatMap((m) => (m.axes ? [...m.axes, ...(m.calc ? [m.calc] : [])] : [m]));
       const dates = [...new Set(tests.flatMap((it) => (history[it.test_id] || []).map((h) => h.qa_date)))].sort().slice(-3).reverse();
       const dp = decimalsOf(tests.flatMap((it) => [...(history[it.test_id] || []).slice(-5).map((h) => h.value), (it.limits || {}).expected]));
@@ -2228,12 +2350,14 @@ async function renderPerform(assignmentId) {
       const judged = members.filter((it) => it.type === "numeric");
       const unitOf = (it) => (it.unit && it.unit !== "unitless" ? it.unit : "");
       const sameBaseline = axisRow && judged.length > 0 && judged.every((it) => (it.limits || {}).expected != null && it.limits.expected === judged[0].limits.expected);
-      const axes = axisRow && !sameBaseline ? judged.filter((it) => "XYZ".includes(it.axisLabel)) : [];
+      const axes = axisRow && !sameBaseline ? judged.filter((it) => /^[XYZ]$/.test(it.axisLabel)) : [];
       const eachBaseline = axes.length > 1 && axes.every((it) => (it.limits || {}).expected != null);
       const baselineInTitle = (it) => sameBaseline || (eachBaseline && axes.some((a) => a.test_id === it.test_id));
       const signedBaseline = (it) => `${it.limits.expected > 0 ? "+" : it.limits.expected < 0 ? "−" : ""}${fmt(Math.abs(it.limits.expected), dp)}${unitOf(it) ? ` ${unitOf(it)}` : ""}`;
       const titleBaseline = sameBaseline ? `Baseline ${refCell(judged[0], unitOf(judged[0]))}` : eachBaseline ? `Baseline ${axes.map((it) => `${it.axisLabel} = ${signedBaseline(it)}`).join(", ")}` : null;
-      const titleMember = firstHeader !== "Test" ? members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null)) : null;
+      const limitsOf = (it) => limitsLine(it, unitOf(it))?.textContent || null;
+      const titleMember = firstHeader !== "Test" && (!joined || judged.every((it) => limitsOf(it) === limitsOf(judged[0])))
+        ? members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null)) : null;
       const titleLimits = titleMember ? limitsLine(titleMember, titleMember.unit && titleMember.unit !== "unitless" ? titleMember.unit : "")?.textContent || null : null;
       const sharedCells = (parts) => {
         const has = (p, ...keys) => p.it.type === "numeric" && keys.some((k) => (p.it.limits || {})[k] != null);
@@ -2250,35 +2374,70 @@ async function renderPerform(assignmentId) {
         const details = (p) => (!axisRow || derivedExplanation(p.it, t.items, numbers) || directionsText(p.it) !== groupDirections ? testDetailsButton(axisRow ? { ...p.it, steps: null } : p.it, t.items, numbers) : null);
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));
         // (An axis field reads "X: [ ]"; its unit is in the block's name when the tests' names carry it, "… [cm]".)
-        const unitInName = axisRow && /\[[^\]]+\]\s*$/.test(groupName);
-        const cell = sharedCell(parts.map((p) => [p.it, axisRow ? p.it.axisLabel : shortName(p.it), p.it.type === "numeric" && !unitInName ? p.unit : "", details(p), p.control,
+        // (An X / Y pair's unit is on its title's line when that says a baseline or limits.)
+        const unitInName = axisRow && (joined ? !!(titleBaseline || titleLimits) : /\[[^\]]+\]\s*$/.test(groupName));
+        const fieldName = (p) => (axisRow ? p.it.axisLabel : shortName(p.it));
+        const cell = sharedCell(parts.map((p) => [p.it, fieldName(p), p.it.type === "numeric" && !unitInName && !unitNamed(fieldName(p) || p.it.name, p.unit) ? p.unit : "", details(p), p.control,
           has(p, "expected", "warn", "fail") ? p.statusCell : null, limits(p), p.note, p.comment]));
         parts.forEach((p, i) => { p.entry.field = cell.firstChild.children[i]; });
         if (axisRow) cell.firstChild.style.setProperty("--qa-fields", parts.length);   // every axis on the one line (app.css)
         return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
+      // Tests on one row of the table ("Same row as the test above") read as one line of it, lined up like a
+      // spreadsheet's (Brook, 2026-11-20): the last test is the row's value, under Measured with its baseline, unit and
+      // result in their columns; the tests before it are answered beside their names in the Test column, on the same
+      // line. Names that start alike say those words once, in bold where a test's name is ("Chamber", "Daily output").
+      const inlineRow = (parts) => {
+        const main = parts.at(-1), others = parts.slice(0, -1);
+        const named = joinedNames(parts.map((p) => shortName(p.it)));
+        const labels = named ? named.labels : parts.map((p) => shortName(p.it));
+        const judged = (p) => p.it.type === "numeric" && ["expected", "warn", "fail"].some((k) => (p.it.limits || {})[k] != null);
+        const unitTag = (p, name) => (p.it.type === "numeric" && p.unit && !unitNamed(name || p.it.name, p.unit) ? el("span", { class: "qa-shared-unit" }, ` (${p.unit})`) : null);
+        const named_ = (button, name) => { if (button) for (const key of ["title", "aria-label"]) button.setAttribute(key, `${button.getAttribute(key)}: ${name}`); return button; };
+        const fields = others.map((p, i) => {
+          const line = limitsLine(p.it, p.unit)?.textContent || null;
+          const limits = (p.it.limits || {}).expected != null && p.it.type === "numeric" ? [`Baseline ${refCell(p.it, "")}`, line].filter(Boolean).join(" · ") : line;
+          const tag = unitTag(p, labels[i]);
+          const field = el("span", { class: "qa-inline-field", "data-test-id": p.it.test_id },
+            labels[i] || tag ? el("span", { class: "qa-inline-name" }, labels[i], tag) : null, named_(testDetailsButton(p.it, t.items, numbers), labels[i] || p.it.name), p.control,
+            judged(p) ? p.statusCell : null, limits ? el("span", { class: "qa-limits qa-inline-limits" }, limits) : null, p.note, p.comment);
+          p.entry.field = field;
+          return field;
+        });
+        main.noteToggle.addEventListener("click", () => others.forEach((p) => { p.comment.hidden = false; }));   // the + opens every note
+        const last = labels.at(-1);
+        const details = named_(testDetailsButton(main.it, t.items, numbers), last || main.it.name);
+        const cell = el("td", { class: "qa-label qa-inline-cell" },
+          el("div", { class: "qa-test-title" },
+            // (The fields are a group of their own, so a line that wraps starts under the first field, not under the name.)
+            el("div", { class: `qa-test-name qa-inline${named ? " qa-inline-named" : ""}` }, named ? el("strong", { class: "qa-inline-title" }, named.title) : null,
+              el("div", { class: "qa-inline-fields" }, fields, last ? el("span", { class: "qa-inline-name qa-inline-main" }, last) : null)), details),
+          limitsLine(main.it, main.unit), main.note);
+        return { main, cell };
+      };
       const trRows = (firstHeader === "Test" ? sharedRows(members, numbers) : axisRow ? [members] : members.map((it) => [it])).map((group) => {
         const parts = group.map((it) => { drawn.add(it.test_id); return { it, unit: it.unit && it.unit !== "unitless" ? it.unit : "", ...buildEntry(it) }; });
-        const [{ it, unit, control, comment, noteToggle, note, statusCell }] = parts;
-        const shared = parts.length > 1 ? sharedCells(parts) : null, main = shared ? shared.main : parts[0];
-        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
+        const inline = firstHeader === "Test" && parts.length > 1 ? inlineRow(parts) : null;
+        const { it, unit, control, comment, noteToggle, note, statusCell } = inline ? inline.main : parts[0];   // what the row's own cells show
+        const shared = !inline && parts.length > 1 ? sharedCells(parts) : null, main = inline ? inline.main : shared ? shared.main : parts[0];
+        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared || inline ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
         const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
         // In a group the directions are beside its title; a row repeats them only when its own differ. A calculation keeps its ⓘ.
-        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(firstHeader === "Test" ? it : { ...it, steps: null }, t.items, numbers) : null;
+        const details = shared || inline ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || directionsText(it) !== groupDirections ? testDetailsButton(firstHeader === "Test" ? it : { ...it, steps: null }, t.items, numbers) : null;
         // The quick trend: this test's; on an X / Y / Z row, every axis (and the 3D), one under another.
-        const trended = axisRow ? parts.filter((p) => p.it.type === "numeric") : [main];
+        const trended = axisTrend ? parts.filter((p) => p.it.type === "numeric") : [main];
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
-          const series = trended.map((p) => ({ label: axisRow ? p.it.axisLabel : p.it.name, points: (history[p.it.test_id] || []).slice(-60) })).filter((x) => x.points.length);
+          const series = trended.map((p) => ({ label: axisTrend ? p.it.axisLabel : p.it.name, points: (history[p.it.test_id] || []).slice(-60) })).filter((x) => x.points.length);
           if (!series.length) return toast("No results yet for this test.", true);
           if (chart.hidden) chart.firstChild.replaceChildren(
-            el("div", { class: "row" }, el("strong", {}, axisRow ? groupName : label(main.it)), el("span", { class: "spacer" }),
+            el("div", { class: "row" }, el("strong", {}, axisTrend ? groupName : label(main.it)), el("span", { class: "spacer" }),
               el("a", { class: "small", href: `#/trends?machine_id=${t.machine.id}&list=${t.assignment.id}&test_id=${main.it.test_id}&range=365` }, "Full trend")),
             seriesChart(series, main.unit, { small: true, yLabel: yAxisLabel(trended.map((p) => p.it.name)) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
-        const row = el("tr", {'data-qa-entry':it.test_id, class: axisRow ? "qa-axis-row" : null},
+        const row = el("tr", {'data-qa-entry':parts[0].it.test_id, class: axisRow ? "qa-axis-row" : inline ? "qa-inline-row" : null},
           numberCell(it),
-          shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
+          shared ? shared.cell : inline ? inline.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
           // null, not "": an empty cell must stay :empty so the card layout drops its label too.
           shared ? null : el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
@@ -2287,10 +2446,10 @@ async function renderPerform(assignmentId) {
           shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
           el("td", { class: "history-cell" }, !dates.length ? el("span", { class: "muted small" }, "—")
-            : axisRow ? trended.map((p) => el("div", { class: "qa-axis-history" }, el("div", { class: "qa-shared-name" }, p.it.axisLabel), histChips(p.it, p.unit)))   // each axis its own
+            : axisTrend ? trended.map((p) => el("div", { class: "qa-axis-history" }, el("div", { class: "qa-shared-name" }, p.it.axisLabel), histChips(p.it, p.unit)))   // each axis its own
             : [shared?.history, histChips(main.it, main.unit)]),
           el("td", {class:"qa-trends"}, main.it.type === "numeric" ? trend : null));   // a trend only for a measured value
-        for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
+        for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared || inline) p.entry.rowEntries = parts.map((x) => x.entry); }
         const extras = el('td', {class:'qa-phone-extras', colspan:9});
         orderMeasurementRow(row);
         row.append(extras);
@@ -2339,6 +2498,19 @@ async function renderPerform(assignmentId) {
       }
       return out;
     };
+    // Tests on one row ("Same row as the test above") named for the axes of one thing ("…: X offset [mm]", "…: Y offset
+    // [mm]") are a titled block like an X / Y / Z group (Brook, 2026-11-20: the name, then "X: [ ] Y: [ ]" on the row
+    // below). Any other tests on one row stay a row of the table around them (inlineRow).
+    const foldJoined = (list) => {
+      const out = [];
+      for (let i = 0; i < list.length; i++) {
+        const group = [list[i]], same = (it) => it && !it.axes && numbers.joined?.has(it.test_id) && numbers.get(it.test_id) === numbers.get(list[i].test_id);
+        if (!list[i].axes) while (same(list[i + group.length])) group.push(list[i + group.length]);
+        const named = group.length > 1 ? joinedNames(group.map(shortName)) : null;
+        if (named && named.axes) { out.push({ joined: group, title: named.title, labels: named.axes }); i += group.length - 1; } else out.push(list[i]);
+      }
+      return out;
+    };
     const flush = () => {
       if (!pending.length) return;
       let plain = [];
@@ -2347,7 +2519,17 @@ async function renderPerform(assignmentId) {
           firstCell: (it, details) => qaTestName(it, shortName(it), details) }));
         plain = [];
       };
-      for (const m of foldAxes(pending)) {
+      for (const m of foldJoined(foldAxes(pending))) {
+        if (m.joined) {
+          emitPlain();
+          rows.push(measureTable(m.joined.map((it, k) => ({ ...it, axisLabel: m.labels[k] })), {
+            firstHeader: "Axis", joined: true,
+            title: el("div", { class: "measure-title" }, el("strong", {}, m.title), performDirections(m.joined[0], m.title, m.joined)),
+            directions: null, groupDirections: directionsText(m.joined[0]), groupName: m.title,
+            label: (it) => it.name, firstCell: (it) => el("strong", {}, it.axisLabel),
+          }));
+          continue;
+        }
         if (!m.axes) { plain.push(m); continue; }
         emitPlain();
         // An X / Y / Z offset (and its 3D magnitude) as a titled table with one row per axis, like the Sphinx tables.
@@ -2355,7 +2537,7 @@ async function renderPerform(assignmentId) {
         rows.push(measureTable(members, {
           firstHeader: "Axis",
           title: el("div", { class: "measure-title" }, el("strong", {}, m.base, m.unitTag ? ` ${m.unitTag}` : ""),
-            performDirections(m.axes[0], `${m.base}${m.unitTag ? ` ${m.unitTag}` : ""}`)),
+            performDirections(m.axes[0], `${m.base}${m.unitTag ? ` ${m.unitTag}` : ""}`, m.calc ? [...m.axes, m.calc] : m.axes)),
           directions: null, groupDirections: directionsText(m.axes[0]), groupName: `${m.base}${m.unitTag ? ` ${m.unitTag}` : ""}`,
           label: (it) => `${m.base} ${it.axisLabel}`,
           firstCell: (it) => el("strong", {}, it.axisLabel),
@@ -2372,7 +2554,7 @@ async function renderPerform(assignmentId) {
       const family = families.get(`${mp0.metric}|${item.unit || ""}`).slice().sort((a, b) => a.mp.sortKey - b.mp.sortKey);
       rows.push(measureTable(family.map((f) => f.item), {
         firstHeader: "Energy",
-        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), performDirections(item, mp0.metricLabel)),
+        title: el("div", { class: "measure-title" }, el("strong", {}, mp0.metricLabel), performDirections(item, mp0.metricLabel, family.map((f) => f.item))),
         directions: null, groupDirections: directionsText(item),
         firstCell: (it) => el("strong", {}, measureParts(it.name).rowLabel),
         label: (it) => { const mp = measureParts(it.name); return `${mp.rowLabel} · ${mp.metricLabel}`; },
@@ -2495,18 +2677,21 @@ async function renderPerform(assignmentId) {
     el('p',{},'Use a Sphinx report export (.xls or Sphinx-format .csv). This reader expects the report’s Setup headings and measurement rows; it does not accept arbitrary CSV column layouts.'),
     el('p',{},'For each row, it identifies the measurement name, energy/spot, warning/action limits, reference, and measured Result. Only the Result fills the answer. Matching uses the measurement and nominal energy, so small energy-label differences and uniquely matched spot renumbering do not create new tests.'),
     el('p',{},'The selected machine’s saved baseline and limits determine pass/fail. Imported reference values and the file’s own verdict do not replace them. Only matching template tests are filled; the remaining answers stay for you to complete.')]:null),sphinxSection?'How Sphinx imports work':'About importing');
-  const fileCard = el("div", { class: "card step qa-import" }, el('div',{class:'row'},el("strong", {}, "Import measurements"),importHelp,sphinxFile),
+  const fileCard = el("div", { class: "card step qa-import" }, el('div',{class:'row'},el("strong", {}, sphinxSection ? "Import Sphinx Measurements" : "Import measurements"),importHelp,sphinxFile),
     autoLine, sphinxInfo);
   if (!t.items.length) {
     app.append(el("div", { class: "card empty" }, "This QA list contains 0 tests. You can submit it for review.",
       can("configure") ? el("a", { href: `#/queues/${t.queue.id}` }, " Add tests") : null));
   }
-  // Sphinx reports belong beside the measurement section they fill.
+  // Sphinx reports belong in the measurement section they fill.
   const customBlocks=(t.queue.import_blocks||[]).filter(b=>!(b.reader==='sphinx'&&sphinxSection)&&!(b.reader==='hdr'&&QAHdrDaily.supported(t)));
   if(!sphinxSection&&(!customBlocks.length||QAHdrDaily.supported(t)||t.items.some(i=>(i.description||'').includes('[rule: wl-max-delta]'))))app.append(fileCard);
   app.append(...customBlocks.map(block=>mappedImportCard(block,t,inputs,qaDate,refresh)));
   app.append(finishedMessage);
-  app.append(...sections.flatMap((x) => [x.heading,x===sphinxSection?fileCard:null,x.box]).filter(Boolean));   // a null would append as the text "null"
+  app.append(...sections.flatMap((x) => [x.heading,x.box]).filter(Boolean));   // a null would append as the text "null"
+  // The Sphinx import is part of the Sphinx Measurements section: under its title (and its directions), above its
+  // tables (Brook, 2026-11-20: the section first, then "Import Sphinx Measurements").
+  if (sphinxSection) { const title = sphinxSection.box.firstElementChild; if (title && title.after) title.after(fileCard); else sphinxSection.box.append(fileCard); }
   const error = el("p", { class: "error" });
   const submit = el("button", { class: "primary", onclick: async () => {
     error.textContent = "";
@@ -3109,6 +3294,57 @@ async function renderQueueEditor(id) {
         }},'Save template'):null));
     dialog.addEventListener('close',()=>{dialog.remove();draw();});drawRows();document.body.append(dialog);dialog.showModal();
   };
+  // Setup QA adds a test or a block where it belongs (Brook, 2026-11-20: "create blocks and tests per block"): each
+  // section's title has ＋ Test and ＋ Block. What is added goes to the end of that section, with the section's number
+  // and name already in its field (nothing is typed for them), and the list is saved. A block is several tests on one
+  // row under one name ("Couch shift": X, Y, Z): one numeric test per field, named for the block and the field. X, Y, Z
+  // are a block by their names; other fields share the row of the first ("Same row as the test above").
+  const sectionField = (n, name, step = 0) => {   // how a new test's field starts in section n, and its category
+    const inside = items.map((it) => byId[it.test_id]).filter((t) => t && sectionNumber(t) === n), category = inside.at(-1)?.category || "";
+    if (!inside.some((t) => TEMPLATE_NUMBER.test(t.description || ""))) return { description: "", category };
+    const next = Math.max(0, ...inside.map((t) => parseInt((TEMPLATE_NUMBER.exec(t.description || "") || [])[2], 10) || 0)) + 1 + step;
+    return { description: `Template ${n}.${String(next).padStart(2, "0")}.${name ? ` [Section: ${name}]` : ""}`, category };
+  };
+  const addToSection = async (n, ids) => {
+    let at = -1;
+    items.forEach((it, i) => { const t = byId[it.test_id]; if (t && sectionNumber(t) === n) at = i; });
+    items.splice(at < 0 ? items.length : at + 1, 0, ...ids.map((test_id) => ({ test_id })));
+    await saveTemplateChanges();
+  };
+  const sectionTools = (n, name, title) => (!editable || valuesFor || isNew || searchTerm || !saveTemplateChanges ? null : el("span", { class: "section-tools" },
+    el("button", { type: "button", class: "small", title: `Add a test to ${title}`, "aria-label": `Add a test to ${title}`, onclick: () => {
+      const start = sectionField(n, name);
+      modal(`New test in ${title}`, testForm({ type: "numeric", tol_mode: "absolute", active: 1, category: start.category, description: start.description }, items.map((x) => byId[x.test_id])), async (data) => {
+        const r = await api("POST", "/api/tests", { ...testFormData(data), owner_queue_id: Number(id) });
+        await addToSection(n, [r.id]);
+      });
+    } }, "＋ Test"),
+    el("button", { type: "button", class: "small", title: `Add a block to ${title}`, "aria-label": `Add a block to ${title}`, onclick: () => {
+      modal(`New block in ${title}`, el("div", { class: "form-grid" },
+        field("Block name", el("input", { name: "block", required: true })),
+        field("Fields", el("input", { name: "fields", required: true, value: "X, Y, Z", title: "One test per field, separated by commas" })),
+        field("Unit", el("input", { name: "unit", placeholder: "mm, cm, %" })),
+        field("Baseline", el("input", { name: "expected", type: "number", step: "any" })),
+        field("Default Warning ±", el("input", { name: "warn", type: "number", step: "any", min: 0 })),
+        field("Default Action ±", el("input", { name: "fail", type: "number", step: "any", min: 0 })),
+        el("p", { class: "muted small wide" }, "One test per field, on one row under the block's name. A limit left blank is recorded, not judged.")),
+      async (data) => {
+        const block = String(data.block || "").trim(), unit = String(data.unit || "").trim();
+        const labels = String(data.fields || "").split(",").map((s) => s.trim()).filter(Boolean);
+        if (!block) throw new Error("Give the block a name.");
+        if (labels.length < 2) throw new Error("A block has two or more fields, separated by commas.");
+        if (new Set(labels.map((l) => l.toLowerCase())).size !== labels.length) throw new Error("Each field needs a name of its own.");
+        const xyz = labels.join(" ") === "X Y Z";   // a block by its names alone
+        const made = labels.map((label, i) => { const start = sectionField(n, name, i);
+          return { name: `${block} ${label}${unit ? ` [${unit}]` : ""}`, category: start.category || block, type: "numeric", unit, expected: data.expected, warn: data.warn, fail: data.fail,
+            tol_mode: "absolute", active: true, description: withRowMark(start.description, i > 0 && !xyz), owner_queue_id: Number(id) }; });
+        const taken = made.find((m) => tests.some((t) => t.name === m.name && (t.category || "") === m.category && Number(t.owner_queue_id) === Number(id)));
+        if (taken) throw new Error(`A test named '${taken.name}' is already in this list.`);
+        const ids = [];
+        try { for (const m of made) ids.push((await api("POST", "/api/tests", m)).id); }
+        finally { if (ids.length) await addToSection(n, ids); }   // what was made is in the list, whatever happened after
+      }, "Add block");
+    } }, "＋ Block")));
   const draw = () => {
     const selection = machineSelections[valuesFor] || {};
     const baseIds = new Set(items.map((i) => i.test_id));
@@ -3174,7 +3410,8 @@ async function renderQueueEditor(id) {
       const shortName = t.category && t.name.startsWith(t.category + " – ") ? t.name.slice(t.category.length + 3) : t.name;
       const tolUnit = ((own && own.tol_mode) || item.tol_mode || t.tol_mode) === "percent" ? "%" : t.unit;
       const n = sectionNumber(t);
-      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 6 }, sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))) : null;
+      const head = n !== lastSection ? el("tr", { class: "section-row" }, el("td", { colspan: 6 }, el("div", { class: "section-row-line" },
+        el("span", {}, sectionTitle(n, sectionCats.get(n), sectionNameOf(t))), sectionTools(n, sectionNameOf(t), sectionTitle(n, sectionCats.get(n), sectionNameOf(t)))))) : null;
       const family = familyOf.get(item.test_id);
       const firstInFamily = family && family[0].item === item;
       const lastInFamily = family && family[family.length - 1].item === item;
@@ -3218,7 +3455,7 @@ async function renderQueueEditor(id) {
         el("td", {}, editable && !valuesFor ? el("input", { value: t.category || '', "aria-label": `Category: ${t.id}`, list: 'template-category-options', oninput: e => editDefinition('category', e.target.value) }) : categoryLabel(t.category) || el("span", { class: "muted" }, "—")),
         el("td", {}, editable && !valuesFor ? el('div', {}, select('', [...Object.entries(TYPE_LABELS),...(/\[calc: workbook\]/.test(t.description||'')?[["workbook","Derived (Excel)"]]:[])], directionType(t)||(QADerived.read(t.description)?'derived':/\[calc: workbook\]/.test(t.description||'')?'workbook':t.type), { "aria-label": `Result type: ${t.id}`, onchange: e => { if(e.target.value==='workbook')return; const kind={direction:'section',direction_next:'next'}[e.target.value]; if(isDirection(t)&&!kind)editDefinition('description',withDirectionMark(t.description,null)); if(kind){t.type='text';t.description=withDirectionMark(QADerived.encode(t.description,null),kind);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'text',description:t.description,derived:null});markDirty();draw();return;} if(e.target.value==='derived'){t.type='numeric';const rule=defaultDerivedRule(items.slice(0,index).map(x=>byId[x.test_id]));t.description=QADerived.encode(t.description,null)+' [derived: '+encodeURIComponent(JSON.stringify(rule))+']';testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),type:'derived',derived:rule});markDirty();}else{t.description=QADerived.encode(t.description,null);editDefinition('type',e.target.value);testUpdates.set(t.id,{...(testUpdates.get(t.id)||{}),derived:null});}draw(); } }), t.type==='choice'&&!isDirection(t)?el('textarea',{rows:4,'aria-label':`Answer options: ${t.id}`,placeholder:'One answer per line',oninput:e=>editDefinition('choices',e.target.value),onchange:()=>draw()},(testUpdates.get(t.id)?.choices ?? choiceOptions(t.description).join('\n'))):null) : typeLabel(t)),
         el("td", {}, numeric ? el("div", { class: "row nowrap" }, input("expected"), t.unit && t.unit !== "unitless" ? el("span", { class: "muted small" }, t.unit) : null)
-          : el("span", { class: "muted" }, isDirection(t) ? "Not recorded" : t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),
+          : el("span", { class: "muted" }, isDirection(t) ? `${directionKind(t) === "next" ? "ⓘ of the test below" : "ⓘ of the section"} · Not recorded` : t.type === "boolean" ? "Pass" : TYPE_LABELS[t.type])),   // where a direction shows on the QA form
         el("td", {}, numeric ? el("div", { class: "tol-cell" },
           el("label", { class: "inline small" }, valuesFor ? "Warning ±" : "Default Warning ±", input("warn", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
           el("label", { class: "inline small" }, valuesFor ? "Action ±" : "Default Action ±", input("fail", { min: 0 }), tolUnit ? el("span", { class: "muted" }, tolUnit) : null),
@@ -3501,7 +3738,8 @@ function testForm(test,prior=[]) {
     field("Test name", el("input", { name: "name", value: t.name || "", required: true })),
     field("Type", type),
     choices, derivedBox, limits,
-    field("Instructions", el("textarea", { name: "description" }, t.description || ""), "wide"),
+    field("Instructions", el("textarea", { name: "description" }, withReference(t.description, "")), "wide"),
+    field("Reference", el("input", { name: "reference", value: referenceOf(t.description), placeholder: "The report this check comes from" }), "wide"),
     el("label", { class: "check" }, el("input", { type: "checkbox", name: "active", checked: !!t.active }), "Active"));
 }
 

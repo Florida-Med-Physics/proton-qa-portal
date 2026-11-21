@@ -1722,6 +1722,9 @@ td, .measure-table td { font-size: 21px; }
 /* Denser test lists preserve the existing text size and full descriptions. */
 .list-editor td { padding:8px 10px; }
 .list-editor .section-row td, .list-editor .group-heading td { padding:8px 12px; }
+/* A section's title in the list editor, with ＋ Test and ＋ Block at its right. */
+.section-row-line { display:flex; align-items:center; gap:10px; }
+.section-tools { margin-left:auto; display:inline-flex; gap:6px; font-weight:400; letter-spacing:0; }
 .list-editor .inline-test-name textarea { min-height:40px; padding:5px 7px; line-height:1.3; }
 .list-editor .name-with-edit { gap:7px; }
 .list-editor .tol-cell { gap:3px 8px; }
@@ -1844,13 +1847,20 @@ td, .measure-table td { font-size: 21px; }
 /* A names row collapsed under a table with the same columns (qaHeadings) takes no room at all: the QA form's one
    reading size is set with !important on every element, so the size is taken away here by a stronger rule. */
 #app .measure-table tr.qa-col-names.repeat > th { font-size:0 !important; }
-/* The Columns box: small, under its button (qaColumnsButton). */
+/* The Column Chooser: a small window over the page (openQaColumnChooser), moved by its title. */
 .qa-columns-wrap { position:relative; display:inline-flex; }
-.qa-columns-pop { position:absolute; top:calc(100% + 6px); right:0; z-index:40; width:272px; max-width:calc(100vw - 24px); padding:8px 12px 10px;
+.qa-columns-pop { position:fixed; z-index:60; width:300px; max-width:calc(100vw - 16px); padding:0 12px 10px;
   color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 30px rgba(20, 30, 50, 0.22); }
-.qa-columns-pop.from-left { right:auto; left:0; }
+.qa-columns-title { display:flex; align-items:center; gap:8px; margin:0 -12px 6px; padding:4px 6px 4px 12px; cursor:move; user-select:none; touch-action:none;
+  background:var(--surface-2); border-bottom:1px solid var(--border); border-radius:10px 10px 0 0; }
+.qa-columns-title .icon-btn { min-width:30px; min-height:30px; padding:0; }
+.qa-columns-pop.qa-drop-hide { outline:2px dashed var(--accent); outline-offset:2px; }
 .qa-columns-list { list-style:none; margin:0; padding:0; }
-.qa-columns-list li { display:flex; align-items:center; gap:6px; padding:1px 0; }
+.qa-columns-list li { display:flex; align-items:center; gap:6px; padding:1px 0; cursor:grab; }
+.qa-columns-list li .drag-handle { color:var(--muted); }
+.qa-columns-list li.qa-col-dragging { opacity:0.45; }
+.qa-columns-list li.qa-drop-before { box-shadow:inset 0 3px 0 var(--accent); }
+.qa-columns-list li.qa-drop-after { box-shadow:inset 0 -3px 0 var(--accent); }
 .qa-columns-list .check { margin:0; font-size:16px; }
 .qa-columns-pop .qa-columns-list .icon-btn { min-width:32px; min-height:32px; padding:0; }
 .qa-columns-list .icon-btn:disabled { opacity:0.3; }
@@ -1867,6 +1877,9 @@ td, .measure-table td { font-size: 21px; }
 /* A step's instruction, word for word, in its details box; its short label opens it too (the ⓘ is not on a phone's card). */
 .qa-step-text { margin:0 0 8px; font-size:18px; line-height:1.45; }
 .qa-step-name { cursor:help; }
+/* The report a check comes from, last in its details box. */
+.qa-reference { margin:12px 0 0; }
+.qa-reference .directions-label { display:block; }
 @media (max-width: 1200px) {
   .qa-step-name { text-decoration:underline dotted; text-underline-offset:4px; }
   .qa-columns-button, .qa-columns-pop { display:none; }   /* a phone's cards have no columns to choose */
@@ -1942,3 +1955,31 @@ td, .measure-table td { font-size: 21px; }
   .qa-axis-row .qa-shared-name > span::after { content:":"; }
   .qa-axis-row .qa-shared-more { grid-column:2; grid-row:2; }
 }
+
+/* Tests on one row of the table ("Same row as the test above"): the last is the row's value, in the table's own
+   columns; the ones before it are answered beside their names in the Test column, name and box on one line (Brook,
+   2026-11-20). The words the names share are said once, in bold, where a test's name is. */
+.qa-inline { display:flex; align-items:baseline; gap:6px 14px; }
+.qa-inline-title { flex:0 0 auto; }
+.qa-inline-fields { flex:1 1 0; min-width:0; display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; }
+.qa-inline-field { display:inline-flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; min-width:0; }
+.qa-inline-field > button, .qa-inline-field > .status-cell { align-self:center; }
+.qa-inline-name { font-weight:600; }
+.qa-inline-named .qa-inline-name { font-weight:400; }
+.qa-inline-field > .qa-inline-name::after { content:":"; }
+#app .measure-table .qa-inline-field .result-input, #app .measure-table .qa-inline-field .text-input { flex:0 0 auto; width:5.5em; max-width:100%; text-align:center; }
+#app .measure-table .qa-inline-field select.result-input { width:10em; text-align:left; }   /* wide enough to read the choice */
+/* On a wide window the rows under one another line up like a spreadsheet's: the shared names take one width, so the
+   boxes beside them start at the same place. */
+@media (min-width: 1280px) {
+  .qa-inline-title { min-width:7.5em; }
+  #app .measure-table .qa-inline-field select.result-input { width:13em; }
+}
+.qa-inline-field .qa-calculation-info { margin-top:0; }
+.qa-inline-field > .qa-inline-limits, .qa-inline-field > .note-input, .qa-inline-field > .muted.small:not(:empty) { flex-basis:100%; }
+.qa-inline-field > .muted.small:empty { display:none; }
+.qa-inline-field .chip.recorded { display:none; }
+
+
+/* The Sphinx import is a row of the Sphinx Measurements section, under its title: no card of its own. */
+.card.section > .qa-import { margin:0; padding:6px 16px 12px; border:0; border-radius:0; box-shadow:none; background:none; }

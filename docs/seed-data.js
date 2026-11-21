@@ -1917,7 +1917,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.02c. [Section: Mechanical and Imaging]",
+     "description": "Template 2.02c. [Section: Mechanical and Imaging]\nReference: TG-224, Mechanical: laser position accuracy 0.2 cm",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[Ortho - kV/kV] PPS 2 XRAY Offset X [cm]"
@@ -1929,7 +1929,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.02d. [Section: Mechanical and Imaging]",
+     "description": "Template 2.02d. [Section: Mechanical and Imaging]\nReference: TG-224, Mechanical: laser position accuracy 0.2 cm",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[Ortho - kV/kV] PPS 2 XRAY Offset Y [cm]"
@@ -1941,7 +1941,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.02e. [Section: Mechanical and Imaging]",
+     "description": "Template 2.02e. [Section: Mechanical and Imaging]\nReference: TG-224, Mechanical: laser position accuracy 0.2 cm",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[Ortho - kV/kV] PPS 2 XRAY Offset Z [cm]"
@@ -1953,7 +1953,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.02f. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Isocenter%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Isocenter%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Isocenter%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]",
+     "description": "Template 2.02f. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Isocenter%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Isocenter%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Isocenter%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22Mechanical%20and%20Safety%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]\nReference: TG-224, Mechanical: laser position accuracy 0.2 cm",
      "_previous_name": "[Ortho - kV/kV] PPS 2 XRAY Offset [cm]"
     },
     {
@@ -2076,7 +2076,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": -5,
      "tol_mode": "absolute",
-     "description": "Template 2.60x. [Section: Mechanical and Imaging]",
+     "description": "Template 2.60x. [Section: Mechanical and Imaging]\nReference: TG-224, Mechanical: couch translational motion < 0.1 cm",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[kV/kV - Gantry 90°] Correction vector X [cm]"
@@ -2088,7 +2088,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": -1,
      "tol_mode": "absolute",
-     "description": "Template 2.60y. [Section: Mechanical and Imaging]",
+     "description": "Template 2.60y. [Section: Mechanical and Imaging]\nReference: TG-224, Mechanical: couch translational motion < 0.1 cm",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[kV/kV - Gantry 90°] Correction vector Y [cm]"
@@ -2100,7 +2100,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 4.5,
      "tol_mode": "absolute",
-     "description": "Template 2.60z. [Section: Mechanical and Imaging]",
+     "description": "Template 2.60z. [Section: Mechanical and Imaging]\nReference: TG-224, Mechanical: couch translational motion < 0.1 cm",
      "warn": 0.15,
      "fail": 0.2,
      "_previous_name": "[kV/kV - Gantry 90°] Correction vector Z [cm]"
@@ -2112,7 +2112,7 @@ window.PORTAL_SEED = {
      "unit": "cm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 2.61. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]"
+     "description": "Template 2.61. [Section: Mechanical and Imaging] [calc: 3d-offset] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20X%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20Y%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%2C%20%7B%22name%22%3A%20%22Mechanical-to-kV%2FkV%20Correction%20Vector%20Z%20%5Bcm%5D%22%2C%20%22category%22%3A%20%22AI_PBS_Daily_Imaging%22%7D%5D%2C%20%22formula%22%3A%20%22sqrt%28A%2AA%2BB%2AB%2BC%2AC%29%22%7D]\nReference: TG-224, Mechanical: couch translational motion < 0.1 cm"
     },
     {
      "name": "Apply the correction vector.",
@@ -2137,12 +2137,6 @@ window.PORTAL_SEED = {
      "category": "Mechanical and Safety",
      "type": "boolean",
      "description": "Template 2.80. [Section: Mechanical and Imaging]"
-    },
-    {
-     "name": "Retract panels A and B.",
-     "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 2.90. [Section: Mechanical and Imaging]"
     },
     {
      "category": "AI_PBS_Daily_Imaging",
@@ -2188,17 +2182,22 @@ window.PORTAL_SEED = {
      "description": "Template 2.95. [Section: Mechanical and Imaging]"
     },
     {
+     "name": "Retract panels A and B.",
+     "category": "Mechanical and Safety",
+     "type": "text",
+     "description": "Template 3.00a. [Section: Sphinx Measurements] [direction: section]"
+    },
+    {
      "category": "A tip for the next procedure",
      "name": "Go to MyQA, open your machine QA, connect Sphinx, and measure the background.",
-     "type": "boolean",
-     "unit": "Yes/No",
-     "description": "Template 2.99. [Section: Mechanical and Imaging]"
+     "type": "text",
+     "description": "Template 3.00b. [Section: Sphinx Measurements] [direction: section]"
     },
     {
      "name": "Deliver the beam.",
      "category": "Mechanical and Safety",
-     "type": "boolean",
-     "description": "Template 3.00. [Section: Sphinx Measurements]"
+     "type": "text",
+     "description": "Template 3.00. [Section: Sphinx Measurements] [direction: section]"
     },
     {
      "category": "Beam_Parameters",
@@ -2228,7 +2227,7 @@ window.PORTAL_SEED = {
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.04. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20100000000%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20200000000%7D%5D%2C%20%22sample%22%3A%20true%7D]"
+     "description": "Template 3.04. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20100000000%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20200000000%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Device Selection",
@@ -2243,7 +2242,7 @@ window.PORTAL_SEED = {
      "unit": "",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.06. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Electrometer%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.0%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.1%7D%5D%2C%20%22sample%22%3A%20true%7D]"
+     "description": "Template 3.06. [Section: Sphinx Measurements] [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Electrometer%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.0%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20electrometer%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%201.1%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Device Selection",
@@ -2270,7 +2269,7 @@ window.PORTAL_SEED = {
      "unit": "cGy",
      "expected": 150,
      "tol_mode": "absolute",
-     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Daily%20output%3A%20Charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Daily_PBS_Dosimetry%22%7D%2C%20%7B%22name%22%3A%20%22Overall%20Calibration%20Factor%20%5BGy%2FC%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20%28Output%29%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22A%2A0.000000001%2AB%2AC%2A100%22%7D]"
+     "description": "Template 3.09. [Section: Sphinx Measurements] [calc: dose] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Daily%20output%3A%20Charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Daily_PBS_Dosimetry%22%7D%2C%20%7B%22name%22%3A%20%22Overall%20Calibration%20Factor%20%5BGy%2FC%5D%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20%28Output%29%22%2C%20%22category%22%3A%20%22Dosimetry%22%7D%5D%2C%20%22formula%22%3A%20%22A%2A0.000000001%2AB%2AC%2A100%22%7D] [row: with above]\nReference: TG-224, Dosimetry: output < 3 % for different energies on different days with one consistent field"
     },
     {
      "category": "Data",
@@ -2285,7 +2284,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 77.7,
      "tol_mode": "absolute",
-     "description": "Template 3.11. [Section: Sphinx Measurements]",
+     "description": "Template 3.11. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: distal depth 1 mm at the distal 90 % depth dose",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -2329,7 +2328,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 158.5,
      "tol_mode": "absolute",
-     "description": "Template 3.15. [Section: Sphinx Measurements]",
+     "description": "Template 3.15. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: distal depth 1 mm at the distal 90 % depth dose",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -2373,7 +2372,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 260.7,
      "tol_mode": "absolute",
-     "description": "Template 3.19. [Section: Sphinx Measurements]",
+     "description": "Template 3.19. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: distal depth 1 mm at the distal 90 % depth dose",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -2419,7 +2418,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.23. [Section: Sphinx Measurements]"
+     "description": "Template 3.23. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2430,7 +2429,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.24. [Section: Sphinx Measurements]"
+     "description": "Template 3.24. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2496,7 +2495,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.30. [Section: Sphinx Measurements]"
+     "description": "Template 3.30. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2507,7 +2506,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.31. [Section: Sphinx Measurements]"
+     "description": "Template 3.31. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2573,7 +2572,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.37. [Section: Sphinx Measurements]"
+     "description": "Template 3.37. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2584,7 +2583,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.38. [Section: Sphinx Measurements]"
+     "description": "Template 3.38. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2650,7 +2649,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.44. [Section: Sphinx Measurements]"
+     "description": "Template 3.44. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2661,7 +2660,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.45. [Section: Sphinx Measurements]"
+     "description": "Template 3.45. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2727,7 +2726,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.51. [Section: Sphinx Measurements]"
+     "description": "Template 3.51. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2738,7 +2737,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.52. [Section: Sphinx Measurements]"
+     "description": "Template 3.52. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2804,7 +2803,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.58. [Section: Sphinx Measurements]"
+     "description": "Template 3.58. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2815,7 +2814,7 @@ window.PORTAL_SEED = {
      "warn": 0.5,
      "fail": 1.0,
      "tol_mode": "absolute",
-     "description": "Template 3.59. [Section: Sphinx Measurements]"
+     "description": "Template 3.59. [Section: Sphinx Measurements]\nReference: TG-224, Dosimetry: spot position 2 mm / 1 mm absolute / relative"
     },
     {
      "category": "Spot",
@@ -2890,7 +2889,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.66. [Section: Sphinx Measurements]",
+     "description": "Template 3.66. [Section: Sphinx Measurements]\nReference: TG-224, Imaging: X-ray and proton beam isocenter coincidence < 1 mm",
      "warn": 0.5,
      "fail": 1.0
     },
@@ -2901,7 +2900,7 @@ window.PORTAL_SEED = {
      "unit": "mm",
      "expected": 0,
      "tol_mode": "absolute",
-     "description": "Template 3.67. [Section: Sphinx Measurements]",
+     "description": "Template 3.67. [Section: Sphinx Measurements] [row: with above]\nReference: TG-224, Imaging: X-ray and proton beam isocenter coincidence < 1 mm",
      "warn": 0.5,
      "fail": 1.0
     },
