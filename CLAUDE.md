@@ -109,7 +109,9 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   reorder or onto a heading, a heading dragged in to hide (`openQaColumnChooser`). A test's **Reference** is a
   `Reference:` line of its field, edited in Setup QA's test form and shown last behind the ⓘ (`referenceOf`,
   `withReference`); the seed's are the department's own TG-224 notes, unverified against the report. Setup QA: ＋ Test
-  and ＋ Block on each section's title. Brook does not like cm and mm mixed in one list: open, see "Waiting on Brook".
+  and ＋ Block on each section's title. A saved run draws tests on one row the same way (`inlineRun`; Brook, 2026-11-25),
+  and an X / Y pair as rows of their own like its X / Y / Z rows (`runRows`). Brook does not like cm and mm mixed in one
+  list: open, see "Waiting on Brook".
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in

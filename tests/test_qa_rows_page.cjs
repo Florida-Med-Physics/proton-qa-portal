@@ -5,7 +5,8 @@
 //    Test column, name and box on one line; everything lines up with the rows around it, like a spreadsheet;
 //  - an X / Y pair is a titled block: its number and name, its baseline and limits under the name, "X: [ ] Y: [ ]" below;
 //  - a test's Reference (the report its check comes from) is behind its ⓘ, and behind a block's for its tests; Setup
-//    QA's test form reads and writes it in a box of its own.
+//    QA's test form reads and writes it in a box of its own;
+//  - a saved run shows the same rows: tests on one row as a row of its table, an X / Y pair as rows of their own.
 // Serve docs locally (port 8791), then run with Playwright available in NODE_PATH: node tests/test_qa_rows_page.cjs
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -127,7 +128,26 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.deepEqual(await edit(''), { reference: 'Synthetic report, section 1', instructions: was }, 'its own box; Instructions as before');
     assert.equal(await stored(), was, 'cleared: the field as it was');
 
+    // 5. A saved run (an empty synthetic one): the same rows in its table. Tests on one row are a row of it, the last
+    // in the table's own columns and the others beside their names; no merged cell. An X / Y pair's tests are rows of
+    // their own there, like the axes of X / Y / Z, under the one number.
+    const run = await p.evaluate(async (id) => (await api('POST', `/api/assignments/${id}/runs`, { results: [] })).id, list);
+    await open(`#/runs/${run}`, '.review-measure-table');
+    assert.equal(await p.locator('.review-measure-table td.qa-shared-cell').count(), 0, 'no merged cell on a saved run');
+    const saved = (name) => p.locator('.review-measure-table tr[data-test-id]', { has: p.locator('.qa-inline-title', { hasText: new RegExp(`^${name}$`) }) });
+    assert.deepEqual([await saved('Chamber').locator('td.qa-n').textContent(), await saved('Chamber').getAttribute('class'), await saved('Chamber').locator('.qa-inline-name').allTextContents(), (await saved('Chamber').locator('td.qa-unit').textContent()).trim()],
+      ['3.03', 'qa-inline-row', ['Cal. Factor(Proton), Gy/C'], 'Gy/C']);
+    assert.deepEqual([await saved('Electrometer').locator('td.qa-n').textContent(), await saved('Electrometer').locator('.qa-inline-name').allTextContents()], ['3.04', ['Calibration Factor']]);
+    assert.deepEqual([await saved('Daily output').locator('td.qa-n').textContent(), await saved('Daily output').locator('.qa-inline-name').allTextContents(), (await saved('Daily output').locator('td.qa-unit').textContent()).trim()],
+      ['3.06', ['Charge [nC]', 'Dose [cGy]'], 'cGy']);
+    assert.match((await saved('Daily output').locator('td.qa-baseline').textContent()).trim(), /^150(\.0+)? cGy$/);
+    for (const row of [saved('Chamber'), saved('Electrometer'), saved('Daily output')]) for (const cell of ['td.qa-baseline', 'td.qa-measured', 'td.qa-unit', 'td.qa-result']) assert.equal(await row.locator(cell).count(), 1, `${cell}: the row keeps the table's columns`);
+    const pairRows = p.locator('.review-measure-table tr[data-test-id]', { has: p.locator('td.qa-label strong', { hasText: /^Isocenter Coincidence \[X-ray vs\. Proton Beam\]: [XY] offset \[mm\]$/ }) });
+    assert.deepEqual(await pairRows.evaluateAll((rows) => rows.map((r) => [r.querySelector('td.qa-n').textContent, r.querySelector('td.qa-label strong').textContent.replace(/^.*: /, ''), r.className])),
+      [['3.20', 'X offset [mm]', ''], ['3.20', 'Y offset [mm]', '']], 'X and Y each a row of its own, under the one number');
+    assert.equal(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, 'nothing scrolls sideways');
+
     assert.deepEqual(errors, []);
-    console.log('QA rows on the page: tests on one row are a row of the table (the last under Measured with its baseline and unit, the others beside their names, all lined up with the rows around them); an X / Y pair is a titled block; a Reference behind a test\'s and a block\'s ⓘ, read and written in Setup QA\'s test form.');
+    console.log('QA rows on the page: tests on one row are a row of the table (the last under Measured with its baseline and unit, the others beside their names, all lined up with the rows around them); an X / Y pair is a titled block; a Reference behind a test\'s and a block\'s ⓘ, read and written in Setup QA\'s test form; a saved run shows the same rows.');
   } finally { await browser.close(); }
 })().catch((error) => { console.error(error); process.exit(1); });

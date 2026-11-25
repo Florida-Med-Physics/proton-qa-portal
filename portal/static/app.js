@@ -4034,19 +4034,34 @@ async function renderReviewMeasurements(run) {
   const numberFor=r=>numbers.get(r.test_id)||checkNumber(r.description)||fallback.get(r.test_id)||'';
   const groups=new Map();
   for(const r of run.results){const n=sectionNumber(r),named=sectionNameOf(r);const key=`${n}|${named||r.category||'General'}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
-  // Tests marked "Same row as the test above" share one row, as on the QA form (measureTable's sharedCells): their values in
-  // one cell (sharedCell; a Pass / Fail answer as its chip), each with its details, its result and deviation when it has a
-  // baseline or limits, its baseline and limits, and its comment; History and Trend of the first judged one, named.
-  const sharedCells=parts=>{
+  // Tests marked "Same row as the test above" are a row of the table, as on the QA form (measureTable's inlineRow): the
+  // last test is the row's value, in the table's own columns (Baseline, Measured, Unit, Result, its note, history and
+  // trend); the tests before it are beside their names in the Test column, each with its value (a Pass / Fail answer as
+  // its chip), its result and deviation when it has a baseline or limits, its baseline and limits, and its comment.
+  // Words the names share are said once, in bold.
+  const inlineRun=parts=>{
+    const main=parts.at(-1),others=parts.slice(0,-1),named=joinedNames(parts.map(p=>qaDisplayName(p.r)));
+    const labels=named?named.labels:parts.map(p=>qaDisplayName(p.r));
     const has=(p,...keys)=>p.r.type==='numeric'&&keys.some(k=>p.r[k]!=null);
-    const main=parts.find(p=>has(p,'warn','fail'))||parts.find(p=>p.r.type==='numeric')||parts[0];
-    return {main,history:parts.filter(p=>p.r.type==='numeric').length>1?el('div',{class:'qa-shared-name'},qaDisplayName(main.r)):null,
-      cell:sharedCell(parts.map(p=>[p.r,qaDisplayName(p.r),p.r.type==='numeric'?p.unit:'',testDetailsButton(p.r,run.results,numbers),
-        p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('div',{class:'review-measured'},p.amount),
+    const naming=(button,text)=>{if(button)for(const key of ['title','aria-label'])button.setAttribute(key,`${button.getAttribute(key)}: ${text}`);return button;};
+    const fields=others.map((p,i)=>{
+      const tag=p.r.type==='numeric'&&p.unit&&!unitNamed(labels[i]||p.r.name,p.unit)?el('span',{class:'qa-shared-unit'},` (${p.unit})`):null;
+      return el('span',{class:'qa-inline-field','data-test-id':p.r.test_id},
+        labels[i]||tag?el('span',{class:'qa-inline-name'},labels[i],tag):null,naming(testDetailsButton(p.r,run.results,numbers),labels[i]||p.r.name),
+        p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('span',{class:'qa-inline-value'},p.amount),
         has(p,'expected','warn','fail')&&!p.missing?p.result:null,
-        has(p,'expected','warn','fail')?el('div',{class:'qa-limits'},[p.r.expected!=null?`Baseline ${fmt(p.r.expected)}`:null,qaLimitsLine(p.limits,p.unit)?.textContent].filter(Boolean).join(' · ')):null,p.r.comment?el('div',{class:'qa-shared-note'},p.r.comment):null])),
-      comment:parts.some(p=>p.r.comment)?null:'—'};
+        has(p,'expected','warn','fail')?el('span',{class:'qa-limits qa-inline-limits'},[p.r.expected!=null?`Baseline ${fmt(p.r.expected)}`:null,qaLimitsLine(p.limits,p.unit)?.textContent].filter(Boolean).join(' · ')):null,
+        p.r.comment?el('span',{class:'qa-shared-note'},p.r.comment):null);
+    });
+    const last=labels.at(-1),details=naming(testDetailsButton(main.r,run.results,numbers),last||main.r.name);
+    return {main,cell:el('td',{class:'qa-label qa-inline-cell'},el('div',{class:'qa-test-title'},
+      el('div',{class:`qa-test-name qa-inline${named?' qa-inline-named':''}`},named?el('strong',{class:'qa-inline-title'},named.title):null,
+        el('div',{class:'qa-inline-fields'},fields,last?el('span',{class:'qa-inline-name qa-inline-main'},last):null)),details),
+      main.r.type==='numeric'?qaLimitsLine(main.limits,main.unit):null)};
   };
+  // A section's rows: tests on one row together, except tests named for the axes of one thing (an X / Y pair), which
+  // are rows of their own here, as the axes of X / Y / Z are.
+  const runRows=results=>sharedRows(results,numbers).flatMap(group=>group.length>1&&joinedNames(group.map(r=>qaDisplayName(r)))?.axes?group.map(r=>[r]):[group]);
   let last=null;
   for(const[key,results]of [...groups].sort(([a],[b])=>Number(a.split('|')[0])-Number(b.split('|')[0]))){
     const [n,category]=key.split('|');
@@ -4054,7 +4069,7 @@ async function renderReviewMeasurements(run) {
     const dp=decimalsOf(results.filter(r=>r.type==='numeric').flatMap(r=>[...(history[r.test_id]||[]).slice(-5).map(h=>h.value),r.expected]));
     if(n!==last){app.append(el('h2',{class:'section-head'},sectionTitle(Number(n),[...groups.keys()].filter(k=>k.startsWith(n+'|')).map(k=>k.split('|')[1]),sectionNameOf(results[0]))));last=n;}
     const tbody=el('tbody');
-    for(const group of sharedRows(results,numbers)){
+    for(const group of runRows(results)){
       const parts=group.map(r=>{
         const unit=r.unit&&r.unit!=='unitless'?r.unit:'';
         const missing=r.value_num==null&&r.value_text==null;
@@ -4080,7 +4095,7 @@ async function renderReviewMeasurements(run) {
         const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
         return {r,unit,missing,amount:amount??value,measured,limits,result:el('div',{class:'status-cell'},chip(r.status),r.type==='numeric'&&!missing?deviationText(r.value_num,limits,unit):null)};
       });
-      const shared=parts.length>1?sharedCells(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=shared?shared.main:parts[0];
+      const inline=parts.length>1?inlineRun(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=inline?inline.main:parts[0];   // what the row's own cells show
       const prior=(history[r.test_id]||[]).filter(h=>h.run_id!==run.id&&h.qa_date<=run.qa_date);
       const recent=[...prior].reverse().slice(0,3);
       const answered=r.type==='boolean'||r.type==='status',histText=h=>answered?answerWord(r.type,r.unit,h.value,h.status):fmt(h.value,dp)+(unit?' '+unit:'');
@@ -4098,16 +4113,16 @@ async function renderReviewMeasurements(run) {
         chart.firstChild.replaceChildren(el('div',{class:'row'},el('strong',{},r.name),el('span',{class:'spacer'}),el('a',{href:`#/trends?machine_id=${run.machine_id}&list=${run.assignment_id}&test_id=${r.test_id}&range=365`},'Full trend')),seriesChart([{label:r.name,points:pts}],unit,{small:true,yLabel:yAxisLabel([r.name])}));
         chart.hidden=false;
       }},trendIcon(16));
-      const details=shared?null:testDetailsButton(r,run.results,numbers);
-      const row=el('tr',{'data-test-id':lead.test_id},
+      const details=inline?null:testDetailsButton(r,run.results,numbers);
+      const row=el('tr',{'data-test-id':lead.test_id,class:inline?'qa-inline-row':null},
         el('td',{class:'qa-n'},numberFor(lead)),
-        shared?shared.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},qaTestName(r,qaDisplayName(r),details)),details),r.type==='numeric'?qaLimitsLine(limits,unit):null),
-        shared?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
-        shared?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
-        shared?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
-        shared?null:el('td',{class:'qa-result','data-label':'Result'},result),
-        el('td',{class:'qa-comment','data-label':'Comment'},shared?shared.comment:r.comment?noteButton(r.comment):'—'),
-        el('td',{class:'history-cell','data-label':'History'},recent.length?shared?.history:null,hist),
+        inline?inline.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},qaTestName(r,qaDisplayName(r),details)),details),r.type==='numeric'?qaLimitsLine(limits,unit):null),
+        el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
+        el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
+        el('td',{class:'qa-measured','data-label':'Measured'},measured),
+        el('td',{class:'qa-result','data-label':'Result'},result),
+        el('td',{class:'qa-comment','data-label':'Comment'},r.comment?noteButton(r.comment):'—'),
+        el('td',{class:'history-cell','data-label':'History'},hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
       orderMeasurementRow(row);
       tbody.append(row,chart);
