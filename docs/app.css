@@ -1979,6 +1979,9 @@ td, .measure-table td { font-size: 21px; }
 .qa-inline-field > .qa-inline-limits, .qa-inline-field > .note-input, .qa-inline-field > .muted.small:not(:empty) { flex-basis:100%; }
 .qa-inline-field > .muted.small:empty { display:none; }
 .qa-inline-field .chip.recorded { display:none; }
+/* On a saved run the tests beside their names show what was recorded: the value, then its verdict, limits and note. */
+.qa-inline-value { font-weight:600; }
+.qa-inline-field > .qa-shared-note { flex-basis:100%; }
 
 
 /* The Sphinx import is a row of the Sphinx Measurements section, under its title: no card of its own. */

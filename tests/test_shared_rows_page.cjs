@@ -5,8 +5,8 @@
 // difference) is the row's value, under Measured with its baseline, unit and result in their columns, and the tests
 // before it are answered beside their names in the Test column (name and unit, input, deviation, baseline, note); the
 // difference follows the typed values with its verdict; its calculation details keep the equation's letters; the saved
-// run shows one row with each note under its test; the PDF numbers alike; unticking gives back the same QA form, byte
-// for byte. Headless
+// run shows the same row of the table (the difference in the columns, the two readings beside their names with their
+// notes); the PDF numbers alike; unticking gives back the same QA form, byte for byte. Headless
 // Chrome or Edge over the DevTools protocol (no Playwright needed); skipped when neither is installed (set CHROME_PATH).
 // Run with node tests/test_shared_rows_page.cjs from the repository root.
 const assert = require('node:assert/strict');
@@ -151,20 +151,30 @@ let browser;
   assert.equal(saved['Source air kerma strength — difference'].status, 'pass');
   assert.deepEqual(['TCS Sk', 'decay table Sk', 'difference'].map((n) => saved[`Source air kerma strength — ${n}`].comment || ''), ['', 'synthetic decay note', 'synthetic difference note']);
   const runRow = `[...document.querySelectorAll('.review-measure-table tr[data-test-id]')][7]`;
-  assert.deepEqual(await page(`(() => { const r = ${runRow}; return [r.querySelector('.qa-n').textContent, [...r.querySelectorAll('.qa-shared-field')].map((f) => f.innerText.replace(/\\s+/g, ' ').trim()), r.querySelector('td.qa-comment').textContent]; })()`),
-    ['1.08', ['TCS Sk (mGy·m²·h⁻¹) 12.05 (Δ +0.05 mGy·m²·h⁻¹) Baseline 12', 'Decay-table Sk (mGy·m²·h⁻¹) 12 (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 synthetic decay note',
-      'Source strength difference (%) ⓘ 0.417 PASS(Δ +0.42 %) Baseline 0 · Action ±1 % synthetic difference note'], ''], 'each note under its test, its limits as on the QA form; the Note column left empty');
+  // As on the QA form: a row of the table. The difference is the row's value, in the table's own columns with its note
+  // behind the pencil; the two readings are beside their names, each with its deviation, baseline and note.
+  const t = `(s) => (s || '').replace(/\\s+/g, ' ').trim()`;
+  assert.deepEqual(await page(`(() => { const t = ${t}, r = ${runRow}; return [r.querySelector('.qa-n').textContent, r.className, r.querySelectorAll('td.qa-shared-cell').length,
+    [...r.querySelectorAll('.qa-inline-field')].map((f) => t(f.innerText)), t(r.querySelector('.qa-inline-main').textContent), t([...r.querySelector('td.qa-label').children].filter((x) => !x.classList.contains('qa-test-title')).map((x) => x.innerText).join(' ')),
+    ['td.qa-baseline', 'td.qa-measured', 'td.qa-unit', 'td.qa-result'].map((s) => t(r.querySelector(s).innerText)), r.querySelector('td.qa-comment button')?.getAttribute('aria-label') || '',
+    [...r.querySelectorAll('button.qa-calculation-info')].map((b) => b.getAttribute('aria-label'))]; })()`),
+    ['1.08', 'qa-inline-row', 0, ['TCS Sk (mGy·m²·h⁻¹) 12.05 (Δ +0.05 mGy·m²·h⁻¹) Baseline 12', 'Decay-table Sk (mGy·m²·h⁻¹) 12 (Δ +0.00 mGy·m²·h⁻¹) Baseline 12 synthetic decay note'],
+      'Source strength difference', 'Action ±1 %', ['0 %', '0.417 %', '%', 'PASS(Δ +0.42 %)'], 'Note: synthetic difference note', ['Calculation details: Source strength difference']],
+    'the difference in the columns with its note; each reading beside its name with its own');
+  assert.deepEqual(await page(`(() => { const rows = [...document.querySelectorAll('.review-measure-table tr[data-test-id]')]; return ['1.10', '1.18'].map((n) => rows.find((r) => r.querySelector('.qa-n').textContent === n)).map((r) => [r.querySelector('.qa-n').textContent, r.querySelector('.qa-inline-title')?.textContent || '', [...r.querySelectorAll('.qa-inline-name')].map((n) => n.textContent)]); })()`),
+    [['1.10', 'Position', ['console (mm)', 'ruler (mm)', 'difference']], ['1.18', 'Dwell time', ['set (s)', 'measured (s)', 'difference']]], 'names that start alike say those words once');
   const pdf = await page(`localApi('GET', '/api/runs/${runId}').then((r) => qaReportPdf(r).text())`);
   assert.deepEqual([...pdf.matchAll(/\((\d+)\. ([^)]*)\) Tj/g)].map((m) => m[1]).slice(6, 12), ['7', '8', '8', '8', '9', '10']);
   // Back on the QA form, the row's History (now one run) is its own value's: the judged difference.
   await go(form, formReady);
   assert.match(await page(`${shared}.querySelector('.history-cell').textContent`), /0\.417 %/, 'the difference\'s history');
   assert.equal(await page(`${shared}.querySelectorAll('.history-cell .qa-shared-name').length`), 0);
-  // In the card layout the empty Note cell is not shown either.
+  // In the card layout the row keeps its readings and its note, and nothing runs off the page.
   await send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 1000, deviceScaleFactor: 1, mobile: false });
   await go(`#/runs`, `document.querySelector('#app') && !document.querySelector('.review-measure-table')`);
   await go(`#/runs/${runId}`, `document.querySelector('.review-measure-table')`);
-  assert.equal(await page(`getComputedStyle(${runRow}.querySelector('td.qa-comment')).display`), 'none');
+  assert.equal(await page(`${runRow}.querySelectorAll('.qa-inline-field').length`), 2);
+  assert.notEqual(await page(`getComputedStyle(${runRow}.querySelector('td.qa-comment')).display`), 'none', 'the row\'s own note is shown');
   assert.equal(await page('document.documentElement.scrollWidth > document.documentElement.clientWidth'), false, 'nothing scrolls sideways at 1024');
   assert.deepEqual(errors, []);
   console.log('Same row: Setup QA box where it can join, one numbered row of the QA table with its last test in the columns, the others beside their names and a live verdict, equation letters, notes, saved run, PDF, and a clean undo.');
