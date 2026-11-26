@@ -112,6 +112,16 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   and ＋ Block on each section's title. A saved run draws tests on one row the same way (`inlineRun`; Brook, 2026-11-25),
   and an X / Y pair as rows of their own like its X / Y / Z rows (`runRows`). Brook does not like cm and mm mixed in one
   list: open, see "Waiting on Brook".
+- **Monthly form (Brook's meeting notes, 2026-11-25; the proton monthly list, from the GTR5 monthly worksheet):** "Compress",
+  "Make it tabular", "Range / Output / XRV / Sphinx", "Go back to look at the excel sheet". A list's own repeated
+  measurements are one table: names "<what> – <energy> MeV[ – <which>] [unit]" or "<what> — G<angle> [unit]"
+  (`listMeasureParts`, `tableParts`); several values per row are a matrix, a column per value with a head row saying the
+  baseline and limits its tests share (`matrix` in `measureTable`; output charge and dose on one row, spot QA's four
+  values). Never widen `measureParts` for this: it also decides which fields a Sphinx import fills and locks. Still open
+  from the same notes: an equipment inventory with chamber selection (N_Dw, k_Q, k_s, k_pol filled from the chosen
+  chamber and not editable: Brook chose all four; Brook enters the real values), an XRV-124 Excel reader (needs a
+  sample export), "Take default off" (Brook had no preference which), "Summarize spot characteristic summary", "Add
+  in TG 224", and the same tables on a saved run and in Machine Trends.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
