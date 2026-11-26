@@ -399,7 +399,7 @@ const NAV = [
   ["#/", "Dashboard", null, ["#/", "#"], "Dashboard"],
   ["#/perform-qa", "Perform QA", null, ["#/perform-qa", "#/perform"]],
   ["#/review", "Review QA", null, ["#/review", "#/runs"]],
-  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit", "#/machines", "#/assignments"]],
+  ["#/setup", "Setup QA", "configure", ["#/setup", "#/queues", "#/tests", "#/audit", "#/machines", "#/assignments", "#/equipment"]],
   ["#/trends", "Machine Trends", null, ["#/trends"]],
   ["#/admin", "Data Administration", "configure", ["#/admin", "#/users"]],
 ];
@@ -647,6 +647,7 @@ const ROUTES = [
   [/^#\/queues$/, () => location.replace("#/setup")],   // old links: the one list of lists is Setup QA
   [/^#\/queues\/(new|\d+)$/, renderQueueEditor],
   [/^#\/tests$/, renderTests],
+  [/^#\/equipment$/, renderEquipment],
   [/^#\/review$/, renderReview],
   [/^#\/runs$/, renderRuns],
   [/^#\/runs\/(\d+)$/, renderRun],
@@ -981,12 +982,171 @@ async function renderSetup() {
 
 
   app.append(el("h2", { class: "section-head" }, "More"), el("p", { class: "row" },
+    el("a", { class: "button small", href: "#/equipment" }, "Equipment"),
     el("a", { class: "button small", href: "#/machines" }, "Manage machines"),
     el("a", { class: "button small", href: "#/tests" }, "All tests"),
     can("manage_users") ? el("a", { class: "button small", href: "#/users" }, "People") : null,
     el("a", { class: "button small", href: "#/audit" }, "Audit log")));
 
 
+}
+
+// ── Equipment (Setup QA) ────────────────────────────────────────────────────────────────────────────────────────────
+// The devices QA lists choose from and the values each one fills on the QA form (Brook, 2026-11-25: "Put in equipment
+// inventory", "Chamber selection", "Ndw … aren't editable"). Nothing new is stored: a list chooses a device with a
+// multiple-choice test tagged [device: chamber] or [device: electrometer], and a test filled from that choice carries a
+// lookup (QADerived, kind "lookup") with a value per device. This page is those tests of every list, one table per
+// kind: a row per device, a column per filled test. Saving writes each test back through /api/tests, so the lists'
+// own audit applies, and a recorded result keeps the value it was recorded with. Values are typed here by a Physicist
+// or Admin; none is ever made up.
+// A calculated field shows three significant figures (QADerived.setInput); a value a device fills shows as it was typed
+// here, so a k_s of 1.003 does not read 1.00. What is recorded is the full value either way.
+function setDerived(input, value) {
+  QADerived.setInput(input, value);
+  if (input.dataset.derivedExact && input.dataset.derivedValue) input.value = input.dataset.derivedValue;
+}
+const DEVICE_KINDS = [["chamber", "Chamber", "Chambers"], ["electrometer", "Electrometer", "Electrometers"]];
+const deviceKindOf = (test) => (/\[device: (chamber|electrometer)\]/.exec(test.description || "") || [])[1] || null;
+function lookupRuleOf(test) { try { const rule = QADerived.read(test.description); return rule && rule.kind === "lookup" ? rule : null; } catch { return null; } }
+function equipmentModel(tests) {
+  const owner = (t) => t.owner_queue_id ?? null;
+  return DEVICE_KINDS.map(([kind, one, many]) => {
+    const selections = tests.filter((t) => t.type === "choice" && deviceKindOf(t) === kind).sort((x, y) => (owner(x) ?? 0) - (owner(y) ?? 0) || x.id - y.id);
+    const factors = [];
+    for (const t of tests) {
+      const rule = t.type === "numeric" ? lookupRuleOf(t) : null;
+      const selection = rule && selections.find((s) => owner(s) === owner(t) && s.name === rule.inputs[0].name && (s.category || "") === rule.inputs[0].category);
+      if (selection) factors.push({ test: t, rule, selection });
+    }
+    factors.sort((x, y) => (owner(x.test) ?? 0) - (owner(y.test) ?? 0) || x.test.id - y.test.id);   // a list's columns together
+    // Every device any of the kind's lists offers, in the order first met; its value for a filled test, or none.
+    const devices = [...new Set(selections.flatMap((s) => choiceOptions(s.description)))].map((name) => ({ name,
+      values: Object.fromEntries(factors.map((f) => [f.test.id, f.rule.values.find((row) => row.choice === name)?.value ?? null])) }));
+    return { kind, one, many, selections, factors, devices, sample: factors.some((f) => f.rule.sample) };
+  });
+}
+// What a test is saved with when only its choices or its lookup change: everything else as it is.
+const testAsSaved = (t) => ({ name: t.name, category: t.category, unit: t.unit, description: t.description, expected: t.expected, warn: t.warn,
+  fail: t.fail, tol_mode: t.tol_mode, active: t.active, owner_queue_id: t.owner_queue_id });
+// What Save writes for a kind: every selection test takes the devices as its choices, every filled test a value per
+// device (blank where none is given). Only tests that change are written. `devices`: [{ name, values: { testId: n } }].
+function equipmentSaves(group, devices) {
+  const names = devices.map((d) => String(d.name || "").trim());
+  if (names.some((n) => !n)) throw new Error("Give every device a name.");
+  if (new Set(names).size !== names.length) throw new Error("Two devices have the same name.");
+  if (names.some((n) => n.length > 200)) throw new Error("A device name can be up to 200 characters.");
+  if (names.length > 100) throw new Error("A kind of device can have up to 100 entries.");
+  const saves = [];
+  for (const s of group.selections)
+    if (JSON.stringify(choiceOptions(s.description)) !== JSON.stringify(names)) saves.push({ id: s.id, body: { ...testAsSaved(s), type: "choice", choices: names } });
+  for (const f of group.factors) {
+    const rows = devices.map((d, i) => { const v = d.values[f.test.id]; return { choice: names[i], value: v === null || v === undefined || v === "" ? null : Number(v) }; });
+    if (rows.some((row) => row.value !== null && !Number.isFinite(row.value))) throw new Error(`${f.test.name}: give a number, or leave it blank.`);
+    const pairs = (list) => JSON.stringify(list.map((row) => [row.choice, row.value ?? null]));
+    if (pairs(f.rule.values) !== pairs(rows)) saves.push({ id: f.test.id, body: { ...testAsSaved(f.test), type: "derived", derived: { kind: "lookup", inputs: f.rule.inputs, values: rows } } });
+  }
+  return saves;
+}
+// Connecting a list: its test that names the device becomes the selection (multiple choice, tagged with the kind, the
+// kind's devices as its choices), and the tests it fills each get a lookup from it, blank until values are typed.
+function equipmentConnection(group, selection, filled) {
+  const names = group.devices.map((d) => d.name);
+  const description = `${String(selection.description || "").replace(/\s*\[device: [^\]]+\]/g, "")} [device: ${group.kind}]`.trim();
+  return [{ id: selection.id, body: { ...testAsSaved(selection), description, type: "choice", choices: names } },
+    ...filled.map((t) => ({ id: t.id, body: { ...testAsSaved(t), type: "derived",
+      derived: { kind: "lookup", inputs: [{ name: selection.name, category: selection.category || "" }], values: names.map((choice) => ({ choice, value: null })) } } }))];
+}
+
+async function renderEquipment() {
+  const editable = can("configure");
+  page("Equipment", "The devices QA lists choose from. When one is chosen on a QA form, its values fill their tests; they are not typed there.",
+    [el("a", { class: "button", href: "#/setup" }, "Back")]);
+  const [tests, queues] = await apiBatch(["/api/tests", "/api/queues"]);
+  const live = new Set(queues.filter((q) => q.active).map((q) => q.id));
+  const listed = tests.filter((t) => t.active !== 0 && (t.owner_queue_id === null || t.owner_queue_id === undefined || live.has(t.owner_queue_id)));
+  const listName = (t) => t.owner_name || (queues.find((q) => q.id === t.owner_queue_id) || {}).name || "";
+  const write = async (saves, done) => {
+    for (const s of saves) await api("PUT", `/api/tests/${s.id}`, s.body);
+    toast(done);
+    route();
+  };
+  for (const group of equipmentModel(listed)) {
+    const devices = group.devices.map((d) => ({ name: d.name, values: { ...d.values } }));
+    const status = el("span", { class: "muted small", role: "status" });
+    const save = el("button", { type: "button", class: "primary", disabled: true, onclick: async () => {
+      status.textContent = "";
+      try { const saves = equipmentSaves(group, devices); save.disabled = true; await write(saves, `${group.many} saved`); }
+      catch (err) { save.disabled = false; status.textContent = err.message; status.className = "error small"; }
+    } }, "Save");
+    const changed = () => { let n = 0; try { n = equipmentSaves(group, devices).length; status.textContent = ""; } catch { n = 1; } save.disabled = !n; };
+    const body = el("tbody");
+    const draw = () => body.replaceChildren(...devices.map((d, i) => el("tr", {},
+      el("td", {}, el("input", { type: "text", value: d.name, disabled: !editable, "aria-label": `${group.one} ${i + 1}: name`, placeholder: "Model / serial",
+        oninput: (e) => { d.name = e.target.value; changed(); } })),
+      group.factors.map((f) => el("td", {}, el("input", { type: "number", step: "any", value: d.values[f.test.id] ?? "", disabled: !editable, placeholder: "—",
+        "aria-label": `${d.name || `${group.one} ${i + 1}`}: ${f.test.name}`, oninput: (e) => { d.values[f.test.id] = e.target.value.trim() === "" ? null : Number(e.target.value); changed(); } }))),
+      el("td", { class: "right" }, editable ? el("button", { type: "button", class: "icon-btn", title: `Remove ${d.name || "this device"}`, "aria-label": `Remove ${d.name || "this device"}`,
+        onclick: () => { devices.splice(i, 1); draw(); changed(); } }, "✕") : null))));
+    draw();
+    changed();   // lists that do not offer the same devices yet: Save brings them level
+    const used = group.selections.map((s) => `${listName(s)}: ${s.name}`);
+    const card = el("section", { class: "card equipment-card", "aria-label": group.many },
+      el("div", { class: "row" }, el("h2", {}, group.many), el("span", { class: "spacer" }),
+        editable && group.selections.length ? el("button", { type: "button", class: "small", onclick: () => { devices.push({ name: "", values: {} }); draw(); changed(); body.lastChild.querySelector("input").focus(); } }, `＋ ${group.one}`) : null,
+        editable ? el("button", { type: "button", class: "small", onclick: () => connectEquipmentDialog(group, listed, queues.filter((q) => q.active), write) }, "Connect a QA List…") : null),
+      group.sample ? el("p", { class: "muted" }, "Sample devices and placeholder values. Replace them with your own.") : null,
+      !group.selections.length ? el("p", { class: "muted" }, `No QA list chooses ${group.kind === "electrometer" ? "an" : "a"} ${group.one.toLowerCase()} yet.`)
+        : el("div", { class: "table-wrap" }, el("table", { class: "equipment-table" },
+            // Each list is named once, over the tests of its that a device fills.
+            el("thead", {}, el("tr", { class: "equipment-lists" }, el("th", {}),
+              group.factors.reduce((spans, f) => { const last = spans.at(-1); if (last && last.id === f.test.owner_queue_id) last.n++; else spans.push({ id: f.test.owner_queue_id, name: listName(f.test), n: 1 }); return spans; }, [])
+                .map((s) => el("th", { colspan: s.n, scope: "colgroup" }, s.name)), el("th", {})),
+              el("tr", {}, el("th", { scope: "col" }, group.one), group.factors.map((f) => el("th", { scope: "col", title: `${f.test.name} · ${listName(f.test)}` }, f.test.name)), el("th", {}))),
+            body)),
+      group.selections.length && !devices.length ? el("p", { class: "muted" }, `No ${group.many.toLowerCase()} yet.`) : null,
+      used.length ? el("p", { class: "muted small" }, `Chosen on: ${used.join(" · ")}`) : null,
+      editable && group.selections.length ? el("div", { class: "row" }, save, status) : null);
+    app.append(card);
+  }
+}
+
+// Connect a QA list to a kind of device: which of its tests names the device, and which tests after it (in the same
+// category) the device fills. A test that is calculated or already filled from a device is not offered.
+async function connectEquipmentDialog(group, tests, queues, write) {
+  const ofList = (id) => tests.filter((t) => t.owner_queue_id === id);
+  const lists = queues.filter((q) => ofList(q.id).some((t) => t.type === "text" || t.type === "choice"));
+  const list = select("queue_id", [["", "Choose the QA list…"], ...lists.map((q) => [q.id, q.name])], "", { "aria-label": "QA list" });
+  const pick = select("selection", [["", "Choose the list first"]], "", { "aria-label": `Test that names the ${group.one.toLowerCase()}`, disabled: true });
+  const boxes = el("div", { class: "equipment-filled" });
+  let ordered = [];
+  const offer = () => {
+    const selection = ordered.find((t) => String(t.id) === pick.value);
+    const after = selection ? ordered.slice(ordered.indexOf(selection) + 1).filter((t) => t.type === "numeric" && (t.category || "") === (selection.category || "")
+      && !/\[(?:calc|derived): /.test(t.description || "")) : [];
+    boxes.replaceChildren(...(after.length ? after.map((t) => el("label", { class: "check" }, el("input", { type: "checkbox", name: `fill-${t.id}` }), t.name))
+      : [el("p", { class: "muted" }, selection ? "No typed number follows it in its category." : "")]));
+  };
+  list.addEventListener("change", async () => {
+    pick.disabled = true; boxes.replaceChildren();
+    if (!list.value) return;
+    const items = (await api("GET", `/api/queues/${list.value}`)).items.slice().sort((a, b) => a.position - b.position);
+    const byId = new Map(tests.map((t) => [t.id, t]));
+    ordered = items.map((i) => byId.get(i.test_id)).filter(Boolean);
+    const candidates = ordered.filter((t) => (t.type === "text" || t.type === "choice") && !deviceKindOf(t) && !/\[(?:direction|auto): /.test(t.description || ""));
+    pick.replaceChildren(...[["", candidates.length ? "Choose the test…" : "No text or multiple-choice test in this list"], ...candidates.map((t) => [t.id, t.name])]
+      .map(([v, label]) => el("option", { value: v }, label)));
+    pick.disabled = !candidates.length;
+  });
+  pick.addEventListener("change", offer);
+  modal(`Connect a QA List: ${group.many}`, el("div", {},
+    el("p", { class: "muted" }, `Its test that names the ${group.one.toLowerCase()} becomes a choice from this page, and the tests you tick are filled from the ${group.one.toLowerCase()} chosen. They stop being typed on the QA form.`),
+    field("QA List", list), field(`Test That Names the ${group.one}`, pick), el("strong", {}, "Filled From It"), boxes),
+    async (data) => {
+      const selection = ordered.find((t) => String(t.id) === pick.value);
+      if (!selection) throw new Error("Choose the QA list and its test.");
+      const filled = ordered.filter((t) => data[`fill-${t.id}`]);
+      await write(equipmentConnection(group, selection, filled), "QA list connected");
+    }, "Connect");
 }
 
 // Browser-only build: the whole database can live in a file the user picks (a shared drive, say).
@@ -2121,7 +2281,8 @@ function wireCalculations(entries) {
       try{sources=QADerived.resolve(derivedRule,entries.slice(0,i).map(x=>x.item)).map(item=>entries.find(x=>x.item===item));}
       catch(err){lock(e,err.message);e.input.value='';e.input.setCustomValidity(err.message);return;}
       lock(e,derivedRule.kind==='lookup'?'From selected device':derivedRule.inputs.map((x,n)=>`${String.fromCharCode(65+n)} = ${x.name}`).join('; ')+'; '+derivedRule.formula);
-      const update=()=>{try{const value=QADerived.calculate(derivedRule,entries.slice(0,i).map(x=>x.item),item=>QADerived.value(entries.find(x=>x.item===item).input));QADerived.setInput(e.input,value);e.input.setCustomValidity('');e.input.dispatchEvent(new Event('input'));}catch(err){QADerived.setInput(e.input,null);e.input.setCustomValidity(err.message);}};
+      if(derivedRule.kind==='lookup')e.input.dataset.derivedExact='1';   // a device's value reads as typed under Equipment (setDerived)
+      const update=()=>{try{const value=QADerived.calculate(derivedRule,entries.slice(0,i).map(x=>x.item),item=>QADerived.value(entries.find(x=>x.item===item).input));setDerived(e.input,value);e.input.setCustomValidity('');e.input.dispatchEvent(new Event('input'));}catch(err){setDerived(e.input,null);e.input.setCustomValidity(err.message);}};
       sources.forEach(src=>src.input.addEventListener('input',update));update();return;
     }
     const hdrKinds = {
@@ -2318,7 +2479,7 @@ async function renderPerform(assignmentId) {
       const unit = item.unit && item.unit !== "unitless" ? item.unit : "";
       // The chip and "(Δ +0.30 mm)" after it follow the value as it is typed.
       const update = () => {
-        if(input.readOnly&&input.dataset.derivedValue!==undefined) QADerived.setInput(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
+        if(input.readOnly&&input.dataset.derivedValue!==undefined) setDerived(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
         const s = entry.status();
         statusCell.replaceChildren(...present([s && !answeredByButton ? chip(s) : null,
           s && item.type === "numeric" ? deviationText(Number(QADerived.value(input)), item.limits, unit) : null]));

@@ -1911,6 +1911,21 @@ td, .measure-table td { font-size: 21px; }
 .qa-axis-row .qa-shared-unit { color:var(--muted); font-weight:400; }
 .qa-axis-history + .qa-axis-history { margin-top:6px; }
 
+/* Equipment (Setup QA): a row per device, a column per test it fills. */
+.equipment-card { margin-bottom:16px; }
+.equipment-card h2 { margin:0; }
+.equipment-table { width:100%; table-layout:fixed; }
+.equipment-table th { text-align:left; vertical-align:bottom; text-transform:none; letter-spacing:0; overflow-wrap:anywhere; }
+.equipment-table tr.equipment-lists th { color:var(--muted); font-weight:400; border-bottom:0; padding-bottom:0; }
+.equipment-table th:first-child, .equipment-table td:first-child { width:26%; }
+.equipment-table th:last-child, .equipment-table td:last-child { width:48px; }
+.equipment-table td { padding:4px 8px 4px 0; }
+.equipment-table input { width:100%; min-width:0; }
+/* A choice in the Measured column (a chamber from Equipment) has room for its text: nothing else is on its row there. */
+.measure-table td.qa-measured:has(> select.result-input) { overflow:visible; }
+#app .measure-table td.qa-measured > select.result-input { width:auto; min-width:100%; max-width:26em; }
+.equipment-filled { display:grid; gap:4px; margin:6px 0 10px; }
+
 /* A section's directions: the ⓘ beside the section's title opens them as a numbered list (sectionDirections). */
 .section > summary .qa-section-info { display:inline-flex; margin-right:auto; }
 .qa-section-info .qa-calculation-info { margin-top:0; }

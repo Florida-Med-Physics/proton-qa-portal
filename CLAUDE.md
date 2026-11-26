@@ -122,6 +122,15 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   chamber and not editable: Brook chose all four; Brook enters the real values), an XRV-124 Excel reader (needs a
   sample export), "Take default off" (Brook had no preference which), "Summarize spot characteristic summary", "Add
   in TG 224", and the same tables on a saved run and in Machine Trends.
+- **Equipment (Brook, 2026-11-25: "Put in equipment inventory", "Chamber selection", "Ndw … aren't editable"):** Setup QA,
+  More, Equipment (`renderEquipment`, `equipmentModel`, `equipmentSaves`, `equipmentConnection`). Nothing new is stored: a
+  list chooses a device with a multiple-choice test tagged `[device: chamber]` / `[device: electrometer]`, and a test a
+  device fills carries a `QADerived` lookup with a value per device; the page edits those tests of every list through
+  `/api/tests`. One inventory per kind for all lists. Brook chose that a chamber carries all four of N_Dw, k_Q, k_s,
+  k_pol. Never put a value in for a device: a connected test is blank until a Physicist types it. A device's value
+  shows on the form as typed (`setDerived`), a calculated one to three figures. Open: the seed's monthly list still
+  types its constants (it is connected from the page); the 22 °C / 1013.25 hPa baselines ("Take default off": Brook had
+  no preference which default); serial, calibration date and other equipment (Zebra, XRV-124) are not held.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
