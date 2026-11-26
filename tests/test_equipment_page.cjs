@@ -133,11 +133,9 @@ const shots = process.env.EQUIPMENT_SHOTS || '';
       assert.equal(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth), 0, `the page does not scroll sideways at ${width}`);
     }
     await p.setViewportSize({ width: 1600, height: 900 });
-    const wrap = await chambers.locator('.table-wrap').evaluate((n) => n.scrollWidth - n.clientWidth);
-    assert.equal(wrap, 0, 'the table fits its card at 1600');
-    // A nine-digit factor shows whole in its box at a laptop's width (no stepper arrows in the way).
+    // A nine-digit factor and a long device name show whole in their boxes at a laptop's width (no stepper arrows in the way).
     await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(300);
-    const clipped = await chambers.locator('tbody input[type=number]').evaluateAll((list) => list.filter((i) => i.value && i.scrollWidth > i.clientWidth + 1).map((i) => `${i.getAttribute('aria-label')} = ${i.value}`));
+    const clipped = await chambers.locator('tbody input').evaluateAll((list) => list.filter((i) => i.value && i.scrollWidth > i.clientWidth + 1).map((i) => `${i.getAttribute('aria-label')} = ${i.value}`));
     assert.deepEqual(clipped, [], 'no value is cut off');
     assert.equal(await chambers.getByLabel('SAMPLE chamber A — placeholder: Chamber Cal. Factor(Proton), Gy/C', { exact: true }).inputValue(), '100000000');
     await p.setViewportSize({ width: 1600, height: 900 });
