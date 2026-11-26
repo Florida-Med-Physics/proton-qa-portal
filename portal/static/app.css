@@ -1956,6 +1956,26 @@ td, .measure-table td { font-size: 21px; }
   .qa-axis-row .qa-shared-more { grid-column:2; grid-row:2; }
 }
 
+/* A list's own table with several values per row (output charge and dose per energy, spot QA): a row per energy, a
+   column per value, named once in the head row with what its tests share (Brook, 2026-11-25: "Compress", "Make it
+   tabular"). A field is its box with its verdict under it; the row's label sits on the boxes' line. Where rows are
+   cards (a narrow window, a phone) there is no head row and every field says its own name, as on an X / Y / Z row. */
+@media (min-width: 1201px) {
+  .qa-matrix-row .qa-shared { grid-template-columns:8.5em repeat(var(--qa-fields, 2), minmax(0, 11em)); align-items:baseline; }
+  .qa-matrix-row .qa-shared-field { display:block; }
+  .qa-matrix-row .qa-shared-name > span::after { content:none; }
+  .qa-matrix-row:not(.qa-matrix-head) .qa-shared-name { display:none; }   /* named in the head row */
+  .qa-matrix-rowlabel { white-space:nowrap; }
+  .qa-matrix-head .qa-shared { align-items:end; }
+  .qa-matrix-head .qa-matrix-rowlabel { color:var(--muted); }
+  .qa-matrix-head .qa-shared-more { padding-bottom:2px; }
+  #app .measure-table tr.qa-matrix-head > td { padding-bottom:0; }
+}
+@media (max-width: 1200px) {
+  #app .measure-table tr.qa-matrix-head { display:none; }
+  #app .measure-table .qa-matrix-rowlabel { grid-column:1/-1; }
+}
+
 /* Tests on one row of the table ("Same row as the test above"): the last is the row's value, in the table's own
    columns; the ones before it are answered beside their names in the Test column, name and box on one line (Brook,
    2026-11-20). The words the names share are said once, in bold, where a test's name is. */
