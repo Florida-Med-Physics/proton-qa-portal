@@ -2520,18 +2520,20 @@ async function renderPerform(assignmentId) {
       // A matrix's head row: what its rows are (Energy, Gantry), then each column's name, its ⓘ where its tests have a
       // calculation or directions of their own, and the baseline and limits they share. (The block's number cell is
       // with its first row shown, as in every block: the form moves it when rows are hidden.)
-      const matrixHead = !matrix ? null : el("tr", { class: "qa-axis-row qa-matrix-row qa-matrix-head" },
-        el("td", { class: "qa-n" }),
-        el("td", { class: "qa-measured qa-shared-cell", colspan: 5 }, el("div", { class: "qa-shared", style: `--qa-fields:${matrix.columns.length}` },
-          el("div", { class: "qa-matrix-rowlabel" }, el("span", { class: "qa-matrix-rowhead" }, matrix.rowHeader)),
-          matrix.columns.map((col) => {
+      const matrixHeadCell = matrix ? sharedCell([]) : null;   // the same cell a row of fields has (its span is said once, there)
+      if (matrix) {
+        matrixHeadCell.firstChild.style.setProperty("--qa-fields", matrix.columns.length);
+        matrixHeadCell.firstChild.append(el("div", { class: "qa-matrix-rowlabel" }, el("span", { class: "qa-matrix-rowhead" }, matrix.rowHeader)),
+          ...matrix.columns.map((col) => {
             const info = derivedExplanation(col.first, t.items, numbers) || addsDirections(col.first, members[0]) ? testDetailsButton({ ...col.first, steps: null }, t.items, numbers) : null;
             if (info) for (const key of ["title", "aria-label"]) info.setAttribute(key, `${info.getAttribute(key)}: ${col.label}`);
             const shared = [col.baseline, col.limits].filter(Boolean).join(" · ");
             return el("div", { class: "qa-shared-field" }, el("div", { class: "qa-shared-name" }, el("span", {}, col.label), info), el("div"),
               el("div", { class: "qa-shared-more" }, shared ? el("div", { class: "qa-shared-info" }, el("span", { class: "qa-limits" }, shared)) : null));
-          }))),
-        el("td", { class: "qa-comment" }), el("td", { class: "history-cell" }), el("td", { class: "qa-trends" }));
+          }));
+      }
+      const matrixHead = !matrix ? null : el("tr", { class: "qa-axis-row qa-matrix-row qa-matrix-head" },
+        el("td", { class: "qa-n" }), matrixHeadCell, el("td", { class: "qa-comment" }), el("td", { class: "history-cell" }), el("td", { class: "qa-trends" }));
       const tableEl = el("table", { class: `measure-table${category==='HDR treatment-day QA'?' hdr-qa-table':''}${firstHeader === "Axis" || matrix ? " axis-table" : ""}${matrix ? " matrix-table" : ""}${firstHeader !== "Test" ? " energy-table" : ""}` },
           el("thead", {}, el("tr", { class: "qa-col-names" }, qaHeaders(axisRow || matrix ? "Test" : firstHeader)),   // collapsed under a table with the same columns (qaHeadings)
             dates.length ? qaDatesRow(dates.map(dateSlot)) : null),

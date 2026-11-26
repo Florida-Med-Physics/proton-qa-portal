@@ -11,7 +11,7 @@ const between = (from, to) => { const a = source.indexOf(from), b = source.index
 // when History is on); the first table of a section names them, and so does the first one shown when "Show unfinished
 // only" hides the tables above it. A table's columns are named on its block (data-cols) by layoutQaTable.
 const measureTable = between('    const measureTable = (members,', '    const shortName = (it) =>');
-assert.match(measureTable, /el\("thead", \{\}, el\("tr", \{ class: "qa-col-names" \}, qaHeaders\(axisRow \? "Test" : firstHeader\)\),/, 'every table builds its names row');
+assert.match(measureTable, /el\("thead", \{\}, el\("tr", \{ class: "qa-col-names" \}, qaHeaders\(axisRow \|\| matrix \? "Test" : firstHeader\)\),/, 'every table builds its names row');
 assert.match(measureTable, /dates\.length \? qaDatesRow\(dates\.map\(dateSlot\)\) : null/, 'and its date row, as before');
 assert.match(measureTable, /layoutQaTable\(tableEl, "perform"\);/, 'and is laid out in the person\'s columns');
 assert.match(between('function layoutQaTable(', 'function qaHeadings('), /block\.dataset\.cols = `\$\{shown\.map\(\(c\) => c\.key\)\.join\(' '\)\}\|\$\{history \? dates : 0\}\|\$\{table\.querySelector\('\.seg\.warn'\) \? 'wide' : ''\}`;/, 'the block names its columns');
