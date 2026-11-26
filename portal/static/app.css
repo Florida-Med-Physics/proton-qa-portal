@@ -1917,10 +1917,13 @@ td, .measure-table td { font-size: 21px; }
 .equipment-table { width:100%; table-layout:fixed; }
 .equipment-table th { text-align:left; vertical-align:bottom; text-transform:none; letter-spacing:0; overflow-wrap:anywhere; }
 .equipment-table tr.equipment-lists th { color:var(--muted); font-weight:400; border-bottom:0; padding-bottom:0; }
-.equipment-table th:first-child, .equipment-table td:first-child { width:26%; }
 .equipment-table th:last-child, .equipment-table td:last-child { width:48px; }
 .equipment-table td { padding:4px 8px 4px 0; }
 .equipment-table input { width:100%; min-width:0; }
+/* A calibration factor can be nine digits long: no stepper arrows, and less padding, so the whole number shows. */
+#app .equipment-table input[type="number"] { appearance:textfield; -moz-appearance:textfield; padding-left:8px; padding-right:8px; }
+.equipment-table input[type="number"]::-webkit-outer-spin-button, .equipment-table input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.equipment-table th:first-child, .equipment-table td:first-child { width:22%; }
 /* A choice in the Measured column (a chamber from Equipment) has room for its text: nothing else is on its row there. */
 .measure-table td.qa-measured:has(> select.result-input) { overflow:visible; }
 #app .measure-table td.qa-measured > select.result-input { width:auto; min-width:100%; max-width:26em; }

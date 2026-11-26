@@ -135,6 +135,12 @@ const shots = process.env.EQUIPMENT_SHOTS || '';
     await p.setViewportSize({ width: 1600, height: 900 });
     const wrap = await chambers.locator('.table-wrap').evaluate((n) => n.scrollWidth - n.clientWidth);
     assert.equal(wrap, 0, 'the table fits its card at 1600');
+    // A nine-digit factor shows whole in its box at a laptop's width (no stepper arrows in the way).
+    await p.setViewportSize({ width: 1440, height: 900 }); await p.waitForTimeout(300);
+    const clipped = await chambers.locator('tbody input[type=number]').evaluateAll((list) => list.filter((i) => i.value && i.scrollWidth > i.clientWidth + 1).map((i) => `${i.getAttribute('aria-label')} = ${i.value}`));
+    assert.deepEqual(clipped, [], 'no value is cut off');
+    assert.equal(await chambers.getByLabel('SAMPLE chamber A — placeholder: Chamber Cal. Factor(Proton), Gy/C', { exact: true }).inputValue(), '100000000');
+    await p.setViewportSize({ width: 1600, height: 900 });
     assert.deepEqual(errors, []);
     console.log('Equipment: one list of chambers and electrometers read from the QA lists; a list is connected from the page; a device is added, renamed and removed for every list; the monthly form chooses its chamber and is filled from it, never typed.');
   } finally { await browser.close(); }
