@@ -1080,11 +1080,15 @@ async function renderEquipment() {
     } }, "Save");
     const changed = () => { let n = 0; try { n = equipmentSaves(group, devices).length; status.textContent = ""; } catch { n = 1; } save.disabled = !n; };
     const body = el("tbody");
+    // A box is at least as wide as what it holds, so a long name or a nine-digit factor is never cut off: its column
+    // follows, and the table scrolls inside its card if the window is too narrow for it all.
+    const fit = (input, least) => { input.style.minWidth = `${Math.max(least, Math.ceil(String(input.value).length * 1.1) + 1)}ch`; return input; };
     const draw = () => body.replaceChildren(...devices.map((d, i) => el("tr", {},
-      el("td", {}, el("input", { type: "text", value: d.name, disabled: !editable, "aria-label": `${group.one} ${i + 1}: name`, placeholder: "Model / serial",
-        oninput: (e) => { d.name = e.target.value; changed(); } })),
-      group.factors.map((f) => el("td", {}, el("input", { type: "number", step: "any", value: d.values[f.test.id] ?? "", disabled: !editable, placeholder: "—",
-        "aria-label": `${d.name || `${group.one} ${i + 1}`}: ${f.test.name}`, oninput: (e) => { d.values[f.test.id] = e.target.value.trim() === "" ? null : Number(e.target.value); changed(); } }))),
+      el("td", {}, fit(el("input", { type: "text", value: d.name, disabled: !editable, "aria-label": `${group.one} ${i + 1}: name`, placeholder: "Model / serial",
+        oninput: (e) => { d.name = e.target.value; fit(e.target, 12); changed(); } }), 12)),
+      group.factors.map((f) => el("td", {}, fit(el("input", { type: "text", inputmode: "decimal", value: d.values[f.test.id] ?? "", disabled: !editable, placeholder: "—",
+        "aria-label": `${d.name || `${group.one} ${i + 1}`}: ${f.test.name}`,
+        oninput: (e) => { const typed = e.target.value.trim(); d.values[f.test.id] = typed === "" ? null : Number(typed); fit(e.target, 5); changed(); } }), 5))),
       el("td", { class: "right" }, editable ? el("button", { type: "button", class: "icon-btn", title: `Remove ${d.name || "this device"}`, "aria-label": `Remove ${d.name || "this device"}`,
         onclick: () => { devices.splice(i, 1); draw(); changed(); } }, "✕") : null))));
     draw();

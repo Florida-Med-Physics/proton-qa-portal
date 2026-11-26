@@ -1912,18 +1912,18 @@ td, .measure-table td { font-size: 21px; }
 .qa-axis-history + .qa-axis-history { margin-top:6px; }
 
 /* Equipment (Setup QA): a row per device, a column per test it fills. */
-.equipment-card { margin-bottom:16px; }
+.equipment-card { margin-bottom:16px; min-width:0; }
+.equipment-card .table-wrap { overflow-x:auto; max-width:100%; }   /* a table too wide for a narrow window scrolls here, not the page */
 .equipment-card h2 { margin:0; }
-.equipment-table { width:100%; table-layout:fixed; }
+.equipment-table { width:100%; }
 .equipment-table th { text-align:left; vertical-align:bottom; text-transform:none; letter-spacing:0; overflow-wrap:anywhere; }
 .equipment-table tr.equipment-lists th { color:var(--muted); font-weight:400; border-bottom:0; padding-bottom:0; }
 .equipment-table th:last-child, .equipment-table td:last-child { width:48px; }
 .equipment-table td { padding:4px 8px 4px 0; }
-.equipment-table input { width:100%; min-width:0; }
-/* A calibration factor can be nine digits long: no stepper arrows, and less padding, so the whole number shows. */
-#app .equipment-table input[type="number"] { appearance:textfield; -moz-appearance:textfield; padding-left:8px; padding-right:8px; }
-.equipment-table input[type="number"]::-webkit-outer-spin-button, .equipment-table input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-.equipment-table th:first-child, .equipment-table td:first-child { width:22%; }
+/* A box is at least as wide as what it holds (its least width follows its text in app.js), and fills its column. */
+#app .equipment-table input { width:100%; max-width:none; box-sizing:content-box; padding-left:8px; padding-right:8px; }
+.equipment-table td:first-child { padding-right:16px; }
+#app .equipment-table th, #app .equipment-table td { max-width:none; }   /* (tables elsewhere cap a cell's width) */
 /* A choice in the Measured column (a chamber from Equipment) has room for its text: nothing else is on its row there. */
 .measure-table td.qa-measured:has(> select.result-input) { overflow:visible; }
 #app .measure-table td.qa-measured > select.result-input { width:auto; min-width:100%; max-width:26em; }
