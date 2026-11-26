@@ -117,8 +117,10 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
   parts (machineHistory); never ask for a machine's whole history in one reply.
 - **Charts:** views "Absolute <unit>" and "Δ from Reference", unit unchanged between them; several series in
-  Absolute = stacked subplots. Lines join dots; green band inside warning, orange strips warning→action; axis spans
-  the warning band; calendar x-axis with a line per month; HTML key under the chart; biggest outlier ringed; click a
+  Absolute = stacked subplots. Lines join dots; green band inside warning, orange strips warning→action; the axis
+  takes in the limits drawn, out to Action on both sides (Warning where there is no Action), with the same margin
+  beyond on every chart (Brook, 2026-11-25: "more consistent margins for the warning and error axis levels"; it was
+  "spans the warning band"); calendar x-axis with a line per month; HTML key under the chart; biggest outlier ringed; click a
   dot to show date, value, Δ. Pass-rate rings: thick, green/red only, small number inside; per test ("30 days"
   column) and beside each machine's last result on the Dashboard; never a row of rings at the top.
 - **One QA list object (Brook, 2026-10-22, emphatic):** Setup QA, Perform QA and Machine Trends all read the same

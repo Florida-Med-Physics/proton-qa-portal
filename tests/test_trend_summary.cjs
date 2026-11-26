@@ -119,6 +119,31 @@ const xs = (tag) => all(spread, tag).flatMap((n) => (tag === 'circle' ? [n.props
 assert.equal(Math.min(...xs('polygon')), Math.min(...xs('circle')));
 assert.equal(all(spread, 'polygon').length, 3);
 
+// The axis takes in the limits that are drawn, out to Action on both sides, with the same margin beyond on every chart:
+// the orange strips and the green band sit at the same heights whatever the limits are (Brook, 2026-11-25). A compact
+// chart's plot runs from y = 20 to y = 133; a tenth of the span beyond Action is a twelfth of that height.
+{
+  const ys = (chart, cls) => all(chart, 'polygon').filter((n) => n.props.class === cls).flatMap((n) => n.props.points.split(' ').map((q) => Number(q.split(',')[1])));
+  const ends = (chart, cls) => { const v = ys(chart, cls); return [Math.min(...v), Math.max(...v)]; };
+  const draw = (values, limits) => context.drawSeries([{ label: 'synthetic', points: lim(values, 10, () => limits) }], 'mm', { compact: true, delta: true, prediction: false });
+  const close = (a, b, what) => assert(Math.abs(a - b) < 1e-6, `${what}: ${a} against ${b}`);
+  const top = 20 + 113 / 12, bottom = 133 - 113 / 12;
+  for (const [warn, fail, spread] of [[0.75, 1, 1], [1.5, 2, 1], [7.5, 10, 3], [0.075, 0.1, 0.02]]) {
+    const chart = draw([0.1, -0.1, 0.05, 0].map((v) => 10 + v * spread), { warn, fail });
+    close(ends(chart, 'band-fail')[0], top, `Action ±${fail}: top of the orange strip`); close(ends(chart, 'band-fail')[1], bottom, `Action ±${fail}: bottom`);
+    close(ends(chart, 'band-warn')[0], 20 + 113 * 0.45 / 2.4, `Warning ±${warn}: top of the green band`);
+    for (const y of [...ys(chart, 'band-fail'), ...ys(chart, 'band-warn')]) assert(y >= 20 && y <= 133, 'no band runs off the plot');
+  }
+  // Warning only: the axis runs out to Warning with the same margin. No limits: the results alone, as before.
+  close(ends(draw([10.1, 9.9, 10], { warn: 0.5, fail: null }), 'band-warn')[0], top, 'Warning only');
+  assert.equal(all(draw([10.1, 9.9, 10], { warn: null, fail: null }), 'polygon').length, 0);
+  // A result beyond Action stretches the axis: the strips are still whole, nearer the middle.
+  const beyond = draw([10, 12.5, 10], { warn: 0.75, fail: 1 });
+  assert(ends(beyond, 'band-fail')[0] > top + 20 && ends(beyond, 'band-fail')[1] <= 133);
+  const dots = all(beyond, 'circle').map((n) => n.props.cy).filter((v) => v !== undefined);
+  assert(Math.min(...dots) >= 20 && Math.min(...dots) < ends(beyond, 'band-fail')[0], 'the result beyond Action is on the plot, above the strip');
+}
+
 // The summary table is a named region (keyboard-scrollable on a phone) with a caption; its first column says what it holds.
 const box = context.trendSummaryTable([{ label: '201 MeV', points: pts([10.1, 10.2], 10) }], 'mm', true, 'Position X');
 assert.equal(box.props.role, 'region'); assert.equal(box.props.tabindex, '0'); assert.equal(box.props['aria-label'], 'Δ Position X summary (mm)');

@@ -4664,10 +4664,13 @@ function drawSeries(series, unit, { small = false, compact = false, delta = fals
     return { d: p.qa_date, w: p.warn === null ? null : bandValue(p, "warn", 1) - p.expected, f: p.fail === null ? null : bandValue(p, "fail", 1) - p.expected, c: p.expected };
   }).filter((b) => b.c !== null && b.c !== undefined).map((b) => (bands ? b : { ...b, w: null, f: null }));
 
-  // Auto-scale to the data only, with a little headroom.
+  // The axis takes in the results and the limits that are drawn: out to Action (Warning where there is no Action
+  // limit) on both sides, then the same tenth of the span beyond. So the green band and the orange strips are whole and
+  // sit at the same height on every chart (Brook, 2026-11-25: "more consistent margins for the warning and error axis
+  // levels"); a result beyond the limits stretches it further.
   const values = series.flatMap((s) => s.points.map(val));
   for (const f of fits) if (f && prediction) values.push(f.end);
-  for (const b of ref) if (b.w !== null && b.w !== undefined) values.push(b.c + b.w, b.c - b.w);
+  for (const b of ref) for (const k of ["w", "f"]) if (b[k] !== null && b[k] !== undefined) values.push(b.c + b[k], b.c - b[k]);
   let lo = Math.min(...values), hi = Math.max(...values);
   if (lo === hi) {
     const pad = Math.abs(lo) * 0.05 || (ref[0] && ref[0].w) || 1;
