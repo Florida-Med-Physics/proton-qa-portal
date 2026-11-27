@@ -26,8 +26,9 @@ const review = between('async function renderReviewMeasurements(', 'async functi
 assert.doesNotMatch(review, /h\.value\?'Pass':'Fail'/, 'the saved run uses the same words as the form');
 assert.match(review, /fmt\(h\.value,dp\)/, 'the saved run History uses one decimal count per table');
 
-// 3. A saved run: its title names the machine, its limits line reads as on the QA form, the therapist's own Yes on the
-// form is not a sign-off, and the way back fits the role.
+// 3. A saved run: its title names the machine, its limits read as on the QA form (in the Warning ± and Action ± columns,
+// and on the line under the name that shows while those are hidden), the therapist's own Yes on the form is not a
+// sign-off, and the way back fits the role.
 context.el = (tag, props, ...kids) => ({ tag, props: props || {}, textContent: kids.flat(Infinity).join('') });
 run(between('function fmt(', '// A Pass / Fail or Yes / No answer'));
 run(between('function qaLimitsLine(', 'const TYPE_LABELS'));
@@ -40,8 +41,30 @@ assert.equal(line({ criterion: 'wl-max-delta' }, 'mm'), 'Pass < 1 mm · Action �
 assert.equal(line({ warn: 2, fail: 3 }, undefined), 'Warning ±2 · Action ±3');
 assert.match(between('    const measureTable = (members,', '      const numberCell = (it) =>'), /const limitsLine = \(it, unit\) => \(it\.type === "numeric" \? qaLimitsLine\(it\.limits, unit\) : null\);/);
 assert.doesNotMatch(review, /limitsText/, 'the saved run no longer says "No limits" or repeats the baseline in its limits line');
-assert.match(review, /r\.type==='numeric'\?qaLimitsLine\(limits,unit\):null/);
-assert.match(review, /\[p\.r\.expected!=null\?`Baseline \$\{fmt\(p\.r\.expected\)\}`:null,qaLimitsLine\(p\.limits,p\.unit\)\?\.textContent\]\.filter\(Boolean\)\.join\(' · '\)/);
+// The limits are in the Warning ± and Action ± columns (below); the line under the name is still built with the form's
+// words, marked qa-limits-under, and shows only while both columns are hidden (app.css). Not for tests on one line.
+assert.match(review, /const under=inline\|\|r\.type!=='numeric'\?null:qaLimitsLine\(limits,unit\);\s*if\(under\)under\.classList\.add\('qa-limits-under'\);/);
+assert.match(review, /el\('td',\{class:'qa-label'\},el\('div',\{class:'qa-test-title'\},el\('div',\{class:'qa-test-name'\},qaTestName\(r,qaDisplayName\(r\),details\)\),details\),under\)/);
+assert.match(fs.readFileSync('portal/static/app.css', 'utf8'), /\.measure-table:not\(\.qa-no-limit-cols\) \.qa-limits-under, \.measure-block:not\(\.qa-no-limit-cols\) > \.measure-title \.qa-limits-under \{ display:none; \}/);
+// A limit's cell reads the same on both pages: the number alone (the Unit column says the unit), a percent limit with its
+// sign, Winston-Lutz as "≥ 1 mm" under Action ± only, and nothing where the test has no such limit or is not measured.
+const formCells = run(`(it) => { ${/const limitCell = \(key\) => \([\s\S]*?: null\);/.exec(between('      const lineRow = (parts) => {', '        const row = el("tr", {'))[0]} return [limitCell("warn"), limitCell("fail")]; }`);
+const runCells = run(`(r, limits) => { ${/const limitCell=key=>.*?:null;/.exec(review)[0]} return [limitCell('warn'), limitCell('fail')]; }`);
+for (const [type, limits, cells] of [['numeric', { expected: 100, warn: 0.5, fail: 1, tol_mode: 'absolute' }, ['±0.5', '±1']], ['numeric', { expected: 100, warn: 1.5, fail: null, tol_mode: 'percent' }, ['±1.5 %', null]],
+  ['numeric', { criterion: 'wl-max-delta' }, [null, '≥ 1 mm']], ['numeric', { expected: 12, warn: null, fail: null }, [null, null]], ['boolean', { warn: 0.5, fail: 1 }, [null, null]]]) {
+  assert.deepEqual(Array.from(formCells({ type, limits })), cells, `QA form: ${JSON.stringify(limits)}`);
+  assert.deepEqual(Array.from(runCells({ type, ...limits }, limits)), cells, `saved run: ${JSON.stringify(limits)}`);
+}
+assert.match(review, /el\('td',\{class:'qa-warn num','data-label':'Warning ±'\},limitCell\('warn'\)\),\s*inline\?null:el\('td',\{class:'qa-action num','data-label':'Action ±'\},limitCell\('fail'\)\)/);
+// Tests on one line ("Same row as the test above") are laid out by the helper the QA form uses (lineLayout), from the
+// limits the run recorded: what every judged test shares is said once under the line's title; a test whose own differ
+// says them itself, the baseline first, then the limits in the same words.
+run(between('function joinedNames(', '// A shared row is one cell'));
+const onLine = (...limits) => { const parts = limits.map((l, i) => ({ test: { name: `Synthetic pair: ${'AB'[i]} [mm]`, type: 'numeric' }, unit: 'mm', limits: l })), layout = context.lineLayout(parts, (test) => test.name); return [layout.title, layout.shared, ...parts.map((p) => layout.own(p))]; };
+assert.deepEqual(onLine({ expected: 2, warn: 0.5, fail: 1 }, { expected: 2, warn: 0.5, fail: 1 }), ['Synthetic pair [mm]', 'Baseline 2 mm · Warning ±0.5 mm · Action ±1 mm', null, null]);
+assert.deepEqual(onLine({ expected: 2, warn: 0.5, fail: 1 }, { expected: 3, warn: null, fail: 1 }), ['Synthetic pair [mm]', null, 'Baseline 2 mm · Warning ±0.5 mm · Action ±1 mm', 'Baseline 3 mm · Action ±1 mm']);
+assert.match(review, /const rows=parts\.map\(p=>\(\{test:p\.r,unit:p\.unit,limits:p\.limits,p\}\)\),line=lineLayout\(rows,qaDisplayName\);/);
+assert.match(between('      const lineRow = (parts) => {', '      const groups = matrix'), /const line = lineLayout\(rows, shortName, \(x\) => refCell\(x\.test, x\.unit\)\);/);
 assert.match(review, /const original=r\.value_num==null\|\|r\.value_num&&!run\.therapist_approved_by\?'':r\.value_num\?'pass':'fail';/);
 const runPage = between('async function renderRun(', 'function bandValue(');
 assert.match(runPage, /page\(`\$\{run\.machine_name\} · \$\{run\.queue_name\}`, shortDate\(run\.qa_date\)/);
@@ -154,12 +177,17 @@ async function decisions() {
   for (const rule of phone) assert.ok(css.includes(`#app[data-page="runs"]${rule}`), `phone card rule for Past results: ${rule}`);
 }
 
-// 7. Calmer tables and form: no zebra or vertical rules, no grey "Recorded" chip in result cells, "Choose…", a trend
+// 7. Calmer tables and form: no zebra or vertical rules (but a QA table on a computer is a grid of cells, a hairline
+// around every cell: Brook, 2026-11-27, for QA tables only), no grey "Recorded" chip in result cells, "Choose…", a trend
 // button only for a measured value (and no empty Trends field on phones).
 {
   const css = fs.readFileSync('portal/static/app.css', 'utf8');
   assert.doesNotMatch(css, /\.fixed-table tbody tr:nth-child\(even\) td \{ background: color-mix/);
   assert.doesNotMatch(css, /^th \+ th, td \+ td \{ border-left: 1px/m);
+  const cells = css.slice(css.indexOf('/* Cells, as on a worksheet'));
+  assert.match(cells.slice(0, cells.indexOf('\n}\n')), /@media \(min-width: 1201px\) \{\n  #app \.measure-table th, #app \.measure-table td \{ border:1px solid var\(--border\); \}/, 'cells: QA tables, on a computer');
+  const ruled = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, selector, body]) => /(^|[\s>,])t[dh](\s*,|\s*$)/m.test(selector) && /border(-left|-right)?\s*:\s*1px solid/.test(body)).map(([, selector]) => selector.trim());
+  assert.deepEqual(ruled, ['#app .measure-table th, #app .measure-table td'], 'and the cells of no other table have rules between them');
   assert.match(css, /\.measure-table \.status-cell \.chip\.recorded \{ display:none; \}/);
   assert.match(css, /\.fixed-table tbody tr:hover td \{ background: var\(--surface-2\); \}/, 'the hover highlight stays');
   assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');

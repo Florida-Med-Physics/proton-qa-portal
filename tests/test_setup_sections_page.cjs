@@ -2,7 +2,8 @@
 // title in the list editor), on the browser build (docs/, the seeded PBS daily list, synthetic names and values only, a
 // fresh isolated browser context): what is added goes to the end of its section with the section's number and name
 // already in its field, the list is saved, and the QA form draws it there: X, Y, Z as a titled block, other fields as
-// one row under the block's name, a single test as a row of its own.
+// one line of the table under the block's name and unit ("Synthetic gap [mm]": In [ ] Out [ ]), a single test as a row
+// of its own.
 // Serve docs locally (port 8791), then run with Playwright available in NODE_PATH: node tests/test_setup_sections_page.cjs
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
@@ -99,9 +100,11 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.equal(await shift.locator('tr[data-qa-entry]').count(), 1);
     assert.deepEqual(await shift.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z']);
     assert.match(await shift.locator('.measure-title .qa-limits').textContent(), /^Baseline 0(\.0+)? cm · Warning ±0\.1 cm$/);
-    const gapRow = p.locator('tr.qa-inline-row', { has: p.getByLabel('Synthetic gap In [mm]', { exact: true }) });
-    assert.deepEqual([await gapRow.locator('.qa-inline-title').textContent(), await gapRow.locator('.qa-inline-name').allTextContents()], ['Synthetic gap', ['In [mm]', 'Out [mm]']]);
-    assert.equal(await gapRow.locator('td.qa-measured input[aria-label="Synthetic gap Out [mm]"]').count(), 1);
+    const gapRow = p.locator('tr.qa-line-row', { has: p.getByLabel('Synthetic gap In [mm]', { exact: true }) });
+    assert.deepEqual([await gapRow.locator('.qa-line-title').textContent(), await gapRow.locator('.qa-line-name').allTextContents(), await gapRow.locator('.qa-line-unit').count()], ['Synthetic gap [mm]', ['In', 'Out'], 0],
+      'the words the names start with and the unit they all end with are the line\'s name, said once; each field keeps the rest');
+    assert.deepEqual(await gapRow.locator('td.qa-measured.qa-shared-cell.qa-line-cell .qa-line-field > input.result-input').evaluateAll((boxes) => boxes.map((box) => box.getAttribute('aria-label'))), ['Synthetic gap In [mm]', 'Synthetic gap Out [mm]'],
+      'both answered beside their names, in the line\'s one cell');
     const numberOf = (row) => row.locator('td.qa-n').textContent();
     const final = p.locator('tr[data-qa-entry]', { has: p.getByRole('button', { name: 'Synthetic final check: pass', exact: true }) });
     assert.equal(await final.count(), 1);

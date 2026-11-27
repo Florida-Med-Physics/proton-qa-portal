@@ -40,7 +40,8 @@ Share with `--host 0.0.0.0`.
   gantry (TG-224)` from the boss's GTR5 monthly worksheet (floridaphysics repo). The TG-224 daily template is kept
   but not scheduled. In the seed (Brook, 2026-11-20) the instruction-only steps of the daily list are directions
   (the seven setup steps of Setup and Safety; seventeen in Mechanical and Imaging for the block below them; "Retract panels A
-  and B.", "Go to MyQA…" and "Deliver the beam." for the Sphinx Measurements section), four pairs share a row (chamber and
+  and B.", "Go to MyQA…" and "Deliver the beam." for the Sphinx Measurements section), tests share rows (2026-11-26:
+  delivered MU with beam time; chamber, electrometer, their factors and the overall factor on one line; before that: chamber and
   electrometer with their factors, Charge [nC] with Dose [cGy], the coincidence X offset with Y), block 2.02
   is "Mechanical-to-kV/kV Isocenter [cm]" (X, Y, Z, 3D), 2.03 "Mechanical-to-CBCT Correction Vector [cm]" (baselines
   X −5, Y −1, Z +4.5 cm, Warning ±0.15, Action ±0.2, from Brook; fifth step "DO NOT APPLY Correction") and 2.04
@@ -117,20 +118,56 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   measurements are one table: names "<what> – <energy> MeV[ – <which>] [unit]" or "<what> — G<angle> [unit]"
   (`listMeasureParts`, `tableParts`); several values per row are a matrix, a column per value with a head row saying the
   baseline and limits its tests share (`matrix` in `measureTable`; output charge and dose on one row, spot QA's four
-  values). Never widen `measureParts` for this: it also decides which fields a Sphinx import fills and locks. Still open
-  from the same notes: an equipment inventory with chamber selection (N_Dw, k_Q, k_s, k_pol filled from the chosen
-  chamber and not editable: Brook chose all four; Brook enters the real values), an XRV-124 Excel reader (needs a
-  sample export), "Take default off" (Brook had no preference which), "Summarize spot characteristic summary", "Add
-  in TG 224", and the same tables on a saved run and in Machine Trends.
+  values). Never widen `measureParts` for this: it also decides which fields a Sphinx import fills and locks. Brook
+  (2026-11-26, of the spot QA matrix): "this looks good, I like things like this". The seed's list (2026-11-26) has
+  sections of its own, in Brook's order: 3 Isocentricity / XRV ("in dosimetry, not mechanical"), 4 Range / Zebra,
+  5 Spot Characteristics / Sphinx, 6 Output, then 7 Imaging; couch translation X / Y / Z is one line, couch pitch /
+  roll / yaw one line, the couch isocentricity ranges and the maximum radial displacement one line (the maximum last);
+  the chamber and N_Dw, k_Q, k_s, k_pol are one line, from Equipment. Still open: a Sphinx file that fills the spot
+  table ("upload a sphinx file and read in all these numbers automatically") and an XRV file reader ("there's a file
+  that gets uploaded and read in for that as well"): each needs a sample export and how its numbers map to the tests,
+  never guessed; the spot tests' directions still say Lynx (from the worksheet) under a section named Sphinx;
+  "Take default off" (Brook had no preference which); "Add in TG 224" (the tests carry a "TG-224: …" line; no column
+  yet); the same tables on a saved run and in Machine Trends.
 - **Equipment (Brook, 2026-11-25: "Put in equipment inventory", "Chamber selection", "Ndw … aren't editable"):** Setup QA,
   More, Equipment (`renderEquipment`, `equipmentModel`, `equipmentSaves`, `equipmentConnection`). Nothing new is stored: a
   list chooses a device with a multiple-choice test tagged `[device: chamber]` / `[device: electrometer]`, and a test a
   device fills carries a `QADerived` lookup with a value per device; the page edits those tests of every list through
   `/api/tests`. One inventory per kind for all lists. Brook chose that a chamber carries all four of N_Dw, k_Q, k_s,
   k_pol. Never put a value in for a device: a connected test is blank until a Physicist types it. A device's value
-  shows on the form as typed (`setDerived`), a calculated one to three figures. Open: the seed's monthly list still
-  types its constants (it is connected from the page); the 22 °C / 1013.25 hPa baselines ("Take default off": Brook had
-  no preference which default); serial, calibration date and other equipment (Zebra, XRV-124) are not held.
+  shows on the form as typed (`setDerived`), a calculated one to three figures. The seed's monthly list is connected
+  (Brook, 2026-11-26: "all of these from monthly should be setup in the equipment spot, not in the monthly input"):
+  its chamber is a choice of the sample devices and its four constants are blank look-ups; a list already edited is
+  connected from the page. Open: the 22 °C / 1013.25 hPa baselines ("Take default off": Brook had no preference which
+  default); serial, calibration date and other equipment (Zebra, XRV-124) are not held.
+- **QA form, round 5 (Brook, 2026-11-26; overrides the notes above where they differ):** "Make this look a lot more
+  tabular", "make each row have much less height", "reduce row height all throughout the application", "really we are
+  just looking for a much more simplified look", and of the GTR5 monthly worksheet "take inspiration on how tabular
+  that is". A test is ONE line: columns `# · Test · Baseline · Measured · Unit · Warning ± · Action ± · Result ·
+  History · Note · Trend` (`QA_COLUMNS`; keys `warn`, `action`), the Baseline a number alone; the limits go back under
+  the name (`.qa-limits-under`, `.qa-no-limit-cols`) only when both limit columns are hidden or the window has no room
+  for them (`fitQaTable.tight`). Tests on one row are one line, every test beside its own name ("the dose [cGy] needs
+  to be closer to the actual line item its measuring"; `lineRow`, `lineRun`, `lineLayout`): shared first and last
+  words once in bold with the shared baseline and limits under them; the one value a device on the line fills has no
+  label of its own. A passing test on a line, or an axis of an X / Y / Z row, shows PASS alone (its Δ on the chip); a
+  test on a row of its own still says "PASS (Δ +0.30 mm)". A table of several energies or spots that a file fills
+  starts closed, one line with its verdict and the worst row named ("make all the spot characteristics pass fail, with
+  the ability to expand the results"; "Anytime there's multiple energies and something is coming directly from an
+  excel sheet, I don't want you to show all the energies automatically, allow the user to expand it out, but don't
+  automatically show it, I'm trying to reduce the amount of scrolling required"): never open one by itself, not even
+  for an ACTION ("Next unanswered" may open the one it lands in). Typed tables stay open. Rows are short everywhere:
+  padding and control heights in `app.css` (last block) and in the site's `site-overrides.css` (7b); a phone's cards
+  keep their sizes. An X / Y / Z block and an X / Y pair keep their title, limits line and row of axes.
+- **QA form, round 6 (Brook, 2026-11-27; overrides the notes above where they differ):** "Make this more cell
+  like/tabular … For all QA tests": on a computer a QA table is a grid of cells, a hairline on every side of every
+  cell (this overrides "no vertical rules" for QA tables only), and a box a person fills is its whole cell, lightly
+  tinted; one filled for them is grey. "Theres way too much white space after the test name label": the Test column
+  is only as wide as its longest name, section by section (`qaFitTestColumns`), so the table is as wide as its columns
+  and sits at the left of its card; a row of several tests asks for the width that keeps it on one line. "Column
+  chooser should be transposed": the columns side by side in the table's order, each name over its tick and its ← →.
+  "Each QA list to run should have much smaller row heights": on the Perform QA list a list is one short line, its
+  schedule after its name, the pass-rate ring 22 px with its number beside it (not inside: too small to read there).
+  A matrix table does not repeat the general headings above its own head row, and its verdicts follow their boxes.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in
@@ -141,7 +178,8 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   beyond on every chart (Brook, 2026-11-25: "more consistent margins for the warning and error axis levels"; it was
   "spans the warning band"); calendar x-axis with a line per month; HTML key under the chart; biggest outlier ringed; click a
   dot to show date, value, Δ. Pass-rate rings: thick, green/red only, small number inside; per test ("30 days"
-  column) and beside each machine's last result on the Dashboard; never a row of rings at the top.
+  column) and beside each machine's last result on the Dashboard; never a row of rings at the top. (On the Perform QA
+  list the ring is small with its number beside it: round 6.)
 - **One QA list object (Brook, 2026-10-22, emphatic):** Setup QA, Perform QA and Machine Trends all read the same
   list row; a list is scheduled on machines directly (never copied per machine). Default baseline / Warning / Action
   live on the list; a machine's own values are overrides on its schedule, edited with "Values for" in the list
@@ -169,6 +207,9 @@ baselines, limits, history in mm) should be shown in cm like the imaging checks,
 converted silently); the sign of the 2.03 / 2.04 baselines (Brook gave X −5, Y −1, Z +4.5 cm; the department's TG-224
 daily list expects +5, +1, −4.5 cm); the 2.03 / 2.04 limits (±0.15 / ±0.2 cm) against that list's "couch translational
 motion < 1 mm"; references for the checks that have none; and checking the seeded references against TG-224 itself.
+Proton monthly list: a sample Sphinx export of the monthly spot check (one per gantry angle) and how each number of the
+spot table comes from it; a sample XRV-124 export; whether the spot tests' directions should say Sphinx (they say
+Lynx, from the worksheet); the real chambers and their N_Dw, k_Q, k_s, k_pol (typed under Equipment by a Physicist).
 
 ## Portal updates agreed with Brook (2026-10-22)
 

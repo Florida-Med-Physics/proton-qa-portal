@@ -71,12 +71,15 @@ assert.deepEqual(sphinx.slice(0, 4).map((c) => [c.name, directionKind(c), seedNu
   [['Retract panels A and B.', 'section', ''], ['Go to MyQA, open your machine QA, connect Sphinx, and measure the background.', 'section', ''], ['Deliver the beam.', 'section', ''],
     ['[MU] Delivered MU (Record in IC2)', null, '3.01']]);
 assert.equal(pbs.filter((c) => /\[Section: Mechanical and Imaging\]/.test(c.description || '')).some((c) => /Retract panels|Go to MyQA/.test(c.name)), false);
-// What reads as one line is one row with one number ("Whenever theres nC and cGy, keep it on the same row"): the chamber
-// and the electrometer with their factors, the charge with the dose, the coincidence X offset with Y.
+// What reads as one line is one row with one number ("Whenever theres nC and cGy, keep it on the same row"): the
+// delivered MU with the beam's irradiation time (3.01); the chamber, its factor, the electrometer, its factor and the
+// overall factor, five tests on one line (3.02); the charge with the dose (3.03); the coincidence X offset with Y (3.17).
 const joined = pbs.filter((c) => /\[row: with above\]/.test(c.description || '')).map((c) => [pbs[c.test_id - 2].name, c.name, seedNumbers.get(pbs[c.test_id - 2].test_id), seedNumbers.get(c.test_id)]);
-assert.deepEqual(joined, [['Chamber', 'Chamber Cal. Factor(Proton), Gy/C', '3.03', '3.03'], ['Electrometer', 'Electrometer Calibration Factor', '3.04', '3.04'],
-  ['Daily output: Charge [nC]', 'Daily output: Dose [cGy]', '3.06', '3.06'],
-  ['Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]', '3.20', '3.20']]);
+assert.deepEqual(joined, [['[MU] Delivered MU (Record in IC2)', 'Beam Irradiation Time [min:s]', '3.01', '3.01'],
+  ['Chamber', 'Chamber Cal. Factor(Proton), Gy/C', '3.02', '3.02'], ['Chamber Cal. Factor(Proton), Gy/C', 'Electrometer', '3.02', '3.02'],
+  ['Electrometer', 'Electrometer Calibration Factor', '3.02', '3.02'], ['Electrometer Calibration Factor', 'Overall Calibration Factor [Gy/C]', '3.02', '3.02'],
+  ['Daily output: Charge [nC]', 'Daily output: Dose [cGy]', '3.03', '3.03'],
+  ['Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]', '3.17', '3.17']]);
 assert.deepEqual(imaging.slice(23, 26).map((c) => [c.expected, c.warn, c.fail, c.tol_mode, c.unit]), imaging.slice(13, 16).map((c) => [c.expected, c.warn, c.fail, c.tol_mode, c.unit]));
 assert.ok(imaging.slice(23, 26).every((c) => !/Record the correction vector/.test(c.description)), 'its own direction is a step now');
 // Its 3D is set up as the CBCT block's is: the same formula over its own axes, baseline 0, no limits.

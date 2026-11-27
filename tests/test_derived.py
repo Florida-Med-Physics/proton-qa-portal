@@ -50,4 +50,6 @@ class DerivedTests(unittest.TestCase):
                 if rule:
                     derived.resolve(rule,prior);count+=1
                 prior.append(item)
-        self.assertEqual(count,36)   # 35, and the 3D of the PBS daily list's kV/kV correction vector block (2026-11-20)
+        # 35, the 3D of the PBS daily list's kV/kV correction vector block (2026-11-20), and N_Dw, k_Q, k_s and k_pol of the
+        # proton monthly list, which come from the chamber chosen (2026-11-26)
+        self.assertEqual(count,40)

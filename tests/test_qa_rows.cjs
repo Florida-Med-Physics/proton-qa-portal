@@ -1,6 +1,7 @@
 // Synthetic checks of two things the QA form and Setup QA share:
 //  - what tests on one row ("Same row as the test above") are called together (joinedNames): the words their names start
-//    with are the row's name, each test keeps the rest; an X / Y pair is a block like X / Y / Z;
+//    with are the line's name (title), the words they all end with follow it (tail), each test keeps the rest (labels
+//    with those last words, middle without them); an X / Y pair is a block like X / Y / Z;
 //  - a test's Reference, the report its check comes from: a "Reference: …" line of its directions field, read and
 //    written without touching the field's markers, shown behind the test's ⓘ and saved from Setup QA's test form.
 // The seed's references are checked against where they come from: the department's own TG-224 notes, kept in the seed's
@@ -34,16 +35,23 @@ for (const part of [between('const TYPE_LABELS', '\n'), between('// Directions a
 vm.runInContext('this.api = { joinedNames, unitNamed, referenceOf, withReference, referenceLine, testFormData, testDetailsButton, performDirections, directionsParts, joinDirections, withRowMark, withDirectionMark, helpText };', context);
 const { joinedNames, unitNamed, referenceOf, withReference, testFormData, testDetailsButton, performDirections, directionsParts, joinDirections, withRowMark, withDirectionMark, helpText } = context.api;
 
-// 1. Tests on one row: the words the names share, and what is left of each.
-assert.deepEqual(J(joinedNames(['Daily output: Charge [nC]', 'Daily output: Dose [cGy]'])), { title: 'Daily output', labels: ['Charge [nC]', 'Dose [cGy]'], axes: null });
-assert.deepEqual(J(joinedNames(['Chamber', 'Chamber Cal. Factor(Proton), Gy/C'])), { title: 'Chamber', labels: ['', 'Cal. Factor(Proton), Gy/C'], axes: null }, 'the name itself is the first test\'s');
-assert.deepEqual(J(joinedNames(['Electrometer', 'Electrometer Calibration Factor'])), { title: 'Electrometer', labels: ['', 'Calibration Factor'], axes: null });
-assert.deepEqual(J(joinedNames(['Position — console', 'Position — ruler', 'Position difference'])), { title: 'Position', labels: ['console', 'ruler', 'difference'], axes: null }, 'three tests; the dash is not part of a name');
+// 1. Tests on one row: the words the names share (those they start with are the title, those they all end with the
+// tail), and what is left of each: with the last words (labels) and without them (middle).
+assert.deepEqual(J(joinedNames(['Daily output: Charge [nC]', 'Daily output: Dose [cGy]'])), { title: 'Daily output', labels: ['Charge [nC]', 'Dose [cGy]'], axes: null, middle: ['Charge [nC]', 'Dose [cGy]'], tail: '' });
+assert.deepEqual(J(joinedNames(['Chamber', 'Chamber Cal. Factor(Proton), Gy/C'])), { title: 'Chamber', labels: ['', 'Cal. Factor(Proton), Gy/C'], axes: null, middle: ['', 'Cal. Factor(Proton), Gy/C'], tail: '' }, 'the name itself is the first test\'s');
+assert.deepEqual(J(joinedNames(['Electrometer', 'Electrometer Calibration Factor'])), { title: 'Electrometer', labels: ['', 'Calibration Factor'], axes: null, middle: ['', 'Calibration Factor'], tail: '' });
+assert.deepEqual(J(joinedNames(['Position — console', 'Position — ruler', 'Position difference'])), { title: 'Position', labels: ['console', 'ruler', 'difference'], axes: null, middle: ['console', 'ruler', 'difference'], tail: '' }, 'three tests; the dash is not part of a name');
 // Named for the axes of one thing: an X / Y block under the words they share (what they end with alike is left out).
 assert.deepEqual(J(joinedNames(['Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]'])),
-  { title: 'Isocenter Coincidence [X-ray vs. Proton Beam]', labels: ['X offset [mm]', 'Y offset [mm]'], axes: ['X', 'Y'] });
+  { title: 'Isocenter Coincidence [X-ray vs. Proton Beam]', labels: ['X offset [mm]', 'Y offset [mm]'], axes: ['X', 'Y'], middle: ['X', 'Y'], tail: 'offset [mm]' });
 assert.deepEqual(J(joinedNames(['Couch X', 'Couch Y', 'Couch Z'])).axes, ['X', 'Y', 'Z']);
 assert.equal(J(joinedNames(['Field size X1 [cm]', 'Field size X2 [cm]'])).axes, null, 'X1 and X2 are not axes');
+// The words the names all end with are the tail, said once after the title on a line of the table ("Couch translational
+// accuracy [mm]", "Couch accuracy [deg]"); the middle is what each test is called there.
+assert.deepEqual(J(joinedNames(['Couch translational accuracy — X (lateral) [mm]', 'Couch translational accuracy — Y (longitudinal) [mm]', 'Couch translational accuracy — Z (vertical) [mm]'])),
+  { title: 'Couch translational accuracy', labels: ['X (lateral) [mm]', 'Y (longitudinal) [mm]', 'Z (vertical) [mm]'], axes: null, middle: ['X (lateral)', 'Y (longitudinal)', 'Z (vertical)'], tail: '[mm]' }, 'X (lateral) is not an axis letter alone: a line, not an X / Y / Z block');
+assert.deepEqual(J(joinedNames(['Couch pitch accuracy [deg]', 'Couch roll accuracy [deg]', 'Couch yaw accuracy [deg]'])),
+  { title: 'Couch', labels: ['pitch accuracy [deg]', 'roll accuracy [deg]', 'yaw accuracy [deg]'], axes: null, middle: ['pitch', 'roll', 'yaw'], tail: 'accuracy [deg]' });
 // Nothing shared: each test keeps its whole name.
 assert.equal(joinedNames(['TCS Sk', 'Decay-table Sk', 'Source strength difference']), null);
 assert.equal(joinedNames(['Temperature', 'Pressure']), null);
@@ -138,4 +146,4 @@ for (const c of referenced) {
 }
 for (const [text, [, names, count]] of Object.entries(FROM)) assert.equal(referenced.filter((c) => referenceOf(c.description) === text && names.test(c.name)).length, count, text);
 
-console.log('QA rows and references: what tests on one row are called together (shared words, X / Y pairs, nothing shared); a unit said once; a Reference line read, written and kept through edits; Setup QA\'s Reference box; behind a test\'s and a block\'s ⓘ; every seed reference is one of the department\'s TG-224 notes.');
+console.log('QA rows and references: what tests on one row are called together (shared first and last words, X / Y pairs, nothing shared); a unit said once; a Reference line read, written and kept through edits; Setup QA\'s Reference box; behind a test\'s and a block\'s ⓘ; every seed reference is one of the department\'s TG-224 notes.');
