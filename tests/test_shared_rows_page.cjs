@@ -111,8 +111,8 @@ let browser;
   assert.deepEqual([rows[8][0], rows[8][2]], ['1.09', []], 'the old 1.11 is 1.09');
   assert.deepEqual(rows.map((r, i) => (r[4] === 'qa-line-row' || r[5] ? i : null)).filter((i) => i !== null), [7, 9, 17], 'a line for each set, and only there');
   assert.deepEqual(await page(`[document.querySelectorAll('.hdr-qa-table td.qa-shared-cell').length, document.querySelectorAll('[class*="qa-inline"]').length]`), [3, 0], 'one merged cell for each set; no row is drawn the old way');
-  assert.deepEqual(await page(`[...document.querySelectorAll('.hdr-qa-table tr.qa-line-row')].map((r) => ['td.qa-label', 'td.qa-baseline', 'td.qa-unit', 'td.qa-warn', 'td.qa-action', 'td.qa-result'].map((s) => r.querySelectorAll(':scope > ' + s).length).join(''))`), Array(3).fill('000000'),
-    'a line has no cell of its own for a name, a baseline, a unit, a limit or a result');
+  assert.deepEqual(await page(`[...document.querySelectorAll('.hdr-qa-table tr.qa-line-row')].map((r) => ['td.qa-label', 'td.qa-baseline', 'td.qa-unit', 'td.qa-warn', 'td.qa-action', 'td.qa-result'].map((s) => r.querySelectorAll(':scope > ' + s).length).join(''))`), ['000000', '100000', '100000'],
+    'a line has no cell of its own for a baseline, a unit, a limit or a result; a line with a title has its name in the Test column (1.10, 1.18), one without has none (1.08)');
   // Untick (before anything is typed or saved): the QA form is exactly as before; then tick again.
   await tick(false);
   await go(form, formReady);
@@ -125,12 +125,14 @@ let browser;
   // What a test says of itself, after its box: its verdict or deviation as it reads, then its baseline and limits.
   const beside = async (i) => (await page(`[...${shared}.querySelectorAll('.qa-line-field')[${i}].querySelectorAll(':scope > .status-cell, :scope > .qa-line-limits')].map((x) => x.innerText).join(' ').replace(/\\s+/g, ' ').trim()`)).replace(/Baseline (\d+)\.0+(?!\d)/g, 'Baseline $1');   // decimals follow the history
   assert.deepEqual([await beside(0), await beside(1), await beside(2)], ['Baseline 12 mGy·m²·h⁻¹', 'Baseline 12 mGy·m²·h⁻¹', 'Baseline 0 % · Action ±1 %'], 'each test its own baseline and limits');
-  // Lined up with the rows around it: each line's one cell runs from where a test's name starts to where its Result
-  // ends in a row of one test, over as many of the shared columns as the table shows; it starts where the names start.
+  // Lined up with the rows around it. A line without a title (1.08) is one cell from where a test's name starts to
+  // where its Result ends, over the shared columns the table shows. A line with a title (1.10, 1.18) has its name in the
+  // Test column, like any test's, and its values in one cell from where the Test column ends to where Result ends.
   assert.deepEqual(await page(`(() => { const rows = [...document.querySelectorAll('.hdr-qa-table tr[data-qa-entry]')], edge = (n, side) => Math.round(n.getBoundingClientRect()[side]), one = rows[4];
     const shown = [...one.closest('table').querySelectorAll(':scope > colgroup > col')].filter((c) => ['test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result'].includes(c.dataset.col)).length;
-    return [7, 9, 17].map((i) => { const cell = rows[i].querySelector(':scope > td.qa-line-cell'); return [cell.colSpan === shown, edge(cell, 'left') - edge(one.querySelector('td.qa-label'), 'left'), edge(cell, 'right') - edge(one.querySelector('td.qa-result'), 'right'),
-      edge(rows[i].querySelector('.qa-line-title, .qa-line-name'), 'left') - edge(one.querySelector('td.qa-label strong'), 'left')]; }); })()`), Array(3).fill([true, 0, 0, 0]), 'one cell from Test to Result, like the rows around it');
+    return [7, 9, 17].map((i) => { const cell = rows[i].querySelector(':scope > td.qa-line-cell'), name = rows[i].querySelector(':scope > td.qa-line-label');
+      return [!!name, cell.colSpan === shown - (name ? 1 : 0), edge(name || cell, 'left') - edge(one.querySelector('td.qa-label'), 'left'), edge(cell, 'left') - edge(one.querySelector('td.qa-label'), name ? 'right' : 'left'), edge(cell, 'right') - edge(one.querySelector('td.qa-result'), 'right'),
+        edge(rows[i].querySelector('.qa-line-title, .qa-line-name'), 'left') - edge(one.querySelector('td.qa-label strong'), 'left')]; }); })()`), [[false, true, 0, 0, 0, 0], [true, true, 0, 0, 0, 0], [true, true, 0, 0, 0, 0]], 'lined up with the rows around it: a name where names are, the values up to where Result ends');
   // In a line every name is next to its own box: on its line, a few px before it, nearer than to the box before.
   const gaps = () => page(`[7, 9, 17].flatMap((i) => [...[...document.querySelectorAll('.hdr-qa-table tr[data-qa-entry]')][i].querySelectorAll('.qa-line-field')].map((f) => { const at = (n) => n.getBoundingClientRect(), name = at(f.querySelector(':scope > .qa-line-name')), box = at(f.querySelector(':scope > input.result-input')), prev = f.previousElementSibling && at(f.previousElementSibling.querySelector(':scope > input.result-input'));
     const gap = box.left - name.right, level = Math.abs(name.top + name.height / 2 - box.top - box.height / 2), before = prev && Math.abs(prev.top - box.top) <= 8 ? name.left - prev.right : null;

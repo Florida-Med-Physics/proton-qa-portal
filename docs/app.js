@@ -1797,7 +1797,7 @@ function qaLimitRoom() {
   if (qaLimitRoom.busy) return;
   const width = (col) => parseFloat(getComputedStyle(col).width) || 0;
   let tight = false, seen = false;
-  for (const table of document.querySelectorAll('.measure-table')) {
+  for (const table of document.querySelectorAll('.measure-table:not(.qa-columns-table)')) {
     const wrap = table.parentElement;
     if (!wrap || !wrap.clientWidth) continue;   // a closed table has no width to judge by
     if (!qaColumns(table.dataset.qaView || 'perform').shown.some((c) => QA_LIMIT_COLUMNS.includes(c.key))) continue;   // the person hid them
@@ -1811,7 +1811,7 @@ function qaLimitRoom() {
   if (!seen || tight === !!fitQaTable.tight) return;
   fitQaTable.tight = tight;
   qaLimitRoom.busy = true;
-  try { document.querySelectorAll('.measure-table').forEach((table) => layoutQaTable(table)); } finally { qaLimitRoom.busy = false; }
+  try { document.querySelectorAll('.measure-table:not(.qa-columns-table)').forEach((table) => layoutQaTable(table)); } finally { qaLimitRoom.busy = false; }
 }
 // The Test column is as wide as its longest name, section by section (Brook, 2026-11-27: "Theres way too much white
 // space after the test name label"; "more cell like"): the cells that follow sit beside the names, and the table is only
@@ -1842,8 +1842,11 @@ function qaFitTestColumns() {
         // (What a cell holds, at its natural width, plus the cell's own padding and borders.)
         const natural = (cell, inner) => { const box = cell.querySelector(inner), style = getComputedStyle(cell);
           return box ? box.getBoundingClientRect().width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 2 : 0; };
-        for (const cell of table.querySelectorAll(':scope > tbody > tr:not([hidden]) > td.qa-label')) need = Math.max(need, natural(cell, '.qa-test-title'));
-        for (const cell of table.querySelectorAll(':scope > tbody > tr:not([hidden]) > td.qa-shared-cell')) need = Math.max(need, natural(cell, '.qa-shared') - shared);
+        // (A test's name, or the name of a row of several values. What those values share is said under the name and
+        // may take two lines there: a long line of baselines and limits does not push the value columns away.)
+        for (const cell of table.querySelectorAll(':scope > tbody > tr:not([hidden]) > td.qa-label')) need = Math.max(need, natural(cell, '.qa-test-title'), natural(cell, '.qa-line-name-row'), natural(cell, '.qa-line-head > .qa-limits') * 0.55);
+        // (A values cell is beside a Test cell of its own: widening Test would not give it room, so it asks for none.)
+        for (const cell of table.querySelectorAll(':scope > tbody > tr:not([hidden]) > td.qa-shared-cell:not(.qa-values-cell)')) need = Math.max(need, natural(cell, '.qa-shared') - shared);
       }
       box.classList.remove('qa-measuring');
       const em = parseFloat(getComputedStyle(tables[0]).fontSize) || 16;
@@ -1880,14 +1883,19 @@ function layoutQaTable(table, view = table.dataset.qaView || 'perform') {
   for (const row of rows) {
     if (row.classList.contains('quick-trend')) { row.children[0].colSpan = shown.length - numbered; continue; }
     const shared = [...row.children].find((x) => x.classList.contains('qa-shared-cell'));
+    // A values cell (.qa-values-cell) belongs to a row with a Test cell of its own: it covers the other shared columns,
+    // from the first one shown.
+    const values = !!shared && shared.classList.contains('qa-values-cell');
+    const covers = (c) => !!shared && QA_SHARED_COLUMNS.includes(c.key) && !(values && c.key === 'test');
+    let placed = false;
     for (const c of all) {
-      const cell = shared && QA_SHARED_COLUMNS.includes(c.key) ? (c.key === 'test' ? shared : null)
-        : [...row.children].find((x) => x !== shared && (x.tagName === 'TH' ? x.dataset.col === c.key : x.classList.contains(c.cls)));
+      if (covers(c)) { if (!c.off && !placed) { row.append(shared); shared.classList.remove('qa-col-off'); placed = true; } continue; }
+      const cell = [...row.children].find((x) => x !== shared && (x.tagName === 'TH' ? x.dataset.col === c.key : x.classList.contains(c.cls)));
       if (!cell) continue;
       row.append(cell);
       cell.classList.toggle('qa-col-off', c.off);
     }
-    if (shared) shared.colSpan = shown.filter((c) => QA_SHARED_COLUMNS.includes(c.key)).length;
+    if (shared) shared.colSpan = shown.filter(covers).length;
     const extras = [...row.children].find((x) => x.classList.contains('qa-phone-extras'));
     if (extras) row.append(extras);
   }
@@ -1917,7 +1925,7 @@ function qaHeadings(blocks) {
 // so what has been typed stays. `order` null: back to the page's own columns.
 function applyQaColumns(view, order, hidden = []) {
   saveQaColumnChoice(view, order ? { order, hidden } : null);
-  document.querySelectorAll('.measure-table').forEach((table) => layoutQaTable(table));
+  document.querySelectorAll('.measure-table:not(.qa-columns-table)').forEach((table) => layoutQaTable(table));
   document.querySelectorAll('.card.section').forEach((box) => qaHeadings(box.querySelectorAll('.measure-block')));
   if (applyQaColumns.redraw) applyQaColumns.redraw();   // the open Columns box shows the new order
 }
@@ -1946,30 +1954,29 @@ function closeQaColumnChooser(focus = false) {
   if (focus && button?.isConnected) button.focus();
 }
 // `at`: { x, y } of the pointer for a right-click; without it the window opens under `button`.
-// It is laid out like the table it arranges (Brook, 2026-11-27: "Column chooser should be transposed"): the columns
-// side by side in the order shown, each name over its tick and its ← → (which move it the way they point).
 function openQaColumnChooser(view, at = null, button = null) {
   if (matchMedia('(max-width: 1200px)').matches) return;   // a phone's cards have no columns to choose
   closeQaColumnChooser();
-  const list = el('ul', { class: 'qa-columns-list' });
+  // It is the table's own headings (Brook, 2026-11-27: "Make this look just like the columns that we use, and ditch
+  // the arrows"): a headings row drawn like any QA table's, in the order shown, with a tick under each column that can
+  // be hidden. A heading is dragged left or right to move its column; for anyone who cannot drag, a focused heading
+  // moves with the ← and → keys. # and Test stay first.
+  const list = el('tr', { class: 'qa-columns-list qa-col-names' }), ticks = el('tr', { class: 'qa-columns-ticks' });
+  const table = el('table', { class: 'measure-table qa-columns-table' }, el('thead', {}, list), el('tbody', {}, ticks));
   const clear = () => document.querySelectorAll('.qa-col-dragging, .qa-drop-before, .qa-drop-after, .qa-drop-hide').forEach((x) => x.classList.remove('qa-col-dragging', 'qa-drop-before', 'qa-drop-after', 'qa-drop-hide'));
-  let focus = null;   // what was last used, found again after the list is redrawn
+  let focus = null;   // what was last used, found again after the headings are redrawn
   const draw = () => {
-    const movable = qaColumns(view).all.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
-    list.replaceChildren(...movable.map((c, i) => {
-      const show = el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null,
-        onchange: () => { focus = `li[data-col="${c.key}"] input`; applyQaColumns(view, keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]); } });
-      const move = (by, label, sign) => el('button', { type: 'button', class: 'icon-btn', 'data-move': by, disabled: i + by < 0 || i + by >= movable.length || null,
-        title: label, 'aria-label': `${label}: ${c.label}`,
-        onclick: () => { const next = keys.filter((k) => k !== c.key); next.splice(i + by, 0, c.key); focus = `li[data-col="${c.key}"] button[data-move="${by}"]:not(:disabled), li[data-col="${c.key}"] button:not(:disabled)`; applyQaColumns(view, next, hidden); } }, sign);
-      return el('li', { 'data-col': c.key, draggable: 'true',
+    const columns = qaColumns(view).all, movable = columns.filter((c) => !c.pinned), keys = movable.map((c) => c.key), hidden = movable.filter((c) => c.off).map((c) => c.key);
+    const step = (key, by) => { const i = keys.indexOf(key); if (i + by < 0 || i + by >= keys.length) return; const next = keys.filter((k) => k !== key); next.splice(i + by, 0, key); focus = `th[data-col="${key}"]`; applyQaColumns(view, next, hidden); };
+    list.replaceChildren(...columns.map((c) => (c.pinned ? el('th', { scope: 'col', 'data-col': c.key, class: 'qa-columns-fixed', title: 'Always first' }, c.label)
+      : el('th', { scope: 'col', 'data-col': c.key, class: c.off ? 'qa-columns-hidden' : null, draggable: 'true', tabindex: '0', title: 'Drag left or right to move (or press ← →)',
         ondragstart: (event) => { qaHeadingDrag.key = c.key; qaHeadingDrag.from = 'chooser'; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', c.label); event.currentTarget.classList.add('qa-col-dragging'); },
         ondragend: () => { qaHeadingDrag.key = null; qaHeadingDrag.from = null; clear(); },
-        ondragover: (event) => {   // a name over another name: before or after it
+        ondragover: (event) => {   // a heading over another: before or after it
           if (qaHeadingDrag.from !== 'chooser' || !qaHeadingDrag.key || qaHeadingDrag.key === c.key) return;
           event.preventDefault();
-          const li = event.currentTarget, r = li.getBoundingClientRect(), after = event.clientX > r.left + r.width / 2;   // (the names are side by side)
-          li.classList.toggle('qa-drop-after', after); li.classList.toggle('qa-drop-before', !after);
+          const th = event.currentTarget, r = th.getBoundingClientRect(), after = event.clientX > r.left + r.width / 2;
+          th.classList.toggle('qa-drop-after', after); th.classList.toggle('qa-drop-before', !after);
         },
         ondragleave: (event) => event.currentTarget.classList.remove('qa-drop-before', 'qa-drop-after'),
         ondrop: (event) => {
@@ -1978,14 +1985,16 @@ function openQaColumnChooser(view, at = null, button = null) {
           event.preventDefault(); event.stopPropagation();
           const after = event.currentTarget.classList.contains('qa-drop-after');
           qaHeadingDrag.key = null; qaHeadingDrag.from = null; clear();
-          focus = `li[data-col="${key}"] input`;
+          focus = `th[data-col="${key}"]`;
           moveQaColumn(view, key, c.key, after);
-        } },
-        el('span', { class: 'drag-handle', title: 'Drag to move', 'aria-hidden': 'true' }, '⠿'),
-        el('label', { class: 'check', title: c.always ? 'Always shown' : null }, show, c.label),
-        el('span', { class: 'qa-columns-move' }, move(-1, 'Move left', '←'), move(1, 'Move right', '→')));
+        },
+        onkeydown: (event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); step(c.key, event.key === 'ArrowLeft' ? -1 : 1); } } }, c.label))));
+    ticks.replaceChildren(...columns.map((c) => {
+      const show = c.pinned ? null : el('input', { type: 'checkbox', checked: !c.off, disabled: c.always || null, 'aria-label': `Show ${c.label}`, title: c.always ? 'Always shown' : `Show ${c.label}`,
+        onchange: () => { focus = `td[data-col="${c.key}"] input`; applyQaColumns(view, keys, show.checked ? hidden.filter((k) => k !== c.key) : [...hidden, c.key]); } });
+      return el('td', { 'data-col': c.key }, show);
     }));
-    if (focus) list.querySelector(focus)?.focus();
+    if (focus) table.querySelector(focus)?.focus();
     focus = null;
   };
   const title = el('div', { class: 'qa-columns-title' }, el('strong', {}, 'Column Chooser'), el('span', { class: 'spacer' }),
@@ -2003,8 +2012,8 @@ function openQaColumnChooser(view, at = null, button = null) {
       if (!column || column.always) return toast(column ? `${column.label} is always shown.` : 'That column stays where it is.', true);
       applyQaColumns(view, movable.map((c) => c.key), [...new Set([...movable.filter((c) => c.off).map((c) => c.key), key])]);
     } },
-    title, list,
-    el('p', { class: 'muted small' }, 'Drag a name to move it, or onto a heading. Drag a heading here to hide it.'),
+    title, el('div', { class: 'qa-columns-wrap-table' }, table),
+    el('p', { class: 'muted small' }, 'Drag a heading to move it, or onto a heading of the table. Drag a heading of the table here to hide it.'),
     el('div', { class: 'row' }, el('button', { type: 'button', class: 'small', onclick: () => applyQaColumns(view, null) }, 'Reset')));
   (document.getElementById('app') || document.body).append(box);
   // Where it opens: at the pointer, or under its button; always whole inside the window.
@@ -2029,7 +2038,7 @@ function openQaColumnChooser(view, at = null, button = null) {
   Object.assign(qaColumnChooser, { box, button, stop: () => document.removeEventListener('keydown', escape, true) });
   applyQaColumns.redraw = () => { if (box.isConnected) draw(); };
   if (button) button.setAttribute('aria-expanded', 'true');
-  list.querySelector('input:not(:disabled)')?.focus();
+  ticks.querySelector('input:not(:disabled)')?.focus();
 }
 function qaColumnsButton(view) {
   const button = el('button', { type: 'button', class: 'qa-columns-button', 'aria-haspopup': 'dialog', 'aria-expanded': 'false', title: 'Show, hide and move columns (or right-click a heading)',
@@ -2671,7 +2680,8 @@ async function renderPerform(assignmentId) {
       const limitsLine = (it, unit) => (it.type === "numeric" ? qaLimitsLine(it.limits, unit) : null);
       // A titled block (X / Y / Z, per energy) is one numbered test: its number is beside its name in the title band
       // (Brook, 2026-11-20), and the rows under the band leave the # column empty.
-      const numberCell = (it) => (firstHeader !== "Test"
+      const axisOwnRow = axisRow && !matrix && !!title;   // an X / Y / Z group is one row of the table: number, name, the axes at the right
+      const numberCell = (it) => (axisOwnRow ? el("td", { class: "qa-n" }, numbers.get(members[0].test_id) || "") : firstHeader !== "Test"
         ? (it === members[0] ? el("td", { class: "qa-n qa-n-span", rowspan: (matrix ? matrix.rows.length : axisRow ? 1 : members.length) * 2 }) : null)
         : el("td", { class: "qa-n" }, numbers.get(it.test_id) || ""));
       // Tests marked "Same row as the test above" share one row (sharedCell), each laid out as in a row of its own: its
@@ -2734,7 +2744,16 @@ async function renderPerform(assignmentId) {
             ...matrixRow.cells.map((it) => (it ? fields.get(it.test_id) : el("div", { class: "qa-shared-field qa-matrix-empty" }))));
           grid.style.setProperty("--qa-fields", matrix.columns.length);
         } else if (axisRow) cell.firstChild.style.setProperty("--qa-fields", parts.length);   // every axis on the one line (app.css)
-        return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
+        // An X / Y / Z group's name, its ⓘ and what its axes share are in the Test column, like any test's; the axes are
+        // at the right, from the Baseline column on, each in its own slot so every group's X, Y, Z and 3D line up.
+        let label = null;
+        if (axisOwnRow) {
+          cell.classList.add("qa-values-cell");
+          const said = [titleBaseline, titleLimits].filter(Boolean).join(" · ");
+          for (const strong of title.querySelectorAll("strong")) strong.classList.add("qa-line-title");
+          label = el("td", { class: "qa-label qa-axis-label" }, el("div", { class: "qa-line-head" }, el("div", { class: "qa-line-name-row" }, [...title.childNodes]), said ? el("span", { class: "qa-limits" }, said) : null));
+        }
+        return { main, cell, label, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
       // Tests on one row of the table ("Same row as the test above") are one line of it: each is answered beside its
       // own name, its unit and its verdict after its box (Brook, 2026-11-26: the name next to what it measures). Names
@@ -2761,12 +2780,16 @@ async function renderPerform(assignmentId) {
         });
         parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));   // the + opens every note
         const laid = linePairs(fields, line);
-        const head = line.title ? el("div", { class: "qa-line-head" }, el("div", { class: "qa-line-name-row" }, el("strong", { class: "qa-line-title" }, line.title), named_(testDetailsButton(parts[0].it, t.items, numbers), line.title)),
-          line.shared ? el("span", { class: "qa-limits" }, line.shared) : null) : null;
-        const cell = el("td", { class: "qa-measured qa-shared-cell qa-line-cell", colspan: QA_SHARED_COLUMNS.length }, el("div", { class: "qa-shared qa-line" }, head, el("div", { class: "qa-line-fields" }, laid)));
+        // With a title, the line is laid out like any test: its name (with what its tests share under it) in the Test
+        // column, its values at the right, from the Baseline column on (Brook, 2026-11-27: "Put the X Y Z part on the
+        // right side and think about column alignment"). Without one, the tests and their own names take the whole line.
+        const label = line.title ? el("td", { class: "qa-label qa-line-label" }, el("div", { class: "qa-line-head" },
+          el("div", { class: "qa-line-name-row" }, el("strong", { class: "qa-line-title" }, line.title), named_(testDetailsButton(parts[0].it, t.items, numbers), line.title)),
+          line.shared ? el("span", { class: "qa-limits" }, line.shared) : null)) : null;
+        const cell = el("td", { class: `qa-measured qa-shared-cell qa-line-cell${label ? " qa-values-cell" : ""}`, colspan: QA_SHARED_COLUMNS.length }, el("div", { class: "qa-shared qa-line" }, el("div", { class: "qa-line-fields" }, laid)));
         // (Its history and trend follow the first test with limits, then the first with a baseline, then the first number.)
         const main = (line.judged.find((x) => x.limits.warn != null || x.limits.fail != null) || line.judged[0] || rows.find((x) => x.test.type === "numeric") || rows[0]).p;
-        return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
+        return { main, cell, label, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
       const groups = matrix ? matrix.rows.map((r) => Object.assign(r.cells.filter(Boolean), { matrixRow: r }))
         : firstHeader === "Test" ? sharedRows(members, numbers) : axisRow ? [members] : members.map((it) => [it]);
@@ -2799,6 +2822,7 @@ async function renderPerform(assignmentId) {
         } }, trendIcon(16));
         const row = el("tr", {'data-qa-entry':parts[0].it.test_id, class: matrix ? "qa-axis-row qa-matrix-row" : axisRow ? "qa-axis-row" : line ? "qa-line-row" : null},
           numberCell(it),
+          shared && shared.label ? shared.label : null,
           shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), under, note),
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
           // null, not "": an empty cell must stay :empty so the card layout drops its label too.
@@ -2854,12 +2878,12 @@ async function renderPerform(assignmentId) {
           el("tbody", {}, matrixHead, trRows.flat()));
       // Axis and energy tables carry the shared limits in their title rather than on every row; an X / Y / Z row's
       // title also carries the baseline its axes share.
-      if (title && firstHeader !== "Test") {
+      if (title && firstHeader !== "Test" && !axisOwnRow) {
         title.prepend(el("span", { class: "measure-n" }, numbers.get(members[0].test_id) || ""));
         const shared = [titleBaseline, titleLimits].filter(Boolean);
         if (shared.length) title.append(el("span", { class: `qa-limits${limitCells ? " qa-limits-under" : ""}` }, shared.join(" · ")));
       }
-      const block = el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+      const block = el("div", { class: "measure-block" }, axisOwnRow ? null : title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
       // A table of several energies or spots that a file fills starts closed (Brook, 2026-11-26: "don't automatically
       // show it … I'm trying to reduce the amount of scrolling"): one line, its name and its verdict, the worst row
       // named when one is not PASS. A click on the line opens the rows; nothing opens by itself.
@@ -4482,10 +4506,11 @@ async function renderReviewMeasurements(run) {
         line.judged.includes(x)&&!p.missing?p.result:null,line.fromDevice(i)?null:naming(testDetailsButton(p.r,run.results,numbers),label||p.r.name),
         own?el('span',{class:`qa-limits qa-line-limits${own.length>28?' qa-line-limits-under':''}`},own):null,p.r.comment?el('span',{class:'qa-shared-note'},p.r.comment):null);
     });
-    const head=line.title?el('div',{class:'qa-line-head'},el('strong',{class:'qa-line-title'},line.title),line.shared?el('span',{class:'qa-limits'},line.shared):null):null;
+    const label=line.title?el('td',{class:'qa-label qa-line-label'},el('div',{class:'qa-line-head'},el('div',{class:'qa-line-name-row'},el('strong',{class:'qa-line-title'},line.title)),line.shared?el('span',{class:'qa-limits'},line.shared):null)):null;
     return {main:(line.judged.find(x=>x.limits.warn!=null||x.limits.fail!=null)||line.judged[0]||rows.find(x=>x.test.type==='numeric')||rows[0]).p,
       named:rows.filter(x=>x.test.type==='numeric').length>1,   // several numbers on the line: its History says whose it is
-      cell:el('td',{class:'qa-measured qa-shared-cell qa-line-cell',colspan:QA_SHARED_COLUMNS.length},el('div',{class:'qa-shared qa-line'},head,el('div',{class:'qa-line-fields'},linePairs(fields,line))))};
+      label,   // with a title: the name in the Test column, the values at the right (as on the QA form)
+      cell:el('td',{class:`qa-measured qa-shared-cell qa-line-cell${label?' qa-values-cell':''}`,colspan:QA_SHARED_COLUMNS.length},el('div',{class:'qa-shared qa-line'},el('div',{class:'qa-line-fields'},linePairs(fields,line))))};
   };
   // A section's rows: tests on one row together, except tests named for the axes of one thing (an X / Y pair), which
   // are rows of their own here, as the axes of X / Y / Z are.
@@ -4551,6 +4576,7 @@ async function renderReviewMeasurements(run) {
       const limitCell=key=>r.type!=='numeric'?null:limits.criterion==='wl-max-delta'?(key==='fail'?'≥ 1 mm':null):r[key]!=null?`±${fmt(r[key])}${r.tol_mode==='percent'?' %':''}`:null;
       const row=el('tr',{'data-test-id':lead.test_id,class:inline?'qa-line-row':null},
         el('td',{class:'qa-n'},numberFor(lead)),
+        inline&&inline.label?inline.label:null,
         inline?inline.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},qaTestName(r,qaDisplayName(r),details)),details),under),
         inline?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
         inline?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':fmt(r.expected)),

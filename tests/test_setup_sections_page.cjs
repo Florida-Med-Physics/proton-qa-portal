@@ -96,10 +96,11 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
 
     // 5. The QA form draws them where they were added: the X / Y / Z block, the row of two under the block's name, the test.
     await p.evaluate((h) => { location.hash = h; }, `#/perform/${list}`); await p.waitForSelector('.measure-table'); await p.waitForTimeout(400);
-    const shift = p.locator('.measure-block', { has: p.locator('.measure-title strong', { hasText: /^Synthetic shift \[cm\]$/ }) });
-    assert.equal(await shift.locator('tr[data-qa-entry]').count(), 1);
+    // (An X / Y / Z group is one row of the table: its name and what its axes share in the Test column, its axes at the right.)
+    const shift = p.locator('tr.qa-axis-row[data-qa-entry]', { has: p.locator('td.qa-axis-label strong', { hasText: /^Synthetic shift \[cm\]$/ }) });
+    assert.equal(await shift.count(), 1);
     assert.deepEqual(await shift.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z']);
-    assert.match(await shift.locator('.measure-title .qa-limits').textContent(), /^Baseline 0(\.0+)? cm · Warning ±0\.1 cm$/);
+    assert.match(await shift.locator('td.qa-axis-label .qa-limits').textContent(), /^Baseline 0(\.0+)? cm · Warning ±0\.1 cm$/);
     const gapRow = p.locator('tr.qa-line-row', { has: p.getByLabel('Synthetic gap In [mm]', { exact: true }) });
     assert.deepEqual([await gapRow.locator('.qa-line-title').textContent(), await gapRow.locator('.qa-line-name').allTextContents(), await gapRow.locator('.qa-line-unit').count()], ['Synthetic gap [mm]', ['In', 'Out'], 0],
       'the words the names start with and the unit they all end with are the line\'s name, said once; each field keeps the rest');

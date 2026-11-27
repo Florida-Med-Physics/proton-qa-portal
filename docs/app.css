@@ -1855,15 +1855,6 @@ td, .measure-table td { font-size: 21px; }
   background:var(--surface-2); border-bottom:1px solid var(--border); border-radius:10px 10px 0 0; }
 .qa-columns-title .icon-btn { min-width:30px; min-height:30px; padding:0; }
 .qa-columns-pop.qa-drop-hide { outline:2px dashed var(--accent); outline-offset:2px; }
-.qa-columns-list { list-style:none; margin:0; padding:0; }
-.qa-columns-list li { display:flex; align-items:center; gap:6px; padding:1px 0; cursor:grab; }
-.qa-columns-list li .drag-handle { color:var(--muted); }
-.qa-columns-list li.qa-col-dragging { opacity:0.45; }
-.qa-columns-list li.qa-drop-before { box-shadow:inset 0 3px 0 var(--accent); }
-.qa-columns-list li.qa-drop-after { box-shadow:inset 0 -3px 0 var(--accent); }
-.qa-columns-list .check { margin:0; font-size:16px; }
-.qa-columns-pop .qa-columns-list .icon-btn { min-width:32px; min-height:32px; padding:0; }
-.qa-columns-list .icon-btn:disabled { opacity:0.3; }
 .qa-columns-pop p { margin:6px 0 8px; }
 .qa-columns-pop .row { align-items:center; }
 .qa-columns-pop .row button { min-height:34px; }
@@ -2109,15 +2100,21 @@ td, .measure-table td { font-size: 21px; }
   #app table:not(.measure-table) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), #app table:not(.measure-table) select { min-height:0; padding-top:3px; padding-bottom:3px; }
 }
 
-/* The Column Chooser is transposed (Brook, 2026-11-27): the columns side by side, in the table's order, each name
-   over its tick and its arrows; a name is dragged left or right. */
+/* The Column Chooser is the table's own headings (Brook, 2026-11-27: "Make this look just like the columns that we
+   use, and ditch the arrows"): a headings row drawn like a QA table's, a tick under each column that can be hidden.
+   A heading is dragged left or right. */
 .qa-columns-pop { width:auto; max-width:calc(100vw - 16px); }
-.qa-columns-list { display:flex; flex-wrap:wrap; gap:2px 4px; }
-.qa-columns-list li { flex-direction:column; align-items:center; gap:2px; padding:4px 8px; border-radius:6px; }
-.qa-columns-list li .check { display:flex; flex-direction:column-reverse; align-items:center; gap:2px; white-space:nowrap; }
-.qa-columns-list li.qa-drop-before { box-shadow:inset 3px 0 0 var(--accent); }
-.qa-columns-list li.qa-drop-after { box-shadow:inset -3px 0 0 var(--accent); }
-.qa-columns-move { display:inline-flex; gap:2px; }
+.qa-columns-wrap-table { overflow-x:auto; margin:8px 0 2px; }
+#app .qa-columns-pop table.qa-columns-table { width:auto; min-width:0; table-layout:auto; border-collapse:collapse; }
+#app .qa-columns-pop table.qa-columns-table th { white-space:nowrap; cursor:grab; user-select:none; }
+#app .qa-columns-pop table.qa-columns-table th.qa-columns-fixed { cursor:default; }
+#app .qa-columns-pop table.qa-columns-table th.qa-columns-hidden { opacity:0.45; text-decoration:line-through; }
+#app .qa-columns-pop table.qa-columns-table th.qa-col-dragging { opacity:0.45; }
+#app .qa-columns-pop table.qa-columns-table th.qa-drop-before { box-shadow:inset 3px 0 0 var(--accent); }
+#app .qa-columns-pop table.qa-columns-table th.qa-drop-after { box-shadow:inset -3px 0 0 var(--accent); }
+#app .qa-columns-pop table.qa-columns-table th:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+#app .qa-columns-pop table.qa-columns-table td { text-align:center; }
+#app .qa-columns-pop table.qa-columns-table td input { margin:0; }
 
 /* Cells, as on a worksheet (Brook, 2026-11-27: "Make this more cell like/tabular … For all QA tests"): on a computer a
    QA table is a grid of cells with a hairline between them, and a box a person fills is its whole cell, lightly
@@ -2128,7 +2125,7 @@ td, .measure-table td { font-size: 21px; }
   #app .measure-table td.qa-measured:not(.qa-shared-cell) { padding:0; height:1px; }
   #app .measure-table td.qa-measured:not(.qa-shared-cell) > .result-input, #app .measure-table td.qa-measured:not(.qa-shared-cell) > .text-input {
     display:block; width:100%; height:100%; min-height:34px; margin:0; border:0; border-radius:0; box-shadow:none; text-align:center;
-    background:color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+    background:var(--qa-entry); }
   #app .measure-table td.qa-measured:not(.qa-shared-cell) > .result-input[readonly], #app .measure-table td.qa-measured:not(.qa-shared-cell) > .text-input[readonly] { background:var(--surface-2); }
   #app .measure-table td.qa-measured:not(.qa-shared-cell) > .result-input:focus, #app .measure-table td.qa-measured:not(.qa-shared-cell) > .text-input:focus { outline:2px solid var(--accent); outline-offset:-2px; }
   #app .measure-table td.qa-measured:not(.qa-shared-cell) > .segmented { margin:2px auto; }
@@ -2150,8 +2147,49 @@ td, .measure-table td { font-size: 21px; }
      several tests are as wide as they like, on one line. */
   .qa-measuring .measure-table td.qa-label, .qa-measuring .measure-table td.qa-label *, .qa-measuring .measure-table td.qa-shared-cell * { white-space:nowrap !important; overflow-wrap:normal !important; }
   .qa-measuring .measure-table td.qa-label .qa-test-title { display:inline-flex !important; width:max-content !important; }
+  .qa-measuring .measure-table td.qa-label .qa-line-head { display:inline-flex !important; width:max-content !important; }
+  .qa-measuring .measure-table td.qa-label .qa-line-head > * { flex:0 0 auto !important; width:max-content !important; align-self:flex-start !important; }
   .qa-measuring .measure-table td.qa-label .qa-test-name { flex:0 0 auto !important; }
   .qa-measuring .measure-table td.qa-shared-cell .qa-shared { width:max-content !important; flex-wrap:nowrap !important; }
   .qa-measuring .measure-table .qa-line-fields, .qa-measuring .measure-table .qa-shared-field, .qa-measuring .measure-table .qa-shared-more { flex-wrap:nowrap !important; flex:0 0 auto !important; }
   .qa-measuring .measure-table .qa-line-limits-under { display:none !important; }   /* (under its field: it asks for no width) */
 }
+
+/* A row of several values with a name of its own (an X / Y / Z group, tests on one line whose names share words): the
+   name, with what the values share under it, is in the Test column like any test's; the values are at the right, from
+   the Baseline column on (Brook, 2026-11-27: "Put the X Y Z part on the right side and think about column
+   alignment"). An X / Y / Z group's axes each have a slot, so every group's X, Y, Z and 3D line up. */
+.qa-line-label .qa-line-head, .qa-axis-label .qa-line-head { display:flex; flex-direction:column; }
+.qa-axis-label .qa-line-name-row { display:flex; align-items:center; gap:8px; }
+.qa-axis-label .qa-limits, .qa-line-label .qa-limits { margin-top:0; }
+#app .measure-table td.qa-label.qa-axis-label, #app .measure-table td.qa-label.qa-line-label { text-align:left; }
+/* A phone's card: the row's name, with what its values share, over the values (each on a line of its own, as before). */
+@media (max-width: 1200px) {
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table td.qa-label.qa-axis-label,
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table td.qa-label.qa-line-label { grid-column:1/-1; grid-row:1; }
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table td.qa-shared-cell.qa-values-cell { grid-column:1/-1; grid-row:2; }
+}
+@media(max-width:767px) {
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .qa-label > .qa-line-head { display:flex !important; }
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .qa-line-head > .qa-limits { display:block !important; }   /* as under a group's title before */
+  #app:is([data-page^="perform/"],[data-page^="runs/"]) .measure-table .qa-line-head .qa-line-title { font-size:15px; line-height:1.25; }
+}
+@media (min-width: 1201px) {
+  /* The boxes of a row are on one line, at the top of their slots: what a slot says more (a verdict that is not a PASS,
+     by how much) is under its own box and never in its neighbour's slot. */
+  .qa-axis-row:not(.qa-matrix-row) .qa-values-cell .qa-shared { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); align-items:start; gap:4px 12px; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-values-cell .qa-shared-field { min-width:0; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-values-cell .qa-shared-more { min-width:0; max-width:100%; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-values-cell .qa-shared-more .status-cell { display:flex; flex-wrap:wrap; gap:2px 6px; }
+  /* In its slot an axis's box gives way a little so that a PASS fits beside it, never so far that a value is cut; a
+     longer verdict goes under the box. */
+  #app .measure-table .qa-axis-row:not(.qa-matrix-row) .qa-values-cell .qa-shared-field input:not([type="hidden"]):not(.note-input) { flex:1 1 4em; width:auto; min-width:4em; max-width:5.5em; }
+}
+
+/* A box a person fills is light blue (Brook, 2026-11-27: "I want anything you can/should put numbers in to be light
+   blue"): every one of a QA table, in a cell of its own or beside its name. One filled for the person (calculated,
+   from a file, a device's value) stays grey. */
+:root { --qa-entry:#dbeafe; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --qa-entry:#1e3a5f; } }
+:root[data-theme="dark"] { --qa-entry:#1e3a5f; }
+#app .measure-table input.result-input:not([readonly]), #app .measure-table input.text-input:not([readonly]), #app .measure-table select.result-input:not(:disabled) { background:var(--qa-entry); }
