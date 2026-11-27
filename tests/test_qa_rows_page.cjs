@@ -60,14 +60,20 @@ const SHARED = ['test', 'baseline', 'measured', 'unit', 'warn', 'action', 'resul
     // around it: as many of those columns as the table shows.
     const oneCell = async (row, what) => {
       const c = await row.evaluate((tr, shared) => {
-        const cell = tr.querySelector(':scope > td.qa-measured.qa-shared-cell.qa-line-cell'), table = tr.closest('table'), edge = (n, side) => Math.round(n.getBoundingClientRect()[side]);
+        const cell = tr.querySelector(':scope > td.qa-measured.qa-shared-cell.qa-line-cell'), name = tr.querySelector(':scope > td.qa-label.qa-line-label'), table = tr.closest('table'), edge = (n, side) => Math.round(n.getBoundingClientRect()[side]);
         const own = [...table.querySelectorAll(':scope > tbody > tr')].find((r) => r.querySelector(':scope > td.qa-label') && r.querySelector(':scope > td.qa-result'));   // a test on a row of its own
-        return { cells: ['td.qa-n', 'td.qa-measured', 'td.qa-label', 'td.qa-baseline', 'td.qa-unit', 'td.qa-warn', 'td.qa-action', 'td.qa-result'].map((s) => tr.querySelectorAll(`:scope > ${s}`).length), span: cell.colSpan,
-          shown: [...table.querySelectorAll(':scope > colgroup > col')].map((col) => col.dataset.col).filter((key) => shared.includes(key)), edges: [edge(cell, 'left'), edge(cell, 'right')], columns: [edge(own.querySelector(':scope > td.qa-label'), 'left'), edge(own.querySelector(':scope > td.qa-result'), 'right')] };
+        const shown = [...table.querySelectorAll(':scope > colgroup > col')].map((col) => col.dataset.col).filter((key) => shared.includes(key));
+        return { titled: !!name, values: cell.classList.contains('qa-values-cell'), cells: ['td.qa-n', 'td.qa-measured', 'td.qa-label', 'td.qa-baseline', 'td.qa-unit', 'td.qa-warn', 'td.qa-action', 'td.qa-result'].map((s) => tr.querySelectorAll(`:scope > ${s}`).length), span: cell.colSpan, shown,
+          edges: [edge(cell, 'left'), edge(cell, 'right')], nameEdges: name ? [edge(name, 'left'), edge(name, 'right')] : null,
+          columns: [edge(own.querySelector(':scope > td.qa-label'), 'left'), edge(own.querySelector(':scope > td.qa-label'), 'right'), edge(own.querySelector(':scope > td.qa-result'), 'right')] };
       }, SHARED);
-      assert.deepEqual(c.cells, [1, 1, 0, 0, 0, 0, 0, 0], `${what}: its number and one cell; no cell of its own for a name, a baseline, a unit, a limit or a result`);
-      assert.equal(c.span, c.shown.length, `${what}: the cell covers the shared columns the table shows (${c.shown})`);
-      assert.deepEqual(c.edges, c.columns, `${what}: from where a test's name starts to where its Result ends`);
+      // A line with a title (Brook, 2026-11-27): its name in the Test column, like any test's, and its values in one cell
+      // at the right, from the first column after Test to Result. A line without one is one cell from Test to Result.
+      assert.equal(c.values, c.titled, `${what}: a values cell exactly when the line has a name of its own`);
+      assert.deepEqual(c.cells, [1, 1, c.titled ? 1 : 0, 0, 0, 0, 0, 0], `${what}: its number${c.titled ? ', its name' : ''} and one cell; no cell of its own for a baseline, a unit, a limit or a result`);
+      assert.equal(c.span, c.shown.length - (c.titled ? 1 : 0), `${what}: the cell covers the shared columns the table shows (${c.shown})${c.titled ? ' but Test' : ''}`);
+      if (c.titled) { assert.deepEqual(c.nameEdges, c.columns.slice(0, 2), `${what}: its name is in the Test column`); assert.deepEqual(c.edges, [c.columns[1], c.columns[2]], `${what}: its values run from where the Test column ends to where Result ends`); }
+      else assert.deepEqual(c.edges, [c.columns[0], c.columns[2]], `${what}: from where a test's name starts to where its Result ends`);
       return c;
     };
 
@@ -150,20 +156,28 @@ const SHARED = ['test', 'baseline', 'measured', 'unit', 'warn', 'action', 'resul
     await chamber.getByLabel('Electrometer', { exact: true }).selectOption({ index: 0 });
     assert.equal(await chamber.evaluate((row) => !!row.querySelector('.qa-line-field select[aria-label="Electrometer"]')), true);
 
-    // 2. An X / Y pair: a titled block like X / Y / Z. Its number and name, what the two share under the name, then
-    // "X: [ ] Y: [ ]" on the row below.
-    const pair = p.locator('.measure-block', { has: p.locator('.measure-title strong', { hasText: /^Isocenter Coincidence \[X-ray vs\. Proton Beam\]$/ }) });
+    // 2. An X / Y pair: one row of the table, like an X / Y / Z group (Brook, 2026-11-27: "Put the X Y Z part on the right
+    // side and think about column alignment"). Its number in the # column; its name, with what the two share under it,
+    // in the Test column; "X: [ ] Y: [ ]" at the right, in the same slots as every group's X and Y.
+    const pair = p.locator('tr.qa-axis-row[data-qa-entry]', { has: p.locator('td.qa-axis-label strong', { hasText: /^Isocenter Coincidence \[X-ray vs\. Proton Beam\]$/ }) });
     assert.equal(await pair.count(), 1);
-    assert.equal(await pair.locator('.measure-title .measure-n').textContent(), '3.17');
-    assert.match(await pair.locator('.measure-title .qa-limits').textContent(), /^Baseline 0(\.0+)? mm · Warning ±0\.5 mm · Action ±1 mm$/);
-    assert.equal(await pair.locator('tr[data-qa-entry]').count(), 1);
+    assert.equal(await pair.locator('td.qa-n').textContent(), '3.17');
+    assert.match(await pair.locator('td.qa-axis-label .qa-limits').textContent(), /^Baseline 0(\.0+)? mm · Warning ±0\.5 mm · Action ±1 mm$/);
+    assert.equal(await p.locator('.measure-block', { has: pair }).locator('.measure-title').count(), 0, 'no title band above it');
     assert.deepEqual(await pair.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y'], 'the unit is with the limits, once');
-    const [pairTitle, x, y] = [await pair.locator('.measure-title strong').boundingBox(), await pair.locator('input[aria-label$="X offset [mm]"]').boundingBox(), await pair.locator('input[aria-label$="Y offset [mm]"]').boundingBox()];
-    assert.ok(x.y > pairTitle.y + pairTitle.height && Math.abs(x.y - y.y) <= 1 && y.x > x.x + x.width, 'X and Y side by side on the row below the name');
+    const [pairName, x, y] = [await pair.locator('td.qa-axis-label').boundingBox(), await pair.locator('input[aria-label$="X offset [mm]"]').boundingBox(), await pair.locator('input[aria-label$="Y offset [mm]"]').boundingBox()];
+    assert.ok(x.x >= pairName.x + pairName.width && Math.abs(x.y - y.y) <= 1 && y.x > x.x + x.width, 'X and Y side by side, at the right of the name');
     assert.equal(await pair.locator('.qa-shared-field .qa-shared-name > span').first().evaluate((s) => getComputedStyle(s, '::after').content), '":"');
-    // Its fields start where the X / Y / Z blocks' do.
-    const xyz = p.locator('.measure-block', { has: p.locator('.measure-title strong', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
-    assert.equal(await left(pair.locator('.qa-shared-field input').first()), await left(xyz.locator('.qa-shared-field input').first()), 'X under X');
+    // Column alignment: an axis is as far into its values cell in every group (a slot each for X, Y, Z and 3D), and the
+    // groups of one section, whose tables share their columns, have X under X and Y under Y.
+    const xyz = p.locator('tr.qa-axis-row', { has: p.locator('td.qa-axis-label strong', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
+    const cbct = p.locator('tr.qa-axis-row', { has: p.locator('td.qa-axis-label strong', { hasText: 'Mechanical-to-CBCT Correction Vector' }) }).first();
+    const slots = (row) => row.evaluate((tr) => { const cell = tr.querySelector(':scope > td.qa-values-cell').getBoundingClientRect(); return [...tr.querySelectorAll('.qa-shared-field input.result-input')].map((i) => Math.round(i.getBoundingClientRect().left - cell.left)); });   // (the boxes that are answered, not their notes)
+    const [inPair, inXyz, inCbct] = [await slots(pair), await slots(xyz), await slots(cbct)];
+    assert.deepEqual(inPair, inXyz.slice(0, 2), 'the pair\'s X and Y are in the X and Y slots');
+    assert.deepEqual(inCbct.slice(0, 3), inXyz.slice(0, 3), 'every group\'s X, Y and Z are in the same slots');
+    assert.equal(await left(cbct.locator('.qa-shared-field input').first()), await left(xyz.locator('.qa-shared-field input').first()), 'X under X');
+    for (const row of [pair, xyz]) assert.deepEqual(await row.evaluate((tr) => ['td.qa-n', 'td.qa-label', 'td.qa-values-cell'].map((s) => tr.querySelectorAll(`:scope > ${s}`).length)), [1, 1, 1], 'number, name, values');
 
     // 3. The report a check comes from, behind its ⓘ: a block's (said once for its tests), a calculated value's, and
     // nothing where a test has neither directions nor a reference.
@@ -174,8 +188,8 @@ const SHARED = ['test', 'baseline', 'measured', 'unit', 'warn', 'action', 'resul
       assert.equal((await dialog.locator('.qa-reference').textContent()).replace(/^Reference/, ''), text);
       await closeDialog();
     };
-    await reference(xyz.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }), 'TG-224, Mechanical: laser position accuracy 0.2 cm');
-    await reference(pair.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }), 'TG-224, Imaging: X-ray and proton beam isocenter coincidence < 1 mm');
+    await reference(xyz.locator('td.qa-axis-label').getByRole('button', { name: 'Test details', exact: true }), 'TG-224, Mechanical: laser position accuracy 0.2 cm');
+    await reference(pair.locator('td.qa-axis-label').getByRole('button', { name: 'Test details', exact: true }), 'TG-224, Imaging: X-ray and proton beam isocenter coincidence < 1 mm');
     const distal = p.locator('.measure-block', { has: p.locator('.measure-title strong', { hasText: /^Distal Depth \[mm\]$/ }) });
     await reference(distal.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }), 'TG-224, Dosimetry: distal depth 1 mm at the distal 90 % depth dose');
     await reference(output.getByRole('button', { name: 'Calculation details: Dose [cGy]', exact: true }), 'TG-224, Dosimetry: output < 3 % for different energies on different days with one consistent field');

@@ -168,6 +168,21 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   "Each QA list to run should have much smaller row heights": on the Perform QA list a list is one short line, its
   schedule after its name, the pass-rate ring 22 px with its number beside it (not inside: too small to read there).
   A matrix table does not repeat the general headings above its own head row, and its verdicts follow their boxes.
+- **QA form, round 7 (Brook, 2026-11-27, later the same day; overrides the notes above where they differ):** "Put the
+  X Y Z part on the right side and think about column alignment": a row of several values with a name of its own (an
+  X / Y / Z group with its 3D, an X / Y pair, tests on one line under shared words) is ONE row of the table: its number,
+  its name in the Test column with its ⓘ and, under the name at the left, the baseline and limits the values share
+  (`td.qa-axis-label`, `td.qa-line-label`, `.qa-line-head`); its values in one cell from the Baseline column on
+  (`.qa-values-cell`, `axisOwnRow`, `covers` in `layoutQaTable`). No title band above it. An X / Y / Z group's axes
+  each have a quarter of that cell, so X is under X, Y under Y, Z under Z and 3D under 3D on every group; the boxes
+  of a row stay on one line, a PASS follows its box, a WARNING or ACTION with its Δ goes under its own box. The Test
+  column is fitted to names: a long line of baselines and limits wraps under its name (`qaFitTestColumns`). On a
+  phone's card the row's name is over its values. Column Chooser: "Make this look just like the columns that we use,
+  and ditch the arrows.": the window is the table's own headings row (`table.qa-columns-table`), a tick under each
+  column that can be hidden, no arrow buttons; a heading is dragged left or right, or onto a heading of the table,
+  and ← → move the heading that has the keyboard. "I want anything you can/should put numbers in to be light blue":
+  every box a person fills in a QA table is light blue (`--qa-entry`), in a cell of its own or beside its name; one
+  filled for the person (calculated, from a file, a device's value) stays grey; Yes / No buttons are not tinted.
 - **Machine Trends (Brook, 2026-11-04):** one QA list at a time (the one with the most runs in the period unless a
   link names one); numbers to 2 decimal places; distal depth and spot position first under "Key checks"; spot
   position as X and Y panels in Δ from each result's baseline. Machine Trends and its CSV export load the period in

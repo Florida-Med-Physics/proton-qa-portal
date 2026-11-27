@@ -119,46 +119,47 @@ const LASERS = 'Visually check that the room lasers align with the BB; offset mu
     assert.equal(await dialog.locator('strong').first().textContent(), 'Room lasers align with BB (offset < 0.2 cm)');
     assert.equal(await dialog.locator('.qa-step-text, .directions').count(), 0, 'no instruction or Directions box beside the list');
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    // Above a group (X / Y / Z): its steps are behind the ⓘ in the group's title, in the list's order, not on a row.
-    const offset = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
-    // A block's number is beside its name in the title band; the row under it leaves the # column empty.
-    assert.equal(await offset.locator('.measure-title .measure-n').textContent(), '2.02');
-    assert.equal(await offset.locator('td.qa-n').textContent(), '');
-    const [blockN, blockName, lasersN] = [await offset.locator('.measure-title .measure-n').boundingBox(), await offset.locator('.measure-title strong').boundingBox(), await lasers.locator('td.qa-n').boundingBox()];
-    assert.ok(blockN.x + blockN.width <= blockName.x + 1 && Math.abs(blockN.y + blockN.height / 2 - (blockName.y + blockName.height / 2)) <= 4, 'the number, then the name, on one line');
+    // Above a group (X / Y / Z): its steps are behind the ⓘ beside the group's name, in the list's order, not on a row.
+    const offset = p.locator('tr.qa-axis-row', { has: p.locator('td.qa-axis-label', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
+    // A group is one row of the table (Brook, 2026-11-27): its number in the # column, its name, ⓘ and what its axes
+    // share in the Test column, its axes at the right. No title band above it.
+    assert.equal(await offset.locator('td.qa-n').textContent(), '2.02');
+    assert.equal(await p.locator('.measure-block', { has: offset }).locator('.measure-title').count(), 0, 'no title band');
+    const [blockN, blockName, lasersN] = [await offset.locator('td.qa-n').boundingBox(), await offset.locator('td.qa-axis-label strong').boundingBox(), await lasers.locator('td.qa-n').boundingBox()];
+    assert.ok(blockN.x + blockN.width <= blockName.x + 1 && blockN.y <= blockName.y + 1 && blockName.y + blockName.height <= blockN.y + blockN.height + 1, 'the number, then the name, in one row');
     assert.ok(Math.abs(blockN.x + blockN.width / 2 - (lasersN.x + lasersN.width / 2)) <= 12, 'where the # column\'s numbers are');
-    assert.equal(await offset.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Isocenter [cm]');
+    assert.equal(await offset.locator('td.qa-axis-label strong').textContent(), 'Mechanical-to-kV/kV Isocenter [cm]');
     assert.deepEqual(await offset.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z', '3D']);
-    await offset.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
+    await offset.locator('td.qa-axis-label').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_OFFSET);
     assert.match(await dialog.locator('strong').first().textContent(), /^Mechanical-to-kV\/kV Isocenter \[cm\]$/);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // The next block follows at once: the four steps between the two blocks are its instructions, ahead of its own.
-    const cbct = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-CBCT Correction Vector' }) }).first();
-    assert.equal(await cbct.locator('.measure-title .measure-n').textContent(), '2.03');
-    assert.equal(await cbct.locator('.measure-title strong').textContent(), 'Mechanical-to-CBCT Correction Vector [cm]');
-    await cbct.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
+    const cbct = p.locator('tr.qa-axis-row', { has: p.locator('td.qa-axis-label', { hasText: 'Mechanical-to-CBCT Correction Vector' }) }).first();
+    assert.equal(await cbct.locator('td.qa-n').textContent(), '2.03');
+    assert.equal(await cbct.locator('td.qa-axis-label strong').textContent(), 'Mechanical-to-CBCT Correction Vector [cm]');
+    await cbct.locator('td.qa-axis-label').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_CBCT, 'five steps, the last "DO NOT APPLY Correction"');
     assert.equal(await dialog.locator('.directions').count(), 0, 'no Directions box beside the list');
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // Its axes have baselines of their own: the title line names each, with the limits they share; the 3D keeps its own.
-    assert.equal(await cbct.locator('.measure-title .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
+    assert.equal(await cbct.locator('td.qa-axis-label .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
     assert.deepEqual(await cbct.locator('.qa-shared-field .qa-limits').allTextContents(), ['Baseline 0.0'], 'only the 3D says its own');
     // Its 3D is still worked out from its axes, under their new names.
     for (const [axis, value] of [['X', '-5.05'], ['Y', '-1.17'], ['Z', '4.25']]) await p.getByLabel(`Mechanical-to-CBCT Correction Vector ${axis} [cm]`, { exact: true }).fill(value);
     assert.deepEqual((await cbct.locator('.qa-shared-field').allTextContents()).slice(0, 3).map((text) => text.replace(/\s+/g, ' ').trim()),
       ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)'], 'each axis is judged against its own baseline');
     // The gantry-90 kV/kV block follows at once (2.04), set out like 2.03: its four steps, then its own direction, one list.
-    const kv = p.locator('.measure-block', { has: p.locator('.measure-title', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();
-    assert.equal(await kv.locator('.measure-title .measure-n').textContent(), '2.04');
-    assert.equal(await kv.locator('.measure-title strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
+    const kv = p.locator('tr.qa-axis-row', { has: p.locator('td.qa-axis-label', { hasText: 'Mechanical-to-kV/kV Correction Vector' }) }).first();
+    assert.equal(await kv.locator('td.qa-n').textContent(), '2.04');
+    assert.equal(await kv.locator('td.qa-axis-label strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
     assert.deepEqual(await kv.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z', '3D'], 'set out as 2.03 is, its 3D worked out from its own axes');
-    await kv.locator('.measure-title').getByRole('button', { name: 'Test details', exact: true }).click();
+    await kv.locator('td.qa-axis-label').getByRole('button', { name: 'Test details', exact: true }).click();
     assert.deepEqual(await dialog.locator('ol.qa-steps > li').allTextContents(), BEFORE_KV, 'six steps: the last two record the vector, then apply the correction');
     assert.equal(await dialog.locator('.directions').count(), 0);
     await dialog.getByRole('button', { name: 'Close', exact: true }).click();
     // The same baselines and limits as 2.03, each axis judged against its own.
-    assert.equal(await kv.locator('.measure-title .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
+    assert.equal(await kv.locator('td.qa-axis-label .qa-limits').textContent(), 'Baseline X = −5.0 cm, Y = −1.0 cm, Z = +4.5 cm · Warning ±0.15 cm · Action ±0.2 cm');
     for (const [axis, value] of [['X', '-5.05'], ['Y', '-1.17'], ['Z', '4.25']]) await p.getByLabel(`Mechanical-to-kV/kV Correction Vector ${axis} [cm]`, { exact: true }).fill(value);
     assert.deepEqual((await kv.locator('.qa-shared-field').allTextContents()).slice(0, 3).map((text) => text.replace(/\s+/g, ' ').trim()), ['XPASS(Δ −0.05 cm)', 'YWARNING(Δ −0.17 cm)', 'ZACTION(Δ −0.25 cm)']);
     assert.equal(await p.getByLabel('Mechanical-to-kV/kV Correction Vector [cm]', { exact: true }).inputValue(), '6.70', 'the same calculation as 2.03\'s 3D');
