@@ -1994,33 +1994,164 @@ td, .measure-table td { font-size: 21px; }
   #app .measure-table .qa-matrix-rowlabel { grid-column:1/-1; }
 }
 
-/* Tests on one row of the table ("Same row as the test above"): the last is the row's value, in the table's own
-   columns; the ones before it are answered beside their names in the Test column, name and box on one line (Brook,
-   2026-11-20). The words the names share are said once, in bold, where a test's name is. */
-.qa-inline { display:flex; align-items:baseline; gap:6px 14px; }
-.qa-inline-title { flex:0 0 auto; }
-.qa-inline-fields { flex:1 1 0; min-width:0; display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; }
-.qa-inline-field { display:inline-flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; min-width:0; }
-.qa-inline-field > button, .qa-inline-field > .status-cell { align-self:center; }
-.qa-inline-name { font-weight:600; }
-.qa-inline-named .qa-inline-name { font-weight:400; }
-.qa-inline-field > .qa-inline-name::after { content:":"; }
-#app .measure-table .qa-inline-field .result-input, #app .measure-table .qa-inline-field .text-input { flex:0 0 auto; width:5.5em; max-width:100%; text-align:center; }
-#app .measure-table .qa-inline-field select.result-input { width:10em; text-align:left; }   /* wide enough to read the choice */
-/* On a wide window the rows under one another line up like a spreadsheet's: the shared names take one width, so the
-   boxes beside them start at the same place. */
-@media (min-width: 1280px) {
-  .qa-inline-title { min-width:7.5em; }
-  #app .measure-table .qa-inline-field select.result-input { width:13em; }
+/* Tests on one line of the table ("Same row as the test above"; Brook, 2026-11-26): each is answered beside its own
+   name, its unit and its verdict after its box, so a name is next to what it measures. The words the names share are
+   said once, in bold, with the baseline and limits the tests share under them. One cell over the table's columns. */
+#app .measure-table td.qa-line-cell { text-align:left; white-space:normal; }
+.qa-shared.qa-line { display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; }
+.qa-line-head { display:flex; flex-direction:column; flex:0 0 auto; min-width:0; max-width:100%; }
+.qa-line-title { font-weight:600; }
+.qa-line-name-row { display:flex; align-items:center; gap:8px; }
+.qa-line-head .qa-limits { margin-top:0; }
+.qa-line-fields { display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; flex:1 1 0; min-width:0; }
+.qa-shared-field.qa-line-field { display:inline-flex; flex-wrap:wrap; align-items:center; gap:2px 6px; min-width:0; max-width:none; grid-row:auto; }
+.qa-line-name { font-weight:600; }
+.qa-line-head ~ .qa-line-fields .qa-line-name { font-weight:400; }   /* under a bold title the names are plain */
+.qa-line-unit { color:var(--muted); white-space:nowrap; }
+.qa-line-pair { display:inline-flex; flex-wrap:nowrap; align-items:center; gap:6px; min-width:0; }
+.review-measure-table .qa-line-name { font-weight:400; }
+.qa-line-value { font-weight:600; }                                   /* a saved run: what was recorded */
+#app .measure-table .qa-shared-field.qa-line-field input.result-input, #app .measure-table .qa-shared-field.qa-line-field input.text-input { flex:0 0 auto; width:4.8em; max-width:100%; text-align:center; }
+#app .measure-table .qa-shared-field.qa-line-field select.result-input { flex:0 1 auto; width:9.5em; max-width:100%; text-align:left; }   /* wide enough to read the choice */
+/* A box that is filled for the person (calculated, a device's value, from a file) is as wide as what it holds, where
+   the browser can size it so. */
+#app .measure-table .qa-shared-field.qa-line-field input[readonly] { field-sizing:content; width:auto; min-width:3.2em; max-width:11em; }
+.qa-line-field > .status-cell { display:inline-flex; align-items:center; gap:6px; }
+.qa-line-field > .status-cell:empty { display:none; }
+.qa-line-field .chip.recorded { display:none; }
+.qa-line-field .chip.recorded + .result-dev { margin-left:0; }
+/* A passing test on a line says PASS; one that is not says by how much. (A test on a row of its own always says its Δ.) */
+.qa-line-field .chip.pass + .result-dev { display:none; }
+.qa-line-field .qa-calculation-info { margin-top:0; }
+.qa-line-field > .qa-line-limits { display:inline; margin-top:0; white-space:nowrap; }
+.qa-line-field > .qa-line-limits-under, .qa-line-field > .note-input, .qa-line-field > .muted.small:not(:empty), .qa-line-field > .qa-shared-note { flex-basis:100%; }
+.qa-line-field > .qa-line-limits-under { width:0; min-width:100%; white-space:normal; }   /* under its field, never wider than it */
+.qa-line-field > .muted.small:empty { display:none; }
+#app .measure-table .qa-line-field .review-measured { display:inline-flex; }
+@media (max-width: 1200px) {
+  .qa-shared.qa-line, .qa-line-fields { flex-direction:column; align-items:stretch; gap:8px; }
+  .qa-shared-field.qa-line-field { display:flex; justify-content:space-between; }
 }
-.qa-inline-field .qa-calculation-info { margin-top:0; }
-.qa-inline-field > .qa-inline-limits, .qa-inline-field > .note-input, .qa-inline-field > .muted.small:not(:empty) { flex-basis:100%; }
-.qa-inline-field > .muted.small:empty { display:none; }
-.qa-inline-field .chip.recorded { display:none; }
-/* On a saved run the tests beside their names show what was recorded: the value, then its verdict, limits and note. */
-.qa-inline-value { font-weight:600; }
-.qa-inline-field > .qa-shared-note { flex-basis:100%; }
-
 
 /* The Sphinx import is a row of the Sphinx Measurements section, under its title: no card of its own. */
 .card.section > .qa-import { margin:0; padding:6px 16px 12px; border:0; border-radius:0; box-shadow:none; background:none; }
+
+/* An X / Y / Z row on a computer: every axis on the one line, its verdict after its box, not under it (Brook,
+   2026-11-26: less height). A passing axis says PASS, its Δ on the chip; one that is not says by how much. */
+@media (min-width: 1201px) {
+  .qa-axis-row:not(.qa-matrix-row) .qa-shared { display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-shared-field { display:inline-flex; flex-wrap:wrap; align-items:center; gap:2px 6px; max-width:none; }
+  #app .measure-table .qa-axis-row:not(.qa-matrix-row) .qa-shared-field input:not([type="hidden"]) { flex:0 0 auto; width:5.5em; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-shared-more { display:inline-flex; flex-wrap:wrap; align-items:center; gap:2px 6px; padding:0; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-shared-more > * { margin-top:0; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-shared-more .status-cell { display:inline-flex; align-items:center; gap:6px; }
+  .qa-axis-row:not(.qa-matrix-row) .qa-shared-more .status-cell:empty { display:none; }
+  .qa-axis-row:not(.qa-matrix-row) .chip.pass + .result-dev { display:none; }
+}
+
+/* A test is one line of the table, as on the monthly worksheet (Brook, 2026-11-26): its limits are in the Warning ± and
+   Action ± columns. The line under its name, and under a table's title, says them only while both columns are hidden
+   (layoutQaTable marks that with .qa-no-limit-cols). */
+@media (min-width: 1201px) {
+  .measure-table:not(.qa-no-limit-cols) .qa-limits-under, .measure-block:not(.qa-no-limit-cols) > .measure-title .qa-limits-under { display:none; }
+}   /* (a phone's cards have no columns: the line shows there as it always did) */
+.measure-table td.qa-warn, .measure-table td.qa-action { text-align:center; white-space:nowrap; font-variant-numeric:tabular-nums; }
+@media (max-width: 1200px) {
+  #app[data-page] .measure-table td.qa-warn, #app[data-page] .measure-table td.qa-action { display:none; }   /* a card says its result, not its limits, as before */
+}
+
+/* A table of several energies or spots that a file fills starts closed: one line, its name and its verdict (Brook,
+   2026-11-26: "allow the user to expand it out, but don't automatically show it"). A click on the line opens the rows. */
+.measure-closed > .measure-wrap { display:none; }
+.measure-closable > .measure-title { cursor:pointer; }
+.measure-summary { display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px 8px; font-size:16px; font-weight:400; }
+.measure-summary .chip { font-size:14px; }
+.measure-summary-row { white-space:nowrap; }
+.measure-toggle { background:none; border:0; box-shadow:none; min-height:0; padding:0 4px; color:var(--accent); font:inherit; font-size:15px; font-weight:400; cursor:pointer; }
+.measure-toggle::after { content:" ▸"; }
+.measure-toggle[aria-expanded="true"]::after { content:" ▾"; }
+.section > .measure-block.measure-closed { margin-top:0; }
+@media (max-width: 1200px) {
+  /* On a card, a test's name never runs out of its card, however narrow (a phone zoomed far in): a long word breaks. */
+  #app .measure-table td.qa-label, #app .measure-table td.qa-label .qa-test-name, #app .measure-table td.qa-label strong { overflow-wrap:anywhere; }
+  .measure-closable > .measure-title strong { overflow-wrap:normal; word-break:normal; }   /* a name never breaks inside a word */
+  .measure-closable > .measure-title .measure-n + strong { flex:0 1 auto; }
+}
+.section > .measure-block.measure-closed > .measure-title { margin:0; padding-top:5px; padding-bottom:5px; border-top:0; border-bottom:1px solid var(--border); }
+
+/* ── Shorter rows (Brook, 2026-11-26: "reduce row height all throughout the application", "make each row have much
+   less height"): less room above and below every table cell and, in a QA table on a computer, lower boxes and
+   buttons. A phone's cards keep their sizes: fingers need the room. */
+#app th, #app td { padding-top:4px; padding-bottom:4px; }
+@media (min-width: 1201px) {
+  #app .measure-table th { padding-top:5px; padding-bottom:5px; }
+  #app .measure-table td { padding-top:2px; padding-bottom:2px; }
+  #app .measure-table .result-input, #app .measure-table .text-input { min-height:34px; padding-top:2px; padding-bottom:2px; }
+  #app .measure-table .bool-choice button, #app .measure-table .segmented button { min-height:34px; padding-top:2px; padding-bottom:2px; }
+  #app .measure-table .note-btn, #app .measure-table td.qa-trends .icon-btn { min-width:34px; min-height:34px; padding-top:0; padding-bottom:0; }
+  #app .measure-table .qa-calculation-info, #app .measure-title .qa-calculation-info { width:30px; min-height:30px; margin-top:0; }
+  #app .section > .measure-block > .measure-title { padding-top:6px; }
+  /* The Perform QA list (Brook, 2026-11-27: "Each QA list to run should have much smaller row heights"): one line
+     per list. Its schedule follows its name (cut short when there is no room), the start button is small, and the
+     pass-rate ring is small with its number beside it. */
+  #app[data-page="perform-qa"] .fixed-table tbody td { padding-top:2px; padding-bottom:2px; }
+  #app[data-page="perform-qa"] td.list-cell > .start-dot { width:22px; height:22px; min-width:22px; font-size:10px; }
+  #app[data-page="perform-qa"] td.list-cell > .list-name { display:inline-flex; align-items:baseline; gap:10px; min-width:0; max-width:calc(100% - 30px); white-space:nowrap; overflow:hidden; line-height:1.3; }
+  #app[data-page="perform-qa"] td.list-cell > .list-name > .muted.small { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  #app[data-page="perform-qa"] .fixed-table .chip { display:inline-block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:middle; }
+  #app[data-page="perform-qa"] .history-rate { min-width:0; min-height:0; gap:6px; }
+  #app[data-page="perform-qa"] .history-rate .trend-pass-donut { position:relative; width:22px; height:22px; margin-right:36px; }
+  #app[data-page="perform-qa"] .history-rate .trend-pass-donut::after { content:""; position:absolute; inset:5px; border-radius:50%; background:var(--surface); }
+  #app[data-page="perform-qa"] .history-rate .trend-pass-value { position:absolute; left:28px; top:50%; transform:translateY(-50%); width:auto; height:auto; background:none; font-size:12px; white-space:nowrap; }
+  /* A saved run's History: a date and its value on one line. */
+  #app .review-measure-table .hist-row .hist { display:inline-flex; flex-direction:row; align-items:baseline; gap:6px; white-space:nowrap; }
+  /* Boxes in the other tables (Equipment, Data Administration, Setup QA) are lower too. */
+  #app table:not(.measure-table) input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), #app table:not(.measure-table) select { min-height:0; padding-top:3px; padding-bottom:3px; }
+}
+
+/* The Column Chooser is transposed (Brook, 2026-11-27): the columns side by side, in the table's order, each name
+   over its tick and its arrows; a name is dragged left or right. */
+.qa-columns-pop { width:auto; max-width:calc(100vw - 16px); }
+.qa-columns-list { display:flex; flex-wrap:wrap; gap:2px 4px; }
+.qa-columns-list li { flex-direction:column; align-items:center; gap:2px; padding:4px 8px; border-radius:6px; }
+.qa-columns-list li .check { display:flex; flex-direction:column-reverse; align-items:center; gap:2px; white-space:nowrap; }
+.qa-columns-list li.qa-drop-before { box-shadow:inset 3px 0 0 var(--accent); }
+.qa-columns-list li.qa-drop-after { box-shadow:inset -3px 0 0 var(--accent); }
+.qa-columns-move { display:inline-flex; gap:2px; }
+
+/* Cells, as on a worksheet (Brook, 2026-11-27: "Make this more cell like/tabular … For all QA tests"): on a computer a
+   QA table is a grid of cells with a hairline between them, and a box a person fills is its whole cell, lightly
+   tinted; one filled for them (calculated, from a file, a device's value) is grey. A row of several tests is one
+   merged cell and keeps its small boxes. This overrides "no vertical rules" for QA tables only. */
+@media (min-width: 1201px) {
+  #app .measure-table th, #app .measure-table td { border:1px solid var(--border); }
+  #app .measure-table td.qa-measured:not(.qa-shared-cell) { padding:0; height:1px; }
+  #app .measure-table td.qa-measured:not(.qa-shared-cell) > .result-input, #app .measure-table td.qa-measured:not(.qa-shared-cell) > .text-input {
+    display:block; width:100%; height:100%; min-height:34px; margin:0; border:0; border-radius:0; box-shadow:none; text-align:center;
+    background:color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+  #app .measure-table td.qa-measured:not(.qa-shared-cell) > .result-input[readonly], #app .measure-table td.qa-measured:not(.qa-shared-cell) > .text-input[readonly] { background:var(--surface-2); }
+  #app .measure-table td.qa-measured:not(.qa-shared-cell) > .result-input:focus, #app .measure-table td.qa-measured:not(.qa-shared-cell) > .text-input:focus { outline:2px solid var(--accent); outline-offset:-2px; }
+  #app .measure-table td.qa-measured:not(.qa-shared-cell) > .segmented { margin:2px auto; }
+  #app .measure-table td.qa-measured:not(.qa-shared-cell) > .review-measured { padding:2px 8px; }
+  #app .measure-table td.qa-comment, #app .measure-table td.qa-trends { text-align:center; }
+  /* A matrix (several values per row) names its own columns in its head row: the table's general headings are not
+     repeated above it. Its verdicts follow their boxes (PASS alone; a WARNING or ACTION says its Δ), so a row stays
+     one line. */
+  #app .measure-table.matrix-table > thead > tr.qa-col-names > th { height:0 !important; padding-top:0 !important; padding-bottom:0 !important; border-top:0 !important; border-bottom:0 !important; line-height:0 !important; font-size:0 !important; overflow:hidden; }
+  .qa-matrix-row:not(.qa-matrix-head) .qa-shared-field { display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; }
+  #app .measure-table .qa-matrix-row:not(.qa-matrix-head) .qa-shared-field input:not([type="hidden"]) { flex:0 0 auto; width:5.5em; }
+  .qa-matrix-row:not(.qa-matrix-head) .qa-shared-more { display:flex; flex:1 1 0; min-width:0; flex-wrap:wrap; align-items:center; gap:2px 6px; padding:0; }
+  .qa-matrix-row:not(.qa-matrix-head) .qa-shared-more .status-cell { display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; }
+  .qa-matrix-row:not(.qa-matrix-head) .qa-shared-field { flex-wrap:nowrap; align-items:flex-start; }
+  .qa-matrix-row:not(.qa-matrix-head) .result-dev { margin-left:0; }
+  .qa-matrix-row:not(.qa-matrix-head) .qa-shared-more > * { margin-top:0; }
+  .qa-matrix-row .chip.pass + .result-dev { display:none; }
+  /* The Test column is as wide as its longest name (qaFitTestColumns): while it is measured, a name and a row of
+     several tests are as wide as they like, on one line. */
+  .qa-measuring .measure-table td.qa-label, .qa-measuring .measure-table td.qa-label *, .qa-measuring .measure-table td.qa-shared-cell * { white-space:nowrap !important; overflow-wrap:normal !important; }
+  .qa-measuring .measure-table td.qa-label .qa-test-title { display:inline-flex !important; width:max-content !important; }
+  .qa-measuring .measure-table td.qa-label .qa-test-name { flex:0 0 auto !important; }
+  .qa-measuring .measure-table td.qa-shared-cell .qa-shared { width:max-content !important; flex-wrap:nowrap !important; }
+  .qa-measuring .measure-table .qa-line-fields, .qa-measuring .measure-table .qa-shared-field, .qa-measuring .measure-table .qa-shared-more { flex-wrap:nowrap !important; flex:0 0 auto !important; }
+  .qa-measuring .measure-table .qa-line-limits-under { display:none !important; }   /* (under its field: it asks for no width) */
+}

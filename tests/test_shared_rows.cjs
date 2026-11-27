@@ -3,9 +3,11 @@
 // (blockNumbers) gives a joined test the number of the test above it and the next row the next number, and ignores the
 // tag on the first test of a list or section, across categories and after an X/Y/Z block, and Setup QA offers the box
 // only where it can join; the PDF report numbers alike; a calculation whose inputs share a row number keeps its letters;
-// a list without the tag numbers and prints as before; the shared cell lays out each test as a row of its own (name
-// and unit with its details button, input, result, baseline and limits, note).
-// The QA form and a saved run are checked in a browser by tests/test_shared_rows_page.cjs.
+// a list without the tag numbers and prints as before; which seed lists carry the tag, and their rows of several tests;
+// the shared cell (the one cell of an X / Y / Z or a matrix row, over the table's shared columns: QA_SHARED_COLUMNS, now
+// with Warning ± and Action ±) lays out each field as a row of its own (name and unit with its details button, input,
+// result, baseline and limits, note). Tests on one row are a line of the table (lineRow, lineRun), drawn in one cell
+// over the same columns: the QA form and a saved run are checked in a browser by tests/test_shared_rows_page.cjs.
 // Run with node tests/test_shared_rows.cjs from the repository root.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -23,7 +25,7 @@ function el(tag, props, ...kids) {
 const context = { el, Blob, QADerived: { read: (d) => { const m = /\[derived: ([^\]]+)\]/.exec(d || ''); return m ? JSON.parse(decodeURIComponent(m[1])) : null; } } };
 vm.createContext(context);
 for (const part of [between('const REVIEW_LABEL', 'function reviewChip('), between('function capitalize(', 'function decimalsOf('),
-  between('// Directions are shown with the test', 'function infoDisclosure('), between('function helpText(', 'function fitTextarea('),
+  between('// Directions are shown with the test', 'function infoDisclosure('), between('const QA_SHARED_COLUMNS', '\n'), between('function helpText(', 'function fitTextarea('),
   between('function sectionNumber(', 'function checkNumber('), between('function checkNumber(', 'function wireCalculations('), between('const AXIS_NAME', '// Rotations of one thing'),
   between('function qaReportPdf(', 'function downloadWorkbookBlob(')])
   vm.runInContext(part, context);
@@ -34,9 +36,26 @@ const J = (x) => JSON.parse(JSON.stringify(x));   // answers from node:vm, compa
 // 1. The tag round trip in Setup QA (the box), for the kinds of directions the seed lists carry.
 const seed = JSON.parse(fs.readFileSync('portal/seed.json', 'utf8'));
 const hdr = seed.templates.find((t) => t.name === 'Daily QA – HDR Flexitron').checks;
-// (Of the seed lists only the PBS daily list carries the tag: four pairs of its Sphinx section. The HDR list, used here, has none.)
+// (Of the seed lists two carry the tag, each on four rows: the PBS daily list in its Sphinx section, and the proton
+// monthly list on its chamber with the four factors it fills and on three rows of its Mechanical section. The HDR
+// list, used here, has none.)
 assert.ok(!JSON.stringify(hdr).includes('[row:'), 'the seeded HDR list carries no row tag');
-assert.deepEqual(seed.templates.filter((t) => JSON.stringify(t).includes('[row:')).map((t) => t.name), ['PBS DailyQA Template - Sphinx']);
+assert.deepEqual(seed.templates.filter((t) => JSON.stringify(t).includes('[row:')).map((t) => t.name), ['PBS DailyQA Template - Sphinx', 'Monthly QA template – Proton gantry (TG-224)']);
+// Their rows of several tests, as numbered: every tagged test joins the test above it (none is ignored).
+const isDirection = vm.runInContext('isDirection', context);
+const seedRows = (name) => {
+  const list = seed.templates.find((t) => t.name === name).checks.map((c, i) => ({ ...c, test_id: i + 1 })), n = blockNumbers(list);
+  assert.equal(n.joined.size, list.filter((c) => (c.description || '').includes(TAG)).length, `${name}: every tag joins`);
+  return J(sharedRows(list.filter((c) => !isDirection(c)), n).filter((r) => r.length > 1).map((r) => [n.get(r[0].test_id), ...r.map((c) => c.name)]));
+};
+assert.deepEqual(seedRows('PBS DailyQA Template - Sphinx'), [['3.01', '[MU] Delivered MU (Record in IC2)', 'Beam Irradiation Time [min:s]'],
+  ['3.02', 'Chamber', 'Chamber Cal. Factor(Proton), Gy/C', 'Electrometer', 'Electrometer Calibration Factor', 'Overall Calibration Factor [Gy/C]'],
+  ['3.03', 'Daily output: Charge [nC]', 'Daily output: Dose [cGy]'],
+  ['3.17', 'Isocenter Coincidence [X-ray vs. Proton Beam]: X offset [mm]', 'Isocenter Coincidence [X-ray vs. Proton Beam]: Y offset [mm]']]);
+assert.deepEqual(seedRows('Monthly QA template – Proton gantry (TG-224)'), [['0.05', 'Chamber (model / serial)', 'N_Dw [cGy/nC]', 'k_Q', 'k_s', 'k_pol'],
+  ['2.01', 'Couch translational accuracy — X (lateral) [mm]', 'Couch translational accuracy — Y (longitudinal) [mm]', 'Couch translational accuracy — Z (vertical) [mm]'],
+  ['2.03', 'Couch pitch accuracy [deg]', 'Couch roll accuracy [deg]', 'Couch yaw accuracy [deg]'],
+  ['2.12', 'Couch isocentricity — range of ΔX (max − min) [mm]', 'Couch isocentricity — range of ΔY (max − min) [mm]', 'Couch isocentricity — range of ΔZ (max − min) [mm]', 'Couch isocentricity — max radial displacement [mm]']]);
 const samples = [...new Set(hdr.map((c) => c.description)), '', 'Plain directions', 'Line one\nline two', 'Source: only a source line', '  spaced  '];
 for (const d of samples) {
   const on = withRowMark(d, true);
@@ -119,14 +138,16 @@ const asResults = (list) => list.map((i) => ({ ...i, value_num: i.type === 'nume
   assert.deepEqual(after.slice(7, 11), ['8. Source air kerma strength - TCS Sk', '8. Source air kerma strength - decay table Sk', '8. Source air kerma strength - difference', '9. Position verification']);
   assert.equal(after.at(-1), '20. Position indicator light test');
 
-  // 4. The shared cell: one cell over Test, Measured, Unit, Result and Baseline; each test as a row of its own, in list
-  // order: name and unit with its details button (named for it), its input, then its result, baseline and limits, note.
+  // 4. The shared cell: one cell over Test, Baseline, Measured, Unit, Warning ±, Action ± and Result (the table's shared
+  // columns); each test as a row of its own, in list order: name and unit with its details button (named for it), its
+  // input, then its result, baseline and limits, note.
+  assert.deepEqual(J(vm.runInContext('QA_SHARED_COLUMNS', context)), ['test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result']);
   const info = (title) => { const b = el('button', { title, 'aria-label': title }, 'ⓘ'); b.getAttribute = (k) => b.props[k]; b.setAttribute = (k, v) => { b.props[k] = v; }; return b; };
   const cell = sharedCell([
     [{ test_id: 1 }, 'TCS Sk', 'mGy·m²·h⁻¹', null, el('input'), el('div', { class: 'status-cell' }, '(Δ +0.20)'), el('span', { class: 'qa-limits' }, 'Baseline 12.000'), el('input', { class: 'note-input' })],
     [{ test_id: 2 }, 'Decay-table Sk', 'mGy·m²·h⁻¹', null, el('input'), null, null, el('input', { class: 'note-input' })],
     [{ test_id: 3 }, 'Source strength difference', '%', info('Calculation details'), el('input'), el('div', { class: 'status-cell' }, 'PASS'), el('span', { class: 'qa-limits' }, 'Baseline 0.000 · Action ±1 %'), el('input', { class: 'note-input' })]]);
-  assert.equal(cell.tag, 'td'); assert.equal(cell.props.colspan, 5); assert.equal(cell.props.class, 'qa-measured qa-shared-cell');
+  assert.equal(cell.tag, 'td'); assert.equal(cell.props.colspan, 7); assert.equal(cell.props.class, 'qa-measured qa-shared-cell');
   const fields = cell.kids[0].kids;
   assert.deepEqual(fields.map((f) => [f.props['data-test-id'], f.kids.map((k) => k.props.class || k.tag)]), [1, 2, 3].map((id) => [id, ['qa-shared-name', 'input', 'qa-shared-more']]));
   assert.deepEqual(fields.map((f) => f.kids[0].text), ['TCS Sk (mGy·m²·h⁻¹)', 'Decay-table Sk (mGy·m²·h⁻¹)', 'Source strength difference (%)ⓘ']);
@@ -134,5 +155,5 @@ const asResults = (list) => list.map((i) => ({ ...i, value_num: i.type === 'nume
     [['status-cell:(Δ +0.20)', 'qa-shared-info:Baseline 12.000', 'note-input:'], ['note-input:'], ['status-cell:PASS', 'qa-shared-info:Baseline 0.000 · Action ±1 %', 'note-input:']]);
   assert.deepEqual([fields[2].kids[0].kids[1].props.title, fields[2].kids[0].kids[1].props['aria-label']], Array(2).fill('Calculation details: Source strength difference'));
   assert.ok(!/null|undefined|\[object/.test(cell.text));
-  console.log('Row tag: round trip, hidden in directions; numbering with joined rows and edge cases; where the box is offered; equation letters; PDF numbers; shared cell layout.');
+  console.log('Row tag: round trip, hidden in directions; the two seed lists that carry it and their rows; numbering with joined rows and edge cases; where the box is offered; equation letters; PDF numbers; shared cell layout over the shared columns.');
 })().catch((e) => { console.error(e); process.exit(1); });

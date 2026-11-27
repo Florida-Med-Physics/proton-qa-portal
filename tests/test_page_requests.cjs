@@ -16,30 +16,32 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 // ── A stand-in DOM: elements, text, attributes, classes, simple selectors (tag, #id, .class, [attr], [attr=v], :not(),
-// :disabled, :first-child, descendant and child combinators, comma lists). Enough for the pages below; no layout.
+// :disabled, :first-child, :scope (the element asked), descendant and child combinators, comma lists). Enough for the
+// pages below; no layout.
 function dom() {
-  const compile = (text) => split(text, ',').map((group) => {
+  const compile = (text, scope = null) => split(text, ',').map((group) => {
     const parts = []; let s = group.trim(), comb = ' ';
     while (s) {
       if (s[0] === '>') { comb = '>'; s = s.slice(1).trimStart(); continue; }
       let i = 0, depth = 0, quote = null;
       for (; i < s.length; i++) { const c = s[i]; if (quote) { if (c === quote) quote = null; } else if (c === '"' || c === "'") quote = c; else if (c === '(' || c === '[') depth++; else if (c === ')' || c === ']') depth--; else if (!depth && (c === ' ' || c === '>')) break; }
-      parts.push({ comb, test: compound(s.slice(0, i)) }); s = s.slice(i).trimStart(); comb = ' ';
+      parts.push({ comb, test: compound(s.slice(0, i), scope) }); s = s.slice(i).trimStart(); comb = ' ';
     }
     return parts;
   });
   const split = (s, sep) => { const out = []; let depth = 0, cur = ''; for (const c of s) { if (c === '(' || c === '[') depth++; if (c === ')' || c === ']') depth--; if (c === sep && !depth) { out.push(cur); cur = ''; } else cur += c; } out.push(cur); return out; };
-  function compound(s) {
-    const tests = [], re = /([a-zA-Z][\w-]*|\*)|#([\w-]+)|\.([\w-]+)|\[([\w-]+)(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]*)))?\]|:not\(((?:[^()]|\([^()]*\))*)\)|:([\w-]+)/y;
+  function compound(s, scope) {
+    const tests = [], re =/([a-zA-Z][\w-]*|\*)|#([\w-]+)|\.([\w-]+)|\[([\w-]+)(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]*)))?\]|:not\(((?:[^()]|\([^()]*\))*)\)|:([\w-]+)/y;
     for (let i = 0; i < s.length;) {
       re.lastIndex = i; const m = re.exec(s); if (!m) throw new Error(`stand-in DOM: selector "${s}"`); i = re.lastIndex;
       if (m[1]) { if (m[1] !== '*') tests.push((n) => n.localName === m[1].toLowerCase()); }
       else if (m[2]) tests.push((n) => n.getAttribute('id') === m[2]);
       else if (m[3]) tests.push((n) => n.classList.contains(m[3]));
       else if (m[4]) { const v = m[5] ?? m[6] ?? m[7]; tests.push((n) => n.hasAttribute(m[4]) && (v === undefined || n.getAttribute(m[4]) === v)); }
-      else if (m[8] !== undefined) { const inner = compile(m[8]); tests.push((n) => !matches(n, inner)); }
+      else if (m[8] !== undefined) { const inner = compile(m[8], scope); tests.push((n) => !matches(n, inner)); }
       else if (m[9] === 'disabled') tests.push((n) => !!n.disabled);
       else if (m[9] === 'first-child') tests.push((n) => n.parentNode && n.parentNode.children[0] === n);
+      else if (m[9] === 'scope') tests.push((n) => n === scope);   // (app.js asks a table for its own columns: ":scope > colgroup > col")
       else throw new Error(`stand-in DOM: :${m[9]}`);
     }
     return (n) => n.nodeType === 1 && tests.every((t) => t(n));
@@ -104,10 +106,10 @@ function dom() {
     getBoundingClientRect() { return { x: 0, y: 0, top: 0, left: 0, right: 800, bottom: 20, width: 800, height: 20 }; }
     get offsetWidth() { return 800; } get offsetHeight() { return 20; } get clientWidth() { return 800; } get scrollWidth() { return 800; }
     getBBox() { return { x: 0, y: 0, width: 40, height: 12 }; } getComputedTextLength() { return 40; }
-    querySelectorAll(sel) { const g = compile(sel), out = []; const walk = (n) => { for (const c of n.children) { if (matches(c, g)) out.push(c); walk(c); } }; walk(this); return out; }
+    querySelectorAll(sel) { const g = compile(sel, this), out = []; const walk = (n) => { for (const c of n.children) { if (matches(c, g)) out.push(c); walk(c); } }; walk(this); return out; }
     querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
-    closest(sel) { const g = compile(sel); for (let n = this; n && n.nodeType === 1; n = n.parentElement) if (matches(n, g)) return n; return null; }
-    matches(sel) { return matches(this, compile(sel)); }
+    closest(sel) { const g = compile(sel, this); for (let n = this; n && n.nodeType === 1; n = n.parentElement) if (matches(n, g)) return n; return null; }
+    matches(sel) { return matches(this, compile(sel, this)); }
   }
   const document = new Node(9);
   Object.assign(document, { hidden: false, activeElement: null,

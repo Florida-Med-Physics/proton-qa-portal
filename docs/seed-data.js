@@ -2212,7 +2212,7 @@ window.PORTAL_SEED = {
      "category": "Beam_Parameters",
      "name": "Beam Irradiation Time [min:s]",
      "type": "text",
-     "description": "Template 3.02. [Section: Sphinx Measurements] Entered as min:s."
+     "description": "Template 3.02. [Section: Sphinx Measurements] Entered as min:s. [row: with above]"
     },
     {
      "category": "Device Selection",
@@ -2233,7 +2233,7 @@ window.PORTAL_SEED = {
      "category": "Device Selection",
      "name": "Electrometer",
      "type": "choice",
-     "description": "Template 3.05. [Section: Sphinx Measurements] [device: electrometer] [choices: %5B%22SAMPLE%20electrometer%20A%20%5Cu2014%20placeholder%22%2C%20%22SAMPLE%20electrometer%20B%20%5Cu2014%20placeholder%22%5D]"
+     "description": "Template 3.05. [Section: Sphinx Measurements] [device: electrometer] [choices: %5B%22SAMPLE%20electrometer%20A%20%5Cu2014%20placeholder%22%2C%20%22SAMPLE%20electrometer%20B%20%5Cu2014%20placeholder%22%5D] [row: with above]"
     },
     {
      "category": "Device Selection",
@@ -2251,7 +2251,7 @@ window.PORTAL_SEED = {
      "unit": "Gy/C",
      "expected": null,
      "tol_mode": "absolute",
-     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20Cal.%20Factor%28Proton%29%2C%20Gy%2FC%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Electrometer%20Calibration%20Factor%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%22%7D]"
+     "description": "Template 3.07. [Section: Sphinx Measurements] [calc: product] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20Cal.%20Factor%28Proton%29%2C%20Gy%2FC%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%2C%20%7B%22name%22%3A%20%22Electrometer%20Calibration%20Factor%22%2C%20%22category%22%3A%20%22Device%20Selection%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%22%7D] [row: with above]"
     },
     {
      "category": "Daily_PBS_Dosimetry",
@@ -3372,8 +3372,8 @@ window.PORTAL_SEED = {
     {
      "category": "Conditions",
      "name": "Chamber (model / serial)",
-     "type": "text",
-     "description": "Template 0.05. [Section: Chamber and conditions]"
+     "type": "choice",
+     "description": "Template 0.05. [Section: Chamber and conditions] [device: chamber] [choices: %5B%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%5D]"
     },
     {
      "category": "Conditions",
@@ -3381,7 +3381,7 @@ window.PORTAL_SEED = {
      "type": "numeric",
      "unit": "cGy/nC",
      "tol_mode": "absolute",
-     "description": "Template 0.06. [Section: Chamber and conditions] Chamber calibration coefficient; enter once."
+     "description": "Template 0.06. [Section: Chamber and conditions] Chamber calibration coefficient of the chamber chosen; typed once under Setup QA, Equipment. [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20%28model%20%2F%20serial%29%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Conditions",
@@ -3389,7 +3389,7 @@ window.PORTAL_SEED = {
      "type": "numeric",
      "unit": "",
      "tol_mode": "absolute",
-     "description": "Template 0.07. [Section: Chamber and conditions] Beam quality factor; enter once."
+     "description": "Template 0.07. [Section: Chamber and conditions] Beam quality factor of the chamber chosen; typed once under Setup QA, Equipment. [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20%28model%20%2F%20serial%29%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Conditions",
@@ -3397,7 +3397,7 @@ window.PORTAL_SEED = {
      "type": "numeric",
      "unit": "",
      "tol_mode": "absolute",
-     "description": "Template 0.08. [Section: Chamber and conditions] Ion recombination factor; enter once."
+     "description": "Template 0.08. [Section: Chamber and conditions] Ion recombination factor of the chamber chosen; typed once under Setup QA, Equipment. [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20%28model%20%2F%20serial%29%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Conditions",
@@ -3405,7 +3405,7 @@ window.PORTAL_SEED = {
      "type": "numeric",
      "unit": "",
      "tol_mode": "absolute",
-     "description": "Template 0.09. [Section: Chamber and conditions] Polarity factor; enter once."
+     "description": "Template 0.09. [Section: Chamber and conditions] Polarity factor of the chamber chosen; typed once under Setup QA, Equipment. [derived: %7B%22kind%22%3A%20%22lookup%22%2C%20%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Chamber%20%28model%20%2F%20serial%29%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22values%22%3A%20%5B%7B%22choice%22%3A%20%22SAMPLE%20chamber%20A%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%2C%20%7B%22choice%22%3A%20%22SAMPLE%20chamber%20B%20%5Cu2014%20placeholder%22%2C%20%22value%22%3A%20null%7D%5D%2C%20%22sample%22%3A%20true%7D] [row: with above]"
     },
     {
      "category": "Safety",
@@ -3476,7 +3476,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.02. [Section: Mechanical] Apply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm"
+     "description": "Template 2.02. [Section: Mechanical] Apply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm [row: with above]"
     },
     {
      "category": "Patient positioner",
@@ -3487,7 +3487,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.03. [Section: Mechanical] Apply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm"
+     "description": "Template 2.03. [Section: Mechanical] Apply 65.0 mm shift from setup position, read on rule\nBaseline is the applied shift; edit if a different shift is used.\nTG-224: ≤1 mm [row: with above]"
     },
     {
      "category": "Patient positioner",
@@ -3520,7 +3520,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.06. [Section: Mechanical] Apply 2.0° roll correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1°"
+     "description": "Template 2.06. [Section: Mechanical] Apply 2.0° roll correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1° [row: with above]"
     },
     {
      "category": "Patient positioner",
@@ -3531,7 +3531,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 2.07. [Section: Mechanical] Apply 2.0° yaw correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1°"
+     "description": "Template 2.07. [Section: Mechanical] Apply 2.0° yaw correction — verify with digital inclinometer / imaging (edit baseline if a different angle is applied)\nTG-224: 1° [row: with above]"
     },
     {
      "category": "Patient positioner",
@@ -3787,17 +3787,6 @@ window.PORTAL_SEED = {
     },
     {
      "category": "Couch isocentricity",
-     "name": "Couch isocentricity — max radial displacement [mm]",
-     "type": "numeric",
-     "unit": "mm",
-     "expected": 0,
-     "warn": 0.75,
-     "fail": 1,
-     "tol_mode": "absolute",
-     "description": "Template 2.35. [Section: Mechanical] [calc: max:BB walkout [mm]:5] Calculated here: max of the 5 rows above. Worst case of the couch angles above (sets the limits used by those rows)\nRadius form of the TG-224 ≤2 mm circle-diameter limit.\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28abs%28A%29%2Cabs%28B%29%2Cabs%28C%29%2Cabs%28D%29%2Cabs%28E%29%29%22%7D]"
-    },
-    {
-     "category": "Couch isocentricity",
      "name": "Couch isocentricity — range of ΔX (max − min) [mm]",
      "type": "numeric",
      "unit": "mm",
@@ -3805,7 +3794,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.36. [Section: Mechanical] [calc: range:BB walkout X [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
+     "description": "Template 2.35. [Section: Mechanical] [calc: range:BB walkout X [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20X%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
     },
     {
      "category": "Couch isocentricity",
@@ -3816,7 +3805,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.37. [Section: Mechanical] [calc: range:BB walkout Y [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
+     "description": "Template 2.36. [Section: Mechanical] [calc: range:BB walkout Y [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Y%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D] [row: with above]"
     },
     {
      "category": "Couch isocentricity",
@@ -3827,7 +3816,18 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.38. [Section: Mechanical] [calc: range:BB walkout Z [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D]"
+     "description": "Template 2.37. [Section: Mechanical] [calc: range:BB walkout Z [mm]:5] Calculated here: range of the 5 rows above. Spread of the BB position across all couch angles\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20Z%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28A%2CB%2CC%2CD%2CE%29-min%28A%2CB%2CC%2CD%2CE%29%22%7D] [row: with above]"
+    },
+    {
+     "category": "Couch isocentricity",
+     "name": "Couch isocentricity — max radial displacement [mm]",
+     "type": "numeric",
+     "unit": "mm",
+     "expected": 0,
+     "warn": 0.75,
+     "fail": 1,
+     "tol_mode": "absolute",
+     "description": "Template 2.38. [Section: Mechanical] [calc: max:BB walkout [mm]:5] Calculated here: max of the 5 rows above. Worst case of the couch angles above (sets the limits used by those rows)\nRadius form of the TG-224 ≤2 mm circle-diameter limit.\nTG-224: ≤2 mm dia [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Couch%20angle%200%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20315%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20270%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20225%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%2C%20%7B%22name%22%3A%20%22Couch%20angle%20180%5Cu00b0%20%5Cu2013%20BB%20walkout%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22Couch%20isocentricity%22%7D%5D%2C%20%22formula%22%3A%20%22max%28abs%28A%29%2Cabs%28B%29%2Cabs%28C%29%2Cabs%28D%29%2Cabs%28E%29%29%22%7D] [row: with above]"
     },
     {
      "category": "Snout",
@@ -3849,7 +3849,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.40. [Section: Mechanical] Energy sweep matches the range list: 70–220 MeV in 10 MeV steps plus 225 MeV. Phantom set up by kV / CBCT, then verified by delivered radiation. Enter the worst-case ISO difference at each angle.\nMax |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+     "description": "Template 3.01. [Section: Isocentricity / XRV] Energy sweep matches the range list: 70–220 MeV in 10 MeV steps plus 225 MeV. Phantom set up by kV / CBCT, then verified by delivered radiation. Enter the worst-case ISO difference at each angle.\nMax |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
     },
     {
      "category": "XRV-124 coincidence",
@@ -3860,7 +3860,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.41. [Section: Mechanical] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+     "description": "Template 3.02. [Section: Isocentricity / XRV] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
     },
     {
      "category": "XRV-124 coincidence",
@@ -3871,7 +3871,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.42. [Section: Mechanical] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+     "description": "Template 3.03. [Section: Isocentricity / XRV] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
     },
     {
      "category": "XRV-124 coincidence",
@@ -3882,7 +3882,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.43. [Section: Mechanical] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
+     "description": "Template 3.04. [Section: Isocentricity / XRV] Max |ISO difference| over the full energy sweep at this gantry angle\nTG-224: ±2 mm"
     },
     {
      "category": "XRV-124 coincidence",
@@ -3893,159 +3893,7 @@ window.PORTAL_SEED = {
      "warn": 1.5,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 2.44. [Section: Mechanical] [calc: max:XRV ISO difference:4] Calculated here: max of the 4 rows above. Worst case of the four gantry angles above\nTG-224: ±2 mm [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G000%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G060%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G120%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G180%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%5D%2C%20%22formula%22%3A%20%22max%28abs%28A%29%2Cabs%28B%29%2Cabs%28C%29%2Cabs%28D%29%29%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 70 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.01. [Section: Dosimetry] Enter the chamber constants once, then the raw charge each month. Dose = M(nC) × k_TP × N_Dw × k_Q × k_s × k_pol, with k_TP taken from cell F6. Proteus ONE permits gantry 0° and 90° only; the four energies are editable and intended to be cycled.\nGantry 0° · PPC05 in solid water at reference depth\nReference dose = commissioned dose at this energy (set once).\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 70 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.02. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%2070%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 120 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.03. [Section: Dosimetry] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 120 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.04. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20120%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 180 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.05. [Section: Dosimetry] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 180 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.06. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20180%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 225 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.07. [Section: Dosimetry] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G0 – 225 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.08. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20225%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 70 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.09. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 70 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.10. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%2070%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 120 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.11. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 120 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.12. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20120%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 180 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.13. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 180 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.14. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20180%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 225 MeV – charge [nC]",
-     "type": "numeric",
-     "unit": "nC",
-     "tol_mode": "absolute",
-     "description": "Template 3.15. [Section: Dosimetry] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
-    },
-    {
-     "category": "Output constancy",
-     "name": "Output G90 – 225 MeV – dose [cGy]",
-     "type": "numeric",
-     "unit": "cGy",
-     "expected": null,
-     "warn": 1.5,
-     "fail": 2,
-     "tol_mode": "percent",
-     "description": "Template 3.16. [Section: Dosimetry] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20225%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+     "description": "Template 3.05. [Section: Isocentricity / XRV] [calc: max:XRV ISO difference:4] Calculated here: max of the 4 rows above. Worst case of the four gantry angles above\nTG-224: ±2 mm [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G000%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G060%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G120%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%2C%20%7B%22name%22%3A%20%22XRV%20ISO%20difference%20%5Cu2014%20G180%20%5Bmm%5D%22%2C%20%22category%22%3A%20%22XRV-124%20coincidence%22%7D%5D%2C%20%22formula%22%3A%20%22max%28abs%28A%29%2Cabs%28B%29%2Cabs%28C%29%2Cabs%28D%29%29%22%7D]"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4056,7 +3904,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.17. [Section: Dosimetry] Stand-alone acquisition. Enter measured R80; baselines are filled once from commissioning.\nR90 depth in water (Zebra)\nFill baseline once from commissioning R80.\nTG-224: ±1 mm"
+     "description": "Template 4.01. [Section: Range / Zebra] Stand-alone acquisition. Enter measured R80; baselines are filled once from commissioning.\nR90 depth in water (Zebra)\nFill baseline once from commissioning R80.\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4067,7 +3915,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.18. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.02. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4078,7 +3926,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.19. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.03. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4089,7 +3937,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.20. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.04. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4100,7 +3948,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.21. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.05. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4111,7 +3959,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.22. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.06. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4122,7 +3970,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.23. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.07. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4133,7 +3981,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.24. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.08. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4144,7 +3992,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.25. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.09. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4155,7 +4003,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.26. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.10. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4166,7 +4014,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.27. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.11. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4177,7 +4025,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.28. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.12. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4188,7 +4036,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.29. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.13. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4199,7 +4047,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.30. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.14. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4210,7 +4058,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.31. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.15. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4221,7 +4069,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.32. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.16. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Range verification (Zebra)",
@@ -4232,7 +4080,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 3.33. [Section: Dosimetry] R90 depth in water (Zebra)\nTG-224: ±1 mm"
+     "description": "Template 4.17. [Section: Range / Zebra] R90 depth in water (Zebra)\nTG-224: ±1 mm"
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4243,7 +4091,7 @@ window.PORTAL_SEED = {
      "warn": 1,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 3.34. [Section: Dosimetry] Set cell C7 to NO in months when this is not performed — every row below then reads SKIPPED. Daily Sphinx QA already covers spot position and size; this is the quarterly two-angle check. Energy layers are editable (blue).\nGantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.01. [Section: Spot Characteristics / Sphinx] Set cell C7 to NO in months when this is not performed — every row below then reads SKIPPED. Daily Sphinx QA already covers spot position and size; this is the quarterly two-angle check. Energy layers are editable (blue).\nGantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4254,7 +4102,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.35. [Section: Dosimetry] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.02. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4265,7 +4113,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.36. [Section: Dosimetry] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.03. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4276,7 +4124,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.15,
      "tol_mode": "absolute",
-     "description": "Template 3.37. [Section: Dosimetry] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.04. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4287,7 +4135,7 @@ window.PORTAL_SEED = {
      "warn": 1,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 3.38. [Section: Dosimetry] Gantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.05. [Section: Spot Characteristics / Sphinx] Gantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4298,7 +4146,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.39. [Section: Dosimetry] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.06. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4309,7 +4157,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.40. [Section: Dosimetry] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.07. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4320,7 +4168,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.15,
      "tol_mode": "absolute",
-     "description": "Template 3.41. [Section: Dosimetry] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.08. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4331,7 +4179,7 @@ window.PORTAL_SEED = {
      "warn": 1,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 3.42. [Section: Dosimetry] Gantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.09. [Section: Spot Characteristics / Sphinx] Gantry 0° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4342,7 +4190,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.43. [Section: Dosimetry] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.10. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4353,7 +4201,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.44. [Section: Dosimetry] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.11. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4364,7 +4212,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.15,
      "tol_mode": "absolute",
-     "description": "Template 3.45. [Section: Dosimetry] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.12. [Section: Spot Characteristics / Sphinx] Gantry 0° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4375,7 +4223,7 @@ window.PORTAL_SEED = {
      "warn": 1,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 3.46. [Section: Dosimetry] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.13. [Section: Spot Characteristics / Sphinx] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4386,7 +4234,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.47. [Section: Dosimetry] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.14. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4397,7 +4245,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.48. [Section: Dosimetry] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.15. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4408,7 +4256,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.15,
      "tol_mode": "absolute",
-     "description": "Template 3.49. [Section: Dosimetry] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.16. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4419,7 +4267,7 @@ window.PORTAL_SEED = {
      "warn": 1,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 3.50. [Section: Dosimetry] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.17. [Section: Spot Characteristics / Sphinx] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4430,7 +4278,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.51. [Section: Dosimetry] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.18. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4441,7 +4289,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.52. [Section: Dosimetry] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.19. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4452,7 +4300,7 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.15,
      "tol_mode": "absolute",
-     "description": "Template 3.53. [Section: Dosimetry] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.20. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4463,7 +4311,7 @@ window.PORTAL_SEED = {
      "warn": 1,
      "fail": 2,
      "tol_mode": "absolute",
-     "description": "Template 3.54. [Section: Dosimetry] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.21. [Section: Spot Characteristics / Sphinx] Gantry 90° · max deviation from planned spot position (all spots in layer)\nTG-224: not specified monthly\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4474,7 +4322,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.55. [Section: Dosimetry] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.22. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot size σx (or FWHM x)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4485,7 +4333,7 @@ window.PORTAL_SEED = {
      "warn": 7.5,
      "fail": 10,
      "tol_mode": "percent",
-     "description": "Template 3.56. [Section: Dosimetry] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.23. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot size σy (or FWHM y)\nTG-224: ±10%\nQuarterly item: leave blank in months when spot QA is not performed."
     },
     {
      "category": "Spot QA (quarterly)",
@@ -4496,35 +4344,187 @@ window.PORTAL_SEED = {
      "warn": 0.1,
      "fail": 0.15,
      "tol_mode": "absolute",
-     "description": "Template 3.57. [Section: Dosimetry] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+     "description": "Template 5.24. [Section: Spot Characteristics / Sphinx] Gantry 90° · spot skewness (max |value| of x, y)\nTG-224: not specified\nQuarterly item: leave blank in months when spot QA is not performed."
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 70 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.01. [Section: Output] Enter the chamber constants once, then the raw charge each month. Dose = M(nC) × k_TP × N_Dw × k_Q × k_s × k_pol, with k_TP taken from cell F6. Proteus ONE permits gantry 0° and 90° only; the four energies are editable and intended to be cycled.\nGantry 0° · PPC05 in solid water at reference depth\nReference dose = commissioned dose at this energy (set once).\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 70 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.02. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%2070%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 120 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.03. [Section: Output] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 120 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.04. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20120%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 180 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.05. [Section: Output] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 180 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.06. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20180%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 225 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.07. [Section: Output] Gantry 0° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G0 – 225 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.08. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G0%20%5Cu2013%20225%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 70 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.09. [Section: Output] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 70 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.10. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%2070%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 120 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.11. [Section: Output] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 120 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.12. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20120%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 180 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.13. [Section: Output] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 180 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.14. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20180%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 225 MeV – charge [nC]",
+     "type": "numeric",
+     "unit": "nC",
+     "tol_mode": "absolute",
+     "description": "Template 6.15. [Section: Output] Gantry 90° · PPC05 in solid water at reference depth\nTG-224: ±2%"
+    },
+    {
+     "category": "Output constancy",
+     "name": "Output G90 – 225 MeV – dose [cGy]",
+     "type": "numeric",
+     "unit": "cGy",
+     "expected": null,
+     "warn": 1.5,
+     "fail": 2,
+     "tol_mode": "percent",
+     "description": "Template 6.16. [Section: Output] [calc: dose-ndw] [derived: %7B%22inputs%22%3A%20%5B%7B%22name%22%3A%20%22Output%20G90%20%5Cu2013%20225%20MeV%20%5Cu2013%20charge%20%5BnC%5D%22%2C%20%22category%22%3A%20%22Output%20constancy%22%7D%2C%20%7B%22name%22%3A%20%22Temp.%20%26%20Press.%20Correction%20kTP%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22N_Dw%20%5BcGy%2FnC%5D%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_Q%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_s%22%2C%20%22category%22%3A%20%22Conditions%22%7D%2C%20%7B%22name%22%3A%20%22k_pol%22%2C%20%22category%22%3A%20%22Conditions%22%7D%5D%2C%20%22formula%22%3A%20%22A%2AB%2AC%2AD%2AE%2AF%22%7D]"
     },
     {
      "category": "kV planar imaging",
      "name": "Spatial resolution (high contrast)",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.01. [Section: Imaging] Per TG-142 / TG-179. myQA imaging licence under investigation; until then, score against the baseline image.\nCompare against the baseline phantom image\nTG-224: baseline"
+     "description": "Template 7.01. [Section: Imaging] Per TG-142 / TG-179. myQA imaging licence under investigation; until then, score against the baseline image.\nCompare against the baseline phantom image\nTG-224: baseline"
     },
     {
      "category": "kV planar imaging",
      "name": "Low-contrast detectability",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.02. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
+     "description": "Template 7.02. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
     },
     {
      "category": "kV planar imaging",
      "name": "Uniformity and noise",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.03. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
+     "description": "Template 7.03. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
     },
     {
      "category": "kV planar imaging",
      "name": "Artefacts / dead pixels",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.04. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
+     "description": "Template 7.04. [Section: Imaging] Compare against the baseline phantom image\nTG-224: baseline"
     },
     {
      "category": "kV planar imaging",
@@ -4535,7 +4535,7 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 4.05. [Section: Imaging] Known phantom length measured on the image\nBaseline = true phantom length (set once).\nTG-224: ±1 mm"
+     "description": "Template 7.05. [Section: Imaging] Known phantom length measured on the image\nBaseline = true phantom length (set once).\nTG-224: ±1 mm"
     },
     {
      "category": "CBCT (CATPHAN)",
@@ -4546,7 +4546,7 @@ window.PORTAL_SEED = {
      "warn": 30,
      "fail": 40,
      "tol_mode": "absolute",
-     "description": "Template 4.06. [Section: Imaging] Mean HU in the water ROI\nBaseline = commissioned water HU (set once).\nTG-224: baseline ±40 HU"
+     "description": "Template 7.06. [Section: Imaging] Mean HU in the water ROI\nBaseline = commissioned water HU (set once).\nTG-224: baseline ±40 HU"
     },
     {
      "category": "CBCT (CATPHAN)",
@@ -4557,7 +4557,7 @@ window.PORTAL_SEED = {
      "warn": 30,
      "fail": 40,
      "tol_mode": "absolute",
-     "description": "Template 4.07. [Section: Imaging] Max HU difference between peripheral and central ROIs\nTG-224: baseline"
+     "description": "Template 7.07. [Section: Imaging] Max HU difference between peripheral and central ROIs\nTG-224: baseline"
     },
     {
      "category": "CBCT (CATPHAN)",
@@ -4568,28 +4568,28 @@ window.PORTAL_SEED = {
      "warn": 0.75,
      "fail": 1,
      "tol_mode": "absolute",
-     "description": "Template 4.08. [Section: Imaging] Known phantom distance measured on the reconstruction\nBaseline = true phantom distance (set once).\nTG-224: ±1 mm"
+     "description": "Template 7.08. [Section: Imaging] Known phantom distance measured on the reconstruction\nBaseline = true phantom distance (set once).\nTG-224: ±1 mm"
     },
     {
      "category": "CBCT (CATPHAN)",
      "name": "Spatial resolution",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.09. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
+     "description": "Template 7.09. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
     },
     {
      "category": "CBCT (CATPHAN)",
      "name": "Low-contrast detectability",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.10. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
+     "description": "Template 7.10. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
     },
     {
      "category": "CBCT (CATPHAN)",
      "name": "Noise / SNR",
      "type": "boolean",
      "unit": "Pass/Fail",
-     "description": "Template 4.11. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
+     "description": "Template 7.11. [Section: Imaging] Compare against the baseline reconstruction\nTG-224: baseline"
     }
    ]
   },

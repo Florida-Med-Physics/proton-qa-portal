@@ -1004,6 +1004,9 @@ async function renderSetup() {
 function setDerived(input, value) {
   QADerived.setInput(input, value);
   if (input.dataset.derivedExact && input.dataset.derivedValue) input.value = input.dataset.derivedValue;
+  // On a line of several tests a box is narrow: one that holds a long value, as a device's factor typed in full, is
+  // as wide as what it holds.
+  if (input.dataset.derivedExact) input.style.minWidth = input.value.length > 6 ? `${Math.ceil(input.value.length * 1.1) + 1}ch` : "";
 }
 const DEVICE_KINDS = [["chamber", "Chamber", "Chambers"], ["electrometer", "Electrometer", "Electrometers"]];
 const deviceKindOf = (test) => (/\[device: (chamber|electrometer)\]/.exec(test.description || "") || [])[1] || null;
@@ -1653,13 +1656,17 @@ function qaDisplayName(item) {
 // row's cells, the widths and the Columns box all read this list. # and Test stay first. A person may hide any column
 // but #, Test, Measured and Result, and put the others in any order. The choice is kept in this browser, per person and
 // per page: "perform" is the QA form, where History starts hidden; "review" is a saved run. Widths are in px (Test takes
-// the room that is left; History's grows with the dates shown).
+// the room that is left; History's grows with the dates shown). A test is one line of the table, as on the monthly
+// worksheet (Brook, 2026-11-26: "take inspiration on how tabular that is"): its limits are in columns of their own,
+// "Warning ±" and "Action ±", not on a line under its name; that line shows again only while both columns are hidden.
 const QA_COLUMNS = [
-  { key: 'n', cls: 'qa-n', title: '#', width: 72, pinned: true },
+  { key: 'n', cls: 'qa-n', title: '#', width: 64, pinned: true },
   { key: 'test', cls: 'qa-label', title: 'Test', width: 0, pinned: true },
-  { key: 'baseline', cls: 'qa-baseline', title: 'Baseline', width: 132 },
-  { key: 'measured', cls: 'qa-measured', title: 'Measured', width: 156, always: true },
-  { key: 'unit', cls: 'qa-unit', title: 'Unit', width: 76 },
+  { key: 'baseline', cls: 'qa-baseline', title: 'Baseline', width: 124 },
+  { key: 'measured', cls: 'qa-measured', title: 'Measured', width: 148, always: true },
+  { key: 'unit', cls: 'qa-unit', title: 'Unit', width: 70 },
+  { key: 'warn', cls: 'qa-warn', title: 'Warning ±', width: 140 },
+  { key: 'action', cls: 'qa-action', title: 'Action ±', width: 124 },
   { key: 'result', cls: 'qa-result', title: 'Result', width: 300, always: true },   // fits "WARNING (Δ −12.35 mm)" on one line at the form's 22 px
   { key: 'history', cls: 'history-cell', title: 'History', width: 112 },
   { key: 'comment', cls: 'qa-comment', title: 'Comment', label: 'Note', width: 72 },
@@ -1667,7 +1674,8 @@ const QA_COLUMNS = [
 ];
 const QA_COLUMNS_HIDDEN = { perform: ['history'], review: [] };   // the columns a page starts without
 const QA_COLUMNS_KEY = 'gatorqa-columns-v1';
-const QA_SHARED_COLUMNS = ['test', 'baseline', 'measured', 'unit', 'result'];   // what a shared row's one cell covers (sharedCell)
+const QA_SHARED_COLUMNS = ['test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result'];   // what a shared row's one cell covers (sharedCell)
+const QA_LIMIT_COLUMNS = ['warn', 'action'];
 const qaColumnMemory = {};   // this visit's choices, so one still applies where the browser keeps nothing (a private window)
 function qaColumnChoice(view) {
   const who = `${state.user?.id ?? ''}`, here = `${who}|${view}`;
@@ -1691,7 +1699,9 @@ function saveQaColumnChoice(view, choice) {   // null: back to the page's own co
 function qaColumns(view = 'perform', sharedRows = false) {
   const choice = qaColumnChoice(view), movable = QA_COLUMNS.filter((c) => !c.pinned);
   const picked = (Array.isArray(choice?.order) ? choice.order : []).map((key) => movable.find((c) => c.key === key)).filter(Boolean);
-  let order = [...new Set([...picked, ...movable])];
+  // A column the person's kept order does not know (one added since) goes after the column it follows here, not last.
+  let order = [...new Set(picked)];
+  movable.forEach((c, i) => { if (!order.includes(c)) order.splice(i ? order.indexOf(movable[i - 1]) + 1 : 0, 0, c); });
   if (sharedRows) order = [...order.filter((c) => QA_SHARED_COLUMNS.includes(c.key)), ...order.filter((c) => !QA_SHARED_COLUMNS.includes(c.key))];
   const hidden = new Set(Array.isArray(choice?.hidden) ? choice.hidden : QA_COLUMNS_HIDDEN[view] || []);
   const all = [...QA_COLUMNS.filter((c) => c.pinned), ...order].map((c) => ({ ...c, label: c.label || c.title, off: hidden.has(c.key) && !c.pinned && !c.always }));
@@ -1763,7 +1773,7 @@ function fitQaTable(table) {
     if(!table?.isConnected)return;
     const wrap=table.parentElement;
     const adapt=()=>{
-      const {shown}=qaColumns(table.dataset.qaView||'perform',!!table.querySelector('td.qa-shared-cell'));
+      const shown=qaColumns(table.dataset.qaView||'perform',!!table.querySelector('td.qa-shared-cell')).shown.filter(c=>!(fitQaTable.tight&&QA_LIMIT_COLUMNS.includes(c.key)));
       const compact=matchMedia('(max-width: 1200px)').matches;
       const maxHistory=Math.max(0,...[...table.querySelectorAll('.hist-row')].map(row=>row.children.length));
       // The test name keeps 320 px or more beside the columns shown; History then shows as many dates (up to 3) as fit.
@@ -1771,9 +1781,82 @@ function fitQaTable(table) {
       const count=compact?maxHistory:Math.min(maxHistory,Math.max(1,Math.min(3,Math.floor((wrap.clientWidth-fixed-320)/144))));
       table.querySelectorAll('.hist-row').forEach(row=>[...row.children].forEach((cell,i)=>cell.hidden=i>=count));
       qaColgroup(table,shown,count);
+      if(!compact)qaLimitRoom();
+      qaFitTestColumns();
     };
     table.qaFit=adapt;
     const observer=new ResizeObserver(adapt);qaTableObservers.add(observer);observer.observe(wrap);adapt();
+  });
+}
+// The Warning ± and Action ± columns give way when they would leave a test's name too little room (a narrow window,
+// large type): the limits then show on the line under the name, as when the columns are hidden. Decided once for the
+// page, from the real column widths of every QA table shown, so the tables stay lined up: the columns go when any
+// table lacks the room and come back when every table has it. (While the tables are laid out again nothing is decided,
+// so a table cannot answer back.)
+function qaLimitRoom() {
+  if (qaLimitRoom.busy) return;
+  const width = (col) => parseFloat(getComputedStyle(col).width) || 0;
+  let tight = false, seen = false;
+  for (const table of document.querySelectorAll('.measure-table')) {
+    const wrap = table.parentElement;
+    if (!wrap || !wrap.clientWidth) continue;   // a closed table has no width to judge by
+    if (!qaColumns(table.dataset.qaView || 'perform').shown.some((c) => QA_LIMIT_COLUMNS.includes(c.key))) continue;   // the person hid them
+    const cols = [...table.querySelectorAll(':scope > colgroup > col')];
+    const limits = cols.filter((col) => QA_LIMIT_COLUMNS.includes(col.dataset.col));
+    if (limits.length) fitQaTable.limitWidth = limits.reduce((sum, col) => sum + width(col), 0);
+    const others = cols.filter((col) => col.dataset.col !== 'test' && !QA_LIMIT_COLUMNS.includes(col.dataset.col)).reduce((sum, col) => sum + width(col), 0);
+    seen = true;
+    if (wrap.clientWidth - others - (fitQaTable.limitWidth || 232) < 16 * (parseFloat(getComputedStyle(table).fontSize) || 16)) tight = true;
+  }
+  if (!seen || tight === !!fitQaTable.tight) return;
+  fitQaTable.tight = tight;
+  qaLimitRoom.busy = true;
+  try { document.querySelectorAll('.measure-table').forEach((table) => layoutQaTable(table)); } finally { qaLimitRoom.busy = false; }
+}
+// The Test column is as wide as its longest name, section by section (Brook, 2026-11-27: "Theres way too much white
+// space after the test name label"; "more cell like"): the cells that follow sit beside the names, and the table is only
+// as wide as its columns, at the left of its card. A row of several tests asks for the width that keeps it on one line.
+// Never wider than the room there is; a phone's cards are not touched. Measured with the names unwrapped (app.css,
+// .qa-measuring), once per frame however many tables ask.
+function qaFitTestColumns() {
+  if (qaFitTestColumns.pending) return;
+  qaFitTestColumns.pending = true;
+  requestAnimationFrame(() => {
+    qaFitTestColumns.pending = false;
+    if (matchMedia('(max-width: 1200px)').matches) {   // a phone's cards: nothing is left of a width fitted on a wider window
+      for (const table of document.querySelectorAll('#app .measure-table')) { table.style.width = ''; table.style.minWidth = ''; const col = table.querySelector(':scope > colgroup > col[data-col="test"]'); if (col) col.style.width = 'auto'; }
+      return;
+    }
+    const width = (col) => parseFloat(getComputedStyle(col).width) || 0;
+    for (const box of document.querySelectorAll('#app .card.section')) {
+      const tables = [...box.querySelectorAll('.measure-table')].filter((table) => table.parentElement && table.parentElement.clientWidth);
+      if (!tables.length) continue;
+      box.classList.add('qa-measuring');
+      let need = 0, room = Infinity;
+      const sums = new Map();
+      for (const table of tables) {
+        const cols = [...table.querySelectorAll(':scope > colgroup > col')], others = cols.filter((col) => col.dataset.col !== 'test');
+        const all = others.reduce((sum, col) => sum + width(col), 0), shared = others.filter((col) => QA_SHARED_COLUMNS.includes(col.dataset.col)).reduce((sum, col) => sum + width(col), 0);
+        sums.set(table, all);
+        room = Math.min(room, table.parentElement.clientWidth - all);
+        // (What a cell holds, at its natural width, plus the cell's own padding and borders.)
+        const natural = (cell, inner) => { const box = cell.querySelector(inner), style = getComputedStyle(cell);
+          return box ? box.getBoundingClientRect().width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + 2 : 0; };
+        for (const cell of table.querySelectorAll(':scope > tbody > tr:not([hidden]) > td.qa-label')) need = Math.max(need, natural(cell, '.qa-test-title'));
+        for (const cell of table.querySelectorAll(':scope > tbody > tr:not([hidden]) > td.qa-shared-cell')) need = Math.max(need, natural(cell, '.qa-shared') - shared);
+      }
+      box.classList.remove('qa-measuring');
+      const em = parseFloat(getComputedStyle(tables[0]).fontSize) || 16;
+      const fit = Math.ceil(Math.max(12 * em, need + 2));
+      for (const table of tables) {
+        const col = table.querySelector(':scope > colgroup > col[data-col="test"]');
+        if (!col) continue;
+        // No room to spare: the table fills its card, as before, and is never narrower than its other columns and a
+        // 12em name (a page zoomed far in), so the Test column cannot be squeezed to nothing.
+        if (fit >= room - 1) { col.style.width = 'auto'; table.style.width = ''; table.style.minWidth = `${Math.round(sums.get(table) + 12 * em)}px`; }
+        else { col.style.width = `${fit}px`; table.style.width = `${Math.round(sums.get(table) + fit)}px`; table.style.minWidth = '0'; }
+      }
+    }
   });
 }
 function orderMeasurementRow(row) {
@@ -1787,7 +1870,9 @@ function orderMeasurementRow(row) {
 // changes: nothing is drawn again, so what has been typed stays.
 function layoutQaTable(table, view = table.dataset.qaView || 'perform') {
   table.dataset.qaView = view;
-  const { all, shown } = qaColumns(view, !!table.querySelector('td.qa-shared-cell'));
+  const columns = qaColumns(view, !!table.querySelector('td.qa-shared-cell'));
+  // (No room for the limit columns: fitQaTable. They are left out like columns the person hid.)
+  const all = columns.all.map((c) => (fitQaTable.tight && QA_LIMIT_COLUMNS.includes(c.key) ? { ...c, off: true } : c)), shown = all.filter((c) => !c.off);
   const rows = [...table.children].filter((part) => part.tagName === 'THEAD' || part.tagName === 'TBODY').flatMap((part) => [...part.children]);   // the table's own rows
   // A group's number cell spans its rows, quick trends included, so those take one column fewer (a column too many
   // would add an empty one to the table and squeeze the test's own).
@@ -1810,6 +1895,8 @@ function layoutQaTable(table, view = table.dataset.qaView || 'perform') {
   table.classList.toggle('qa-no-history', !history);
   // Tables with these in common line up under one another, so the second need not name its columns again (qaHeadings).
   const block = table.closest('.measure-block');
+  const noLimitColumns = !shown.some((c) => QA_LIMIT_COLUMNS.includes(c.key));
+  for (const node of [table, block]) if (node) node.classList.toggle('qa-no-limit-cols', noLimitColumns);
   if (block) block.dataset.cols = `${shown.map((c) => c.key).join(' ')}|${history ? dates : 0}|${table.querySelector('.seg.warn') ? 'wide' : ''}`;
   if (table.qaFit) table.qaFit(); else qaColgroup(table, shown);
 }
@@ -1821,6 +1908,7 @@ function qaHeadings(blocks) {
   for (const block of blocks) {
     const names = block.querySelector('tr.qa-col-names');
     if (!names || block.hidden) continue;
+    if (block.classList?.contains('measure-closed')) { above = null; continue; }   // a closed table: the next open one names its columns
     names.classList.toggle('repeat', above === block.dataset.cols);
     above = block.dataset.cols;
   }
@@ -1858,6 +1946,8 @@ function closeQaColumnChooser(focus = false) {
   if (focus && button?.isConnected) button.focus();
 }
 // `at`: { x, y } of the pointer for a right-click; without it the window opens under `button`.
+// It is laid out like the table it arranges (Brook, 2026-11-27: "Column chooser should be transposed"): the columns
+// side by side in the order shown, each name over its tick and its ← → (which move it the way they point).
 function openQaColumnChooser(view, at = null, button = null) {
   if (matchMedia('(max-width: 1200px)').matches) return;   // a phone's cards have no columns to choose
   closeQaColumnChooser();
@@ -1878,7 +1968,7 @@ function openQaColumnChooser(view, at = null, button = null) {
         ondragover: (event) => {   // a name over another name: before or after it
           if (qaHeadingDrag.from !== 'chooser' || !qaHeadingDrag.key || qaHeadingDrag.key === c.key) return;
           event.preventDefault();
-          const li = event.currentTarget, r = li.getBoundingClientRect(), after = event.clientY > r.top + r.height / 2;
+          const li = event.currentTarget, r = li.getBoundingClientRect(), after = event.clientX > r.left + r.width / 2;   // (the names are side by side)
           li.classList.toggle('qa-drop-after', after); li.classList.toggle('qa-drop-before', !after);
         },
         ondragleave: (event) => event.currentTarget.classList.remove('qa-drop-before', 'qa-drop-after'),
@@ -1892,8 +1982,8 @@ function openQaColumnChooser(view, at = null, button = null) {
           moveQaColumn(view, key, c.key, after);
         } },
         el('span', { class: 'drag-handle', title: 'Drag to move', 'aria-hidden': 'true' }, '⠿'),
-        el('label', { class: 'check', title: c.always ? 'Always shown' : null }, show, c.label), el('span', { class: 'spacer' }),
-        move(-1, 'Move left', '←'), move(1, 'Move right', '→'));
+        el('label', { class: 'check', title: c.always ? 'Always shown' : null }, show, c.label),
+        el('span', { class: 'qa-columns-move' }, move(-1, 'Move left', '←'), move(1, 'Move right', '→')));
     }));
     if (focus) list.querySelector(focus)?.focus();
     focus = null;
@@ -2097,6 +2187,7 @@ const categoryLabel = (c) => CATEGORY_LABEL[c] || (c ? String(c).replace(/_/g, "
 // Section label for a test on its own (Trends), e.g. "3.0 Sphinx Measurements".
 function sectionOf(item) {
   const n = sectionNumber(item);
+  if (sectionNameOf(item)) return sectionTitle(n, [], sectionNameOf(item));   // a list's own section name ("3.0 Isocentricity / XRV")
   return sectionTitle(n, n === 3 || n === 4 ? [] : [item.category]).replace(/^(\d)\.0 $/, (_, d) => `${d}.0 ${{ 3: "Sphinx Measurements", 4: "Other" }[d]}`);
 }
 
@@ -2221,7 +2312,9 @@ function joinedNames(names) {
   let tail = 0;
   while (tail < room && rest.every((w) => w[w.length - 1 - tail] === rest[0][rest[0].length - 1 - tail])) tail++;
   const letters = rest.map((w) => trim(w.slice(0, w.length - tail).join(" ")));
-  return { title, labels: rest.map((w) => trim(w.join(" "))), axes: letters.every((l) => /^[XYZ]$/.test(l)) ? letters : null };
+  // `middle`: each name without the words they all start and end with; `tail`: the words they all end with ("[mm]").
+  return { title, labels: rest.map((w) => trim(w.join(" "))), axes: letters.every((l) => /^[XYZ]$/.test(l)) ? letters : null,
+    middle: letters, tail: tail ? rest[0].slice(rest[0].length - tail).join(" ") : "" };
 }
 // A field's unit follows its name unless the name already says it ("Charge [nC]", "Cal. Factor(Proton), Gy/C").
 function unitNamed(name, unit) {
@@ -2229,11 +2322,50 @@ function unitNamed(name, unit) {
   const u = String(unit).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp("(?:\\[|\\(|,\\s*)" + u + "\\s*(?:\\]|\\)|$)").test(name || "");
 }
+// Tests on one line of the table ("Same row as the test above"; Brook, 2026-11-26: "the dose [cGy] needs to be closer to
+// the actual line item its measuring"): every test is answered beside its own name, "Charge [nC] [ ] Dose [cGy] [ ]".
+// What the line says once, for the QA form and a saved run. `parts`: [{ test, unit, limits }] in the line's order.
+//   title   the words the names start with, then the words they all end with ("Daily output"; "Couch translational
+//           accuracy [mm]"; "Couch accuracy [deg]" for couch pitch, roll and yaw accuracy), null when they share none;
+//   labels  what is left of each name ("Charge [nC]"; "X (lateral)"; "Pitch"). The one value a device on the line
+//           fills (a chamber's calibration factor after the chamber) has no label of its own: it reads as that
+//           device's value, and its box still carries its full name;
+//   shared  the baseline, and the limits, every judged test has, said once under the title; null when they differ or
+//           there is no title to say them under;
+//   own(p)  what a test says for itself: its baseline and its limits, less what `shared` already says;
+//   fromDevice(i)  whether test i is a value of a device chosen on the line (it needs no explanation of its own).
+function lineLayout(parts, nameOf, baseline = (p) => `${fmt(p.limits.expected)}${p.unit ? ` ${p.unit}` : ""}`) {
+  const names = parts.map((p) => nameOf(p.test)), named = joinedNames(names);
+  const capital = (text) => text.replace(/^[a-z]/, (c) => c.toUpperCase());   // (ASCII only: "σx" stays as it is)
+  const labels = named ? named.middle.map(capital) : names.slice();
+  const device = parts.map((p) => {   // the name of the device on the line whose value this test is
+    let rule = null;
+    try { rule = QADerived.read(p.test.description); } catch { rule = null; }
+    const from = rule && rule.kind === "lookup" && rule.inputs && rule.inputs[0] ? rule.inputs[0].name : null;
+    return from && parts.some((x) => x.test.name === from) ? from : null;
+  });
+  parts.forEach((p, i) => { if (i && device[i] === parts[i - 1].test.name && device.filter((d) => d === device[i]).length === 1) labels[i] = ""; });
+  const judged = parts.filter((p) => p.test.type === "numeric" && ["expected", "warn", "fail"].some((k) => (p.limits || {})[k] != null));
+  const baseOf = (p) => ((p.limits || {}).expected != null ? `Baseline ${baseline(p)}` : null), limitsOf = (p) => qaLimitsLine(p.limits, p.unit)?.textContent || null;
+  const same = (of) => !!named && judged.length > 0 && judged.every((p) => of(p) === of(judged[0]));
+  const head = [same(baseOf) ? baseOf(judged[0]) : null, same(limitsOf) ? limitsOf(judged[0]) : null];
+  return { title: named ? [named.title, named.tail].filter(Boolean).join(" ") : null, labels, judged, shared: head.filter(Boolean).join(" · ") || null, fromDevice: (i) => !!device[i],
+    own: (p) => (!judged.includes(p) ? null : [head[0] ? null : baseOf(p), head[1] ? null : limitsOf(p)].filter(Boolean).join(" · ") || null) };
+}
+// A device's value with no label of its own never wraps away from its device: the two are one piece of the line.
+function linePairs(fields, line) {
+  const out = [];
+  fields.forEach((field, i) => {
+    if (i && !line.labels[i] && line.fromDevice(i) && out.length) out.push(el("span", { class: "qa-line-pair" }, out.pop(), field));
+    else out.push(field);
+  });
+  return out;
+}
 // A shared row is one cell over the Test, Measured, Unit, Result and Baseline columns, its tests side by side as in a
 // row of their own: each one's name and unit ("TCS Sk (mGy·m²·h⁻¹)") with its details button (named for it), its input
 // or value, its result, baseline and limits, and its notes. `fields` are [test, name, unit, details, answer, result, limits, ...notes].
 function sharedCell(fields) {
-  return el("td", { class: "qa-measured qa-shared-cell", colspan: 5 }, el("div", { class: "qa-shared" },
+  return el("td", { class: "qa-measured qa-shared-cell", colspan: QA_SHARED_COLUMNS.length }, el("div", { class: "qa-shared" },
     fields.map(([test, name, unit, details, answer, result, limits, ...notes]) => {
       if (details) for (const key of ["title", "aria-label"]) details.setAttribute(key, `${details.getAttribute(key)}: ${name || test.name}`);
       return el("div", { class: "qa-shared-field", "data-test-id": test.test_id },   // (a field its block's title names has no name of its own)
@@ -2390,10 +2522,10 @@ async function renderPerform(assignmentId) {
     const entry=remaining.find(e=>inputs.indexOf(e)>nextIndex)||remaining[0];
     if(!entry){toast('All required tests are answered.');return;}
     nextIndex=inputs.indexOf(entry);
-    for(let parent=entry.row.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+    for(let parent=entry.row.parentElement;parent;parent=parent.parentElement){if(parent.tagName==='DETAILS')parent.open=true;if(parent.qaOpen)parent.qaOpen(true);}
     app.querySelectorAll('.qa-next-unanswered').forEach(row=>row.classList.remove('qa-next-unanswered'));
     entry.row.classList.add('qa-next-unanswered');entry.row.scrollIntoView({block:'center',behavior:'smooth'});
-    const within=entry.field?.classList.contains('qa-inline-field')?'':'.qa-measured ';   // a test answered beside its name (inlineRow) is not in the Measured column
+    const within='.qa-measured ';
     const focus=(entry.field||entry.row).querySelector(`${within}button:not(:disabled):not(.qa-calculation-info), ${within}select:not(:disabled), ${within}input:not([readonly]):not([type=hidden]):not(.note-input)`);   // a shared row's field also holds its details and note
     if(focus)focus.focus({preventScroll:true});else{entry.row.tabIndex=-1;entry.row.focus({preventScroll:true});}
   }},'Next unanswered');
@@ -2418,6 +2550,7 @@ async function renderPerform(assignmentId) {
       for(const block of blocks){
         const rows=[...block.querySelectorAll('tr[data-qa-entry]')],visible=rows.filter(row=>!row.hidden);
         block.hidden=unfinishedOnly&&!visible.length;
+        if(block.qaSummary)block.qaSummary();
         const number=block.querySelector('.qa-n-span');
         if(number&&visible.length){visible[0].prepend(number);number.rowSpan=visible.length*2;}
       }
@@ -2485,8 +2618,10 @@ async function renderPerform(assignmentId) {
       const update = () => {
         if(input.readOnly&&input.dataset.derivedValue!==undefined) setDerived(input,input.dataset.derivedValue===''?null:Number(input.dataset.derivedValue));
         const s = entry.status();
-        statusCell.replaceChildren(...present([s && !answeredByButton ? chip(s) : null,
-          s && item.type === "numeric" ? deviationText(Number(QADerived.value(input)), item.limits, unit) : null]));
+        const deviation = s && item.type === "numeric" ? deviationText(Number(QADerived.value(input)), item.limits, unit) : null;
+        const verdict = s && !answeredByButton ? chip(s) : null;
+        if (verdict && deviation) verdict.title = deviation.textContent;   // where a line of tests shows PASS alone, its Δ is on the chip
+        statusCell.replaceChildren(...present([verdict, deviation]));
         refresh();
       };
       input.addEventListener("input", update);
@@ -2553,13 +2688,17 @@ async function renderPerform(assignmentId) {
       const signedBaseline = (it) => `${it.limits.expected > 0 ? "+" : it.limits.expected < 0 ? "−" : ""}${fmt(Math.abs(it.limits.expected), dp)}${unitOf(it) ? ` ${unitOf(it)}` : ""}`;
       const titleBaseline = sameBaseline ? `Baseline ${refCell(judged[0], unitOf(judged[0]))}` : eachBaseline ? `Baseline ${axes.map((it) => `${it.axisLabel} = ${signedBaseline(it)}`).join(", ")}` : null;
       const limitsOf = (it) => limitsLine(it, unitOf(it))?.textContent || null;
+      // A table with a row per energy, spot or angle says each row's limits in the Warning ± and Action ± columns; its
+      // title says them only while those columns are hidden, and only when every row has the same.
+      const limitCells = !axisRow && !matrix;
+      const blockEntries = [];   // the table's fields, for the line a closed table shows
       // What a matrix column's heading says for its tests: the limits, and the baseline, they all share.
       if (matrix) for (const col of matrix.columns) {
         const numeric = col.tests.filter((it) => it.type === "numeric"), texts = numeric.map(limitsOf), bases = numeric.map((it) => (it.limits || {}).expected);
         col.limits = texts.length && texts.every((x) => x && x === texts[0]) ? texts[0] : null;
         col.baseline = bases.length && bases.every((b) => b != null && b === bases[0]) ? `Baseline ${refCell(numeric[0], unitOf(numeric[0]))}` : null;
       }
-      const titleMember = firstHeader !== "Test" && !matrix && (!joined || judged.every((it) => limitsOf(it) === limitsOf(judged[0])))
+      const titleMember = firstHeader !== "Test" && !matrix && (!(joined || limitCells) || judged.every((it) => limitsOf(it) === limitsOf(judged[0])))
         ? members.find((it) => it.type === "numeric" && it.limits && (it.limits.warn !== null || it.limits.fail !== null)) : null;
       const titleLimits = titleMember ? limitsLine(titleMember, titleMember.unit && titleMember.unit !== "unitless" ? titleMember.unit : "")?.textContent || null : null;
       const sharedCells = (parts, matrixRow = null) => {
@@ -2597,49 +2736,56 @@ async function renderPerform(assignmentId) {
         } else if (axisRow) cell.firstChild.style.setProperty("--qa-fields", parts.length);   // every axis on the one line (app.css)
         return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
-      // Tests on one row of the table ("Same row as the test above") read as one line of it, lined up like a
-      // spreadsheet's (Brook, 2026-11-20): the last test is the row's value, under Measured with its baseline, unit and
-      // result in their columns; the tests before it are answered beside their names in the Test column, on the same
-      // line. Names that start alike say those words once, in bold where a test's name is ("Chamber", "Daily output").
-      const inlineRow = (parts) => {
-        const main = parts.at(-1), others = parts.slice(0, -1);
-        const named = joinedNames(parts.map((p) => shortName(p.it)));
-        const labels = named ? named.labels : parts.map((p) => shortName(p.it));
-        const judged = (p) => p.it.type === "numeric" && ["expected", "warn", "fail"].some((k) => (p.it.limits || {})[k] != null);
-        const unitTag = (p, name) => (p.it.type === "numeric" && p.unit && !unitNamed(name || p.it.name, p.unit) ? el("span", { class: "qa-shared-unit" }, ` (${p.unit})`) : null);
+      // Tests on one row of the table ("Same row as the test above") are one line of it: each is answered beside its
+      // own name, its unit and its verdict after its box (Brook, 2026-11-26: the name next to what it measures). Names
+      // that start alike say those words once, in bold, with the baseline and limits the judged tests share under
+      // them (lineLayout); a test says its own when they differ. One cell over the table's columns, like an X / Y / Z row.
+      const lineRow = (parts) => {
+        const rows = parts.map((p) => ({ test: p.it, unit: p.unit, limits: p.it.limits, p }));
+        const line = lineLayout(rows, shortName, (x) => refCell(x.test, x.unit));
         const named_ = (button, name) => { if (button) for (const key of ["title", "aria-label"]) button.setAttribute(key, `${button.getAttribute(key)}: ${name}`); return button; };
-        const fields = others.map((p, i) => {
-          const line = limitsLine(p.it, p.unit)?.textContent || null;
-          const limits = (p.it.limits || {}).expected != null && p.it.type === "numeric" ? [`Baseline ${refCell(p.it, "")}`, line].filter(Boolean).join(" · ") : line;
-          const tag = unitTag(p, labels[i]);
-          const field = el("span", { class: "qa-inline-field", "data-test-id": p.it.test_id },
-            labels[i] || tag ? el("span", { class: "qa-inline-name" }, labels[i], tag) : null, named_(testDetailsButton(p.it, t.items, numbers), labels[i] || p.it.name), p.control,
-            judged(p) ? p.statusCell : null, limits ? el("span", { class: "qa-limits qa-inline-limits" }, limits) : null, p.note, p.comment);
+        // Under a title the first test's ⓘ is the line's, beside the title; a later test shows one only for what it adds
+        // (a calculation, directions of its own).
+        const detailsOf = (p, i, label) => (line.fromDevice(i) ? null : !i || !line.title || derivedExplanation(p.it, t.items, numbers) || addsDirections(p.it, parts[0].it)
+          ? named_(testDetailsButton(i && line.title ? { ...p.it, steps: null } : p.it, t.items, numbers), label || p.it.name) : null);
+        const fields = rows.map((x, i) => {
+          const p = x.p, label = line.labels[i], own = line.own(x);
+          const field = el("div", { class: "qa-shared-field qa-line-field", "data-test-id": p.it.test_id, title: label ? null : p.it.name },
+            label ? el("span", { class: "qa-line-name" }, label) : null, p.control,
+            // (its unit, unless its name says it: a value with no label of its own always says its unit)
+            p.it.type === "numeric" && p.unit && (!label || !unitNamed(p.it.name, p.unit)) ? el("span", { class: "qa-line-unit" }, p.unit) : null,
+            line.judged.includes(x) ? p.statusCell : null, i || !line.title ? detailsOf(p, i, label) : null,
+            own ? el("span", { class: `qa-limits qa-line-limits${own.length > 28 ? " qa-line-limits-under" : ""}` }, own) : null, p.note, p.comment);
           p.entry.field = field;
           return field;
         });
-        main.noteToggle.addEventListener("click", () => others.forEach((p) => { p.comment.hidden = false; }));   // the + opens every note
-        const last = labels.at(-1);
-        const details = named_(testDetailsButton(main.it, t.items, numbers), last || main.it.name);
-        const cell = el("td", { class: "qa-label qa-inline-cell" },
-          el("div", { class: "qa-test-title" },
-            // (The fields are a group of their own, so a line that wraps starts under the first field, not under the name.)
-            el("div", { class: `qa-test-name qa-inline${named ? " qa-inline-named" : ""}` }, named ? el("strong", { class: "qa-inline-title" }, named.title) : null,
-              el("div", { class: "qa-inline-fields" }, fields, last ? el("span", { class: "qa-inline-name qa-inline-main" }, last) : null)), details),
-          limitsLine(main.it, main.unit), main.note);
-        return { main, cell };
+        parts[0].noteToggle.addEventListener("click", () => parts.forEach((p) => { p.comment.hidden = false; }));   // the + opens every note
+        const laid = linePairs(fields, line);
+        const head = line.title ? el("div", { class: "qa-line-head" }, el("div", { class: "qa-line-name-row" }, el("strong", { class: "qa-line-title" }, line.title), named_(testDetailsButton(parts[0].it, t.items, numbers), line.title)),
+          line.shared ? el("span", { class: "qa-limits" }, line.shared) : null) : null;
+        const cell = el("td", { class: "qa-measured qa-shared-cell qa-line-cell", colspan: QA_SHARED_COLUMNS.length }, el("div", { class: "qa-shared qa-line" }, head, el("div", { class: "qa-line-fields" }, laid)));
+        // (Its history and trend follow the first test with limits, then the first with a baseline, then the first number.)
+        const main = (line.judged.find((x) => x.limits.warn != null || x.limits.fail != null) || line.judged[0] || rows.find((x) => x.test.type === "numeric") || rows[0]).p;
+        return { main, cell, history: parts.filter((p) => p.it.type === "numeric").length > 1 ? el("div", { class: "qa-shared-name" }, shortName(main.it)) : null };
       };
       const groups = matrix ? matrix.rows.map((r) => Object.assign(r.cells.filter(Boolean), { matrixRow: r }))
         : firstHeader === "Test" ? sharedRows(members, numbers) : axisRow ? [members] : members.map((it) => [it]);
       const trRows = groups.map((group) => {
         const parts = group.map((it) => { drawn.add(it.test_id); return { it, unit: it.unit && it.unit !== "unitless" ? it.unit : "", ...buildEntry(it) }; });
-        const inline = firstHeader === "Test" && parts.length > 1 ? inlineRow(parts) : null;
-        const { it, unit, control, comment, noteToggle, note, statusCell } = inline ? inline.main : parts[0];   // what the row's own cells show
-        const shared = !inline && (parts.length > 1 || matrix) ? sharedCells(parts, group.matrixRow) : null, main = inline ? inline.main : shared ? shared.main : parts[0];
-        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared || inline ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
-        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: 9 }));
+        const line = firstHeader === "Test" && parts.length > 1 ? lineRow(parts) : null;
+        const { it, unit, control, comment, noteToggle, note, statusCell } = parts[0];   // what the row's own cells show
+        const shared = line || (parts.length > 1 || matrix ? sharedCells(parts, group.matrixRow) : null), main = shared ? shared.main : parts[0];
+        noteToggle.textContent = "+"; noteToggle.title = "Add comment"; noteToggle.setAttribute("aria-label", `Add comment for ${shared ? parts.map((p) => p.it.name).join(", ") : it.name}`); noteToggle.className = "icon-btn note-btn";   // the note box appears on demand
+        const chart = el("tr", { class: "quick-trend", hidden: true }, el("td", { colspan: QA_COLUMNS.length }));
         // In a group the directions are beside its title; a row repeats them only when its own differ. A calculation keeps its ⓘ.
-        const details = shared || inline ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || addsDirections(it, members[0]) ? testDetailsButton(firstHeader === "Test" ? it : { ...it, steps: null }, t.items, numbers) : null;
+        const details = shared ? null : firstHeader === "Test" || derivedExplanation(it, t.items, numbers) || addsDirections(it, members[0]) ? testDetailsButton(firstHeader === "Test" ? it : { ...it, steps: null }, t.items, numbers) : null;
+        // A test is one line: its limits are in the Warning ± and Action ± columns. The line under its name says them
+        // only while both columns are hidden (app.css, .qa-no-limit-cols).
+        blockEntries.push(...parts.map((p) => p.entry));
+        const under = shared || (firstHeader !== "Test" && titleLimits) ? null : limitsLine(it, unit);
+        if (under) under.classList.add("qa-limits-under");
+        const limitCell = (key) => (it.type !== "numeric" ? null : (it.limits || {}).criterion === "wl-max-delta" ? (key === "fail" ? "≥ 1 mm" : null)
+          : (it.limits || {})[key] != null ? `±${fmt(it.limits[key])}${it.limits.tol_mode === "percent" ? " %" : ""}` : null);
         // The quick trend: this test's; on an X / Y / Z row, every axis (and the 3D), one under another.
         const trended = axisTrend ? parts.filter((p) => p.it.type === "numeric") : [main];
         const trend = el("button", { type: "button", class: "icon-btn", title: "Show the trend here", onclick: () => {
@@ -2651,22 +2797,25 @@ async function renderPerform(assignmentId) {
             seriesChart(series, main.unit, { small: true, yLabel: yAxisLabel(trended.map((p) => p.it.name)) }));
           chart.hidden = !chart.hidden;
         } }, trendIcon(16));
-        const row = el("tr", {'data-qa-entry':parts[0].it.test_id, class: matrix ? "qa-axis-row qa-matrix-row" : axisRow ? "qa-axis-row" : inline ? "qa-inline-row" : null},
+        const row = el("tr", {'data-qa-entry':parts[0].it.test_id, class: matrix ? "qa-axis-row qa-matrix-row" : axisRow ? "qa-axis-row" : line ? "qa-line-row" : null},
           numberCell(it),
-          shared ? shared.cell : inline ? inline.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), firstHeader === "Test" ? limitsLine(it, unit) : null, note),
+          shared ? shared.cell : el("td", { class: "qa-label" }, el("div",{class:"qa-test-title"},el("div",{class:"qa-test-name"},firstCell(it, details)),details), under, note),
           // A Pass / Fail test needs no unit or baseline: its buttons say both.
           // null, not "": an empty cell must stay :empty so the card layout drops its label too.
           shared ? null : el("td", { class: "qa-unit", "data-label":"Unit" }, it.type === "numeric" ? unit || null : null),
-          shared ? null : el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, unit) : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
+          // (The Unit column says the unit: the baseline and the limits are numbers alone, as on a worksheet.)
+          shared ? null : el("td", { class: "num qa-baseline", "data-label":"Baseline" }, it.type === "numeric" ? refCell(it, "") : it.type === "boolean" || it.type === "status" ? null : el("span", { class: "muted" }, "—")),
           shared ? null : el("td", { class: "qa-measured" }, control),
+          shared ? null : el("td", { class: "num qa-warn", "data-label":"Warning ±" }, limitCell("warn")),
+          shared ? null : el("td", { class: "num qa-action", "data-label":"Action ±" }, limitCell("fail")),
           shared ? null : el("td", {class:"qa-result", "data-label":"Result"}, statusCell),
           el("td", { class: "qa-comment" }, noteToggle, shared ? null : comment),
           el("td", { class: "history-cell" }, !dates.length ? el("span", { class: "muted small" }, "—")
             : axisTrend ? trended.map((p) => el("div", { class: "qa-axis-history" }, el("div", { class: "qa-shared-name" }, p.it.axisLabel), histChips(p.it, p.unit)))   // each axis its own
             : [shared?.history, histChips(main.it, main.unit)]),
           el("td", {class:"qa-trends"}, main.it.type === "numeric" ? trend : null));   // a trend only for a measured value
-        for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared || inline) p.entry.rowEntries = parts.map((x) => x.entry); }
-        const extras = el('td', {class:'qa-phone-extras', colspan:9});
+        for (const p of parts) { p.entry.row = row; p.entry.chart = chart; if (shared) p.entry.rowEntries = parts.map((x) => x.entry); }
+        const extras = el('td', {class:'qa-phone-extras', colspan:QA_COLUMNS.length});
         orderMeasurementRow(row);
         row.append(extras);
         const secondary = ['qa-comment','history-cell','qa-trends'].map(name=>[...row.children].find(c=>c.classList.contains(name)));
@@ -2708,9 +2857,36 @@ async function renderPerform(assignmentId) {
       if (title && firstHeader !== "Test") {
         title.prepend(el("span", { class: "measure-n" }, numbers.get(members[0].test_id) || ""));
         const shared = [titleBaseline, titleLimits].filter(Boolean);
-        if (shared.length) title.append(el("span", { class: "qa-limits" }, shared.join(" · ")));
+        if (shared.length) title.append(el("span", { class: `qa-limits${limitCells ? " qa-limits-under" : ""}` }, shared.join(" · ")));
       }
       const block = el("div", { class: "measure-block" }, title, directions, el("div", { class: "table-wrap measure-wrap" }, tableEl));
+      // A table of several energies or spots that a file fills starts closed (Brook, 2026-11-26: "don't automatically
+      // show it … I'm trying to reduce the amount of scrolling"): one line, its name and its verdict, the worst row
+      // named when one is not PASS. A click on the line opens the rows; nothing opens by itself.
+      if (title && limitCells && firstHeader !== "Test" && blockEntries.length > 1 && blockEntries.every((e) => e.input.readOnly && e.input.placeholder === "from file")) {
+        const summary = el("span", { class: "measure-summary", role: "status" });
+        const toggle = el("button", { type: "button", class: "measure-toggle", "aria-expanded": "false", title: "Show the results" }, "Show");
+        const setOpen = (open) => {
+          block.classList.toggle("measure-closed", !open);
+          toggle.setAttribute("aria-expanded", String(open)); toggle.textContent = open ? "Hide" : "Show"; toggle.title = open ? "Hide the results" : "Show the results";
+          if (block.parentElement) qaHeadings(block.parentElement.querySelectorAll(".measure-block"));
+        };
+        title.addEventListener("click", (event) => { if (event.target === toggle || !event.target.closest("button, a, input, select")) setOpen(block.classList.contains("measure-closed")); });
+        (title.querySelector(".qa-limits") || { before: (...nodes) => title.append(...nodes) }).before(summary, toggle);
+        block.classList.add("measure-closable", "measure-closed");
+        block.qaOpen = setOpen;
+        block.qaSummary = () => {
+          const rows = blockEntries.map((e) => ({ e, s: e.status() })), answered = rows.filter((x) => x.s);
+          if (!answered.length) { summary.replaceChildren(el("span", { class: "muted small" }, "from file")); return; }
+          const out = answered.filter((x) => x.s === "warn" || x.s === "fail").sort((a, b) => STATUS_RANK[b.s] - STATUS_RANK[a.s]);
+          const worst = out.length ? out[0].s : answered.some((x) => x.s === "pass") ? "pass" : "recorded";
+          summary.replaceChildren(...present([chip(worst),
+            out.length ? el("span", { class: "measure-summary-row" }, tableParts(out[0].e.item.name).rowLabel, " ", deviationText(Number(QADerived.value(out[0].e.input)), out[0].e.item.limits, unitOf(out[0].e.item))) : null,
+            out.length > 1 ? el("span", { class: "muted small" }, `${out.length - 1} more`) : null,
+            answered.length < rows.length ? el("span", { class: "muted small" }, `${answered.length} of ${rows.length}`) : null]));
+        };
+        block.qaSummary();
+      }
       layoutQaTable(tableEl, "perform");   // the person's columns; names the block's columns (data-cols) for qaHeadings
       fitQaTable(tableEl);
       return block;
@@ -2733,7 +2909,7 @@ async function renderPerform(assignmentId) {
     };
     // Tests on one row ("Same row as the test above") named for the axes of one thing ("…: X offset [mm]", "…: Y offset
     // [mm]") are a titled block like an X / Y / Z group (Brook, 2026-11-20: the name, then "X: [ ] Y: [ ]" on the row
-    // below). Any other tests on one row stay a row of the table around them (inlineRow).
+    // below). Any other tests on one row are one line of the table around them (lineRow).
     const foldJoined = (list) => {
       const out = [];
       for (let i = 0; i < list.length; i++) {
@@ -4290,30 +4466,26 @@ async function renderReviewMeasurements(run) {
   const numberFor=r=>numbers.get(r.test_id)||checkNumber(r.description)||fallback.get(r.test_id)||'';
   const groups=new Map();
   for(const r of run.results){const n=sectionNumber(r),named=sectionNameOf(r);const key=`${n}|${named||r.category||'General'}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
-  // Tests marked "Same row as the test above" are a row of the table, as on the QA form (measureTable's inlineRow): the
-  // last test is the row's value, in the table's own columns (Baseline, Measured, Unit, Result, its note, history and
-  // trend); the tests before it are beside their names in the Test column, each with its value (a Pass / Fail answer as
-  // its chip), its result and deviation when it has a baseline or limits, its baseline and limits, and its comment.
-  // Words the names share are said once, in bold.
-  const inlineRun=parts=>{
-    const main=parts.at(-1),others=parts.slice(0,-1),named=joinedNames(parts.map(p=>qaDisplayName(p.r)));
-    const labels=named?named.labels:parts.map(p=>qaDisplayName(p.r));
-    const has=(p,...keys)=>p.r.type==='numeric'&&keys.some(k=>p.r[k]!=null);
+  // Tests marked "Same row as the test above" are one line of the table, as on the QA form (measureTable's lineRow):
+  // each test beside its own name with what was recorded (a Pass / Fail answer as its chip), its unit, its result and
+  // deviation when it has a baseline or limits, and its comment. Words the names share are said once, in bold, with the
+  // baseline and limits the judged tests share under them (lineLayout).
+  const lineRun=parts=>{
+    const rows=parts.map(p=>({test:p.r,unit:p.unit,limits:p.limits,p})),line=lineLayout(rows,qaDisplayName);
     const naming=(button,text)=>{if(button)for(const key of ['title','aria-label'])button.setAttribute(key,`${button.getAttribute(key)}: ${text}`);return button;};
-    const fields=others.map((p,i)=>{
-      const tag=p.r.type==='numeric'&&p.unit&&!unitNamed(labels[i]||p.r.name,p.unit)?el('span',{class:'qa-shared-unit'},` (${p.unit})`):null;
-      return el('span',{class:'qa-inline-field','data-test-id':p.r.test_id},
-        labels[i]||tag?el('span',{class:'qa-inline-name'},labels[i],tag):null,naming(testDetailsButton(p.r,run.results,numbers),labels[i]||p.r.name),
-        p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('span',{class:'qa-inline-value'},p.amount),
-        has(p,'expected','warn','fail')&&!p.missing?p.result:null,
-        has(p,'expected','warn','fail')?el('span',{class:'qa-limits qa-inline-limits'},[p.r.expected!=null?`Baseline ${fmt(p.r.expected)}`:null,qaLimitsLine(p.limits,p.unit)?.textContent].filter(Boolean).join(' · ')):null,
-        p.r.comment?el('span',{class:'qa-shared-note'},p.r.comment):null);
+    const fields=rows.map((x,i)=>{
+      const p=x.p,label=line.labels[i],own=line.own(x);
+      return el('div',{class:'qa-shared-field qa-line-field','data-test-id':p.r.test_id,title:label?null:p.r.name},
+        label?el('span',{class:'qa-line-name'},label):null,
+        p.measured.firstElementChild||p.missing?p.measured:p.r.type==='boolean'||p.r.type==='status'?chip(p.r.status):el('span',{class:'qa-line-value'},p.amount),
+        p.r.type==='numeric'&&p.unit&&!p.missing&&(!label||!unitNamed(p.r.name,p.unit))?el('span',{class:'qa-line-unit'},p.unit):null,
+        line.judged.includes(x)&&!p.missing?p.result:null,line.fromDevice(i)?null:naming(testDetailsButton(p.r,run.results,numbers),label||p.r.name),
+        own?el('span',{class:`qa-limits qa-line-limits${own.length>28?' qa-line-limits-under':''}`},own):null,p.r.comment?el('span',{class:'qa-shared-note'},p.r.comment):null);
     });
-    const last=labels.at(-1),details=naming(testDetailsButton(main.r,run.results,numbers),last||main.r.name);
-    return {main,cell:el('td',{class:'qa-label qa-inline-cell'},el('div',{class:'qa-test-title'},
-      el('div',{class:`qa-test-name qa-inline${named?' qa-inline-named':''}`},named?el('strong',{class:'qa-inline-title'},named.title):null,
-        el('div',{class:'qa-inline-fields'},fields,last?el('span',{class:'qa-inline-name qa-inline-main'},last):null)),details),
-      main.r.type==='numeric'?qaLimitsLine(main.limits,main.unit):null)};
+    const head=line.title?el('div',{class:'qa-line-head'},el('strong',{class:'qa-line-title'},line.title),line.shared?el('span',{class:'qa-limits'},line.shared):null):null;
+    return {main:(line.judged.find(x=>x.limits.warn!=null||x.limits.fail!=null)||line.judged[0]||rows.find(x=>x.test.type==='numeric')||rows[0]).p,
+      named:rows.filter(x=>x.test.type==='numeric').length>1,   // several numbers on the line: its History says whose it is
+      cell:el('td',{class:'qa-measured qa-shared-cell qa-line-cell',colspan:QA_SHARED_COLUMNS.length},el('div',{class:'qa-shared qa-line'},head,el('div',{class:'qa-line-fields'},linePairs(fields,line))))};
   };
   // A section's rows: tests on one row together, except tests named for the axes of one thing (an X / Y pair), which
   // are rows of their own here, as the axes of X / Y / Z are.
@@ -4331,7 +4503,7 @@ async function renderReviewMeasurements(run) {
         const missing=r.value_num==null&&r.value_text==null;
         // A Pass / Fail answer is the Result chip itself; writing it under Measured too would repeat it.
         const amount=missing||r.type==='boolean'||r.type==='status'||['text','choice'].includes(r.type)?null:QADerived.read(r.description)||/\[calc:/.test(r.description||'')?Number(r.value_num).toPrecision(3):fmt(r.value_num);
-        const value=missing?'Unanswered':r.type==='boolean'||r.type==='status'?'':['text','choice'].includes(r.type)?r.value_text:`${amount} ${unit}`.trim();
+        const value=missing?'Unanswered':r.type==='boolean'||r.type==='status'?'':['text','choice'].includes(r.type)?r.value_text:amount;   // (the Unit column says the unit)
         const measured=el('div',{class:'review-measured'},value);
         if(therapistReviewCheck(r)&&run.therapist_approval_required&&!run.trashed_at&&can('therapist_approve')){
           const {value:input,control}=passFailInput(r.name,false,false);
@@ -4349,14 +4521,16 @@ async function renderReviewMeasurements(run) {
           measured.replaceChildren(control);
         }
         const limits={expected:r.expected,warn:r.warn,fail:r.fail,tol_mode:r.tol_mode,...((r.description||'').includes('[rule: wl-max-delta]')?{criterion:'wl-max-delta'}:{})};
-        return {r,unit,missing,amount:amount??value,measured,limits,result:el('div',{class:'status-cell'},chip(r.status),r.type==='numeric'&&!missing?deviationText(r.value_num,limits,unit):null)};
+        const deviation=r.type==='numeric'&&!missing?deviationText(r.value_num,limits,unit):null,verdict=chip(r.status);
+        if(deviation)verdict.title=deviation.textContent;   // where a line of tests shows PASS alone, its Δ is on the chip
+        return {r,unit,missing,amount:amount??value,measured,limits,result:el('div',{class:'status-cell'},verdict,deviation)};
       });
-      const inline=parts.length>1?inlineRun(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=inline?inline.main:parts[0];   // what the row's own cells show
+      const inline=parts.length>1?lineRun(parts):null,lead=parts[0].r,{r,unit,measured,limits,result}=inline?inline.main:parts[0];   // whose history and trend the row shows
       const prior=(history[r.test_id]||[]).filter(h=>h.run_id!==run.id&&h.qa_date<=run.qa_date);
       const recent=[...prior].reverse().slice(0,3);
       const answered=r.type==='boolean'||r.type==='status',histText=h=>answered?answerWord(r.type,r.unit,h.value,h.status):fmt(h.value,dp)+(unit?' '+unit:'');
       const hist=recent.length?el('span',{class:'hist-row'},recent.map(h=>el('span',{class:`hist ${h.status}`,title:`${h.qa_date}: ${histText(h)}`},el('span',{class:'small'},new Date(h.qa_date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'})),el('span',{},histText(h))))):el('span',{class:'muted small'},'—');
-      const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:9}));
+      const chart=el('tr',{class:'quick-trend',hidden:true},el('td',{colspan:QA_COLUMNS.length}));
       // The quick trend shows the newest 60 points of this test, fetched on the first click: the page's own history
       // stops at this run's date, which would leave an early or trashed run's chart empty.
       let quick=null;
@@ -4370,15 +4544,22 @@ async function renderReviewMeasurements(run) {
         chart.hidden=false;
       }},trendIcon(16));
       const details=inline?null:testDetailsButton(r,run.results,numbers);
-      const row=el('tr',{'data-test-id':lead.test_id,class:inline?'qa-inline-row':null},
+      // A test is one line: its limits are in the Warning ± and Action ± columns; the line under its name says them only
+      // while both columns are hidden (app.css, .qa-no-limit-cols).
+      const under=inline||r.type!=='numeric'?null:qaLimitsLine(limits,unit);
+      if(under)under.classList.add('qa-limits-under');
+      const limitCell=key=>r.type!=='numeric'?null:limits.criterion==='wl-max-delta'?(key==='fail'?'≥ 1 mm':null):r[key]!=null?`±${fmt(r[key])}${r.tol_mode==='percent'?' %':''}`:null;
+      const row=el('tr',{'data-test-id':lead.test_id,class:inline?'qa-line-row':null},
         el('td',{class:'qa-n'},numberFor(lead)),
-        inline?inline.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},qaTestName(r,qaDisplayName(r),details)),details),r.type==='numeric'?qaLimitsLine(limits,unit):null),
-        el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
-        el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':`${fmt(r.expected)} ${unit}`.trim()),
-        el('td',{class:'qa-measured','data-label':'Measured'},measured),
-        el('td',{class:'qa-result','data-label':'Result'},result),
-        el('td',{class:'qa-comment','data-label':'Comment'},r.comment?noteButton(r.comment):'—'),
-        el('td',{class:'history-cell','data-label':'History'},hist),
+        inline?inline.cell:el('td',{class:'qa-label'},el('div',{class:'qa-test-title'},el('div',{class:'qa-test-name'},qaTestName(r,qaDisplayName(r),details)),details),under),
+        inline?null:el('td',{class:'qa-unit','data-label':'Unit'},r.type==='boolean'?null:unit||null),
+        inline?null:el('td',{class:'qa-baseline num','data-label':'Baseline'},r.type==='boolean'||r.type==='status'?null:r.expected==null?'—':fmt(r.expected)),
+        inline?null:el('td',{class:'qa-measured','data-label':'Measured'},measured),
+        inline?null:el('td',{class:'qa-warn num','data-label':'Warning ±'},limitCell('warn')),
+        inline?null:el('td',{class:'qa-action num','data-label':'Action ±'},limitCell('fail')),
+        inline?null:el('td',{class:'qa-result','data-label':'Result'},result),
+        el('td',{class:'qa-comment','data-label':'Comment'},inline?(parts.some(x=>x.r.comment)?null:'—'):r.comment?noteButton(r.comment):'—'),
+        el('td',{class:'history-cell','data-label':'History'},inline&&inline.named&&recent.length?el('div',{class:'qa-shared-name'},qaDisplayName(r)):null,hist),
         el('td',{class:'qa-trends','data-label':'Trends'},r.type==='numeric'?trend:'—'));
       orderMeasurementRow(row);
       tbody.append(row,chart);

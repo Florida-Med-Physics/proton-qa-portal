@@ -1,5 +1,6 @@
-// Synthetic checks for the QA table's columns (QA_COLUMNS in app.js): the order a page starts with, what a person may
-// hide and move, where the choice is kept, and the short labels of the PBS daily steps. The real code runs in node:vm
+// Synthetic checks for the QA table's columns (QA_COLUMNS in app.js): the order a page starts with (the limits in columns
+// of their own, "Warning ±" and "Action ±"), what a person may hide and move, where a column added since goes in an order
+// kept from before it, where the choice is kept, and the short labels of the PBS daily steps. The real code runs in node:vm
 // with a stand-in for the browser's storage; nothing here reads stored data. Run with node tests/test_qa_columns.cjs.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -20,33 +21,41 @@ function page({ storage = true } = {}) {
 }
 const keys = (cols) => J(cols.map((c) => c.key));
 
-// 1. What a page starts with: Baseline, Measured, then Result; the QA form without History, a saved run with it.
+// 1. What a page starts with: Baseline, Measured, Unit, the two limits (Warning ±, Action ±), then Result; the QA form
+// without History, a saved run with it.
 {
   const p = page();
-  assert.deepEqual(keys(p.qaColumns('perform').all), ['n', 'test', 'baseline', 'measured', 'unit', 'result', 'history', 'comment', 'trends']);
-  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'result', 'comment', 'trends'], 'the QA form starts without History');
-  assert.deepEqual(keys(p.qaColumns('review').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'result', 'history', 'comment', 'trends'], 'a saved run starts with every column');
-  assert.deepEqual(J(p.qaColumns('perform').all.map((c) => c.label)), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Result', 'History', 'Note', 'Trend']);
+  assert.deepEqual(keys(p.qaColumns('perform').all), ['n', 'test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result', 'history', 'comment', 'trends']);
+  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result', 'comment', 'trends'], 'the QA form starts without History');
+  assert.deepEqual(keys(p.qaColumns('review').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result', 'history', 'comment', 'trends'], 'a saved run starts with every column');
+  assert.deepEqual(J(p.qaColumns('perform').all.map((c) => c.label)), ['#', 'Test', 'Baseline', 'Measured', 'Unit', 'Warning ±', 'Action ±', 'Result', 'History', 'Note', 'Trend']);
 }
 
 // 2. A person's choice: any order after # and Test; anything hidden but #, Test, Measured and Result.
 {
   const p = page();
+  p.saveQaColumnChoice('perform', { order: ['result', 'action', 'measured', 'trends', 'baseline', 'unit', 'history', 'warn', 'comment'], hidden: ['unit', 'comment', 'warn'] });
+  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'result', 'action', 'measured', 'trends', 'baseline', 'history'], 'the order and the hidden columns as chosen (the limit columns like any other); History shown once chosen');
+  assert.deepEqual(keys(p.qaColumns('review').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result', 'history', 'comment', 'trends'], 'each page keeps its own');
+  // An order kept from before the limit columns names neither: each goes after the column it follows by default (Warning ±
+  // after Unit, wherever the person put Unit and shown or not; Action ± after Warning ±), not last.
   p.saveQaColumnChoice('perform', { order: ['result', 'measured', 'trends', 'baseline', 'unit', 'history', 'comment'], hidden: ['unit', 'comment'] });
-  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'result', 'measured', 'trends', 'baseline', 'history'], 'the order and the hidden columns as chosen; History shown once chosen');
-  assert.deepEqual(keys(p.qaColumns('review').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'result', 'history', 'comment', 'trends'], 'each page keeps its own');
+  assert.deepEqual(keys(p.qaColumns('perform').all), ['n', 'test', 'result', 'measured', 'trends', 'baseline', 'unit', 'warn', 'action', 'history', 'comment'], 'the kept order stays; the new columns follow Unit');
+  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'result', 'measured', 'trends', 'baseline', 'warn', 'action', 'history'], 'and show, though Unit is hidden');
   p.saveQaColumnChoice('perform', { order: ['n', 'bogus', 'trends', 'test'], hidden: ['n', 'test', 'measured', 'result', 'bogus', 'baseline'] });
-  assert.deepEqual(keys(p.qaColumns('perform').all), ['n', 'test', 'trends', 'baseline', 'measured', 'unit', 'result', 'history', 'comment'], '# and Test stay first; unknown names are dropped; columns not named follow in their usual order');
-  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'trends', 'measured', 'unit', 'result', 'history', 'comment'], '#, Test, Measured and Result cannot be hidden');
+  assert.deepEqual(keys(p.qaColumns('perform').all), ['n', 'test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result', 'history', 'comment', 'trends'], '# and Test stay first; unknown names are dropped; a column not named goes after the one it follows by default (Baseline, which follows none, first)');
+  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'measured', 'unit', 'warn', 'action', 'result', 'history', 'comment', 'trends'], '#, Test, Measured and Result cannot be hidden');
   p.saveQaColumnChoice('perform', null);
-  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'result', 'comment', 'trends'], 'Reset: the page\'s own columns again');
+  assert.deepEqual(keys(p.qaColumns('perform').shown), ['n', 'test', 'baseline', 'measured', 'unit', 'warn', 'action', 'result', 'comment', 'trends'], 'Reset: the page\'s own columns again');
 }
 
-// 3. Kept in this browser, per person; where the browser keeps nothing, for the visit.
+// 3. Kept in this browser, per person; where the browser keeps nothing, for the visit. (The order as the Column Chooser
+// keeps it, every column named: Measured moved left of Baseline.)
 {
   const p = page();
-  p.saveQaColumnChoice('perform', { order: ['measured', 'baseline'], hidden: [] });
-  assert.deepEqual(JSON.parse(p.kept.get('gatorqa-columns-v1')), { 7: { perform: { order: ['measured', 'baseline'], hidden: [] } } });
+  const order = ['measured', 'baseline', 'unit', 'warn', 'action', 'result', 'history', 'comment', 'trends'];
+  p.saveQaColumnChoice('perform', { order, hidden: [] });
+  assert.deepEqual(JSON.parse(p.kept.get('gatorqa-columns-v1')), { 7: { perform: { order, hidden: [] } } });
   p.state.user = { id: 8 };
   assert.deepEqual(keys(p.qaColumns('perform').shown).slice(2, 4), ['baseline', 'measured'], 'another person on the same computer has their own');
   p.state.user = { id: 7 };
@@ -60,23 +69,23 @@ const keys = (cols) => J(cols.map((c) => c.key));
   assert.deepEqual(keys(later.qaColumns('perform').shown).slice(2, 4), ['baseline', 'measured'], 'unreadable storage: the usual columns');
   const priv = page({ storage: false });
   assert.deepEqual(keys(priv.qaColumns('perform').shown).slice(2, 4), ['baseline', 'measured']);
-  priv.saveQaColumnChoice('perform', { order: ['measured', 'baseline'], hidden: ['unit'] });
-  assert.deepEqual(keys(priv.qaColumns('perform').shown).slice(2, 5), ['measured', 'baseline', 'result'], 'a private window: the choice still applies for the visit');
+  priv.saveQaColumnChoice('perform', { order, hidden: ['unit'] });
+  assert.deepEqual(keys(priv.qaColumns('perform').shown).slice(2, 5), ['measured', 'baseline', 'warn'], 'a private window: the choice still applies for the visit');
 }
 
 // 4. A table with a shared row ("Same row as the test above"): the columns its one cell covers stay side by side, in the
 // person's order, ahead of the others, so every row sits under its headings.
 {
   const p = page();
-  p.saveQaColumnChoice('perform', { order: ['comment', 'result', 'history', 'measured', 'baseline', 'unit', 'trends'], hidden: [] });
-  assert.deepEqual(keys(p.qaColumns('perform', true).all), ['n', 'test', 'result', 'measured', 'baseline', 'unit', 'comment', 'history', 'trends']);
-  assert.deepEqual(keys(p.qaColumns('perform', false).all), ['n', 'test', 'comment', 'result', 'history', 'measured', 'baseline', 'unit', 'trends']);
+  p.saveQaColumnChoice('perform', { order: ['comment', 'action', 'result', 'history', 'measured', 'baseline', 'warn', 'unit', 'trends'], hidden: [] });
+  assert.deepEqual(keys(p.qaColumns('perform', true).all), ['n', 'test', 'action', 'result', 'measured', 'baseline', 'warn', 'unit', 'comment', 'history', 'trends'], 'the limit columns are among those its one cell covers');
+  assert.deepEqual(keys(p.qaColumns('perform', false).all), ['n', 'test', 'comment', 'action', 'result', 'history', 'measured', 'baseline', 'warn', 'unit', 'trends']);
 }
 
 // 5. The fixed widths the History count is worked out from: every column but Test (what is left) and History (its dates).
 {
   const cols = J(page().QA_COLUMNS);
-  assert.equal(cols.filter((c) => c.key !== 'history').reduce((sum, c) => sum + c.width, 0), 888);
+  assert.equal(cols.filter((c) => c.key !== 'history').reduce((sum, c) => sum + c.width, 0), 1122);
   assert.deepEqual(cols.filter((c) => c.pinned).map((c) => c.key), ['n', 'test']);
   assert.deepEqual(cols.filter((c) => c.always).map((c) => c.key), ['measured', 'result']);
 }
@@ -122,4 +131,4 @@ const keys = (cols) => J(cols.map((c) => c.key));
   assert.match(between('function testDetailsButton(', 'function qaColgroup('), /el\(step\?'p':'strong',\{class:step\?'qa-step-text':null\},item\.name\)/);
 }
 
-console.log('QA columns: Baseline, Measured, Result by default; History off on the QA form; a choice per person and page that survives odd storage; shared rows keep their columns together; PBS step labels match the seed list.');
+console.log('QA columns: Baseline, Measured, Unit, Warning ±, Action ±, Result by default; History off on the QA form; a choice per person and page that survives odd storage; a column added since goes after the one it follows; shared rows keep their columns together; PBS step labels match the seed list.');

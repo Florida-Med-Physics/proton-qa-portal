@@ -9,7 +9,8 @@ const between = (from, to) => { const a = source.indexOf(from), b = source.index
 
 // 1. QA form: in a section, a table under one with the same columns does not name them again (History's dates still show
 // when History is on); the first table of a section names them, and so does the first one shown when "Show unfinished
-// only" hides the tables above it. A table's columns are named on its block (data-cols) by layoutQaTable.
+// only" hides the tables above it, or when the table above is closed (a table a file fills starts closed, its rows
+// hidden). A table's columns are named on its block (data-cols) by layoutQaTable.
 const measureTable = between('    const measureTable = (members,', '    const shortName = (it) =>');
 assert.match(measureTable, /el\("thead", \{\}, el\("tr", \{ class: "qa-col-names" \}, qaHeaders\(axisRow \|\| matrix \? "Test" : firstHeader\)\),/, 'every table builds its names row');
 assert.match(measureTable, /dates\.length \? qaDatesRow\(dates\.map\(dateSlot\)\) : null/, 'and its date row, as before');
@@ -22,13 +23,14 @@ vm.runInContext(between('function qaHeadings(', '// The columns as a person arra
 // The repeated names row is collapsed with the class "repeat", never removed with hidden: screen readers still read each
 // cell's column names (Measured, Unit, Result…) from it.
 const classList = () => { const on = new Set(); return { toggle: (c, force) => { if (force) on.add(c); else on.delete(c); return !!force; }, contains: (c) => on.has(c) }; };
-const block = (cols, { hidden = false } = {}) => {
-  const names = { hidden: false, classList: classList() };
-  return { hidden, dataset: { cols }, names, querySelector: (sel) => (sel === 'tr.qa-col-names' ? names : null) };
+const block = (cols, { hidden = false, closed = false } = {}) => {
+  const names = { hidden: false, classList: classList() }, own = classList();
+  own.toggle('measure-closed', closed);
+  return { hidden, dataset: { cols }, names, classList: own, querySelector: (sel) => (sel === 'tr.qa-col-names' ? names : null) };
 };
-const shown = (blocks) => blocks.map((b) => (b.hidden ? 'hidden' : b.names.hidden ? 'names removed' : b.names.classList.contains('repeat') ? 'collapsed' : 'names'));
+const shown = (blocks) => blocks.map((b) => (b.hidden ? 'hidden' : b.classList.contains('measure-closed') ? 'closed' : b.names.hidden ? 'names removed' : b.names.classList.contains('repeat') ? 'collapsed' : 'names'));
 const thin = (blocks) => { form.qaHeadings(blocks); return shown(blocks); };
-const PLAIN = 'n test baseline measured unit result comment trends|0|', DATED = 'n test baseline measured unit result history comment trends|3|';
+const PLAIN = 'n test baseline measured unit warn action result comment trends|0|', DATED = 'n test baseline measured unit warn action result history comment trends|3|';
 assert.deepEqual(thin([block(PLAIN), block(PLAIN), block(PLAIN), block(PLAIN)]), ['names', 'collapsed', 'collapsed', 'collapsed'], 'one names row for a section of like tables');
 assert.deepEqual(thin([block(DATED), block(DATED), block(DATED.replace('|3|', '|2|'))]), ['names', 'collapsed', 'names'], 'other number of dates (other History width): names again');
 assert.deepEqual(thin([block(PLAIN), block(PLAIN + 'wide'), block(PLAIN)]), ['names', 'names', 'names'], 'a wider Measured (Pass / Warning / Fail buttons): names again');
@@ -37,11 +39,18 @@ const unfinished = [block(PLAIN, { hidden: true }), block(PLAIN), block(PLAIN)];
 assert.deepEqual(thin(unfinished), ['hidden', 'names', 'collapsed'], 'unfinished only: the first table shown gets the names');
 unfinished[0].hidden = false;
 assert.deepEqual(thin(unfinished), ['names', 'collapsed', 'collapsed'], 'and back');
+// A closed table shows no names row (app.css hides its whole table), so the next open one names its columns; once it
+// is opened it is a table like the others.
+const fromFile = [block(PLAIN), block(PLAIN, { closed: true }), block(PLAIN), block(PLAIN)];
+assert.deepEqual(thin(fromFile), ['names', 'closed', 'names', 'collapsed'], 'under a closed table: names again');
+fromFile[1].classList.toggle('measure-closed', false);
+assert.deepEqual(thin(fromFile), ['names', 'collapsed', 'collapsed', 'collapsed'], 'opened: one names row for the section again');
 const css = fs.readFileSync('portal/static/app.css', 'utf8');
 assert.equal(fs.readFileSync('docs/app.css', 'utf8'), css, 'docs/app.css is out of step: run python build_pages.py');
 assert.ok(css.includes('.measure-table tr.qa-col-names.repeat > th { height:0 !important; padding-top:0 !important; padding-bottom:0 !important; border:0 !important; line-height:0 !important; font-size:0 !important; overflow:hidden; }'),
   'the repeated names row takes no room on screen');
 assert.ok(css.includes('#app .measure-table tr.qa-col-names.repeat > th { font-size:0 !important; }'), 'not even its text, which the form sizes with !important');
+assert.ok(css.includes('.measure-closed > .measure-wrap { display:none; }'), 'a closed table takes its names row with it');
 
 // 2. Limits read "Warning ±" / "Action ±" (never WARNING / ACTION / FAIL; the verdict chips keep PASS / WARNING / ACTION).
 const words = { el: (tag, props, ...kids) => ({ tag, props: props || {}, textContent: kids.flat(Infinity).join('') }) };
@@ -67,7 +76,9 @@ assert.deepEqual([pencil.tag, pencil.className, pencil.textContent, pencil.title
 pencil.props.onclick();
 assert.equal(shown2.length, 1, 'a click opens the note in a box');
 assert.deepEqual([shown2[0].tag, shown2[0].kids[0].kids[0], shown2[0].kids[1].props.class, shown2[0].kids[1].kids[0]], ['dialog', 'Note', 'pre', 'Synthetic note: chamber re-seated.']);
-assert.match(between('async function renderReviewMeasurements(', 'async function renderRun('), /el\('td',\{class:'qa-comment','data-label':'Comment'\},r\.comment\?noteButton\(r\.comment\):'—'\)/);
+// (Tests on one line show each note beside its own test, in the line: the row's Note cell is then empty, a dash when none has a note.)
+assert.match(between('async function renderReviewMeasurements(', 'async function renderRun('), /el\('td',\{class:'qa-comment','data-label':'Comment'\},inline\?\(parts\.some\(x=>x\.r\.comment\)\?null:'—'\):r\.comment\?noteButton\(r\.comment\):'—'\)/);
+assert.match(between('  const lineRun=parts=>{', '  // A section\'s rows:'), /p\.r\.comment\?el\('span',\{class:'qa-shared-note'\},p\.r\.comment\):null\);/);
 // 3b. The note's box never scrolls sideways: a long unbroken path or file name wraps inside it (the box is outside #app,
 // so the table cells' overflow-wrap does not reach it).
 assert.match(css, /\.calculation-dialog \.pre \{ overflow-wrap:anywhere; \}/, 'a note with a long unbroken path wraps in its box');
@@ -102,4 +113,4 @@ assert.equal(pieces('Chamber Cal. Factor(Proton), Gy/C'), 'Chamber Cal. Factor<w
 assert.equal(pieces('k_Q'), 'k_Q'); assert.equal(pieces(null), ''); assert.equal(pieces('Chamber k_pol'), 'Chamber k_pol'); assert.equal(pieces('Range (D90) [cm]'), 'Range (D90) [cm]');
 assert.match(between('function trendSummaryTable(', '// Limit bands on a Δ chart'), /el\("th", \{ scope: "row" \}, el\("span", \{ class: `key-swatch line \$\{r\.color\}`, "aria-hidden": "true" \}\), seriesNameWraps\(r\.label\)\)/);
 
-console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them); limits read Warning ± / Action ±; a saved run note behind a pencil; Mark in Progress beside Submit on a phone.');
+console.log('GUI and navigation 2: no repeated column names under a table with the same columns (first shown keeps them, and the first under a closed table); limits read Warning ± / Action ±; a saved run note behind a pencil; Mark in Progress beside Submit on a phone.');
