@@ -78,7 +78,7 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.deepEqual(await group.locator('.qa-shared-field .qa-shared-name > span').allTextContents(), ['X', 'Y', 'Z', '3D'], 'the unit is in the block\'s name');
     assert.equal(await group.locator('td.qa-axis-label strong').textContent(), 'Mechanical-to-kV/kV Correction Vector [cm]');
     // Each field reads "X: [ ]": its letter beside its box, on one line.
-    const [letter, boxX] = [await group.locator('.qa-shared-field .qa-shared-name').first().boundingBox(), await group.locator('.qa-shared-field input[type=number]').first().boundingBox()];
+    const [letter, boxX] = [await group.locator('.qa-shared-field .qa-shared-name > span').first().boundingBox(), await group.locator('.qa-shared-field input[type=number]').first().boundingBox()];
     assert.ok(letter.x + letter.width <= boxX.x && letter.y + letter.height / 2 > boxX.y && letter.y + letter.height / 2 < boxX.y + boxX.height, 'the letter is beside its box');
     assert.equal(await group.locator('.qa-shared-field .qa-shared-name > span').first().evaluate((s) => getComputedStyle(s, '::after').content), '":"');
     const offset = p.locator('tr.qa-axis-row[data-qa-entry]', { has: p.locator('td.qa-axis-label', { hasText: 'Mechanical-to-kV/kV Isocenter' }) }).first();
@@ -89,16 +89,43 @@ const base = process.env.PORTAL_TEST_URL || 'http://127.0.0.1:8791/';
     assert.deepEqual((await offset.locator('.qa-shared-field').allTextContents()).map((text) => text.replace(/\s+/g, ' ').trim()),
       ['XPASS(Δ +0.05 cm)', 'YWARNING(Δ +0.17 cm)', 'ZACTION(Δ −0.25 cm)', '3DⓘRecorded(Δ +0.31 cm)']);
     // What a person sees of that: a passing axis says PASS alone (its Δ is the chip's title), one that is not says by how
-    // much. Each axis has a slot of its own, so every group's X, Y, Z and 3D line up: a PASS follows its box on the same
-    // line, and a longer verdict that its slot has no room for goes under the box, still in its slot.
+    // much. Every such row is one grid (Brook, 2026-11-27: "do better! on the alignment"): a letter and its box on one
+    // line, the four boxes the same size and under one another on every group, and what an axis says more under its own
+    // letter and box, in its own slot.
     assert.deepEqual(await offset.locator('.qa-shared-field').evaluateAll((fields) => fields.map((f) => f.innerText.replace(/\s+/g, ' ').trim())), ['X PASS', 'Y WARNING (Δ +0.17 cm)', 'Z ACTION (Δ −0.25 cm)', '3D ⓘ (Δ +0.31 cm)']);
     assert.equal(await offset.locator('.qa-shared-field .chip.pass').getAttribute('title'), '(Δ +0.05 cm)');
-    const [passBox, verdictX] = [await p.getByLabel('Mechanical-to-kV/kV Isocenter X [cm]', { exact: true }).boundingBox(), await offset.locator('.qa-shared-field .chip.pass').boundingBox()];
-    assert.ok(verdictX.x >= passBox.x + passBox.width && verdictX.y + verdictX.height / 2 > passBox.y && verdictX.y + verdictX.height / 2 < passBox.y + passBox.height, 'a PASS follows its box');
-    const [slotY, boxY, verdictY] = [await offset.locator('.qa-shared-field').nth(1).boundingBox(), await p.getByLabel('Mechanical-to-kV/kV Isocenter Y [cm]', { exact: true }).boundingBox(), await offset.locator('.qa-shared-field .chip.warn').boundingBox()];
-    assert.ok(verdictY.x >= slotY.x - 1 && verdictY.x + verdictY.width <= slotY.x + slotY.width + 1 && verdictY.y >= boxY.y - 1, 'a longer verdict stays in its axis\'s slot, beside or under its box');
-    const slotLefts = async (row) => (await row.locator('.qa-shared-field').evaluateAll((fields) => fields.map((f) => Math.round(f.getBoundingClientRect().left))));
-    assert.deepEqual((await slotLefts(group)).slice(0, 4), (await slotLefts(offset)).slice(0, 4), 'X under X, Y under Y, Z under Z, 3D under 3D');
+    // (One reading of a row: where each slot, letter, box and verdict is, and whether a box shows all of its value.)
+    const laidOut = (row) => row.locator('.qa-shared-field').evaluateAll((fields) => fields.map((f) => { const at = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom }; };
+      const input = f.querySelector(':scope > input'), info = f.querySelector('.qa-calculation-info');
+      return { slot: at(f), letter: at(f.querySelector('.qa-shared-name > span')), box: at(input), chip: at([...f.querySelectorAll('.chip')].find((c) => c.getClientRects().length)), dev: at([...f.querySelectorAll('.result-dev')].find((c) => c.getClientRects().length)), info: at(info), cut: input.scrollWidth > input.clientWidth + 1 }; }));
+    const aligned = async (when) => {
+      const [a, b] = [await laidOut(offset), await laidOut(group)];
+      for (const row of [a, b]) {
+        assert.equal(new Set(row.map((f) => Math.round(f.box.y))).size, 1, `${when}: the four boxes are on one line`);
+        assert.ok(Math.max(...row.map((f) => f.box.w)) - Math.min(...row.map((f) => f.box.w)) <= 1, `${when}: the four boxes are the same size: ${row.map((f) => Math.round(f.box.w))}`);
+        for (const f of row) assert.ok(f.letter.r <= f.box.x + 1 && f.letter.y + f.letter.h / 2 > f.box.y && f.letter.y + f.letter.h / 2 < f.box.b, `${when}: every letter is beside its own box`);
+        for (const [i, f] of row.entries()) if (i) assert.ok(f.slot.x >= row[i - 1].box.r, `${when}: a slot begins after the box before it`);
+        assert.deepEqual(row.map((f) => f.cut), [false, false, false, false], `${when}: no box cuts its value short`);
+      }
+      assert.deepEqual(a.map((f) => Math.round(f.box.x)), b.map((f) => Math.round(f.box.x)), `${when}: X under X, Y under Y, Z under Z, 3D under 3D`);
+      for (const f of a.slice(0, 3)) {
+        assert.ok(f.chip.y >= f.box.b - 1, `${when}: a verdict is under its box`);
+        assert.ok(f.chip.x >= f.slot.x - 1 && f.chip.r <= f.slot.r + 1, `${when}: a verdict stays in its own slot`);
+        if (f.dev) assert.ok(f.dev.x >= f.slot.x - 1 && f.dev.r <= f.slot.r + 1 && f.dev.y >= f.box.b - 1, `${when}: and so does by how much`);
+      }
+      // (The 3D says how it is worked out behind a ⓘ of its own: under its letter, its Δ beside that.)
+      assert.ok(a[3].info.y >= a[3].letter.b - 1 && a[3].info.x < a[3].box.x && a[3].dev.x >= a[3].info.r - 1, `${when}: the 3D's ⓘ is under its letter`);
+      return a;
+    };
+    const wideRow = await aligned('wide window');
+    assert.equal(await p.locator('.dev-unit:visible').count() > 0, true, 'with room, a deviation says its unit');
+    // A narrower window (the limit columns have given way, so the values have less room): the same grid, still one line.
+    await p.setViewportSize({ width: 1300, height: 900 }); await p.waitForTimeout(400);
+    const narrowRow = await aligned('narrower window');
+    assert.ok(narrowRow[0].box.w < wideRow[0].box.w + 1, 'the boxes give way together');
+    await p.setViewportSize(wide); await p.waitForTimeout(400);
+    // These boxes have no stepping arrows (they kept part of a small box for themselves).
+    assert.equal(await p.getByLabel('Mechanical-to-kV/kV Isocenter X [cm]', { exact: true }).evaluate((input) => getComputedStyle(input).appearance), 'textfield');
     assert.equal(await p.getByLabel('Mechanical-to-kV/kV Isocenter [cm]', { exact: true }).inputValue(), '0.306');
     // (The Test column takes the width that keeps a row of several tests on one line, where the window has it.)
     await p.waitForTimeout(300);

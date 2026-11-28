@@ -173,11 +173,18 @@ These were stated directly (2026-10-22) and override older notes. Check every ch
   X / Y / Z group with its 3D, an X / Y pair, tests on one line under shared words) is ONE row of the table: its number,
   its name in the Test column with its ⓘ and, under the name at the left, the baseline and limits the values share
   (`td.qa-axis-label`, `td.qa-line-label`, `.qa-line-head`); its values in one cell from the Baseline column on
-  (`.qa-values-cell`, `axisOwnRow`, `covers` in `layoutQaTable`). No title band above it. An X / Y / Z group's axes
-  each have a quarter of that cell, so X is under X, Y under Y, Z under Z and 3D under 3D on every group; the boxes
-  of a row stay on one line, a PASS follows its box, a WARNING or ACTION with its Δ goes under its own box. The Test
-  column is fitted to names: a long line of baselines and limits wraps under its name (`qaFitTestColumns`). On a
-  phone's card the row's name is over its values. Column Chooser: "Make this look just like the columns that we use,
+  (`.qa-values-cell`, `axisOwnRow`, `covers` in `layoutQaTable`). No title band above it. The Test column is fitted
+  to names: a long line of baselines and limits wraps under its name (`qaFitTestColumns`). On a phone's card the
+  row's name is over its values. Then, of the live page in a window about 800 px wide, where X's box had dropped
+  under its letter: "do better! on the alignment". An X / Y / Z row is ONE grid, the same for every group (app.css,
+  `.qa-values-cell .qa-shared`): a letter's column and a box's column, four times; the letters' columns are as wide
+  as "X:" and "3D:", the boxes share the rest equally, so the four boxes are the same size, evenly spaced, and stand
+  under one another on every group, with or without a 3D, at any width. A letter and its box are always on one line;
+  under them, in the same slot, the verdict (a PASS too) and its Δ, then a baseline of its own; the 3D's ⓘ is under
+  its letter (`.qa-has-info`). In a narrow slot a Δ leaves its unit to the block's name (`.dev-unit`, a container
+  query) and these boxes have no stepping arrows (they cut a value short in a small box). **Brook's screenshot
+  of that day was of a window about 800 px wide (it looks like the app's side pane; Claude's reading, not Brook's
+  words): check every layout change at that width first, then wide.** Column Chooser: "Make this look just like the columns that we use,
   and ditch the arrows.": the window is the table's own headings row (`table.qa-columns-table`), a tick under each
   column that can be hidden, no arrow buttons; a heading is dragged left or right, or onto a heading of the table,
   and ← → move the heading that has the keyboard. "I want anything you can/should put numbers in to be light blue":

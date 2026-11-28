@@ -364,9 +364,10 @@ const TYPE_LABELS = { numeric: "Numeric", boolean: "Pass / fail", status: "Pass 
 function deviationText(value, limits, unit) {
   if (!Number.isFinite(value) || !limits || limits.expected === null || limits.expected === undefined) return null;
   const d = value - limits.expected;
+  // (The unit is a part of its own: a narrow X / Y / Z slot leaves it to the block's name, app.css. A percent stays.)
   const text = limits.tol_mode === "percent" && limits.expected
-    ? `(Δ ${signed((100 * d) / limits.expected, 2)} %)`
-    : `(Δ ${signed(d)}${unit ? ` ${unit}` : ""})`;
+    ? [`(Δ ${signed((100 * d) / limits.expected, 2)} %)`]
+    : [`(Δ ${signed(d)}`, unit ? el("span", { class: "dev-unit" }, ` ${unit}`) : null, ")"];
   return el("span", { class: "result-dev", title: `Difference from the reference ${fmt(limits.expected)} ${unit || ""}`.trim() }, [el("span", {}, text)]);
 }
 
@@ -2377,7 +2378,7 @@ function sharedCell(fields) {
   return el("td", { class: "qa-measured qa-shared-cell", colspan: QA_SHARED_COLUMNS.length }, el("div", { class: "qa-shared" },
     fields.map(([test, name, unit, details, answer, result, limits, ...notes]) => {
       if (details) for (const key of ["title", "aria-label"]) details.setAttribute(key, `${details.getAttribute(key)}: ${name || test.name}`);
-      return el("div", { class: "qa-shared-field", "data-test-id": test.test_id },   // (a field its block's title names has no name of its own)
+      return el("div", { class: details ? "qa-shared-field qa-has-info" : "qa-shared-field", "data-test-id": test.test_id },   // (a field its block's title names has no name of its own)
         el("div", { class: "qa-shared-name" }, name || unit ? el("span", {}, name, unit ? [" ", el("span", { class: "qa-shared-unit" }, `(${unit})`)] : null) : null, details), answer,
         el("div", { class: "qa-shared-more" }, result, limits ? el("div", { class: "qa-shared-info" }, limits) : null, notes));
     })));
